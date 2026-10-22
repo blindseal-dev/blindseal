@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
-    "@blindseal/mcp-proxy": "workspace:*"
+    "@blindseal/proxy": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -3,7 +3,7 @@
   "version": "0.2.0-rc.11",
   "description": "MCP prompt-injection scanning proxy — 100% TPR / 0% FPR on 80-entry holdout (L3 enabled)",
   "license": "MIT",
-  "homepage": "https://blindseal.io",
+  "homepage": "https://github.com/blindseal/blindseal",
   "repository": {
     "type": "git",
     "url": "https://github.com/blindseal/blindseal.git"
@@ -13,7 +13,7 @@
   },
   "type": "module",
   "bin": {
-    "mcp-proxy": "dist/index.js",
+    "blindseal": "dist/index.js",
     "blindseal-audit": "dist/audit-view.js",
     "blindseal-init": "dist/init.js",
     "blindseal-decide": "dist/decide.js"

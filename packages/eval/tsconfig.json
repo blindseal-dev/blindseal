@@ -13,7 +13,7 @@
     "declaration": false,
     "sourceMap": false,
     "paths": {
-      "@blindseal/mcp-proxy/detection/*": ["../proxy/src/detection/*"]
+      "@blindseal/proxy/detection/*": ["../proxy/src/detection/*"]
     }
   },
   "include": ["src", "test", "../proxy/src/detection"]

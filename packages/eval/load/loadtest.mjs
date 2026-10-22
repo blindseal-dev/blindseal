@@ -54,7 +54,7 @@ if (existsSync(PROXY_DIST)) {
   proxyCmd = process.execPath;
   proxyArgs = ['--import', 'tsx', PROXY_SRC, '--', process.execPath, FIXTURE];
 } else {
-  console.error('ERROR: proxy not built and src not found. Run `pnpm --filter @blindseal/mcp-proxy build`.');
+  console.error('ERROR: proxy not built and src not found. Run `pnpm --filter @blindseal/proxy build`.');
   process.exit(2);
 }
 

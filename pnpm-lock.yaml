@@ -47,15 +47,15 @@ importers:
         specifier: ^12.10.0
         version: 12.10.0
     devDependencies:
+      '@blindseal/corpus':
+        specifier: workspace:*
+        version: link:../corpus
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
       '@types/node':
         specifier: ^22.10.0
         version: 22.19.19
-      '@blindseal/corpus':
-        specifier: workspace:*
-        version: link:../corpus
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(jiti@1.21.7)(postcss@8.5.15)(tsx@4.22.3)(typescript@5.9.3)

@@ -1,5 +1,5 @@
 /// blindseal init — detect MCP configs on this machine and wrap every server's command
-/// with `npx @blindseal/mcp-proxy --`, so the proxy intercepts tool responses before they
+/// with `npx @blindseal/proxy --`, so the proxy intercepts tool responses before they
 /// reach the agent. Idempotent. Backs up each config to <config>.blindseal-backup before
 /// writing.
 ///

@@ -29,7 +29,7 @@ import {
 export interface ScanHttpOptions {
   listenPort: number;
   listenHost?: string;
-  /// Logical server identifier recorded with each scan (e.g. "https://blindseal.io").
+  /// Logical server identifier recorded with each scan (e.g. "https://github.com/blindseal/blindseal").
   /// Per-request overrides via the serverUrl body field take precedence.
   defaultServerUrl?: string;
 }
