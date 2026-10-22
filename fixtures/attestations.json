@@ -1,6 +1,7 @@
 [
   {
     "version": 1,
+    "id": "att_af877263",
     "decisionId": "1ZYXWVTSRQPNMKJHGFEDCBA987",
     "actionHash": "0x13a111cb3474c0c4bc220f97b4552ff30f384f0d9cdf70e38c999fad075b56b6",
     "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
@@ -30,6 +31,7 @@
   },
   {
     "version": 1,
+    "id": "att_7db462be",
     "decisionId": "GZYXWVTHRQPNMKJHGFEDCBA987",
     "actionHash": "0x1ef1bf9891a621e00349bf8af77dfdb040436b1e99869c8908b0c5b9f6c7b17d",
     "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
@@ -58,6 +60,7 @@
   },
   {
     "version": 1,
+    "id": "att_730d318d",
     "decisionId": "ZZYXWVTSRQPNMKJHGFEDCBA987",
     "actionHash": "0xf52cb59155a8fff04f6839ee0326f8a8b009a159f7e8dc4cf3d536e59633be65",
     "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
@@ -87,6 +90,7 @@
   },
   {
     "version": 1,
+    "id": "att_daa57fbb",
     "decisionId": "EZYXWVTSRQPNMKJHGFEDCBA987",
     "actionHash": "0x1904a533e00fb24c0fa8107ee3738f01b3c79adfa2dbe2872d74b5ccd970b9e1",
     "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
@@ -116,6 +120,7 @@
   },
   {
     "version": 1,
+    "id": "att_5f5de7e9",
     "decisionId": "XZYXWVTSRQPNMKJHGFEDCBA987",
     "actionHash": "0x9baee8190b24e34008840a73c7c7a7538c46e01911992a931fe790f32fd29b33",
     "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
@@ -144,6 +149,7 @@
   },
   {
     "version": 1,
+    "id": "att_74c62e10",
     "decisionId": "CZYXWVTSGQPNMKJHGFEDCBA987",
     "actionHash": "0x1813c571fd039e0cfb5654e4c32190d59dc8d0ff0f67eb8edb74b0ffece71449",
     "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",

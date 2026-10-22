@@ -85,7 +85,7 @@ export async function runRun(argv: string[]): Promise<number> {
     `  token: ${handle.token}\n` +
     `  dashboard: open with #token=${handle.token}\n` +
     `  fixtures: ${fixturesDir}\n` +
-    `  WS: ${handle.url.replace(/^http/, 'ws').replace(/\/api$/, '/events')}?token=${handle.token}\n` +
+    `  WS: ${handle.url.replace(/^http/, 'ws')}/events?token=${handle.token}\n` +
     'Ctrl-C to stop.\n',
   );
   return new Promise<number>((resolve) => {

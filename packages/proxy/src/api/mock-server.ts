@@ -141,13 +141,30 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
     }
   };
 
+  // in-memory overlays so GET resolves items that aren't in the static fixtures:
+  // attestations created via POST, and decisions pushed over the live WS stream.
+  const createdAttestations = new Map<string, any>();
+  const liveDecisions = new Map<string, any>();
+
   const server: Server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${host}:${port}`);
     const p = url.pathname;
+    const method = req.method ?? 'GET';
+
+    // CORS: the dashboard runs cross-origin on a Vite dev port, so a browser preflights.
+    // Reflect only localhost/127.0.0.1 origins; answer OPTIONS before auth (it carries no token).
+    const origin = req.headers['origin'];
+    if (typeof origin === 'string' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type, x-confirm');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+      res.setHeader('Vary', 'Origin');
+    }
+    if (method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+
     if (!p.startsWith('/api/')) return sendErr(res, 404, 'NOT_FOUND', 'unknown path');
     if (!bearerOk(req, token, url)) return sendErr(res, 401, 'UNAUTHORIZED', 'missing or invalid bearer token');
     const seg = p.slice('/api/'.length).split('/').filter(Boolean);
-    const method = req.method ?? 'GET';
 
     try {
       // GET /api/status
@@ -171,7 +188,7 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
 
       // GET /api/decisions/:id   POST /api/decisions/:id/reveal
       if (seg[0] === 'decisions' && seg.length >= 2) {
-        const d = fx.decisions.find((x) => x.id === seg[1]);
+        const d = fx.decisions.find((x) => x.id === seg[1]) ?? liveDecisions.get(seg[1]!);
         if (!d) return sendErr(res, 404, 'NOT_FOUND', 'decision not found');
         if (method === 'GET' && seg.length === 2) {
           return sendJson(res, 200, { ...d, payloadRedacted: `[mock redacted payload for ${d.id}]` });
@@ -251,13 +268,21 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
           if (!d) return sendErr(res, 404, 'NOT_FOUND', 'decision not found');
           if (!d.action) return sendErr(res, 422, 'NO_ACTION_FIELDS', 'decision has no on-chain action to attest');
           const id = 'att_' + randomBytes(5).toString('hex');
-          // simulate async generation over WS
+          // stash a generating attestation so GET /attestations/:id resolves it
+          createdAttestations.set(id, {
+            ...fx.sample, id, decisionId: d.id, status: 'generating', progressPct: 50, createdAt: new Date().toISOString(),
+          });
+          // simulate async generation over WS, and flip the stored status
           setTimeout(() => broadcast({ type: 'attestation', data: { id, status: 'generating', progressPct: 50 } }), 50);
-          setTimeout(() => broadcast({ type: 'attestation', data: { id, status: 'generated', progressPct: 100 } }), 150);
+          setTimeout(() => {
+            const a = createdAttestations.get(id);
+            if (a) { a.status = 'generated'; a.progressPct = 100; }
+            broadcast({ type: 'attestation', data: { id, status: 'generated', progressPct: 100 } });
+          }, 150);
           return sendJson(res, 202, { id });
         }
         if (seg.length >= 2) {
-          const a = fx.attestations.find((x) => ('att_' + x.nonce.slice(2, 10)) === seg[1]) ?? (seg[1] === 'sample' ? fx.sample : undefined);
+          const a = fx.attestations.find((x) => x.id === seg[1]) ?? createdAttestations.get(seg[1]!) ?? (seg[1] === 'sample' ? fx.sample : undefined);
           if (method === 'GET' && seg.length === 2) {
             if (!a) return sendErr(res, 404, 'NOT_FOUND', 'attestation not found');
             return sendJson(res, 200, a);
@@ -290,7 +315,9 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
   // WS /events — minimal server->client stream
   server.on('upgrade', (req, socket: Socket) => {
     const url = new URL(req.url ?? '/', `http://${host}:${port}`);
-    if (url.pathname !== '/events' || !bearerOk(req, token, url)) {
+    // canonical path is /api/events (same base as REST); /events accepted as an alias
+    const isEvents = url.pathname === '/api/events' || url.pathname === '/events';
+    if (!isEvents || !bearerOk(req, token, url)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
@@ -313,9 +340,13 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
   let idx = 0;
   const timer = setInterval(() => {
     if (wsClients.size === 0) return;
-    const d = fx.decisions[idx % fx.decisions.length];
+    const base = fx.decisions[idx % fx.decisions.length];
     idx++;
-    broadcast({ type: 'decision', data: { ...d, id: d.id + '_live' + idx, ts: new Date().toISOString() } });
+    const live = { ...base, id: base.id + '_live' + idx, ts: new Date().toISOString() };
+    liveDecisions.set(live.id, live);
+    // cap the overlay so a long-running mock doesn't grow unbounded
+    if (liveDecisions.size > 100) liveDecisions.delete(liveDecisions.keys().next().value as string);
+    broadcast({ type: 'decision', data: live });
   }, emitIntervalMs);
   timer.unref?.();
 

@@ -190,6 +190,7 @@ function mkAttestation(d, idx, status) {
   const publicInputs = [d.payloadHash, policy.root, DETECTOR_VERSION, actionHash, nullifier, '0x' + expirySlot.toString(16)];
   return {
     version: 1,
+    id: 'att_' + nonce.slice(2, 10),
     decisionId: d.id,
     actionHash,
     policyRoot: policy.root,
@@ -210,7 +211,7 @@ const attestations = actionDecisions.map((d, idx) => mkAttestation(d, idx, STATU
 // link attestationId back onto the decisions
 attestations.forEach((a) => {
   const d = decisions.find((x) => x.id === a.decisionId);
-  if (d) d.attestationId = 'att_' + a.nonce.slice(2, 10);
+  if (d) d.attestationId = a.id;
 });
 
 // sample (good) + tampered (one public input flipped)

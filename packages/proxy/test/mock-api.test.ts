@@ -89,6 +89,20 @@ describe('mock API — audit', () => {
   });
 });
 
+describe('mock API — CORS', () => {
+  it('answers OPTIONS preflight (no token) and reflects a localhost origin', async () => {
+    const r = await fetch(`${base}/status`, { method: 'OPTIONS', headers: { origin: 'http://localhost:5173', 'access-control-request-method': 'GET' } });
+    expect(r.status).toBe(204);
+    expect(r.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+    expect(r.headers.get('access-control-allow-headers')).toContain('authorization');
+  });
+  it('sets ACAO on an authed GET from a localhost origin', async () => {
+    const r = await fetch(`${base}/status`, { headers: { ...auth.headers, origin: 'http://127.0.0.1:5173' } });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('access-control-allow-origin')).toBe('http://127.0.0.1:5173');
+  });
+});
+
 describe('mock API — policy & attestations', () => {
   it('GET policy returns rules + root', async () => {
     const p = await (await fetch(`${base}/policy`, auth)).json();
@@ -98,8 +112,20 @@ describe('mock API — policy & attestations', () => {
   it('lists attestations and filters by status', async () => {
     const all = await (await fetch(`${base}/attestations`, auth)).json();
     expect(all.length).toBe(6);
+    expect(all.every((a: any) => typeof a.id === 'string')).toBe(true);
     const consumed = await (await fetch(`${base}/attestations?status=consumed`, auth)).json();
     expect(consumed.every((a: any) => a.status === 'consumed')).toBe(true);
+  });
+  it('navigates list -> detail by id, and a created attestation is fetchable', async () => {
+    const all = await (await fetch(`${base}/attestations`, auth)).json();
+    const one = await fetch(`${base}/attestations/${all[0].id}`, auth);
+    expect(one.status).toBe(200);
+    expect((await one.json()).id).toBe(all[0].id);
+    const withAction = (await (await fetch(`${base}/decisions?limit=200`, auth)).json()).items.find((d: any) => d.action);
+    const created = await (await fetch(`${base}/attestations`, { method: 'POST', headers: { ...auth.headers, 'content-type': 'application/json' }, body: JSON.stringify({ decisionId: withAction.id }) })).json();
+    const got = await fetch(`${base}/attestations/${created.id}`, auth);
+    expect(got.status).toBe(200);
+    expect((await got.json()).id).toBe(created.id);
   });
   it('create: 202 for a decision with action, 422 for one without', async () => {
     const withAction = (await (await fetch(`${base}/decisions?limit=200`, auth)).json()).items.find((d: any) => d.action);
@@ -115,7 +141,7 @@ describe('mock API — policy & attestations', () => {
 
 describe('mock API — WS /events', () => {
   it('streams a decision event', async () => {
-    const wsUrl = base.replace(/^http/, 'ws').replace(/\/api$/, '/events') + `?token=${TOKEN}`;
+    const wsUrl = base.replace(/^http/, 'ws') + `/events?token=${TOKEN}`;
     const got = await new Promise<any>((resolve, reject) => {
       const ws = new WebSocket(wsUrl);
       const timer = setTimeout(() => { ws.close(); reject(new Error('no decision event within 3s')); }, 3000);
@@ -129,7 +155,7 @@ describe('mock API — WS /events', () => {
     expect(got.data).toHaveProperty('verdict');
   });
   it('rejects WS without a token', async () => {
-    const wsUrl = base.replace(/^http/, 'ws').replace(/\/api$/, '/events');
+    const wsUrl = base.replace(/^http/, 'ws') + '/events';
     const failed = await new Promise<boolean>((resolve) => {
       const ws = new WebSocket(wsUrl);
       ws.addEventListener('open', () => { ws.close(); resolve(false); });
