@@ -1,0 +1,50 @@
+{
+  "name": "@blindseal/proxy",
+  "version": "0.2.0-rc.11",
+  "description": "MCP prompt-injection scanning proxy — 100% TPR / 0% FPR on 80-entry holdout (L3 enabled)",
+  "license": "MIT",
+  "homepage": "https://blindseal.io",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blindseal/blindseal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/blindseal/blindseal/issues"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-proxy": "dist/index.js",
+    "blindseal-audit": "dist/audit-view.js",
+    "blindseal-check": "dist/check.js",
+    "blindseal-init": "dist/init.js",
+    "blindseal-decide": "dist/decide.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "view-audit": "tsx src/cli/audit-view.ts",
+    "check": "tsx src/cli/check.ts",
+    "init": "tsx src/cli/init.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "bench:l3": "tsx bench/layer3-floor.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@xenova/transformers": "^2.17.2",
+    "better-sqlite3": "^12.10.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.10.0",
+    "@blindseal/corpus": "workspace:*",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

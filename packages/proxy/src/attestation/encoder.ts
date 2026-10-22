@@ -1,0 +1,79 @@
+/// ABI encoders for the two Blindseal EAS schemas. Schema strings (must match the registered
+/// schema strings in @blindseal/contracts/script/register-schemas.ts):
+///   ScanReceipt:   "bytes32 contentHash,string mcpServerUrl,string toolName,uint8 verdict,
+///                   uint8 confidence,uint8 layersRun,string[] detectedPatterns,uint64 scannedAt"
+///   ThreatRecord:  "bytes32 contentHash,string mcpServerUrl,string toolName,string category,
+///                   bytes32 receiptRefUID,uint64 detectedAt"
+
+import { encodeAbiParameters, type Hex } from 'viem';
+import type { ScanReceiptPayload, ThreatRecordPayload, TradeReceiptPayload } from './types.js';
+
+const SCAN_PARAMS = [
+  { type: 'bytes32', name: 'contentHash' },
+  { type: 'string', name: 'mcpServerUrl' },
+  { type: 'string', name: 'toolName' },
+  { type: 'uint8', name: 'verdict' },
+  { type: 'uint8', name: 'confidence' },
+  { type: 'uint8', name: 'layersRun' },
+  { type: 'string[]', name: 'detectedPatterns' },
+  { type: 'uint64', name: 'scannedAt' },
+] as const;
+
+const THREAT_PARAMS = [
+  { type: 'bytes32', name: 'contentHash' },
+  { type: 'string', name: 'mcpServerUrl' },
+  { type: 'string', name: 'toolName' },
+  { type: 'string', name: 'category' },
+  { type: 'bytes32', name: 'receiptRefUID' },
+  { type: 'uint64', name: 'detectedAt' },
+] as const;
+
+// TradeReceipt: "string mcpServerUrl,string toolName,uint8 decision,uint8 reasonCode,
+//                bytes32 recipientHash,string token,uint8 valueBucket,uint64 guardedAt"
+const TRADE_PARAMS = [
+  { type: 'string', name: 'mcpServerUrl' },
+  { type: 'string', name: 'toolName' },
+  { type: 'uint8', name: 'decision' },
+  { type: 'uint8', name: 'reasonCode' },
+  { type: 'bytes32', name: 'recipientHash' },
+  { type: 'string', name: 'token' },
+  { type: 'uint8', name: 'valueBucket' },
+  { type: 'uint64', name: 'guardedAt' },
+] as const;
+
+export function encodeScanReceipt(p: ScanReceiptPayload): Hex {
+  return encodeAbiParameters(SCAN_PARAMS, [
+    p.contentHash,
+    p.mcpServerUrl,
+    p.toolName,
+    p.verdict,
+    p.confidence,
+    p.layersRun,
+    p.detectedPatterns,
+    p.scannedAt,
+  ]);
+}
+
+export function encodeThreatRecord(p: ThreatRecordPayload): Hex {
+  return encodeAbiParameters(THREAT_PARAMS, [
+    p.contentHash,
+    p.mcpServerUrl,
+    p.toolName,
+    p.category,
+    p.receiptRefUID,
+    p.detectedAt,
+  ]);
+}
+
+export function encodeTradeReceipt(p: TradeReceiptPayload): Hex {
+  return encodeAbiParameters(TRADE_PARAMS, [
+    p.mcpServerUrl,
+    p.toolName,
+    p.decision,
+    p.reasonCode,
+    p.recipientHash,
+    p.token,
+    p.valueBucket,
+    p.guardedAt,
+  ]);
+}

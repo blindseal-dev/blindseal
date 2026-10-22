@@ -1,0 +1,474 @@
+/// blindseal check — query the on-chain reputation score for an MCP server.
+///
+/// Reads BlindsealReputation.getScore(string) on Base. No private key required —
+/// purely a public read. Address + RPC come from deployments.json, overridable
+/// via BLINDSEAL_BASE_RPC_URL and BLINDSEAL_REPUTATION_CONTRACT.
+///
+/// Usage:
+///   blindseal check <server>                  one server (URL, package name, or stdio:<cmd>)
+///   blindseal check --all                     every server in the user's MCP configs
+///   blindseal check <server> --json           machine-readable
+///   blindseal check <server> --rpc-url <url>  override RPC
+///   blindseal check --network base            base | base-sepolia (default base-sepolia)
+
+import { readFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+
+// ---- ANSI (same convention as audit-view.ts — no external color dep) -----
+
+const HAS_TTY = process.stdout.isTTY && !process.env.NO_COLOR;
+function color(s: string, code: string): string {
+  if (!HAS_TTY) return s;
+  return `\x1b[${code}m${s}\x1b[0m`;
+}
+const dim = (s: string) => color(s, '2;37');
+const red = (s: string) => color(s, '31');
+const yellow = (s: string) => color(s, '33');
+const green = (s: string) => color(s, '32');
+const cyan = (s: string) => color(s, '36');
+const bold = (s: string) => color(s, '1');
+
+// ---- Help ----------------------------------------------------------------
+
+const HELP = `blindseal check — on-chain reputation for an MCP server
+
+Usage:
+  blindseal check <server>                 check one server (URL or stdio:<cmd>)
+  blindseal check --all                    every server in your MCP config(s)
+  blindseal check <server> --json          machine-readable
+  blindseal check --tool <name>            guarded-trade safety record for a tool (the partner EVM chain)
+  blindseal check --network base-sepolia   network (default: base-sepolia)
+  blindseal check --rpc-url <url>          override RPC endpoint
+  blindseal check --help, -h               this help
+
+Examples:
+  blindseal check https://mcp.example.com/v1
+  blindseal check stdio:npx
+  blindseal check --all
+  blindseal check stdio:npx --json | jq .
+
+Server identifier conventions match the Blindseal proxy:
+  - http transport: full upstream URL  (https://...)
+  - stdio transport: stdio:<command>   (e.g. stdio:npx, stdio:uvx)
+
+If no scheme is present, "stdio:" is assumed.
+`;
+
+// ---- Types ---------------------------------------------------------------
+
+interface ParsedArgs {
+  server?: string;
+  tool?: string;
+  all: boolean;
+  json: boolean;
+  network: 'base' | 'base-sepolia';
+  rpcUrl?: string;
+  showHelp: boolean;
+}
+
+export interface CheckResult {
+  server: string;
+  score: number;
+  scans: number;
+  blocks: number;
+  blockRate: number;
+  explorer: string;
+  interpretation: string;
+}
+
+interface Deployments {
+  [network: string]: { blindsealReputation?: string; eas?: string; tradeReceiptLedger?: string; rpcUrl?: string };
+}
+
+// ---- Parse ---------------------------------------------------------------
+
+export function parseArgs(argv: string[]): ParsedArgs {
+  const out: ParsedArgs = {
+    all: false,
+    json: false,
+    network: 'base-sepolia',
+    showHelp: false,
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--help' || a === '-h') {
+      out.showHelp = true;
+    } else if (a === '--all') {
+      out.all = true;
+    } else if (a === '--json') {
+      out.json = true;
+    } else if (a === '--network') {
+      const v = argv[++i];
+      if (v === 'base' || v === 'base-sepolia') out.network = v;
+      else throw new Error(`unknown network: ${v} (expected base|base-sepolia)`);
+    } else if (a === '--rpc-url') {
+      out.rpcUrl = argv[++i];
+    } else if (a === '--tool') {
+      out.tool = argv[++i];
+    } else if (a && !a.startsWith('--') && !out.server) {
+      out.server = a;
+    } else if (a?.startsWith('--')) {
+      throw new Error(`unknown flag: ${a}`);
+    }
+  }
+  return out;
+}
+
+// ---- Normalize server identifier ----------------------------------------
+
+export function normalizeServer(input: string): string {
+  if (/^https?:\/\//i.test(input)) return input;
+  if (input.startsWith('stdio:')) return input;
+  // Bare package name or command → treat as stdio:<cmd>
+  // Match the proxy's convention from stdio.ts: stdio:<cmd> (first token only).
+  const cmd = input.split(/\s+/)[0]!;
+  return `stdio:${cmd}`;
+}
+
+// ---- Deployments ---------------------------------------------------------
+
+function loadDeployments(): Deployments {
+  // Walk up from this file to find packages/contracts/deployments.json.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(here, '../../../contracts/deployments.json'),
+    path.resolve(here, '../../contracts/deployments.json'),
+    path.resolve(process.cwd(), 'packages/contracts/deployments.json'),
+    path.resolve(process.cwd(), 'deployments.json'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      try {
+        return JSON.parse(readFileSync(p, 'utf8'));
+      } catch {
+        // keep trying
+      }
+    }
+  }
+  // Built-in fallback: the addresses we deployed on Base Sepolia.
+  return {
+    'base-sepolia': {
+      blindsealReputation: '0x3A977E4D8BA43367cc41BB4695feFF4615fec189',
+    },
+  };
+}
+
+// ---- Read MCP configs (used by --all) ------------------------------------
+
+interface McpServer { command?: string; args?: string[]; url?: string; }
+interface McpConfig { mcpServers?: Record<string, McpServer> }
+
+export function findMcpConfigPaths(): string[] {
+  const home = os.homedir();
+  const candidates: string[] = [];
+  // Claude Desktop
+  if (process.platform === 'darwin') {
+    candidates.push(path.join(home, 'Library/Application Support/Claude/claude_desktop_config.json'));
+  } else if (process.platform === 'linux') {
+    candidates.push(path.join(home, '.config/Claude/claude_desktop_config.json'));
+  } else if (process.platform === 'win32') {
+    if (process.env.APPDATA) {
+      candidates.push(path.join(process.env.APPDATA, 'Claude/claude_desktop_config.json'));
+    }
+  }
+  // Claude Code global + project-local
+  candidates.push(path.join(home, '.claude/mcp_settings.json'));
+  candidates.push(path.resolve(process.cwd(), '.claude/mcp_settings.json'));
+  candidates.push(path.resolve(process.cwd(), 'mcp_settings.json'));
+  return candidates.filter((p) => existsSync(p));
+}
+
+export function readMcpServersFromConfigs(): Array<{ name: string; identifier: string; source: string }> {
+  const out: Array<{ name: string; identifier: string; source: string }> = [];
+  const seen = new Set<string>();
+  for (const cfgPath of findMcpConfigPaths()) {
+    let cfg: McpConfig;
+    try {
+      cfg = JSON.parse(readFileSync(cfgPath, 'utf8')) as McpConfig;
+    } catch {
+      continue;
+    }
+    const servers = cfg.mcpServers ?? {};
+    for (const [name, s] of Object.entries(servers)) {
+      let id: string | undefined;
+      if (s.url) id = s.url;
+      else if (s.command) id = `stdio:${s.command}`;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ name, identifier: id, source: cfgPath });
+    }
+  }
+  return out;
+}
+
+// ---- On-chain read (lazy viem import) ------------------------------------
+
+const REPUTATION_ABI = [
+  {
+    type: 'function',
+    name: 'getScore',
+    stateMutability: 'view',
+    inputs: [{ name: 'mcpServerUrl', type: 'string' }],
+    outputs: [
+      { name: 'score', type: 'uint16' },
+      { name: 'totalScans', type: 'uint32' },
+      { name: 'totalBlocks', type: 'uint32' },
+    ],
+  },
+] as const;
+
+const RPC_DEFAULTS: Record<string, string> = {
+  base: 'https://mainnet.base.org',
+  'base-sepolia': 'https://base-sepolia-rpc.publicnode.com',
+};
+
+const EXPLORER: Record<string, string> = {
+  base: 'https://basescan.org',
+  'base-sepolia': 'https://sepolia.basescan.org',
+};
+
+export async function queryScore(
+  server: string,
+  network: 'base' | 'base-sepolia',
+  contractAddress: `0x${string}`,
+  rpcUrl: string,
+): Promise<{ score: number; scans: number; blocks: number }> {
+  const viem = await import('viem');
+  const { createPublicClient, http } = viem;
+  const client = createPublicClient({ transport: http(rpcUrl) });
+  const result = await client.readContract({
+    address: contractAddress,
+    abi: REPUTATION_ABI,
+    functionName: 'getScore',
+    args: [server],
+  });
+  const [score, totalScans, totalBlocks] = result;
+  return { score: Number(score), scans: Number(totalScans), blocks: Number(totalBlocks) };
+}
+
+// ---- the partner EVM chain tool safety record (TradeReceiptLedger) --------------
+
+const RH_LEDGER_ABI = [
+  {
+    type: 'function',
+    name: 'getToolStats',
+    stateMutability: 'view',
+    inputs: [{ name: 'toolName', type: 'string' }],
+    outputs: [
+      { name: 'total', type: 'uint64' },
+      { name: 'cleared', type: 'uint64' },
+      { name: 'warned', type: 'uint64' },
+      { name: 'blocked', type: 'uint64' },
+      { name: 'score', type: 'uint16' },
+    ],
+  },
+] as const;
+
+const RH_RPC_DEFAULT = 'https://rpc.mainnet.chain.partner-chain.com';
+const RH_EXPLORER = 'https://partner-chainchain.blockscout.com';
+
+export interface ToolCheckResult {
+  tool: string;
+  total: number;
+  cleared: number;
+  blocked: number;
+  score: number;
+  explorer: string;
+  interpretation: string;
+}
+
+export async function queryToolStats(
+  toolName: string,
+  ledger: `0x${string}`,
+  rpcUrl: string,
+): Promise<{ total: number; cleared: number; blocked: number; score: number }> {
+  const viem = await import('viem');
+  const chain = viem.defineChain({
+    id: 4663,
+    name: 'the partner EVM chain',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: { default: { http: [rpcUrl] } },
+  });
+  const client = viem.createPublicClient({ chain, transport: viem.http(rpcUrl) });
+  const [total, cleared, , blocked, score] = await client.readContract({
+    address: ledger,
+    abi: RH_LEDGER_ABI,
+    functionName: 'getToolStats',
+    args: [toolName],
+  });
+  return { total: Number(total), cleared: Number(cleared), blocked: Number(blocked), score: Number(score) };
+}
+
+function interpretTool(total: number, blocked: number, score: number): string {
+  if (total === 0) return 'no guarded trades recorded yet for this tool on the partner EVM chain';
+  const rate = ((blocked / total) * 100).toFixed(1);
+  if (score >= 900) return `${total} guarded trades, ${blocked} blocked (${rate}%) — clean record`;
+  if (score >= 500) return `${total} guarded trades, ${blocked} blocked (${rate}%) — some blocks, review`;
+  return `${total} guarded trades, ${blocked} blocked (${rate}%) — high block rate, treat with caution`;
+}
+
+// ---- Format --------------------------------------------------------------
+
+export function scoreColor(score: number, scans: number): (s: string) => string {
+  if (scans === 0) return dim; // no data yet
+  if (score >= 800) return (s) => green(bold(s));
+  if (score >= 500) return yellow;
+  return (s) => red(bold(s));
+}
+
+export function interpretScore(score: number, scans: number, blocks: number): string {
+  if (scans === 0) return 'no scans recorded yet — server is unknown to the Blindseal network';
+  if (blocks === 0) return `${scans} clean scan${scans === 1 ? '' : 's'} on record, no threats detected`;
+  const blockRate = (blocks / scans) * 100;
+  if (score >= 800) return `low threat rate (${blockRate.toFixed(1)}% over ${scans} scans) — generally safe`;
+  if (score >= 500) return `elevated threat rate (${blockRate.toFixed(1)}% over ${scans} scans) — review before connecting`;
+  return `HIGH threat rate (${blockRate.toFixed(1)}% over ${scans} scans) — avoid or investigate`;
+}
+
+export function buildResult(
+  server: string,
+  raw: { score: number; scans: number; blocks: number },
+  network: 'base' | 'base-sepolia',
+  contractAddress: string,
+): CheckResult {
+  const blockRate = raw.scans === 0 ? 0 : raw.blocks / raw.scans;
+  return {
+    server,
+    score: raw.score,
+    scans: raw.scans,
+    blocks: raw.blocks,
+    blockRate,
+    explorer: `${EXPLORER[network]}/address/${contractAddress}`,
+    interpretation: interpretScore(raw.score, raw.scans, raw.blocks),
+  };
+}
+
+export function renderHuman(r: CheckResult, scans: number): string {
+  const tint = scoreColor(r.score, scans);
+  const scoreStr = tint(`score ${r.score}/1000`);
+  const lines: string[] = [];
+  lines.push(`  ${bold(r.server.padEnd(40))} ${scoreStr}    ${dim(`scans ${r.scans}`)}    ${dim(`blocks ${r.blocks}`)}`);
+  lines.push(`  ${' '.repeat(40)} ${dim(r.interpretation)}`);
+  lines.push(`  ${' '.repeat(40)} ${dim('explorer:')} ${cyan(r.explorer)}`);
+  return lines.join('\n');
+}
+
+// ---- Main ----------------------------------------------------------------
+
+export async function runCheck(argv: string[]): Promise<number> {
+  let args: ParsedArgs;
+  try {
+    args = parseArgs(argv);
+  } catch (e) {
+    process.stderr.write(`blindseal check: ${(e as Error).message}\n`);
+    process.stderr.write(HELP);
+    return 2;
+  }
+  if (args.showHelp) {
+    process.stdout.write(HELP);
+    return 0;
+  }
+  const deployments = loadDeployments();
+
+  // --tool <name>: read the tool's guarded-trade safety record from the RH ledger.
+  if (args.tool) {
+    // Built-in default so `npx ... check --tool` works out of the box (the published package
+    // doesn't bundle deployments.json). Overridable via env or a local deployments.json.
+    const ledger = (process.env.BLINDSEAL_RH_LEDGER_CONTRACT ??
+      deployments['partner-chain-chain']?.tradeReceiptLedger ??
+      '0x89bf75bccea833fff371fa300f7c885b5c23f103') as `0x${string}` | undefined;
+    if (!ledger) {
+      process.stderr.write('blindseal check --tool: no TradeReceiptLedger address known (set BLINDSEAL_RH_LEDGER_CONTRACT).\n');
+      return 1;
+    }
+    const rhRpc = args.rpcUrl ?? process.env.BLINDSEAL_RH_RPC_URL ?? RH_RPC_DEFAULT;
+    try {
+      const s = await queryToolStats(args.tool, ledger, rhRpc);
+      const result: ToolCheckResult = {
+        tool: args.tool,
+        total: s.total,
+        cleared: s.cleared,
+        blocked: s.blocked,
+        score: s.score,
+        explorer: `${RH_EXPLORER}/address/${ledger}`,
+        interpretation: interpretTool(s.total, s.blocked, s.score),
+      };
+      if (args.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        const tint = scoreColor(result.score, result.total);
+        process.stdout.write(
+          `  ${bold(result.tool.padEnd(28))} ${tint(`score ${result.score}/1000`)}    ` +
+            `${dim(`guarded ${result.total}`)}    ${dim(`blocked ${result.blocked}`)}\n` +
+            `  ${' '.repeat(28)} ${dim(result.interpretation)}\n` +
+            `  ${' '.repeat(28)} ${dim('explorer:')} ${cyan(result.explorer)}\n`,
+        );
+      }
+      return 0;
+    } catch (e) {
+      process.stderr.write(`blindseal check --tool: query failed: ${(e as Error).message}\n`);
+      return 1;
+    }
+  }
+
+  if (!args.server && !args.all) {
+    process.stderr.write('blindseal check: provide <server>, --tool <name>, or --all\n');
+    process.stderr.write(HELP);
+    return 2;
+  }
+
+  const net = deployments[args.network];
+  const contractAddress = net?.blindsealReputation as `0x${string}` | undefined;
+  if (!contractAddress) {
+    process.stderr.write(
+      `blindseal check: no BlindsealReputation address known for network '${args.network}'. ` +
+        `Set BLINDSEAL_REPUTATION_CONTRACT or add to packages/contracts/deployments.json.\n`,
+    );
+    return 1;
+  }
+  const rpcUrl =
+    args.rpcUrl ?? process.env.BLINDSEAL_BASE_RPC_URL ?? RPC_DEFAULTS[args.network]!;
+
+  const servers: string[] = [];
+  if (args.all) {
+    const found = readMcpServersFromConfigs();
+    if (found.length === 0) {
+      process.stderr.write(
+        'blindseal check --all: no MCP configs found.\n' +
+          '  Looked in: ~/Library/Application Support/Claude/, ~/.claude/, ./.claude/\n',
+      );
+      return 1;
+    }
+    for (const f of found) servers.push(normalizeServer(f.identifier));
+    if (!args.json) {
+      process.stderr.write(dim(`Checking ${servers.length} server${servers.length === 1 ? '' : 's'} from your MCP config(s)...\n\n`));
+    }
+  } else if (args.server) {
+    servers.push(normalizeServer(args.server));
+  }
+
+  const results: CheckResult[] = [];
+  for (const s of servers) {
+    try {
+      const raw = await queryScore(s, args.network, contractAddress, rpcUrl);
+      results.push(buildResult(s, raw, args.network, contractAddress));
+    } catch (e) {
+      process.stderr.write(`blindseal check: query failed for ${s}: ${(e as Error).message}\n`);
+      return 1;
+    }
+  }
+
+  if (args.json) {
+    process.stdout.write(JSON.stringify(results.length === 1 ? results[0] : results, null, 2) + '\n');
+  } else {
+    for (const r of results) process.stdout.write(renderHuman(r, r.scans) + '\n\n');
+  }
+  return 0;
+}
+
+// CLI entry
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runCheck(process.argv.slice(2)).then((code) => process.exit(code));
+}

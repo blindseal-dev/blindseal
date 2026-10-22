@@ -1,0 +1,30 @@
+{
+  "name": "@blindseal/eval",
+  "version": "0.0.1",
+  "description": "Blindseal Red Team — eval harness comparing Blindseal against a third-party detector / OpenAI Moderation / raw Anthropic judge",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "blindseal-eval": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "score": "tsx src/index.ts",
+    "eval": "tsx src/run.ts",
+    "bench:latency": "tsx src/latency-bench.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@blindseal/mcp-proxy": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

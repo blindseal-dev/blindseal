@@ -1,0 +1,45 @@
+node_modules/
+dist/
+out/
+cache/
+broadcast/
+.next/
+*.tsbuildinfo
+*.log
+.DS_Store
+.vitest-cache/
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+
+
+# Audit logs (operator-only, never commit)
+*.audit.jsonl
+audit-*.jsonl
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.tmp/
+
+# Internal sprint / dev files — never commit these
+CLAUDE.md
+OPERATOR_NOTES.md
+overnight-sprint.txt
+
+# Operator-private notes — see ~/blindseal-private-notes/ outside the repo
+# Untracked eval results stay local unless explicitly committed with provenance
+.private/
+.claude/
+*.private.md
+packages/eval/results/eval-*.json
+packages/eval/results/eval-*.md
+
+# local-only identity sweep list (BLINDSEAL.md §7)
+.identity-sweep
