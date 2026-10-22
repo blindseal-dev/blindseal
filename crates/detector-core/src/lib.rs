@@ -108,7 +108,10 @@ fn compiled_rules() -> &'static Vec<CompiledRule> {
 }
 
 /// Port of TS `runLayer1`. Returns the raw verdict + matched pattern names (TS order).
-pub fn run_layer1(text: &str) -> RawResult {
+/// Combine per-rule match results (in RULES order) into the raw verdict + pattern set,
+/// shared by the build-time path (`run_layer1`) and the guest/serialized path
+/// (`run_layer1_serialized`) so both are identical by construction.
+fn combine_l1(text: &str, matched: &[bool]) -> RawResult {
     let mut verdict = Severity::Clean;
     let mut patterns: Vec<String> = Vec::new();
     let bump = |sev: Severity, name: &str, patterns: &mut Vec<String>, verdict: &mut Severity| {
@@ -117,31 +120,24 @@ pub fn run_layer1(text: &str) -> RawResult {
             *verdict = sev;
         }
     };
-
-    // Rules fire in TS order. Zero-width density and base64 sit between html-entity-run and
-    // the taxonomy rules in TS; we interleave by walking RULES and inserting the code-only
-    // checks at their TS positions.
-    for r in compiled_rules() {
-        if r.name == "bracket-ai-directive" {
-            // TS pushes zero-width-density then large-base64-blob BEFORE the taxonomy block,
-            // but AFTER html-comment/md-link. large-base64-blob is a RULE (already handled in
-            // order); zero-width-density is code-only and inserted here, right before the
-            // taxonomy rules begin (TS order: ... md-link, zero-width, base64, bracket-ai ...).
-            if zero_width_dense(text) {
-                bump(Severity::Suspicious, "zero-width-density", &mut patterns, &mut verdict);
-            }
+    for (i, r) in RULES.iter().enumerate() {
+        // zero-width-density (code-only threshold) is inserted at its TS position, just
+        // before the taxonomy block begins (… md-link, zero-width, base64, bracket-ai …).
+        if r.name == "bracket-ai-directive" && zero_width_dense(text) {
+            bump(Severity::Suspicious, "zero-width-density", &mut patterns, &mut verdict);
         }
-        if r.re.is_match(Input::new(text)) {
+        if matched[i] {
             bump(r.sev, r.name, &mut patterns, &mut verdict);
         }
     }
-    // Reorder to exact TS sequence: TS pushes zero-width-density immediately after
-    // markdown-link-prompt-anchor and before large-base64-blob. The loop above appended it
-    // just before bracket-ai-directive; fix the position so set-comparison and any
-    // order-sensitive consumer both match TS. (Verdict is order-independent.)
     reorder_zero_width(&mut patterns);
-
     RawResult { verdict, patterns }
+}
+
+/// Build-time path: compile the rule DFAs in-process and match. Used by the proxy/host.
+pub fn run_layer1(text: &str) -> RawResult {
+    let matched: Vec<bool> = compiled_rules().iter().map(|r| r.re.is_match(Input::new(text))).collect();
+    combine_l1(text, &matched)
 }
 
 /// TS pushes `zero-width-density` between `markdown-link-prompt-anchor` and `large-base64-blob`.
@@ -465,4 +461,57 @@ pub fn policy_root_hex() -> String {
 /// Number of committed policy leaves (rules).
 pub fn policy_leaf_count() -> usize {
     policy_leaves().len()
+}
+
+// ---------------- serialized / guest-side L1 execution (BLINDSEAL.md §3.4) ----------------
+// The guest must NOT compile regexes (expensive, unbounded cycles). Instead the policy carries
+// pre-serialized forward dense-DFA bytes (same bytes policy_root commits to), and the guest
+// deserializes + runs them. `SerializedL1` is that policy; `run_layer1_serialized` runs it and
+// is proven identical to the build-time `run_layer1` by the cross-mode parity test.
+use regex_automata::dfa::Automaton;
+
+/// Forward dense-DFA bytes for each L1 rule, in RULES order. This is what the guest runs and
+/// what `policy_root` commits to.
+pub struct SerializedL1 {
+    pub dfas: Vec<Vec<u8>>,
+}
+
+/// Serialize the L1 rule DFAs (host / policy-commit time).
+pub fn serialize_l1() -> SerializedL1 {
+    SerializedL1 {
+        dfas: RULES.iter().map(|r| rule_dfa_bytes(&build_pattern(r.pattern), r.ci)).collect(),
+    }
+}
+
+/// A 4-byte-aligned copy of `bytes` (regex-automata `from_bytes` requires alignment; a plain
+/// Vec<u8> is only 1-aligned and its pointer can move). Backed by a Vec<u32> (4-aligned alloc).
+struct Aligned(Vec<u32>, usize);
+impl Aligned {
+    fn new(bytes: &[u8]) -> Self {
+        let words = bytes.len().div_ceil(4);
+        let mut v = vec![0u32; words.max(1)];
+        // SAFETY: v is a freshly-allocated Vec<u32> (≥4-aligned); writing bytes.len() bytes
+        // into its byte view is in-bounds (words*4 ≥ bytes.len()).
+        let dst = unsafe { core::slice::from_raw_parts_mut(v.as_mut_ptr() as *mut u8, words * 4) };
+        dst[..bytes.len()].copy_from_slice(bytes);
+        Aligned(v, bytes.len())
+    }
+    fn bytes(&self) -> &[u8] {
+        // SAFETY: viewing the Vec<u32> as its byte representation; len is the word-count*4,
+        // and from_bytes reads only the valid DFA prefix.
+        unsafe { core::slice::from_raw_parts(self.0.as_ptr() as *const u8, self.0.len() * 4) }
+    }
+}
+
+fn dfa_is_match_serialized(dfa_bytes: &[u8], text: &str) -> bool {
+    let aligned = Aligned::new(dfa_bytes);
+    let (dfa, _) = dense::DFA::from_bytes(aligned.bytes()).expect("deserialize forward DFA");
+    dfa.try_search_fwd(&Input::new(text)).ok().flatten().is_some()
+}
+
+/// Guest-side path: run the pre-serialized DFAs. Identical result to `run_layer1` (proven by
+/// the cross-mode parity test).
+pub fn run_layer1_serialized(text: &str, pol: &SerializedL1) -> RawResult {
+    let matched: Vec<bool> = pol.dfas.iter().map(|b| dfa_is_match_serialized(b, text)).collect();
+    combine_l1(text, &matched)
 }
