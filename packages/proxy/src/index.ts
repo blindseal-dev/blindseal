@@ -7,6 +7,7 @@ import { startScanHttp } from './transports/scan-http.js';
 import { runDemo } from './cli/demo.js';
 import { runHistoryCli } from './cli/history.js';
 import { runDashboardCli } from './cli/dashboard.js';
+import { runRun } from './cli/run.js';
 
 function readVersion(): string {
   try {
@@ -31,6 +32,7 @@ const HELP = `blindseal — scans MCP tool responses for prompt injection
 
 Usage
   npx @blindseal/proxy demo                                         # interactive demo (30s first-run experience)
+  BLINDSEAL_MOCK=1 blindseal run --mock                                 # local API + WS over fixtures (FRONTEND.md §5)
   npx @blindseal/proxy -- <command> [args...]                      # stdio (wrap a local MCP server)
   npx @blindseal/proxy --transport http --upstream <url> [--port]  # http (proxy a remote MCP server)
   npx @blindseal/proxy history [flags]                              # show local scan history (requires BLINDSEAL_PERSIST=1)
@@ -92,12 +94,6 @@ On-chain attestation (env, default off)
   BLINDSEAL_ATTEST                     1 to enable EAS attestations on Base
   BLINDSEAL_BASE_RPC_URL               default: https://mainnet.base.org
   BLINDSEAL_ATTESTER_PRIVATE_KEY       hot wallet (fund with ~0.05 ETH on Base)
-  BLINDSEAL_EAS_ADDRESS                EAS contract (default: OP-stack predeploy)
-  BLINDSEAL_SCAN_RECEIPT_SCHEMA        ScanReceipt schema UID (Sepolia default built-in)
-  BLINDSEAL_THREAT_RECORD_SCHEMA       ThreatRecord schema UID (Sepolia default built-in)
-  BLINDSEAL_REPUTATION_CONTRACT        BlindsealReputation address (Sepolia default built-in)
-  BLINDSEAL_ATTEST_SAMPLE_RATE_L1L2    sampling for clean L1/L2 (default 0.1)
-
 Privacy: see PRIVACY.md. SHA-256 hashes only — raw content never leaves the proxy.
 `;
 
@@ -188,6 +184,14 @@ function main(): void {
       process.exit(1);
     });
     return;
+  }
+
+  if (argv[0] === 'run') {
+    runRun(argv.slice(1)).then((code) => { if (code !== 0) process.exit(code); }).catch((err) => {
+      process.stderr.write(`blindseal run: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    });
+    return; // mock server keeps the process alive
   }
 
   if (argv[0] === 'history') {
