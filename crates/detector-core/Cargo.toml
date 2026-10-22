@@ -1,7 +1,20 @@
+# Blindseal L0 + L1 detector core. Ports Blindseal's TS L0 (decode-then-L1) and L1 (regex
+# heuristics) to Rust, behaviour-identical, gated by a parity harness (evals/). Built on
+# regex-automata DFAs — the engine the SP1 guest runs (BLINDSEAL.md §3.4). No std-only deps
+# that break the succinct toolchain (MSRV 1.85). Versions pinned: serialized DFA bytes feed
+# policyRoot, so a crate bump changes the root.
 [package]
 name = "blindseal-detector-core"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.85"
 
 [dependencies]
+regex-automata = "=0.4.9"
+base64 = "=0.22.1"
+percent-encoding = "=2.3.1"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

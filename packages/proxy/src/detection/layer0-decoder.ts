@@ -94,9 +94,17 @@ export function decodeHtmlEntities(content: string): DecodedResult[] {
   const results: DecodedResult[] = [];
   while ((m = re.exec(content)) !== null) {
     const run = m[0];
-    const decoded = run.replace(/&#x([0-9a-fA-F]+);/gi, (_, h) =>
-      String.fromCodePoint(parseInt(h, 16)),
-    ).replace(/&#([0-9]+);/gi, (_, d) => String.fromCodePoint(parseInt(d, 10)));
+    // Guard against invalid code points (> U+10FFFF or the surrogate range): String.fromCodePoint
+    // throws a RangeError on those, which — with no try/catch in runLayer0/pipeline — would let an
+    // oversized-entity payload (e.g. "&#x110000;"...) crash the scan and pass unscreened. Leave any
+    // such entity undecoded instead. (Security fix; Blindseal M1. See DECISIONS.md.)
+    const fromCp = (cp: number, original: string): string =>
+      Number.isInteger(cp) && cp >= 0 && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff)
+        ? String.fromCodePoint(cp)
+        : original;
+    const decoded = run
+      .replace(/&#x([0-9a-fA-F]+);/gi, (m, h) => fromCp(parseInt(h, 16), m))
+      .replace(/&#([0-9]+);/gi, (m, d) => fromCp(parseInt(d, 10), m));
     if (decoded !== run && isPrintableAscii(decoded) && decoded.length >= MIN_ENCODED_LEN) {
       results.push({ decoder: 'html-entities', decoded, depth: 1 });
     }

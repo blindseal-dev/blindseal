@@ -7,7 +7,7 @@ Updated at the end of M0.5, M1, and M2 (BLINDSEAL.md §9.4).
 - Apple Silicon, macOS 27 (arm64), 10 CPU cores, 32 GB RAM.
 - Docker Desktop memory raised to 24 GB for the Groth16 wrap (see M0.5 notes).
 
-## M0.5 — verifier spike (SP1 Groth16 → Solana via sp1-solana) — GREEN ✅
+## M0.5 — verifier spike (SP1 Groth16 -> Solana via sp1-solana) — green except CU (blocker named)
 
 A minimal SP1 guest (sha256 a few bytes, commit the digest) was proven to a local Groth16
 proof and **verified on the Solana runtime** through `sp1-solana` (`GROTH16_VK_5_0_0_BYTES`,
