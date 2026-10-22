@@ -7,6 +7,7 @@ import type { JudgeContext } from './clients/types.js';
 import type { DetectionResult } from './types.js';
 import { runStreamingPipeline, readStreamThreshold } from './streaming.js';
 import { emitDegradedWarningOnce } from './degraded-state.js';
+import { redact } from '@blindseal/redactor';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
 const L2_DEFAULT_THRESHOLD = 0.35;
@@ -45,10 +46,15 @@ export async function runPipeline(text: string, context?: JudgeContext): Promise
     return { ...l1, layer: 1, l3Status: 'skipped_gate' };
   }
 
+  // Redactor (BLINDSEAL.md §3.2): strip secrets/PII before the model layers see the text, so
+  // L2 (embeddings) and L3 (the LLM judge, possibly in a TEE or remote) never observe raw
+  // credentials. L0/L1 above run on the raw text; L2/L3 below run on the redacted text.
+  const redactedText = redact(text).redacted;
+
   // Layer 2.
   let l2: DetectionResult;
   try {
-    l2 = await runLayer2(text);
+    l2 = await runLayer2(redactedText);
   } catch (err) {
     return {
       ...l1,
@@ -101,7 +107,7 @@ export async function runPipeline(text: string, context?: JudgeContext): Promise
 
   // Run Layer 3 to disambiguate.
   try {
-    const l3Result = await runLayer3(text, context);
+    const l3Result = await runLayer3(redactedText, context);
     return { ...l3Result, l3Status: 'ran' };
   } catch (err) {
     if (!(err instanceof Layer3Unavailable)) {
