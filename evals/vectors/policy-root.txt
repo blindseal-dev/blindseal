@@ -1,0 +1,3 @@
+# Blindseal policy root (detector-core default policy). Shared vector; TS + on-chain must match.
+0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397
+23 leaves

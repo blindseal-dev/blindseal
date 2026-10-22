@@ -382,3 +382,87 @@ pub fn run_layer0(content: &str) -> Option<L0Fire> {
     }
     None
 }
+
+// ---------------- policy commitment (BLINDSEAL.md §3.3) ----------------
+// policyRoot = merkle_sha256(leaves), leaf_i = sha256("blindseal.rule.v1" || rule_id || layer
+// || kind || compiled_bytes). compiled_bytes = serialized dense-DFA bytes for a regex rule,
+// a fixed descriptor for the zero-width threshold. Tree sorted by rule_id; empty tree =
+// sha256("blindseal.policy.empty.v1"). The guest (M1) recomputes this and commits it; the DFA
+// bytes depend on the pinned regex-automata version, so a bump changes the root.
+use regex_automata::dfa::dense;
+use sha2::{Digest, Sha256};
+
+const RULE_DOMAIN: &str = "blindseal.rule.v1";
+const POLICY_EMPTY_DOMAIN: &str = "blindseal.policy.empty.v1";
+
+fn rule_dfa_bytes(pattern: &str, ci: bool) -> Vec<u8> {
+    dense::DFA::builder()
+        .syntax(syntax::Config::new().case_insensitive(ci).unicode(true).utf8(false))
+        .build(pattern)
+        .expect("policy: rule DFA compiles")
+        .to_bytes_little_endian()
+        .0
+}
+
+fn leaf_hash(rule_id: &str, layer: &str, kind: &str, compiled: &[u8]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(RULE_DOMAIN.as_bytes());
+    h.update(rule_id.as_bytes());
+    h.update(layer.as_bytes());
+    h.update(kind.as_bytes());
+    h.update(compiled);
+    h.finalize().into()
+}
+
+/// Policy leaves (rule_id, hash), sorted by rule_id as §3.3 requires.
+fn policy_leaves() -> Vec<(String, [u8; 32])> {
+    let mut leaves: Vec<(String, [u8; 32])> = RULES
+        .iter()
+        .map(|r| {
+            let compiled = rule_dfa_bytes(&build_pattern(r.pattern), r.ci);
+            (r.name.to_string(), leaf_hash(r.name, "L1", "regex", &compiled))
+        })
+        .collect();
+    // zero-width density is a code-only threshold rule, not a DFA.
+    leaves.push((
+        "zero-width-density".to_string(),
+        leaf_hash("zero-width-density", "L1", "threshold", b"zero_width_utf16_ratio>0.02"),
+    ));
+    leaves.sort_by(|a, b| a.0.cmp(&b.0));
+    leaves
+}
+
+fn merkle_root(mut level: Vec<[u8; 32]>) -> [u8; 32] {
+    if level.is_empty() {
+        return Sha256::digest(POLICY_EMPTY_DOMAIN.as_bytes()).into();
+    }
+    while level.len() > 1 {
+        let mut next = Vec::with_capacity(level.len().div_ceil(2));
+        for pair in level.chunks(2) {
+            let mut h = Sha256::new();
+            h.update(pair[0]);
+            h.update(if pair.len() == 2 { pair[1] } else { pair[0] }); // duplicate last if odd
+            next.push(h.finalize().into());
+        }
+        level = next;
+    }
+    level[0]
+}
+
+/// The committed policy root over the detector's L1 rules + the zero-width threshold.
+pub fn policy_root() -> [u8; 32] {
+    merkle_root(policy_leaves().into_iter().map(|(_, h)| h).collect())
+}
+
+pub fn policy_root_hex() -> String {
+    let mut s = String::from("0x");
+    for b in policy_root() {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+/// Number of committed policy leaves (rules).
+pub fn policy_leaf_count() -> usize {
+    policy_leaves().len()
+}
