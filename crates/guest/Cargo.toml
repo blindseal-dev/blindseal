@@ -1,5 +1,6 @@
-# Blindseal SP1 guest (M0 stub) — built for the SP1 riscv target with the SP1 toolchain,
-# NOT part of the host workspace. M0.5 minimal spike -> M1 real guest (BLINDSEAL.md §3.4).
+# Blindseal SP1 guest (M1). Recomputes payloadHash, runs detector-core's L0/L1 on PRE-SERIALIZED
+# DFAs (no regex compilation in-zkVM, §3.4), asserts PASS, and commits public values. Built for
+# the SP1 riscv target with the succinct toolchain; NOT part of the host workspace.
 [package]
 name = "blindseal-guest"
 version = "0.0.0"
@@ -7,3 +8,6 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+sp1-zkvm = "=5.0.0"
+blindseal-detector-core = { path = "../detector-core" }
+sha2 = "=0.10.8"
