@@ -71,12 +71,11 @@ describe('scan-http transport', () => {
     await new Promise<void>((resolve) => ctx.server.close(() => resolve()));
   });
 
-  it('GET /health returns ok with attest/telemetry flags', async () => {
+  it('GET /health returns ok with telemetry flag', async () => {
     const resp = await fetch(`${ctx.url}/health`);
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { ok: boolean; attestEnabled: boolean; telemetryEnabled: boolean };
+    const body = (await resp.json()) as { ok: boolean; telemetryEnabled: boolean };
     expect(body.ok).toBe(true);
-    expect(body.attestEnabled).toBe(false);
     expect(body.telemetryEnabled).toBe(false);
   });
 
@@ -91,11 +90,9 @@ describe('scan-http transport', () => {
       verdict: string;
       layer: number | null;
       contentHash: string;
-      attested: boolean;
     };
     expect(body.verdict).toBe('clean');
     expect(body.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(body.attested).toBe(false);
   }, 20_000);
 
   it('POST /scan returns malicious verdict for prompt-injection payload', async () => {

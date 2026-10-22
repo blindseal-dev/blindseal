@@ -2,9 +2,7 @@ import type { CapabilityConfig, CapabilityMode, TradePolicyConfig } from './capa
 import type { ManifestConfig, ManifestMode } from './manifest/index.js';
 import type { TelemetryConfig } from './telemetry/index.js';
 import type { AuditConfig } from './audit/index.js';
-import type { AttestationConfig, RhLedgerConfig } from './attestation/index.js';
 import { loadScanStoreConfig, type ScanStoreConfig } from './persistence/index.js';
-import type { Hex } from 'viem';
 
 export type BlindsealMode = 'block' | 'warn' | 'log';
 
@@ -15,8 +13,6 @@ export interface BlindsealConfig {
   manifest: ManifestConfig;
   telemetry: TelemetryConfig;
   audit: AuditConfig;
-  attestation: AttestationConfig;
-  rhLedger: RhLedgerConfig;
   persistence: ScanStoreConfig;
 }
 
@@ -30,85 +26,7 @@ export function loadConfig(): BlindsealConfig {
     manifest: loadManifestConfig(),
     telemetry: loadTelemetryConfig(),
     audit: loadAuditConfig(),
-    attestation: loadAttestationConfig(),
-    rhLedger: loadRhLedgerConfig(),
     persistence: loadScanStoreConfig(),
-  };
-}
-
-/// the partner chain-Chain trade-receipt ledger. Off until BLINDSEAL_RH_LEDGER_CONTRACT is set. The
-/// attester key defaults to the same one used for on-chain writes elsewhere.
-function loadRhLedgerConfig(): RhLedgerConfig {
-  const flag = process.env.BLINDSEAL_RH_LEDGER?.toLowerCase();
-  const contract = process.env.BLINDSEAL_RH_LEDGER_CONTRACT as Hex | undefined;
-  // Normalize the attester key: secrets/env often arrive with stray whitespace or a trailing
-  // newline, which viem's privateKeyToAccount rejects ("invalid private key ... got string").
-  const rawKey = (process.env.BLINDSEAL_RH_ATTESTER_PRIVATE_KEY ?? process.env.BLINDSEAL_ATTESTER_PRIVATE_KEY)?.trim();
-  const privateKey =
-    rawKey && /^(0x)?[0-9a-fA-F]{64}$/.test(rawKey) ? (`0x${rawKey.replace(/^0x/, '')}` as Hex) : undefined;
-  const rpcUrl =
-    process.env.BLINDSEAL_RH_LEDGER_RPC_URL ?? process.env.RH_CHAIN_RPC_URL ?? 'https://rpc.mainnet.chain.partner-chain.com';
-  const chainId = positiveInt(process.env.BLINDSEAL_RH_LEDGER_CHAIN_ID ?? process.env.RH_CHAIN_ID, 4663);
-  return {
-    // Enabled when a contract is configured, unless explicitly turned off with BLINDSEAL_RH_LEDGER=0.
-    enabled: !!contract && flag !== '0' && flag !== 'false' && flag !== 'off',
-    contract,
-    rpcUrl,
-    chainId,
-    privateKey,
-  };
-}
-
-// Deployed Base Sepolia addresses (chain 84532). Used as defaults when the RPC URL points
-// at Base Sepolia and the operator hasn't overridden the schema UIDs manually.
-const SEPOLIA_DEFAULTS = {
-  eas: '0x4200000000000000000000000000000000000021' as Hex,
-  scanReceiptSchema: '0xc1d5e8e4f62f3652366e7c7b75d8d77ff8ca59e85f307935d4bffbe61c68f9ec' as Hex,
-  threatRecordSchema: '0xae2b5da24401f0a261dd6cfbbc300fddafcf47692c71d968e0942cba2177dd65' as Hex,
-  blindsealReputation: '0x3A977E4D8BA43367cc41BB4695feFF4615fec189' as Hex,
-} as const;
-
-function isSepolia(rpcUrl: string): boolean {
-  return rpcUrl.includes('sepolia') || rpcUrl.includes('84532');
-}
-
-function loadAttestationConfig(): AttestationConfig {
-  const flag = process.env.BLINDSEAL_ATTEST?.toLowerCase();
-  const enabled = flag === '1' || flag === 'true' || flag === 'on';
-  const rpcUrl = process.env.BLINDSEAL_BASE_RPC_URL ?? 'https://mainnet.base.org';
-  const privateKey = process.env.BLINDSEAL_ATTESTER_PRIVATE_KEY as Hex | undefined;
-
-  const defaults = isSepolia(rpcUrl) ? SEPOLIA_DEFAULTS : null;
-  const eas = (process.env.BLINDSEAL_EAS_ADDRESS as Hex | undefined) ?? defaults?.eas;
-  const scanReceiptSchema =
-    (process.env.BLINDSEAL_SCAN_RECEIPT_SCHEMA as Hex | undefined) ?? defaults?.scanReceiptSchema;
-  const threatRecordSchema =
-    (process.env.BLINDSEAL_THREAT_RECORD_SCHEMA as Hex | undefined) ?? defaults?.threatRecordSchema;
-  const blindsealReputation =
-    (process.env.BLINDSEAL_REPUTATION_CONTRACT as Hex | undefined) ?? defaults?.blindsealReputation;
-  // Optional — trade attestation stays off until this schema UID is set, independent of scans.
-  const tradeReceiptSchema = process.env.BLINDSEAL_TRADE_RECEIPT_SCHEMA as Hex | undefined;
-
-  const addresses =
-    eas && scanReceiptSchema && threatRecordSchema
-      ? { eas, scanReceiptSchema, threatRecordSchema, tradeReceiptSchema, blindsealReputation }
-      : undefined;
-
-  const batchSize = positiveInt(process.env.BLINDSEAL_ATTEST_BATCH, 50);
-  const flushIntervalMs = positiveInt(process.env.BLINDSEAL_ATTEST_FLUSH_MS, 5000);
-  const sampleRaw = process.env.BLINDSEAL_ATTEST_SAMPLE_RATE_L1L2;
-  const sampleParsed = sampleRaw ? Number.parseFloat(sampleRaw) : NaN;
-  const sampleRateL1L2 =
-    Number.isFinite(sampleParsed) && sampleParsed >= 0 && sampleParsed <= 1 ? sampleParsed : 0.1;
-
-  return {
-    enabled,
-    rpcUrl,
-    privateKey,
-    addresses,
-    batchSize,
-    flushIntervalMs,
-    sampleRateL1L2,
   };
 }
 

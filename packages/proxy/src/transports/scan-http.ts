@@ -25,12 +25,6 @@ import {
   sha256Hex,
   type TelemetryReporter,
 } from '../telemetry/index.js';
-import {
-  createAttestationClient,
-  createScanReporter,
-  type AttestationClient,
-  type ScanReporter,
-} from '../attestation/index.js';
 
 export interface ScanHttpOptions {
   listenPort: number;
@@ -102,11 +96,6 @@ function parseRequestBody(raw: string): ScanRequestBody | { error: string } {
 export function startScanHttp(opts: ScanHttpOptions): Server {
   const config = loadConfig();
   const telemetry: TelemetryReporter = createReporter(config.telemetry);
-  const attestClient: AttestationClient = createAttestationClient({ config: config.attestation });
-  const scanReporter: ScanReporter = createScanReporter({
-    client: attestClient,
-    sampleRateL1L2: config.attestation.sampleRateL1L2,
-  });
 
   if (config.telemetry.bannerOnStart) {
     process.stderr.write(
@@ -123,7 +112,6 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
     if (req.method === 'GET' && (path === '/health' || path === '/')) {
       sendJson(res, 200, {
         ok: true,
-        attestEnabled: attestClient.enabled,
         telemetryEnabled: telemetry.enabled,
       });
       return;
@@ -175,17 +163,6 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       });
     }
 
-    if (scanReporter.enabled) {
-      scanReporter.report({
-        toolName,
-        mcpServerUrl: serverUrl,
-        contentHash,
-        result,
-        verdict: result.verdict,
-        layer: result.layer ?? null,
-      });
-    }
-
     if (result.verdict !== 'clean') {
       process.stderr.write(
         `blindseal[scan-http]: ${result.verdict} (L${result.layer ?? '?'}) tool=${toolName} confidence=${result.confidence.toFixed(2)}\n`,
@@ -203,20 +180,18 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       distance: result.distance,
       l3Status: result.l3Status,
       contentHash,
-      attested: scanReporter.enabled,
     });
   });
 
   server.listen(opts.listenPort, opts.listenHost ?? '127.0.0.1', () => {
     process.stderr.write(
-      `blindseal[scan-http]: listening on ${opts.listenHost ?? '127.0.0.1'}:${opts.listenPort} (attest=${attestClient.enabled})\n`,
+      `blindseal[scan-http]: listening on ${opts.listenHost ?? '127.0.0.1'}:${opts.listenPort}\n`,
     );
   });
 
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
       void telemetry.shutdown();
-      void attestClient.shutdown();
       server.close(() => process.exit(0));
     });
   }

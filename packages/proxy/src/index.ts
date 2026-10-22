@@ -5,10 +5,8 @@ import { startProxy } from './transports/stdio.js';
 import { startHttpProxy } from './transports/http.js';
 import { startScanHttp } from './transports/scan-http.js';
 import { runDemo } from './cli/demo.js';
-import { runCheck } from './cli/check.js';
 import { runHistoryCli } from './cli/history.js';
 import { runDashboardCli } from './cli/dashboard.js';
-import { runInspectCli } from './cli/inspect.js';
 
 function readVersion(): string {
   try {
@@ -33,13 +31,10 @@ const HELP = `blindseal — scans MCP tool responses for prompt injection
 
 Usage
   npx @blindseal/proxy demo                                         # interactive demo (30s first-run experience)
-  npx @blindseal/proxy check --tool <name>                         # a tool's guarded-trade record (the partner EVM chain)
-  npx @blindseal/proxy check <server>                              # a server's on-chain reputation
   npx @blindseal/proxy -- <command> [args...]                      # stdio (wrap a local MCP server)
   npx @blindseal/proxy --transport http --upstream <url> [--port]  # http (proxy a remote MCP server)
   npx @blindseal/proxy history [flags]                              # show local scan history (requires BLINDSEAL_PERSIST=1)
   npx @blindseal/proxy dashboard [flags]                            # localhost dashboard for scan history
-  npx @blindseal/proxy inspect [flags]                              # on-chain reputation for your Claude Desktop MCP servers
 
 Examples
   npx @blindseal/proxy -- npx -y @modelcontextprotocol/server-filesystem /tmp
@@ -195,17 +190,6 @@ function main(): void {
     return;
   }
 
-  // check subcommand — on-chain reputation / guarded-trade lookups.
-  if (argv[0] === 'check') {
-    runCheck(argv.slice(1))
-      .then((code) => process.exit(code))
-      .catch((err) => {
-        process.stderr.write(`blindseal check: ${err instanceof Error ? err.message : String(err)}\n`);
-        process.exit(1);
-      });
-    return;
-  }
-
   if (argv[0] === 'history') {
     process.exit(runHistoryCli(argv.slice(1)));
   }
@@ -214,14 +198,6 @@ function main(): void {
     const code = runDashboardCli(argv.slice(1));
     if (code !== 0) process.exit(code);
     return; // dashboard keeps server alive
-  }
-
-  if (argv[0] === 'inspect') {
-    runInspectCli(argv.slice(1)).then((code) => process.exit(code)).catch((err) => {
-      process.stderr.write(`blindseal inspect: ${err instanceof Error ? err.message : String(err)}\n`);
-      process.exit(1);
-    });
-    return;
   }
 
   let parsed: ParsedArgs;

@@ -26,16 +26,6 @@ import {
   type TelemetryReporter,
 } from '../telemetry/index.js';
 import { createAuditLogger, preview, type AuditLogger } from '../audit/index.js';
-import {
-  createAttestationClient,
-  createRhLedgerClient,
-  createScanReporter,
-  emitTradeReceipt,
-  type AttestationClient,
-  type RhLedgerClient,
-  type ScanReporter,
-  type TradeReceiptSink,
-} from '../attestation/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
@@ -110,17 +100,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     config.manifest.mode !== 'off' ? new ManifestChecker('http', [opts.upstream], config.manifest) : null;
   const telemetry: TelemetryReporter = createReporter(config.telemetry);
   const audit: AuditLogger = createAuditLogger(config.audit);
-  const attestClient: AttestationClient = createAttestationClient({ config: config.attestation });
-  const rhLedger: RhLedgerClient = createRhLedgerClient({ config: config.rhLedger });
-  const tradeSink: TradeReceiptSink | null = rhLedger.enabled
-    ? rhLedger
-    : attestClient.enabled && config.attestation.addresses?.tradeReceiptSchema
-      ? attestClient
-      : null;
-  const scanReporter: ScanReporter = createScanReporter({
-    client: attestClient,
-    sampleRateL1L2: config.attestation.sampleRateL1L2,
-  });
   const scanStore: ScanStore = createScanStore(config.persistence);
 
   if (scanStore.enabled) {
@@ -171,10 +150,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           decideCapability(toolName, toolArgs, taint, config.capability),
           decideTradePolicy(toolName, toolArgs, taint, config.tradePolicy, tradeRate),
         );
-        // Guarded-trade receipt (on-chain), when trade attestation is configured.
-        if (tradeSink && config.tradePolicy.enabled) {
-          emitTradeReceipt(tradeSink, config.tradePolicy, upstreamUrl, toolName, toolArgs, decision);
-        }
         if (decision.action !== 'allow' && telemetry.enabled) {
           telemetry.send({
             type: 'capability',
@@ -281,16 +256,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
                   mutated: outcome.mutated,
                   reasoning: outcome.result?.reasoning,
                   contentPreview: preview(previewText),
-                });
-              }
-              if (scanReporter.enabled) {
-                scanReporter.report({
-                  toolName: scannedTool,
-                  mcpServerUrl: upstreamUrl,
-                  contentHash: outcome.contentHash,
-                  result: outcome.result,
-                  verdict: outcome.verdict,
-                  layer: outcome.layer ?? null,
                 });
               }
               if (scanStore.enabled) {
@@ -429,16 +394,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           contentPreview: preview(previewText),
         });
       }
-      if (scanReporter.enabled) {
-        scanReporter.report({
-          toolName,
-          mcpServerUrl: upstreamUrl,
-          contentHash: outcome.contentHash,
-          result: outcome.result,
-          verdict: outcome.verdict,
-          layer: outcome.layer ?? null,
-        });
-      }
       if (scanStore.enabled) {
         const rawText = respMsg.result.content
           .map((c) => (typeof c.text === 'string' ? c.text : ''))
@@ -489,8 +444,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     process.on(sig, () => {
       void telemetry.shutdown();
       void audit.shutdown();
-      void attestClient.shutdown();
-      void rhLedger.shutdown();
       try { scanStore.close(); } catch { /* ignore */ }
       server.close(() => process.exit(0));
     });
