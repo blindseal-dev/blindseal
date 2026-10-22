@@ -1,0 +1,190 @@
+{
+  "root": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
+  "version": 2,
+  "updatedAt": "2026-10-20T09:00:03.606Z",
+  "rules": [
+    {
+      "id": "l0-decoded-injection",
+      "layer": "L0",
+      "kind": "regex",
+      "value": "(?i)ignore (all|previous) instructions",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l0-hex-payload",
+      "layer": "L0",
+      "kind": "threshold",
+      "value": "decoded_entropy>4.0",
+      "enabled": true
+    },
+    {
+      "id": "l1-ignore-previous",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "enabled": true
+    },
+    {
+      "id": "l1-exfil-url",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "enabled": false,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l1-tool-override",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)you are now|new instructions:",
+      "enabled": true
+    },
+    {
+      "id": "l1-zero-width",
+      "layer": "L1",
+      "kind": "denylist",
+      "value": "\\u200b\\u200c\\u200d",
+      "enabled": false
+    },
+    {
+      "id": "l1-base64-blob",
+      "layer": "L1",
+      "kind": "threshold",
+      "value": "base64_run>256",
+      "enabled": true
+    },
+    {
+      "id": "l0-decoded-injection-7",
+      "layer": "L0",
+      "kind": "regex",
+      "value": "(?i)ignore (all|previous) instructions",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l0-hex-payload-8",
+      "layer": "L0",
+      "kind": "threshold",
+      "value": "decoded_entropy>4.0",
+      "enabled": true
+    },
+    {
+      "id": "l1-ignore-previous-9",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "enabled": true
+    },
+    {
+      "id": "l1-exfil-url-10",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "enabled": true
+    },
+    {
+      "id": "l1-tool-override-11",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)you are now|new instructions:",
+      "enabled": true
+    },
+    {
+      "id": "l1-zero-width-12",
+      "layer": "L1",
+      "kind": "denylist",
+      "value": "\\u200b\\u200c\\u200d",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l1-base64-blob-13",
+      "layer": "L1",
+      "kind": "threshold",
+      "value": "base64_run>256",
+      "enabled": true
+    },
+    {
+      "id": "l0-decoded-injection-14",
+      "layer": "L0",
+      "kind": "regex",
+      "value": "(?i)ignore (all|previous) instructions",
+      "enabled": true
+    },
+    {
+      "id": "l0-hex-payload-15",
+      "layer": "L0",
+      "kind": "threshold",
+      "value": "decoded_entropy>4.0",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l1-ignore-previous-16",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "enabled": true
+    },
+    {
+      "id": "l1-exfil-url-17",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "enabled": true
+    },
+    {
+      "id": "l1-tool-override-18",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)you are now|new instructions:",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l1-zero-width-19",
+      "layer": "L1",
+      "kind": "denylist",
+      "value": "\\u200b\\u200c\\u200d",
+      "enabled": true
+    },
+    {
+      "id": "l1-base64-blob-20",
+      "layer": "L1",
+      "kind": "threshold",
+      "value": "base64_run>256",
+      "enabled": false
+    },
+    {
+      "id": "l0-decoded-injection-21",
+      "layer": "L0",
+      "kind": "regex",
+      "value": "(?i)ignore (all|previous) instructions",
+      "enabled": true
+    },
+    {
+      "id": "l0-hex-payload-22",
+      "layer": "L0",
+      "kind": "threshold",
+      "value": "decoded_entropy>4.0",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l1-ignore-previous-23",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "enabled": true,
+      "note": "synthetic fixture rule"
+    },
+    {
+      "id": "l1-exfil-url-24",
+      "layer": "L1",
+      "kind": "regex",
+      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "enabled": true
+    }
+  ]
+}
