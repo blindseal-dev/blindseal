@@ -1,0 +1,20 @@
+# Blindseal M0.5 verifier spike — isolated cargo workspace (excluded from the root
+# workspace). Proves one minimal SP1 guest, Groth16-wraps locally, and verifies on the
+# Solana runtime via sp1-solana. Pinned to SP1 v5.0.0 — the newest version sp1-solana
+# (0.1.0) ships a Groth16 verifying key for (GROTH16_VK_5_0_0_BYTES). See DECISIONS.md.
+[workspace]
+members = ["sp1-program", "script", "program"]
+resolver = "2"
+
+[workspace.dependencies]
+solana-program = "=2.1.6"
+solana-program-test = "=2.1.6"
+solana-sdk = "=2.1.6"
+borsh = "1.5.1"
+sha2 = "0.10.8"
+tokio = "1.40.0"
+sp1-sdk = { version = "=5.0.0", default-features = false }
+sp1-zkvm = "=5.0.0"
+sp1-build = "=5.0.0"
+sp1-solana = "0.1.0"
+blindseal-m05-program = { path = "program" }

@@ -4,29 +4,72 @@ Estimates are not allowed here. Every row is filled from an actual run on a name
 Updated at the end of M0.5, M1, and M2 (BLINDSEAL.md §9.4).
 
 ## Reference machine
-<!-- model, CPU, cores, RAM, OS -->
-_TBD_
+- Apple Silicon, macOS 27 (arm64), 10 CPU cores, 32 GB RAM.
+- Docker Desktop memory raised to 24 GB for the Groth16 wrap (see M0.5 notes).
 
-## M0.5 — verifier spike (SP1 Groth16 → Solana via sp1-solana)
+## M0.5 — verifier spike (SP1 Groth16 → Solana via sp1-solana) — GREEN ✅
+
+A minimal SP1 guest (sha256 a few bytes, commit the digest) was proven to a local Groth16
+proof and **verified on the Solana runtime** through `sp1-solana` (`GROTH16_VK_5_0_0_BYTES`,
+alt_bn128 syscalls), via `solana-program-test`. Source: `m05-spike/`.
+
+### Version matrix (the whole point of M0.5)
+| Component | Version | Note |
+|---|---|---|
+| sp1-sdk (host facade) | 5.0.0 (pinned `=5.0.0`) | caret `"5.0.0"` resolved to 5.2.4 — pinned exact |
+| sp1-zkvm / sp1-build | 5.0.0 | guest + build |
+| SP1 internal crates (sp1-prover, sp1-core-\*, sp1-recursion-gnark-ffi, sp1-stark, sp1-verifier) | **5.2.4** | caret-resolved; sp1-sdk 5.0.0 pulls them at ^5.0.0 |
+| SP1 succinct toolchain | v5.0.0 (rustc 1.85.0-dev) | `sp1up --version v5.0.0` |
+| Groth16 circuit / docker image | **v5.0.0** | `ghcr.io/succinctlabs/sp1-gnark:v5.0.0`, `v5.0.0-groth16.tar.gz` |
+| sp1-solana | 0.1.0 | verify key `GROTH16_VK_5_0_0_BYTES` |
+| solana-program / -sdk / -program-test | 2.1.6 | |
+| Solana CLI (Agave) | 4.3.1 | |
+| Host driver — guest build | Rust 1.85.0 | matches the succinct toolchain's rustc |
+| Host driver — script build | Rust 1.99.1 | sp1-sdk's tree requires rustc ≥1.90 |
+
+**Decision — pin to the SP1 5.0.0 series:** `sp1-solana` 0.1.0 ships Groth16 verifying keys
+only through `GROTH16_VK_5_0_0_BYTES`. The Groth16 wrapper circuit is stable across the 5.x
+series (the internal crates are 5.2.4 yet the gnark circuit/docker image is `v5.0.0`, and the
+proof verifies against the 5.0.0 key), so this is a deliberate pin to the newest supported
+version, **not** a silent downgrade.
+
+### Measured results
 | Field | Value |
 |---|---|
-| SP1 SDK version | _TBD_ |
-| zkVM version | _TBD_ |
-| sp1-solana version | _TBD_ |
-| Groth16 VK bytes matched | _TBD_ |
-| vkey hash | _TBD_ |
-| Proof size | _TBD_ |
-| Public-input size | _TBD_ |
-| Proving time | _TBD_ |
-| Proving RAM | _TBD_ |
-| On-chain verify CU | _TBD_ |
-| Transaction size | _TBD_ |
-| Version-mismatch decision (vendor VK / pin) | _TBD_ |
+| Program verification-key hash (`vk.bytes32()`) | `0x0097cb8781a7e6c5d286471c3df6108fd023e78632fe4e86f93cb99b8b8aaf06` |
+| Groth16 VK matched | `GROTH16_VK_5_0_0_BYTES` |
+| On-chain verify result | **VERIFIED** (`VERIFY_OK true`) |
+| Tampered-input case | **rejected** (`NEGATIVE_REJECTED true`) — the pass is non-vacuous |
+| Proving time (core + Groth16 wrap) | **255,941 ms (~4.3 min)** |
+| Peak host RSS | **5.49 GB** host. The gnark container OOM-killed at Docker's 7.7 GB default and succeeded at 24 GB; the container's own peak was not sampled. |
+| Groth16 proof size | **260 bytes** |
+| Public-input size | **36 bytes** |
+| Transaction size (signed, serialized) | **545 bytes** |
+| Verify compute units | **not captured here** — see caveat |
+
+### Caveats / follow-ups
+- **Compute units — not captured; blocker named.** `solana-program-test` with a native
+  `processor!` does not meter BPF CU. Building the program to SBF succeeds
+  (`cargo build-sbf`, sbpfv3), but `solana-program-test` 2.1.6 then reports the sbpfv3 `.so`
+  as "Program is not deployed" (a loader-version mismatch with Agave 4.3.1's build-sbf, tried
+  via both `ProgramTest::new(..., None)` and `add_upgradeable_program_to_genesis`). A
+  representative CU therefore needs a real `solana-test-validator` deploy — deferred to **M2**,
+  whose "Done when" already records real `verify_and_consume` CU. Public sp1-solana references
+  cite ~105k–300k CU for a Groth16 verify.
+- **Groth16 artifacts:** the 5.0.0 circuit artifacts (`groth16_pk.bin` 2.7 GB, `groth16_circuit.bin`
+  1.1 GB, `groth16_vk.bin`) were fetched from
+  `https://sp1-circuits.s3-us-east-2.amazonaws.com/v5.0.0-groth16.tar.gz` into
+  `~/.sp1/circuits/groth16/v5.0.0/`. The auto-download skipped (the sp1-sdk-5.0.0 path check vs
+  the 5.2.4 prover's versioned mount path), so they were placed manually.
+- **Docker memory:** the gnark Groth16 wrap OOM-killed at Docker's default 7.7 GB on 8.38 M
+  constraints; raising Docker Desktop to 24 GB fixed it.
+- **Reproducing:** `m05-spike/` holds the guest, host, and on-chain program. The prebuilt guest
+  ELF is committed; the SP1/Solana toolchains and the 3 GB circuit artifacts are machine-local.
 
 ## M1 — attestation engine
 <!-- end-to-end proving time + RAM for a real fixture decision -->
 _TBD_
 
 ## M2 — Solana verifier
-<!-- verify_and_consume CU, with/without policy allowlist -->
+<!-- verify_and_consume CU (real SBF/validator), with/without policy allowlist -->
 _TBD_

@@ -43,3 +43,11 @@ packages/eval/results/eval-*.md
 
 # local-only identity sweep list (BLINDSEAL.md §7)
 .identity-sweep
+
+# Rust / Anchor / SP1 spike build artifacts
+target/
+m05-spike/target/
+**/m05-metrics.json
+.anchor/
+test-ledger/
+**/m05_proof.bin

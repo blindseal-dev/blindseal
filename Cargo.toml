@@ -12,6 +12,7 @@ members = [
 # programs build via `anchor build`. Both are excluded from the host workspace.
 exclude = [
   "crates/guest",
+  "m05-spike",
   "programs/blindseal-verify",
   "programs/transfer-gate",
 ]
