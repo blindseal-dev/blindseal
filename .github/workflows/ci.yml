@@ -32,11 +32,11 @@ jobs:
       - name: build the layer 2 corpus (proxy tests depend on it)
         run: pnpm --filter @blindseal/corpus build
 
-      - name: typecheck — proxy + collector + eval + demo-site + contracts
+      - name: typecheck — proxy + collector + eval
         run: pnpm -r typecheck
 
-      - name: test — workspace (contracts handled by foundry job)
-        run: pnpm -r --filter='!@blindseal/contracts' test
+      - name: test — workspace
+        run: pnpm -r test
 
       - name: build — proxy + collector
         run: |
@@ -58,28 +58,3 @@ jobs:
             echo "collector bin exceeded 50KB ceiling"
             exit 1
           fi
-
-  contracts:
-    name: foundry contracts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: foundry-rs/foundry-toolchain@v1
-
-      - name: forge fmt check
-        working-directory: packages/contracts
-        run: forge fmt --check
-        continue-on-error: true # informational for now; flip to required once codebase is stable
-
-      - name: forge build
-        working-directory: packages/contracts
-        run: forge build --sizes
-
-      - name: forge test
-        working-directory: packages/contracts
-        run: forge test -vv
-
-      - name: gas snapshot
-        working-directory: packages/contracts
-        run: forge test --gas-report 2>&1 | tail -40
