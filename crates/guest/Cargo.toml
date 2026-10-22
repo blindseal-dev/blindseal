@@ -1,0 +1,9 @@
+# Blindseal SP1 guest (M0 stub) — built for the SP1 riscv target with the SP1 toolchain,
+# NOT part of the host workspace. M0.5 minimal spike -> M1 real guest (BLINDSEAL.md §3.4).
+[package]
+name = "blindseal-guest"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]

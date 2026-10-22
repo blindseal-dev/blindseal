@@ -1,0 +1,22 @@
+# Blindseal Rust workspace — M0 stub. Real guest/prover/programs land in M0.5 and M1/M2.
+# NOT YET COMPILED: the Rust/Solana/Anchor/SP1 toolchains are not installed in the M0
+# environment (see DECISIONS.md). This file fixes the layout per BLINDSEAL.md §4.
+[workspace]
+resolver = "2"
+members = [
+  "crates/detector-core",
+  "crates/prover",
+  "crates/verifier-wasm",
+]
+# crates/guest builds for the SP1 (riscv) target with its own toolchain; the Anchor
+# programs build via `anchor build`. Both are excluded from the host workspace.
+exclude = [
+  "crates/guest",
+  "programs/blindseal-verify",
+  "programs/transfer-gate",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT"

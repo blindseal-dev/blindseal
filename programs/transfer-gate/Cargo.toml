@@ -1,0 +1,19 @@
+# Blindseal example gated program (M0 stub): SPL transfer requiring an attestation.
+# M2 (BLINDSEAL.md §3.7). Ships as an example, not a published crate (§8 Q5 default).
+[package]
+name = "transfer-gate"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "transfer_gate"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+
+[dependencies]
+# anchor-lang = "0.30"  # pinned in M2

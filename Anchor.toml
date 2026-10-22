@@ -1,0 +1,21 @@
+# Blindseal Anchor workspace — M0 stub (BLINDSEAL.md §3.7, §4). Programs land in M2.
+# Program IDs are placeholders; real keypairs/IDs generated at M2 devnet deploy.
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+blindseal_verify = "BSvrfy1111111111111111111111111111111111111"
+transfer_gate = "BSgate1111111111111111111111111111111111111"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "echo 'M2: anchor tests land here'"
