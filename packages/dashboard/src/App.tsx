@@ -7,6 +7,7 @@ import { Decisions } from './pages/Decisions';
 import { DecisionDetail } from './pages/DecisionDetail';
 import { Audit } from './pages/Audit';
 import { Policy } from './pages/Policy';
+import { Attestations } from './pages/Attestations';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -29,7 +30,7 @@ function Layout() {
           <Route path="/decisions/:id" element={<DecisionDetail />} />
           <Route path="/audit" element={<Audit />} />
           <Route path="/policy" element={<Policy />} />
-          <Route path="/attestations" element={<Placeholder name="Attestations" />} />
+          <Route path="/attestations" element={<Attestations />} />
           <Route path="/settings" element={<Placeholder name="Settings" />} />
         </Routes>
       </Shell>

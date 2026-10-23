@@ -84,6 +84,10 @@ export function useSubmitAttestation() {
   });
 }
 
+export function useTeeQuote() {
+  return useQuery({ queryKey: ['tee'], queryFn: () => api.get<{ mode: string; quote?: string; quoteHash?: string }>('/tee/quote') });
+}
+
 export function useAuditHead() {
   return useQuery({ queryKey: ['audit', 'head'], queryFn: () => api.get<AuditHead>('/audit/head') });
 }
