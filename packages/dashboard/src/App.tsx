@@ -8,6 +8,7 @@ import { DecisionDetail } from './pages/DecisionDetail';
 import { Audit } from './pages/Audit';
 import { Policy } from './pages/Policy';
 import { Attestations } from './pages/Attestations';
+import { Settings } from './pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -31,16 +32,13 @@ function Layout() {
           <Route path="/audit" element={<Audit />} />
           <Route path="/policy" element={<Policy />} />
           <Route path="/attestations" element={<Attestations />} />
-          <Route path="/settings" element={<Placeholder name="Settings" />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Shell>
     </ActionsContext.Provider>
   );
 }
 
-function Placeholder({ name }: { name: string }) {
-  return <div className="page" style={{ padding: 24, color: 'var(--muted)' }}>{name} — ported in a later step of the sprint.</div>;
-}
 
 export default function App() {
   return (
