@@ -12,6 +12,11 @@ test('verify: sample passes, tampered fails, nothing stored, zero egress', async
   await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid');
   await page.getByRole('button', { name: 'Load tampered' }).click();
   await expect(page.locator('.s03-result .panel__title')).toHaveText('Invalid');
+  // a disclosure.json is accepted too: signed by the (mock) proxy identity, chain recomputed in-browser
+  await page.getByRole('button', { name: 'Load disclosure' }).click();
+  await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid', { timeout: 10_000 });
+  await expect(page.locator('.s03-result')).toContainText('content-free entries');
+  await expect(page.locator('.s03-result')).toContainText('ed25519 over the canonical window');
   const ls = await page.evaluate(() => localStorage.length);
   expect(ls).toBe(0);
   expect(off).toEqual([]);

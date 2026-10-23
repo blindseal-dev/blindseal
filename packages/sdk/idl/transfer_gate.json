@@ -1,0 +1,82 @@
+{
+  "address": "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG",
+  "metadata": {
+    "name": "transfer_gate",
+    "version": "0.0.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "gated_transfer",
+      "discriminator": [
+        152,
+        24,
+        148,
+        100,
+        101,
+        96,
+        252,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "source",
+          "docs": [
+            "The authority the transfer debits — also pays for the Nullifier PDA."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "policy_root",
+          "optional": true
+        },
+        {
+          "name": "nullifier",
+          "writable": true
+        },
+        {
+          "name": "verify_program",
+          "docs": [
+            "Typed: a direct call that passes any other program here fails before the transfer."
+          ],
+          "address": "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "name": "public_inputs",
+          "type": "bytes"
+        },
+        {
+          "name": "nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ]
+}

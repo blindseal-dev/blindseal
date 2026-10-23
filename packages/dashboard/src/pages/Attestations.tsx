@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAttestations, useAttestation, useSubmitAttestation, useBusEvent } from '../api/hooks';
+import { useAttestations, useAttestation, useSubmitAttestation, useBusEvent, useNullifier } from '../api/hooks';
 import type { Attestation, AttestationStatus } from '../api/types';
 import { Hash, Icon, StatusChip } from '../kit/react';
 import { splitPublicInputs } from '../api/publicInputs';
@@ -55,6 +55,7 @@ export function Attestations() {
 function Sheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: a, isLoading } = useAttestation(id);
   const submit = useSubmitAttestation();
+  const chain = useNullifier(a?.nullifier); // mainnet read via the proxy (server-side)
   const cluster = 'mainnet-beta' as const; // the only deploy target (no devnet)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -84,6 +85,13 @@ function Sheet({ id, onClose }: { id: string; onClose: () => void }) {
               <dl className="kv">
                 <div><dt>Proof</dt><dd><Hash value={a.proof?.bytes} label="Groth16 proof" /> <span className="is-faint">{a.proof?.protocol}/{a.proof?.curve}</span></dd></div>
                 <div><dt>Nullifier</dt><dd><Hash value={a.nullifier} /></dd></div>
+                <div><dt>On chain</dt><dd className="d05-chain" data-state={chain.data ? (chain.data.consumed ? 'consumed' : 'open') : chain.isError ? 'unknown' : 'loading'}>
+                  {chain.isLoading ? <span className="is-faint">checking mainnet…</span>
+                    : chain.isError ? <span className="is-faint">mainnet read unavailable</span>
+                    : chain.data?.consumed ? <>consumed at slot <span className="num">{chain.data.consumedAtSlot}</span>{chain.data.consumerProgram && <> by <Hash value={chain.data.consumerProgram} /></>}</>
+                    : <span className="is-muted">not consumed</span>}
+                  {chain.data?.rpc === 'public' && <span className="is-faint"> · public RPC</span>}
+                </dd></div>
                 <div><dt>TEE</dt><dd>{a.tee?.mode}</dd></div>
                 {a.txSig && <div><dt>Tx</dt><dd><Hash value={a.txSig} /></dd></div>}
               </dl>

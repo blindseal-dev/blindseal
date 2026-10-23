@@ -25,6 +25,8 @@
     "@types/mocha": "10.0.9",
     "@types/chai": "4.3.20",
     "@types/node": "22.9.0",
-    "@types/bn.js": "5.1.6"
+    "@types/bn.js": "5.1.6",
+    "@blindseal/sdk": "workspace:*",
+    "tsx": "4.19.2"
   }
 }

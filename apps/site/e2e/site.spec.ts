@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const PAGES = ['/', '/how-it-works', '/verify', '/docs', '/explorer', '/changelog'];
+const PAGES = ['/', '/how-it-works', '/verify', '/docs', '/docs/concepts', '/docs/hashing', '/docs/integrate', '/docs/scope', '/explorer', '/changelog'];
 
 for (const path of PAGES) {
   test(`${path}: renders, zero egress, never-write clean`, async ({ page }) => {
@@ -38,6 +38,10 @@ test('verify: sample valid, tampered invalid, nothing stored, wasm fetched same-
   await expect(page.locator('.s03-result .panel__title')).toHaveText('Invalid');
   // The real Groth16 verifier ran: a flipped proof fails the on-curve check.
   await expect(page.locator('.s03-result')).toContainText('NotOnCurve');
+  // a disclosure.json is accepted too (ed25519 + chain recompute, in the browser)
+  await page.getByRole('button', { name: 'Load disclosure' }).click();
+  await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid', { timeout: 10_000 });
+  await expect(page.locator('.s03-result')).toContainText('content-free entries');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
   expect(off, `off-host: ${off.join(', ')}`).toEqual([]);
 });

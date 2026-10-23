@@ -38,7 +38,8 @@
     "@blindseal/redactor": "workspace:*",
     "@blindseal/audit": "workspace:*",
     "@blindseal/sdk": "workspace:*",
-    "@solana/web3.js": "1.98.0"
+    "@solana/web3.js": "1.98.0",
+    "@blindseal/chain-reads": "workspace:*"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

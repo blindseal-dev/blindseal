@@ -3,6 +3,7 @@
 // sp1-solana (M2). Nothing else imports the verifier. The TS schema check below stays so malformed
 // input still produces the step list; the wasm does the cryptographic proof step.
 import init, { verify_attestation_json } from '@blindseal/verifier-wasm';
+import { isDisclosure, verifyDisclosure, isCleanWindow, type Disclosure } from './disclosure';
 
 export interface VerifyStep { id: string; label: string; ok: boolean | null; detail: string; }
 export interface VerifyResult { valid: boolean; steps: VerifyStep[]; error?: string; }
@@ -17,6 +18,7 @@ const ensure = () => (ready ??= init());
 export async function verifyAttestation(json: string): Promise<VerifyResult> {
   let a: any;
   try { a = JSON.parse(json); } catch { return { valid: false, error: 'Not valid JSON.', steps: [] }; }
+  if (isDisclosure(a)) return verifyDisclosureDoc(a);
   const proof = a?.proof?.bytes, pub = a?.publicInputs?.[0], vkey = a?.detectorVersion;
   const schemaOk = !!(proof && hex.test(proof)) && !!(pub && hex.test(pub)) && !!(vkey && hex.test(vkey)) && typeof a.expirySlot === 'number';
 
@@ -57,4 +59,19 @@ export function tamper(json: string): string {
     a.proof.bytes = b.slice(0, -1) + (b.slice(-1) === '0' ? '1' : '0');
     return JSON.stringify(a, null, 2);
   } catch { return json; }
+}
+
+/** A disclosure.json (BLINDSEAL.md §3.6): signature + in-window chain consistency, in the browser. */
+async function verifyDisclosureDoc(d: Disclosure): Promise<VerifyResult> {
+  const v = await verifyDisclosure(d);
+  const n = d.entries.length;
+  const clean = isCleanWindow(d);
+  const steps: VerifyStep[] = [
+    { id: 'schema', label: 'Disclosure is well-formed', ok: true, detail: `window #${d.from}–#${d.to}, ${n} content-free entries` },
+    { id: 'signature', label: 'Signed by the stated proxy identity', ok: v.ok ? true : (v.reason === 'signature mismatch' || v.reason?.startsWith('bad signer') ? false : true), detail: v.ok ? `ed25519 over the canonical window · signer ${d.signerPubkey.slice(0, 16)}…` : (v.reason ?? 'signature did not verify') },
+    { id: 'chain', label: 'Entry hashes reproduce and link in order', ok: v.ok ? true : (v.reason?.includes('hash mismatch') || v.reason?.includes('prevHash') ? false : null), detail: v.ok ? `${n} entries recomputed from their six fields; every prevHash links to the previous hash` : (v.reason ?? '') },
+    { id: 'clean', label: 'Clean window', ok: v.ok ? clean : null, detail: v.ok ? (clean ? 'every disclosed decision passed' : 'window contains non-pass verdicts (still a valid disclosure)') : 'not evaluated' },
+    { id: 'content', label: 'No content disclosed', ok: true, detail: 'only ids, verdicts, payload hashes and timestamps are in this file' },
+  ];
+  return { valid: v.ok, steps };
 }

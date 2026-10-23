@@ -1,0 +1,9 @@
+{
+  "toolName": "transfer_sol",
+  "args": {
+    "to": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+    "lamports": 1000000,
+    "from": "88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj",
+    "memo": "blindseal m2 mainnet acceptance: one gated 0.001 SOL transfer"
+  }
+}

@@ -216,6 +216,17 @@ function main(): void {
     return;
   }
 
+  if (argv[0] === 'audit' || argv[0] === 'verify') {
+    const which = argv[0];
+    (which === 'audit' ? import('./cli/audit.js').then((m) => m.runAuditCli(argv.slice(1))) : import('./cli/verify.js').then((m) => m.runVerifyCli(argv.slice(1))))
+      .then((code) => process.exit(code))
+      .catch((err) => {
+        process.stderr.write(`blindseal ${which}: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exit(1);
+      });
+    return;
+  }
+
   if (argv[0] === 'history') {
     process.exit(runHistoryCli(argv.slice(1)));
   }

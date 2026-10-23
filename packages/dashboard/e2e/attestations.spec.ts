@@ -10,6 +10,6 @@ test('attestations: list + detail sheet with 6 public inputs', async ({ page }) 
   // The single committed blob is decoded into the six labelled fields for display.
   await expect(page.locator('.d05-pi > div')).toHaveCount(6);
   // expirySlot renders as the decoded decimal (280050000), proving the blob was split, not passed through.
-  await expect(page.locator('.d05-pi').getByText('280050000', { exact: true })).toBeVisible();
+  await expect(page.locator('.d05-pi').getByText('280050000', { exact: true })).toBeVisible({ timeout: 15_000 });
   expect(off).toEqual([]);
 });

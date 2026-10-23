@@ -22,6 +22,27 @@ export function useStatus() {
   return useQuery({ queryKey: ['status'], queryFn: () => api.get<Status>('/status') });
 }
 
+/// On-chain nullifier status (mainnet), read server-side by the proxy — the browser stays zero-egress.
+export interface NullifierStatus {
+  nullifier: string;
+  consumed: boolean;
+  pda: string;
+  consumedAtSlot?: number;
+  consumerProgram?: string;
+  actionHash?: string;
+  cluster: 'mainnet-beta';
+  rpc: 'configured' | 'public';
+}
+export function useNullifier(nullifier: string | undefined) {
+  return useQuery({
+    queryKey: ['nullifier', nullifier],
+    queryFn: () => api.get<NullifierStatus>(`/nullifiers/${nullifier}`),
+    enabled: !!nullifier,
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
 export function useDecisions(filter?: { verdict?: string; server?: string }) {
   const qs = new URLSearchParams();
   if (filter?.verdict) qs.set('verdict', filter.verdict);

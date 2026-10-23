@@ -11,6 +11,7 @@ export interface RunOptions {
   port?: number;
   host?: string;
   fixturesDir?: string;
+  dashboard?: string; // built dashboard dir to serve at `/` (application/wasm + CSP)
   help?: boolean;
 }
 
@@ -24,6 +25,8 @@ Flags
   --port <n>          listen port (default 7777)
   --host <addr>       listen host (default 127.0.0.1)
   --fixtures <dir>    fixtures directory (default: nearest fixtures/)
+  --dashboard <dir>   serve the built dashboard at / (default: $BLINDSEAL_DASHBOARD_DIST or
+                      packages/dashboard/dist next to fixtures/, if built)
   --help, -h          this help
 
 M0 supports --mock only. The engine-backed API lands in M1.
@@ -38,6 +41,7 @@ export function parseRunArgs(argv: string[]): RunOptions {
     else if (a === '--port') out.port = Number.parseInt(argv[++i] ?? '', 10);
     else if (a === '--host') out.host = argv[++i];
     else if (a === '--fixtures') out.fixturesDir = argv[++i];
+    else if (a === '--dashboard') out.dashboard = argv[++i];
     else if (a && a.startsWith('--')) throw new Error(`unknown flag: ${a}`);
   }
   return out;
@@ -79,11 +83,16 @@ export async function runRun(argv: string[]): Promise<number> {
   }
 
   const fixturesDir = resolveFixturesDir(opts.fixturesDir);
-  const handle = await startMockApi({ port: opts.port, host: opts.host, fixturesDir });
+  // Built dashboard: explicit flag → env → packages/dashboard/dist beside fixtures/ (if built).
+  const autoDist = path.join(path.dirname(fixturesDir), 'packages', 'dashboard', 'dist');
+  const dashboardDist = opts.dashboard ?? process.env.BLINDSEAL_DASHBOARD_DIST ?? (existsSync(path.join(autoDist, 'index.html')) ? autoDist : undefined);
+  const handle = await startMockApi({ port: opts.port, host: opts.host, fixturesDir, dashboardDist });
   process.stdout.write(
     `blindseal (MOCK): local API on ${handle.url}\n` +
     `  token: ${handle.token}\n` +
-    `  dashboard: open with #token=${handle.token}\n` +
+    (dashboardDist
+      ? `  dashboard: ${handle.url}/#token=${handle.token}  (served from ${dashboardDist}; application/wasm + CSP)\n`
+      : `  dashboard: not served (build packages/dashboard or pass --dashboard <dist>); open the dev app with #token=${handle.token}\n`) +
     `  fixtures: ${fixturesDir}\n` +
     `  WS: ${handle.url.replace(/^http/, 'ws')}/events?token=${handle.token}\n` +
     'Ctrl-C to stop.\n',

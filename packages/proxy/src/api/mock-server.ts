@@ -8,6 +8,15 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import type { Socket } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { getNullifierStatus } from '@blindseal/chain-reads';
+import { discloseBundle, hashEntry } from '@blindseal/audit';
+import { createPrivateKey, createPublicKey } from 'node:crypto';
+
+// The mock proxy's identity: a committed throwaway ed25519 key, so disclosures the mock signs
+// verify for real (dashboard/site verify pages, `blindseal verify`). Not a secret — fixtures only.
+const MOCK_IDENTITY_PKCS8 = '302e020100300506032b657004220420b6c6aa0182de5f17678ed27e9515ed56b438c6bec2ca9d27d653feec4d13da1c';
+const MOCK_PRIVATE_KEY = createPrivateKey({ key: Buffer.from(MOCK_IDENTITY_PKCS8, 'hex'), format: 'der', type: 'pkcs8' });
+const MOCK_PUBKEY_HEX = (createPublicKey(MOCK_PRIVATE_KEY).export({ type: 'spki', format: 'der' }) as Buffer).toString('hex');
 
 export interface MockApiOptions {
   port?: number;
@@ -15,6 +24,39 @@ export interface MockApiOptions {
   fixturesDir: string;
   token?: string;        // explicit token (tests); otherwise read/create ~/.blindseal/dashboard.token
   emitIntervalMs?: number; // fake decision cadence (default 3000)
+  /// Serve the built dashboard (packages/dashboard/dist) at `/` with the MIME types and the CSP
+  /// the in-browser wasm verifier needs (`application/wasm`, `script-src 'wasm-unsafe-eval'`).
+  dashboardDist?: string;
+}
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.wasm': 'application/wasm', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.woff2': 'font/woff2', '.woff': 'font/woff', '.ico': 'image/x-icon', '.map': 'application/json', '.txt': 'text/plain',
+};
+/// Zero-egress by construction: only our origin (plus the WS back to it). `wasm-unsafe-eval` is
+/// what lets the browser compile the verifier module under a CSP; no `unsafe-eval`.
+const DASHBOARD_CSP = [
+  "default-src 'self'", "script-src 'self' 'wasm-unsafe-eval'", "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:", "font-src 'self'", "connect-src 'self' ws://127.0.0.1:* ws://localhost:* http://127.0.0.1:* http://localhost:*",
+  "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'",
+].join('; ');
+
+function serveDashboard(res: ServerResponse, dist: string, pathname: string): boolean {
+  const rel = pathname === '/' ? '/index.html' : decodeURIComponent(pathname);
+  let file = path.normalize(path.join(dist, rel));
+  if (!file.startsWith(path.normalize(dist + path.sep)) && file !== path.normalize(dist)) return false;
+  if (!existsSync(file)) file = path.join(dist, 'index.html'); // SPA (HashRouter) fallback
+  if (!existsSync(file)) return false;
+  const body = readFileSync(file);
+  const type = MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
+  res.writeHead(200, {
+    'content-type': type, 'content-length': body.length, 'content-security-policy': DASHBOARD_CSP,
+    'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer',
+    'cache-control': file.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable',
+  });
+  res.end(body);
+  return true;
 }
 
 export interface MockApiHandle {
@@ -171,7 +213,12 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
     }
     if (method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
-    if (!p.startsWith('/api/')) return sendErr(res, 404, 'NOT_FOUND', 'unknown path');
+    // Built dashboard at `/` (opt-in): same origin as the API, so the app is zero-egress and
+    // the wasm verifier loads under the CSP above.
+    if (!p.startsWith('/api/')) {
+      if (opts.dashboardDist && method === 'GET' && serveDashboard(res, opts.dashboardDist, p)) return;
+      return sendErr(res, 404, 'NOT_FOUND', 'unknown path');
+    }
     if (!bearerOk(req, token, url)) return sendErr(res, 401, 'UNAUTHORIZED', 'missing or invalid bearer token');
     const seg = p.slice('/api/'.length).split('/').filter(Boolean);
     const st = stateOf(url);
@@ -232,8 +279,8 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
           let prev = fx.audit.genesis;
           let brokenAt: number | undefined;
           for (const e of fx.audit.entries) {
-            const core = { index: e.index, ts: e.ts, decisionId: e.decisionId, verdict: e.verdict, payloadHash: e.payloadHash, prevHash: prev };
-            const h = sha(DOMAIN + JSON.stringify(core));
+            // the real hasher (@blindseal/audit): canonical JSON, domain-separated
+            const h = hashEntry({ index: e.index, ts: e.ts, decisionId: e.decisionId, verdict: e.verdict, payloadHash: e.payloadHash, prevHash: prev });
             if (h !== e.hash || e.prevHash !== prev) { brokenAt = e.index; break; }
             prev = e.hash;
           }
@@ -250,11 +297,11 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
           if (st === 'chain-broken' && body.from <= 143 && body.to >= 143)
             return sendErr(res, 409, 'CHAIN_BROKEN', 'the chain is broken at #143; cannot disclose a range over it');
           const entries = fx.audit.entries.filter((e) => e.index >= body.from && e.index <= body.to);
-          return sendJson(res, 200, {
+          // a real, verifiable disclosure (ed25519 over the canonical window) by the mock identity
+          return sendJson(res, 200, discloseBundle({
             from: body.from, to: body.to, head: fx.audit.head, entries,
-            signerPubkey: sha('mock-proxy-identity').slice(0, 66),
-            signature: sha('mock-sig:' + body.from + ':' + body.to),
-          });
+            privateKey: MOCK_PRIVATE_KEY, pubkeyHex: MOCK_PUBKEY_HEX,
+          }));
         }
       }
 
@@ -331,6 +378,15 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
         return sendJson(res, 200, { mode: 'local' });
       }
 
+      // On-chain nullifier status — a real mainnet read even in mock mode (server-side, so the
+      // browser stays zero-egress). GET /api/nullifiers/:nullifier
+      if (seg[0] === 'nullifiers' && seg[1] && method === 'GET') {
+        try {
+          return sendJson(res, 200, await getNullifierStatus(seg[1]));
+        } catch (e) {
+          return sendErr(res, 502, 'RPC_UNAVAILABLE', e instanceof Error ? e.message : String(e));
+        }
+      }
       return sendErr(res, 404, 'NOT_FOUND', `no route for ${method} ${p}`);
     } catch (e) {
       return sendErr(res, 500, 'VALIDATION', (e as Error).message);

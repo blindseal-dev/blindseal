@@ -207,3 +207,89 @@ export async function verifyOffchain(att: Attestation): Promise<VerifyResult> {
   wasm.initSync({ module: bytes });
   return JSON.parse(wasm.verify_attestation_json(JSON.stringify(att))) as VerifyResult;
 }
+
+// ---- admin instructions (authority only) ----
+const boolB = (b: boolean) => Buffer.from([b ? 1 : 0]);
+const vecVkeys = (v: Uint8Array[]) => { const len = Buffer.alloc(4); len.writeUInt32LE(v.length); return Buffer.concat([len, ...v.map((k) => Buffer.from(k))]); };
+const option = (present: boolean, body: Buffer) => (present ? Buffer.concat([Buffer.from([1]), body]) : Buffer.from([0]));
+
+/** `initialize(allowed_vkeys, allowlist_policies)` — creates the Config PDA; `authority` pays and becomes the authority. */
+export function buildInitializeIx(authority: PublicKey, allowedVkeys: Uint8Array[], allowlistPolicies: boolean, programId = PROGRAM_ID): TransactionInstruction {
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: configPda(programId), isSigner: false, isWritable: true },
+      { pubkey: authority, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([discriminator('initialize'), vecVkeys(allowedVkeys), boolB(allowlistPolicies)]),
+  });
+}
+
+/** `set_config(allowed_vkeys?, allowlist_policies?, paused?)` — each `undefined` leaves the field unchanged. */
+export function buildSetConfigIx(authority: PublicKey, o: { allowedVkeys?: Uint8Array[]; allowlistPolicies?: boolean; paused?: boolean }, programId = PROGRAM_ID): TransactionInstruction {
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: configPda(programId), isSigner: false, isWritable: true },
+      { pubkey: authority, isSigner: true, isWritable: false },
+    ],
+    data: Buffer.concat([
+      discriminator('set_config'),
+      option(o.allowedVkeys !== undefined, o.allowedVkeys ? vecVkeys(o.allowedVkeys) : Buffer.alloc(0)),
+      option(o.allowlistPolicies !== undefined, boolB(o.allowlistPolicies ?? false)),
+      option(o.paused !== undefined, boolB(o.paused ?? false)),
+    ]),
+  });
+}
+
+/** `register_policy_root(root)` — authority only; creates PDA(["policy", root]). */
+export function buildRegisterPolicyRootIx(authority: PublicKey, root: Uint8Array, programId = PROGRAM_ID): TransactionInstruction {
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: configPda(programId), isSigner: false, isWritable: false },
+      { pubkey: policyRootPda(root, programId), isSigner: false, isWritable: true },
+      { pubkey: authority, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([discriminator('register_policy_root'), Buffer.from(root)]),
+  });
+}
+
+/** Decode the Config account (8 disc ‖ 32 authority ‖ vec<[u8;32]> ‖ bool allowlist ‖ bool paused ‖ u8 bump). */
+export function decodeConfig(data: Uint8Array) {
+  const b = Buffer.from(data);
+  const n = b.readUInt32LE(40);
+  const vkeys: string[] = [];
+  for (let i = 0; i < n; i++) vkeys.push('0x' + b.subarray(44 + i * 32, 76 + i * 32).toString('hex'));
+  const off = 44 + n * 32;
+  return { authority: new PublicKey(b.subarray(8, 40)).toBase58(), allowedVkeys: vkeys, allowlistPolicies: b[off] === 1, paused: b[off + 1] === 1, bump: b[off + 2] };
+}
+
+// ---- transfer-gate (example gated program) ----
+/** `gated_transfer(proof, public_inputs, nonce, amount)`: the gate CPIs verify_and_consume with the
+ *  action IT executes, then transfers `amount` lamports source → recipient in the same tx. */
+export function buildGatedTransferIx(att: Attestation, accounts: { source: PublicKey; recipient: PublicKey; policyRoot?: PublicKey | null; gateId?: PublicKey; verifyId?: PublicKey }): TransactionInstruction {
+  const gateId = accounts.gateId ?? TRANSFER_GATE_ID;
+  const verifyId = accounts.verifyId ?? PROGRAM_ID;
+  const proof = hex(att.proof.bytes);
+  const blob = hex(att.publicInputs[0]);
+  const { nullifier, policyRoot } = decodePublicInputs(blob);
+  const amount = Buffer.alloc(8); amount.writeBigUInt64LE(BigInt(att.action.amount));
+  const data = Buffer.concat([discriminator('gated_transfer'), vecU8(proof), vecU8(blob), hex(att.nonce), amount]);
+  const policy = accounts.policyRoot === undefined ? policyRootPda(policyRoot, verifyId) : accounts.policyRoot;
+  return new TransactionInstruction({
+    programId: gateId,
+    keys: [
+      { pubkey: accounts.source, isSigner: true, isWritable: true },
+      { pubkey: accounts.recipient, isSigner: false, isWritable: true },
+      { pubkey: configPda(verifyId), isSigner: false, isWritable: false },
+      { pubkey: policy ?? gateId, isSigner: false, isWritable: false }, // Anchor optional None = program id
+      { pubkey: nullifierPda(nullifier, verifyId), isSigner: false, isWritable: true },
+      { pubkey: verifyId, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}

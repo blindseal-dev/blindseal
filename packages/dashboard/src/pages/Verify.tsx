@@ -40,6 +40,12 @@ export function Verify() {
           <button type="button" className="btn primary" disabled={!text || busy} onClick={() => run(text)}>{busy ? 'Verifying…' : 'Verify'}</button>
           <button type="button" className="btn secondary" onClick={() => loadSample(false)}>Load sample</button>
           <button type="button" className="btn secondary" onClick={() => loadSample(true)}>Load tampered</button>
+          <button type="button" className="btn secondary" onClick={async () => {
+            // a signed, content-free disclosure of the last ten audit entries (accepted here too)
+            const head = await api.get<{ index: number }>('/audit/head');
+            const d = await api.post<unknown>('/audit/disclose', { from: Math.max(0, head.index - 9), to: head.index });
+            const json = JSON.stringify(d, null, 2); setText(json); run(json);
+          }}>Load disclosure</button>
           <button type="button" className="btn link" onClick={() => { setText(''); setResult(null); }}>Clear</button>
         </div>
       </section>

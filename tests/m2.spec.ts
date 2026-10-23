@@ -203,9 +203,16 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     const after = await conn.getBalance(recipient.publicKey, 'confirmed');
     expect(after - before).to.equal(AMOUNT.toNumber());
 
-    const nf: any = await verify.account.nullifier.fetch(nullifierPda(NULLIFIER));
-    expect(Buffer.from(nf.actionHash)).to.deep.equal(hex(att.actionHash));
-    expect(nf.consumerProgram.toBase58()).to.equal(gate.programId.toBase58());
+    // Nullifier is written manually by the program (not via an Accounts struct), so it is not in
+    // the IDL's account list; decode its fixed layout: 8 disc ‖ u64 slot ‖ 32 consumer ‖ 32 actionHash ‖ u8 bump.
+    const info = await conn.getAccountInfo(nullifierPda(NULLIFIER), 'confirmed');
+    expect(info, 'nullifier PDA exists').to.not.equal(null);
+    expect(info!.owner.equals(verify.programId)).to.equal(true);
+    const d = info!.data;
+    expect(d.length).to.equal(81);
+    expect(d.subarray(48, 80)).to.deep.equal(hex(att.actionHash));
+    expect(new PublicKey(d.subarray(16, 48)).toBase58()).to.equal(gate.programId.toBase58());
+    expect(Number(d.readBigUInt64LE(8))).to.be.greaterThan(0);
 
     const t = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
     const parser = new anchor.EventParser(verify.programId, new anchor.BorshCoder(verify.idl));

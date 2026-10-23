@@ -57,3 +57,34 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 2. **M2 on-chain**: Anchor verify program + transfer-gate + mainnet deploy (budget ~230k CU + logic, per M0.5).
 3. Raise dashboard motion fidelity (sliding pill, row flash) and the site CRT hero; add a §5 counts endpoint
    to unblock `/decisions` counts + `/policy` root preview.
+
+---
+
+# Finish sequence — M2 + M3 (2026-10-23, in progress)
+
+## Done
+| Item | Where |
+|---|---|
+| Mainnet-only chain model (chainId 1; 2 reserved; devnet removed everywhere) | `104dda7` |
+| Prover CLI (binds real action fields; writes action/nonce/chainId/decisionId) | `104dda7` |
+| `@blindseal/sdk`: buildVerifyIx / buildGatedTransferIx / submit (genesis guard) / verifyOffchain / admin ix | `104dda7`, later |
+| `blindseal attest` (screen → audit → prove), `submit`, `verify`, `audit verify|disclose` | `104dda7`, M3 commit |
+| `blindseal-verify` + `transfer-gate` Anchor programs, built to SBF (`scripts/build-programs.sh`) | `41a0ab4` |
+| `tests/m2.spec.ts` — every §3.7 case incl. paused + atomicity (needs the test proof) | `41a0ab4` |
+| Proxy serves the built dashboard: `application/wasm` + CSP `wasm-unsafe-eval` (served.spec) | M3 commit |
+| On-chain reads server-side: `/api/nullifiers/:nf`, site `/explorer` live via `BLINDSEAL_RPC_URL` | M3 commit |
+| Disclosures end to end: CLI, API (real ed25519 in the mock), dashboard export, both verify pages accept `disclosure.json` | M3 commit |
+| Docs: quickstart, concepts, hashing (§3.3 verbatim), gated-program guide, honest scope; changelog 0.5.0 | M3 commit |
+| Identity sweep script + base-project names scrubbed from every surface | M3 commit |
+| Mainnet tooling: `scripts/mainnet-deploy.sh`, `mainnet-init.mts`, `mainnet-acceptance.mts` | M3 commit |
+
+## Pending (in order)
+1. Test proof (`tests/fixtures/attestation-test.json`, ~2.3 h on this machine) → `anchor test` → CU + tx size → `docs/performance.md`.
+2. Mainnet proof from a real screened decision (`blindseal attest tests/fixtures/mainnet-toolcall.json …`, another ~2.3 h).
+3. **Owner gate:** fund `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj` (BLOCKERS.md) → `scripts/mainnet-deploy.sh`
+   → `scripts/mainnet-acceptance.mts` → both signatures here. Nothing below is claimed until they exist.
+4. Quickstart on a fresh clone; launch checklist boxes.
+
+## Mainnet signatures
+- gated transfer (verify + consume + transfer): _pending funding_
+- replay rejected: _pending funding_

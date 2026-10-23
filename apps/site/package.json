@@ -16,7 +16,9 @@
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "@blindseal/verifier-wasm": "workspace:*"
+    "@blindseal/verifier-wasm": "workspace:*",
+    "@solana/web3.js": "1.98.0",
+    "@blindseal/chain-reads": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.9.0",

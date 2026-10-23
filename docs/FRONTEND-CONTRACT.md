@@ -137,3 +137,12 @@ the attestation — only hashes. Keep that panel.
 `GET /decisions`, `/decisions/:id`, `/policy`, `/attestations`, `/attestations/:id`, `/audit`, the
 `/events` WebSocket, etc. — the `FRONTEND.md` §5 contract, served by `mock-server.ts` from
 `fixtures/*.json`. Build the dashboard against this; it is the shape the real engine will also serve.
+
+### Added in M2 — on-chain reads (server-side, same-origin for the UI)
+
+- `GET /api/nullifiers/:nullifier` → `{ nullifier, consumed: bool, pda, consumedAtSlot?, consumerProgram?,
+  actionHash?, cluster: "mainnet-beta", rpc: "configured" | "public" }`. The proxy reads mainnet via
+  `BLINDSEAL_RPC_URL` (public endpoint when unset — rate-limited and logged; `off` disables). The
+  browser never contacts an RPC: zero-egress is preserved by construction.
+- The site's `/explorer` is a server component over the same reader (`@blindseal/chain-reads`):
+  consumed-nullifier count, registered policy roots, consumer programs, per-day buckets.

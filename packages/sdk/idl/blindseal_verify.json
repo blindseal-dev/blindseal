@@ -1,0 +1,546 @@
+{
+  "address": "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb",
+  "metadata": {
+    "name": "blindseal_verify",
+    "version": "0.0.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "allowed_vkeys",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "allowlist_policies",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "register_policy_root",
+      "docs": [
+        "Authority only. Registers a policy root for allowlist mode."
+      ],
+      "discriminator": [
+        46,
+        99,
+        175,
+        61,
+        198,
+        253,
+        254,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy_root",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "root"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_config",
+      "docs": [
+        "Authority only. Each field is optional so a single call can flip just `paused`."
+      ],
+      "discriminator": [
+        108,
+        158,
+        154,
+        175,
+        212,
+        98,
+        52,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "allowed_vkeys",
+          "type": {
+            "option": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          }
+        },
+        {
+          "name": "allowlist_policies",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "paused",
+          "type": {
+            "option": "bool"
+          }
+        }
+      ]
+    },
+    {
+      "name": "verify_and_consume",
+      "discriminator": [
+        170,
+        228,
+        198,
+        39,
+        122,
+        93,
+        127,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy_root",
+          "optional": true
+        },
+        {
+          "name": "nullifier",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "name": "public_inputs",
+          "type": "bytes"
+        },
+        {
+          "name": "action",
+          "type": {
+            "defined": {
+              "name": "ActionArgs"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "PolicyRoot",
+      "discriminator": [
+        132,
+        3,
+        153,
+        12,
+        23,
+        82,
+        108,
+        150
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Consumed",
+      "discriminator": [
+        30,
+        74,
+        68,
+        130,
+        40,
+        188,
+        227,
+        125
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Paused",
+      "msg": "verifier is paused"
+    },
+    {
+      "code": 6001,
+      "name": "DisallowedVkey",
+      "msg": "detectorVersion is not an allowed vkey"
+    },
+    {
+      "code": 6002,
+      "name": "UnregisteredPolicyRoot",
+      "msg": "policy root is not registered (allowlist mode)"
+    },
+    {
+      "code": 6003,
+      "name": "Expired",
+      "msg": "attestation expired"
+    },
+    {
+      "code": 6004,
+      "name": "ActionHashMismatch",
+      "msg": "action does not match the screened action (actionHash mismatch)"
+    },
+    {
+      "code": 6005,
+      "name": "NullifierMismatch",
+      "msg": "nullifier does not match actionHash"
+    },
+    {
+      "code": 6006,
+      "name": "NullifierAlreadyConsumed",
+      "msg": "nullifier already consumed (replay)"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidProof",
+      "msg": "Groth16 proof did not verify"
+    },
+    {
+      "code": 6008,
+      "name": "BadPublicInputs",
+      "msg": "public inputs must be 168 bytes"
+    },
+    {
+      "code": 6009,
+      "name": "TooManyVkeys",
+      "msg": "too many vkeys"
+    },
+    {
+      "code": 6010,
+      "name": "Unauthorized",
+      "msg": "unauthorized"
+    }
+  ],
+  "types": [
+    {
+      "name": "ActionArgs",
+      "docs": [
+        "The on-chain action the gated program is about to execute, plus the attestation's nonce.",
+        "32-byte fields are zero when n/a; `mint` is zero for the native asset."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_id",
+            "type": "u16"
+          },
+          {
+            "name": "target_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "instruction",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "allowed_vkeys",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "allowlist_policies",
+            "type": "bool"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Consumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "action_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "policy_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "consumer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyRoot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "registered_at",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

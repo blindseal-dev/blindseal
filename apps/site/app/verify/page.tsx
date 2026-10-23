@@ -2,8 +2,10 @@
 import { useState } from 'react';
 import { verifyAttestation, tamper, type VerifyResult } from './verifier';
 import sample from './sample.json';
+import disclosureSample from './disclosure-sample.json';
 
 const CANON = JSON.stringify(sample);
+const DISCLOSURE = JSON.stringify(disclosureSample, null, 2);
 
 export default function VerifyPage() {
   const [text, setText] = useState('');
@@ -27,6 +29,7 @@ export default function VerifyPage() {
           <button type="button" className="btn primary" disabled={!text || busy} onClick={() => run(text)}>{busy ? 'Verifying…' : 'Verify'}</button>
           <button type="button" className="btn secondary" onClick={() => load(false)}>Load sample</button>
           <button type="button" className="btn secondary" onClick={() => load(true)}>Load tampered</button>
+          <button type="button" className="btn secondary" onClick={() => { setText(DISCLOSURE); run(DISCLOSURE); }}>Load disclosure</button>
           <button type="button" className="btn link" onClick={() => { setText(''); setResult(null); }}>Clear</button>
         </div>
       </div>
