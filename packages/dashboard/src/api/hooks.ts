@@ -78,7 +78,7 @@ export function useRevealPayload() {
 export function useSubmitAttestation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: string; cluster: 'devnet' | 'mainnet-beta' }) =>
+    mutationFn: (v: { id: string; cluster: 'mainnet-beta' }) =>
       api.post<{ txSig: string }>(`/attestations/${v.id}/submit`, { cluster: v.cluster }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['attestations'] }),
   });

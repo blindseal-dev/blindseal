@@ -27,9 +27,9 @@ describe('solana chain adapter', () => {
     expect(a!.instruction).toBe('transferChecked');
   });
 
-  it('honors devnet chainId', () => {
-    const a = parseSolanaAction('send', { to: 'X', amount: 1 }, { chain: 'devnet' });
-    expect(a!.chainId).toBe(2);
+  it('chainId is always 1 (Solana mainnet); 2 is reserved, never devnet', () => {
+    const a = parseSolanaAction('send', { to: 'X', amount: 1 }, { chain: 'mainnet' });
+    expect(a!.chainId).toBe(1);
   });
 
   it('accepts an explicit program id on a non-transfer-named tool', () => {

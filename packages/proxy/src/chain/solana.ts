@@ -3,11 +3,14 @@
 /// actionHash (§3.3): target program, instruction, recipient, mint, amount, source authority.
 /// Returns null when the call is not a recognizable on-chain action. Key-based extraction,
 /// like the trade-guard, so it works across MCP servers with different arg names.
-export type SolanaChain = 'mainnet' | 'devnet';
+export type SolanaChain = 'mainnet';
+
+/// chainId 1 = Solana mainnet, the only deploy target. 2 is reserved (never devnet).
+export const CHAIN_ID_SOLANA_MAINNET = 1;
 
 export interface SolanaAction {
   chain: 'solana';
-  chainId: number; // 1 = mainnet, 2 = devnet
+  chainId: number; // 1 = mainnet (2 reserved)
   targetProgram: string; // base58 program id
   instruction: string; // name or discriminator
   recipient: string; // base58, '' if n/a
@@ -61,7 +64,8 @@ export function parseSolanaAction(
 
   const mint = firstString(a, MINT_KEYS);
   const sourceAuthority = firstString(a, AUTHORITY_KEYS);
-  const chainId = opts.chain === 'devnet' ? 2 : 1;
+  void opts; // mainnet is the only chain; the option stays for a future EVM adapter (chainId 3+)
+  const chainId = CHAIN_ID_SOLANA_MAINNET;
   const targetProgram = explicitProgram ?? (mint ? TOKEN_PROGRAM : SYSTEM_PROGRAM);
   const instruction =
     (typeof a.instruction === 'string' && a.instruction) ||

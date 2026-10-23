@@ -55,7 +55,7 @@ export function Attestations() {
 function Sheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: a, isLoading } = useAttestation(id);
   const submit = useSubmitAttestation();
-  const [cluster, setCluster] = useState<'devnet' | 'mainnet-beta'>('devnet');
+  const cluster = 'mainnet-beta' as const; // the only deploy target (no devnet)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
@@ -88,8 +88,8 @@ function Sheet({ id, onClose }: { id: string; onClose: () => void }) {
                 {a.txSig && <div><dt>Tx</dt><dd><Hash value={a.txSig} /></dd></div>}
               </dl>
               <div className="d05-actions">
-                <select className="select" value={cluster} onChange={(e) => setCluster(e.target.value as 'devnet' | 'mainnet-beta')} aria-label="Cluster">
-                  <option value="devnet">devnet</option><option value="mainnet-beta">mainnet-beta</option>
+                <select className="select" value={cluster} disabled aria-label="Cluster">
+                  <option value="mainnet-beta">mainnet-beta</option>
                 </select>
                 <button type="button" className="btn primary" disabled={submit.isPending} onClick={() => submit.mutate({ id, cluster })}>{submit.isPending ? 'Submitting…' : 'Submit'}</button>
                 <button type="button" className="btn secondary" onClick={() => download(a)}><Icon name="download" />Export</button>

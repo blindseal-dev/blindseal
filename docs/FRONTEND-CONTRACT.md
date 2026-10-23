@@ -99,7 +99,7 @@ leaves.
 Action fields (`ActionFields`, `crates/detector-core`), **including `sourceAuthority`** (spec
 amendment §1):
 
-`chainId: u16` (1 = solana mainnet, 2 = devnet), `targetProgram: [u8;32]`,
+`chainId: u16` (1 = solana mainnet; 2 reserved — there is no devnet target), `targetProgram: [u8;32]`,
 `sourceAuthority: [u8;32]`, `instruction: [u8;8]` (anchor discriminator or `sha256(name)[..8]`),
 `recipient: [u8;32]`, `mint: [u8;32]` (zero = native SOL), `amount: u64`.
 

@@ -21,3 +21,8 @@ exclude = [
 version = "0.0.0"
 edition = "2021"
 license = "MIT"
+
+# Anchor's build lint reads this root manifest (Anchor.toml lives here) even though the programs
+# resolve in programs/Cargo.toml, which sets the same profile for the actual SBF build.
+[profile.release]
+overflow-checks = true

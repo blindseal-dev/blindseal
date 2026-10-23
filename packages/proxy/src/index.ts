@@ -194,6 +194,28 @@ function main(): void {
     return; // mock server keeps the process alive
   }
 
+  if (argv[0] === 'attest') {
+    import('./cli/attest.js')
+      .then(({ runAttestCli }) => runAttestCli(argv.slice(1)))
+      .then((code) => process.exit(code))
+      .catch((err) => {
+        process.stderr.write(`blindseal attest: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exit(1);
+      });
+    return;
+  }
+
+  if (argv[0] === 'submit') {
+    import('./cli/submit.js')
+      .then(({ runSubmitCli }) => runSubmitCli(argv.slice(1)))
+      .then((code) => process.exit(code))
+      .catch((err) => {
+        process.stderr.write(`blindseal submit: ${err instanceof Error ? err.message : String(err)}\n`);
+        process.exit(1);
+      });
+    return;
+  }
+
   if (argv[0] === 'history') {
     process.exit(runHistoryCli(argv.slice(1)));
   }

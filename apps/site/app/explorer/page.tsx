@@ -5,7 +5,7 @@ export default function Explorer() {
   const max = Math.max(...DAYS);
   return (
     <section className="site-section s05">
-      <div className="section-head"><div className="section-head__lead"><p className="section-head__eyebrow"><b>·</b> / Explorer</p><h1 className="section-head__title">Devnet explorer</h1></div>
+      <div className="section-head"><div className="section-head__lead"><p className="section-head__eyebrow"><b>·</b> / Explorer</p><h1 className="section-head__title">Mainnet explorer</h1></div>
         <p className="section-head__body">Public on-chain reads only — verifications over time, allowlisted policy roots, and consumer programs. No agent is identifiable here.</p></div>
       <div className="stat-grid" style={{ ['--cols' as any]: 3 }}>
         <div className="stat"><p className="stat__k">Verifications</p><p className="stat__v num">{DAYS.reduce((a, b) => a + b, 0)}</p><p className="stat__d">last 14 days</p></div>

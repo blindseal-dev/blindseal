@@ -1,14 +1,22 @@
-# Blindseal Anchor workspace — M0 stub (BLINDSEAL.md §3.7, §4). Programs land in M2.
-# Program IDs are placeholders; real keypairs/IDs generated at M2 devnet deploy.
+# Blindseal Anchor workspace (BLINDSEAL.md §3.7, §4). Programs live in their own Cargo
+# workspace (programs/Cargo.toml). Program IDs are FIXED (keypairs in keys/localnet/, synced to
+# target/deploy by scripts/anchor-keys.sh) and shared by localnet and mainnet — the test proof
+# binds transfer_gate's id, so it must be stable across machines. Mainnet is the only deploy
+# target; localnet is for the test suite. No devnet.
 [toolchain]
+anchor_version = "0.31.1"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-blindseal_verify = "BSvrfy1111111111111111111111111111111111111"
-transfer_gate = "BSgate1111111111111111111111111111111111111"
+blindseal_verify = "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
+transfer_gate = "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+
+[programs.mainnet]
+blindseal_verify = "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
+transfer_gate = "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
 
 [registry]
 url = "https://api.apr.dev"
@@ -18,4 +26,10 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "echo 'M2: anchor tests land here'"
+test = "pnpm exec ts-mocha -p ./tests/tsconfig.json -t 1000000 tests/**/*.spec.ts"
+
+[test]
+startup_wait = 10000
+
+[test.validator]
+ledger = ".anchor/test-ledger"

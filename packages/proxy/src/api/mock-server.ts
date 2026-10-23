@@ -313,7 +313,7 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
           }
           if (method === 'POST' && seg[2] === 'submit') {
             const body = await readBody(req);
-            if (!body || (body.cluster !== 'devnet' && body.cluster !== 'mainnet-beta')) return sendErr(res, 400, 'VALIDATION', 'cluster must be devnet|mainnet-beta');
+            if (!body || body.cluster !== 'mainnet-beta') return sendErr(res, 400, 'VALIDATION', 'cluster must be mainnet-beta');
             return sendJson(res, 200, { txSig: sha('mock-txsig:' + seg[1]).slice(2, 90) });
           }
           if (method === 'GET' && seg[2] === 'export') {

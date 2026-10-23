@@ -535,7 +535,7 @@ const NULLIFIER_DOMAIN: &str = "blindseal.nullifier.v1";
 /// is zero when n/a; mint is zero for the native asset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActionFields {
-    pub chain_id: u16,            // 1 = solana mainnet, 2 = solana devnet, 3+ reserved for EVM
+    pub chain_id: u16,            // 1 = solana mainnet, 2 = reserved (no devnet), 3+ reserved for EVM
     pub target_program: [u8; 32],
     pub source_authority: [u8; 32],
     pub instruction: [u8; 8],     // anchor discriminator or sha256(name)[..8]
