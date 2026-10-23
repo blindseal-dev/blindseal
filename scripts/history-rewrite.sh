@@ -77,6 +77,17 @@ if b"\x00" not in blob.data[:8000]:
     blob.data = bs_subs.scrub_blob(blob.data, blob.original_id)
 PY
 )"
+# base-product directories that were never part of Blindseal (local `.history-drop-paths`, one per
+# line): removed from every revision — their path names would otherwise survive in diff headers.
+DROP=()
+if [ -f .history-drop-paths ]; then
+  while IFS= read -r p; do [ -n "$p" ] && [ "${p#\#}" = "$p" ] && DROP+=(--path "$p"); done < .history-drop-paths
+fi
+if [ ${#DROP[@]} -gt 0 ]; then
+  for p in $(grep -v '^#' .history-drop-paths | grep .); do [ -e "$p" ] && { echo "refusing: $p exists in the current tree"; exit 1; }; done
+  echo "   dropping from every revision: $(grep -v '^#' .history-drop-paths | grep . | tr '\n' ' ')"
+  git filter-repo --force --refs refs/heads/main "${DROP[@]}" --invert-paths
+fi
 git filter-repo --force --refs refs/heads/main --commit-callback "$COMMIT_CB" --blob-callback "$BLOB_CB"
 rm -f /tmp/bs_subs.py /tmp/bs_allowed_blobs.txt
 

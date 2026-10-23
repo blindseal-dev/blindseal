@@ -62,3 +62,4 @@ crates/prover/attestation.json
 **/.playwright/
 .history-subs
 .history-msg-subs
+.history-drop-paths
