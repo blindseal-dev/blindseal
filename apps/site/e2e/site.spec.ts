@@ -26,3 +26,12 @@ test('home reduced-motion reaches end state', async ({ page }) => {
   })).toBeGreaterThan(0.99);
 });
 
+
+test('verify: sample valid, tampered invalid, nothing stored', async ({ page }) => {
+  await page.goto('/verify');
+  await page.getByRole('button', { name: 'Load sample' }).click();
+  await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid');
+  await page.getByRole('button', { name: 'Load tampered' }).click();
+  await expect(page.locator('.s03-result .panel__title')).toHaveText('Invalid');
+  expect(await page.evaluate(() => localStorage.length)).toBe(0);
+});
