@@ -98,3 +98,9 @@ Guest now recomputes payloadHash + policyRoot, runs L1 (serialized), binds the a
 (up from 77.6M L1-only — the in-zkVM policyRoot merkle over ~22 DFA byte-blobs dominates).
 Optimization: patch sha2 with the SP1 sha256 precompile to cut the hashing cost. Validated
 public values: policyRoot = 0x36a9e9… (matches detector-core), detectorVersion = guest vkey.
+
+### M1 full guest + sha256 precompile — execute
+Patched sha2 with the SP1 sha256 precompile (tag patch-sha2-0.10.8-sp1-4.0.0; min SP1 4.0.0,
+compatible with our 5.0.0). Full guest cycle count (execute): **104,155,812** (down from 346M,
+~3.3x). policyRoot still 0x36a9e9… (correct). Proving is proportionally faster; the remaining
+cost is the policyRoot merkle over the DFA byte-blobs.
