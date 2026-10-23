@@ -1,11 +1,18 @@
+# Blindseal prover (M1): runs the SP1 guest, Groth16-wraps locally, writes attestation.json.
+# Standalone package (own Cargo.lock) — excluded from the host workspace so the SP1 tree
+# doesn't pollute it (same isolation as m05-spike). Local CPU prover only; never the network.
 [package]
 name = "blindseal-prover"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
 
 [[bin]]
 name = "blindseal-prover"
 path = "src/main.rs"
 
 [dependencies]
+sp1-sdk = { version = "=5.0.0", default-features = false }
+blindseal-detector-core = { path = "../detector-core" }
+sha2 = "=0.10.8"
+serde_json = "1"

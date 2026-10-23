@@ -5,13 +5,13 @@
 resolver = "2"
 members = [
   "crates/detector-core",
-  "crates/prover",
   "crates/verifier-wasm",
 ]
 # crates/guest builds for the SP1 (riscv) target with its own toolchain; the Anchor
 # programs build via `anchor build`. Both are excluded from the host workspace.
 exclude = [
   "crates/guest",
+  "crates/prover",
   "m05-spike",
   "programs/blindseal-verify",
   "programs/transfer-gate",

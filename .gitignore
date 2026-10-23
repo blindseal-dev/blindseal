@@ -51,3 +51,6 @@ m05-spike/target/
 .anchor/
 test-ledger/
 **/m05_proof.bin
+
+# prover run output
+crates/prover/attestation.json

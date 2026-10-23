@@ -73,3 +73,16 @@ _TBD_
 ## M2 — Solana verifier
 <!-- verify_and_consume CU (real SBF/validator), with/without policy allowlist -->
 _TBD_
+
+## M1 — attestation engine (real detector-core guest)
+First end-to-end proof from the real guest (minimal: L1 only, commits payloadHash). Reference machine as above.
+| Field | Value |
+|---|---|
+| detectorVersion (guest vkey) | 0x007e7ae67b43fa8e96f6e5f6e8af5daaf9f9c40007ea1901cb23adbd6b5bc552 |
+| policyRoot | 0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397 (matches detector-core::policy_root) |
+| Proof size | 260 bytes |
+| Public-input size | 32 bytes (payloadHash) |
+| **Proving time** | **~4,396,765 ms (~73 min)** — see concern |
+| Peak host RSS | 11.6 GB |
+
+**Concern — proving is slow.** Running 22 serialized DFAs in-zkVM is ~17x the trivial M0.5 guest (~4 min). The likely bulk is `dense::DFA::from_bytes` validation per rule. Mitigations before adding L0 (which adds decoder DFAs + nested runs): use `from_bytes_unchecked` (sound — the policy DFAs are our own committed bytes), and iterate guest logic with `ProverClient::execute` (cycle count, no proof) rather than full proves. The spec (§3.5) anticipates slow async proving and the M4 TEE prover; 73 min still argues for the matcher optimization.
