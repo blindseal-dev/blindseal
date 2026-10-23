@@ -35,8 +35,8 @@ export class ApiError extends Error {
   }
 }
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+async function req<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+  const headers: Record<string, string> = { ...(extra ?? {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res: Response;
@@ -67,7 +67,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export const api = {
   get: <T>(path: string) => req<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => req<T>('POST', path, body),
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) => req<T>('POST', path, body, headers),
   put: <T>(path: string, body?: unknown) => req<T>('PUT', path, body),
 };
 

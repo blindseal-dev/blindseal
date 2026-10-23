@@ -61,6 +61,20 @@ export function useAttestation(id: string | undefined) {
   });
 }
 
+export function useCreateAttestation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decisionId: string) => api.post<{ id: string }>('/attestations', { decisionId }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['attestations'] }),
+  });
+}
+
+export function useRevealPayload() {
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ payload: string }>(`/decisions/${id}/reveal`, undefined, { 'X-Confirm': 'reveal' }),
+  });
+}
+
 export function useSubmitAttestation() {
   const qc = useQueryClient();
   return useMutation({
