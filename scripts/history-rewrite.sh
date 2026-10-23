@@ -86,8 +86,10 @@ fi
 if [ ${#DROP[@]} -gt 0 ]; then
   for p in $(grep -v '^#' .history-drop-paths | grep .); do [ -e "$p" ] && { echo "refusing: $p exists in the current tree"; exit 1; }; done
   echo "   dropping from every revision: $(grep -v '^#' .history-drop-paths | grep . | tr '\n' ' ')"
+  rm -rf .git/filter-repo   # stale state from a previous pass makes filter-repo's metadata step assert
   git filter-repo --force --refs refs/heads/main "${DROP[@]}" --invert-paths
 fi
+rm -rf .git/filter-repo
 git filter-repo --force --refs refs/heads/main --commit-callback "$COMMIT_CB" --blob-callback "$BLOB_CB"
 rm -f /tmp/bs_subs.py /tmp/bs_allowed_blobs.txt
 
