@@ -1,0 +1,177 @@
+/* ============================================================================
+   _shared/shell.css — the dashboard shell (DECISIONS D06; the port)
+   ----------------------------------------------------------------------------
+   The sidebar model: 244px sidebar (rail 64px), the
+   brand row 68px, a WHITE SLIDING PILL for the active item (translate +
+   scaleX on a fixed base width, 240ms out-quint, never on first paint) with a
+   clip-path ink layer riding the same 240ms so the label under the pill is
+   dark at every frame. The sidebar foot carries the proxy identity.
+   Content column: the 68px GLASS top bar (title · actions · connection pill,
+   MOCK) floats over main#main-content, the ONLY scroller, which also
+   runs under the 36px GLASS status bar — so both bars frost real content.
+   The route cover covers the content column below the top bar.
+
+   .bs-app carries data-shell="sidebar".
+
+   BACKDROP ROOT RULE: nothing between the glass bars and main may carry
+   filter / opacity < 1 / mask / clip-path. The ink layer's clip-path sits on
+   a sibling of the nav items, never on an ancestor of glass.
+   ========================================================================== */
+
+/* the page's <main> stays hidden until BS.mountShell() has framed it */
+body > main#main-content:not(.bs-main) { visibility: hidden; }
+html.bs-shell, html.bs-shell body { height: 100%; overflow: hidden; }
+
+/* ══ frame ═══════════════════════════════════════════════════════════════ */
+.bs-app {
+  --side-now: var(--sidebar-w);
+  display: grid; grid-template-columns: var(--side-now) minmax(0, 1fr);
+  height: 100vh; height: 100svh; background: var(--canvas);
+}
+.bs-app.is-rail { --side-now: var(--rail-w); }
+
+/* ══ sidebar ═════════════════════════════════════════════════════════════ */
+.bs-side {
+  position: relative; z-index: var(--z-sidebar);
+  display: flex; flex-direction: column; min-width: 0; height: 100%;
+  padding-bottom: var(--statusbar-h);
+  border-right: var(--hairline); background: var(--canvas);
+}
+.bs-side__brand { display: flex; align-items: center; gap: 10px; flex: none; height: var(--topbar-h); padding: 0 20px; border-bottom: var(--hairline); }
+/* the wordmark: mark A + "Blindseal", strong 16, −0.02em */
+.bs-wordmark {
+  display: inline-flex; align-items: center; gap: 10px; min-width: 0; border-radius: var(--r-control);
+  font: var(--fw-strong) var(--fs-16)/1 var(--font-sans); letter-spacing: -0.02em; color: var(--ink);
+  transition: color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+@media (hover: hover) and (pointer: fine) { .bs-wordmark:hover { color: var(--muted); } }
+.bs-wordmark:active { transform: scale(.98); }
+.bs-wordmark:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.bs-side__brand .chip { margin-left: auto; font-family: var(--font-mono); letter-spacing: .04em; }
+
+.bs-side__nav { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
+.bs-nav__label { padding: 6px 10px 8px; font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.bs-nav { position: relative; display: grid; gap: 2px; }
+.bs-navitem {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: 40px; padding: 8px 10px; border-radius: var(--r-row);
+  color: var(--muted); font: var(--fw-medium) var(--t-body) var(--font-sans);
+  transition: background-color var(--d-150) var(--ease-in-out), color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+  -webkit-tap-highlight-color: transparent;
+}
+.bs-navitem__g { display: grid; place-items: center; width: 20px; flex: 0 0 20px; }
+.bs-navitem__g svg { width: 18px; height: 18px; }
+.bs-navitem__t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (hover: hover) and (pointer: fine) { .bs-navitem:not([aria-current="page"]):hover { background: var(--wash-1); color: var(--ink); } }
+.bs-navitem:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.bs-navitem:active { transform: scale(.98); }
+.bs-navitem[aria-current="page"] { color: var(--pill-ink); }
+
+/* the white sliding pill + its ink layer (the sidebar shell, verbatim mechanics) */
+.bs-nav__pill {
+  position: absolute; top: 0; left: 0; z-index: 0; width: 0; height: 0;
+  transform-origin: 0 0; border-radius: var(--r-row);
+  background: var(--pill); box-shadow: var(--shadow-pill);
+  opacity: 0; pointer-events: none;
+}
+.bs-nav__ink {
+  position: absolute; inset: 0; z-index: 2; display: grid; gap: 2px; align-content: start;
+  pointer-events: none; color: var(--pill-ink); background: var(--pill);
+  clip-path: inset(0 100% 100% 0 round 8px); opacity: 0;
+}
+.bs-nav__ink .bs-navitem { color: var(--pill-ink); }
+.bs-nav.has-pill .bs-nav__pill, .bs-nav.has-pill .bs-nav__ink { opacity: 1; }
+.bs-nav.is-animated .bs-nav__pill { transition: transform var(--d-240) var(--ease-out-quint); }
+.bs-nav.is-animated .bs-nav__ink { transition: clip-path var(--d-240) var(--ease-out-quint); }
+.bs-nav.is-nofx .bs-nav__pill, .bs-nav.is-nofx .bs-nav__ink { transition: none !important; }
+
+/* foot: the proxy identity, then the rail toggle */
+.bs-side__foot { display: grid; gap: 10px; padding: 14px 12px 12px; border-top: var(--hairline); }
+.bs-proxy { display: grid; gap: 6px; padding: 0 2px; min-width: 0; }
+.bs-proxy__k { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.bs-proxy__k .live-dot { color: var(--accent); }
+.bs-proxy .hash { justify-self: start; margin-left: -4px; }
+.bs-side__footrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bs-side__ver { font: var(--fw-medium) var(--t-sub) var(--font-sans); color: var(--muted); padding-left: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* the 64px icon rail */
+.bs-app.is-rail .bs-side__brand { justify-content: center; padding: 0; }
+.bs-app.is-rail :is(.bs-wordmark__word, .bs-side__brand .chip, .bs-nav__label) { display: none; }
+.bs-app.is-rail .bs-side__nav { padding: 12px 10px; }
+.bs-app.is-rail .bs-navitem { justify-content: center; width: 44px; min-height: 44px; margin: 0 auto; padding: 0; }
+.bs-app.is-rail :is(.bs-navitem__t, .bs-proxy, .bs-side__ver) { display: none; }
+.bs-app.is-rail .bs-side__foot { padding: 12px 10px; justify-items: center; }
+.bs-app.is-rail .bs-side__footrow { justify-content: center; }
+.bs-flyout {
+  position: fixed; z-index: var(--z-tooltip); top: 0; left: 0;
+  padding: 5px 8px; border-radius: var(--r-control); border: var(--hairline);
+  background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-raised);
+  font: var(--fw-medium) var(--t-sub) var(--font-sans); white-space: nowrap;
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+.bs-flyout.is-on { opacity: 1; visibility: visible; animation: slide-in-8 var(--d-160) var(--ease-out-cubic) both; }
+
+/* ══ content column ══════════════════════════════════════════════════════ */
+.bs-work { position: relative; min-width: 0; min-height: 0; height: 100%; overflow: clip; }   /* clip (not hidden: no scroll container) so nothing below main can give body a scrollHeight; scrollIntoView then only scrolls main */
+.bs-app { overflow: clip; }
+
+/* the 68px GLASS top bar, floating over the one scroller */
+.bs-top {
+  position: absolute; z-index: var(--z-topbar); top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 16px;
+  height: var(--topbar-h); padding: 0 16px 0 28px;
+}
+.bs-top__lead { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 auto; }
+.bs-top__title { min-width: 0; font: var(--fw-medium) var(--t-money) var(--font-sans); letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bs-top__actions { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bs-top__actions:empty { display: none; }
+.bs-top__right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: none; }
+.bs-top__right .chip.mock { height: 22px; padding: 0 7px; font-size: var(--fs-10); }
+
+/* the ONE scroller — runs under both glass bars */
+.bs-main {
+  --table-top: 0px;   /* main is already padded by the top bar (68): Chrome measures sticky inside that padding, so 0 lands the head right under the glass bar */
+  height: 100%; min-width: 0;
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  scrollbar-gutter: stable; outline: none;
+  padding-top: var(--topbar-h); scroll-padding-top: calc(var(--topbar-h) + 12px); scroll-padding-bottom: var(--statusbar-h);
+}
+
+/* ══ the 36px GLASS status bar ═══════════════════════════════════════════ */
+.bs-status {
+  position: fixed; z-index: var(--z-statusbar); left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; gap: 4px;
+  height: var(--statusbar-h); padding: 0 10px 0 12px;
+  font: var(--fw-strong) var(--t-sub) var(--font-sans); color: var(--muted); white-space: nowrap;
+}
+.bs-status__spacer { flex: 1 1 auto; }
+.bs-sb { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; white-space: nowrap; }
+.bs-sb + .bs-sb { box-shadow: inset 1px 0 0 var(--tn-sep); }
+.bs-sb__k { color: var(--muted); font-weight: var(--fw-medium); }
+.bs-sb__v { color: var(--ink); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; }
+.bs-sb .live-dot { color: var(--accent); }
+.bs-sb[data-state="reconnecting"] .live-dot { color: var(--verdict-flag); }
+.bs-sb[data-state="offline"] .live-dot { color: var(--faint); animation: none; }
+.bs-sb .hash { height: 20px; font-size: var(--hash-size); }
+.bs-sb .chip.mock { height: 18px; }
+.bs-side__ver, .bs-sb, .bs-sb__v, .bs-proxy .hash { font-variant-numeric: tabular-nums; }
+.bs-status .glass-item { min-height: 26px; padding: 0 8px; border-radius: var(--r-control); font-weight: var(--fw-medium); }
+
+/* ══ the route cover (content column only, below the top bar) ════════════ */
+.bs-cover {
+  position: fixed; z-index: var(--z-cover); top: var(--topbar-h); left: var(--side-now); right: 0; bottom: 0;
+  display: grid; place-items: center; background: var(--canvas);
+  visibility: hidden; opacity: 0; pointer-events: none;
+  transition: opacity var(--d-420) var(--ease-in-out), visibility 0s linear var(--d-420);
+}
+.bs-cover.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity var(--d-180) var(--ease-in-out), visibility 0s; }
+.bs-cover.is-quick:not(.is-visible) { transition: opacity var(--d-240) var(--ease-in-out), visibility 0s linear var(--d-240); }
+.bs-cover__ind { display: grid; gap: 14px; place-items: center; color: var(--muted); opacity: 0; transform: translateY(.25rem);
+  transition: opacity var(--d-180) var(--ease-in-out), transform var(--d-240) var(--ease-in-out); }
+.bs-cover.is-visible .bs-cover__ind { opacity: 1; transform: none; }
+.bs-cover:not(.is-visible) .track > span { animation: none; }
+
+html[data-motion="reduce"] :is(.bs-cover, .bs-cover__ind, .bs-nav__pill, .bs-nav__ink) { transition: none !important; }
+html[data-motion="reduce"] .bs-flyout.is-on { animation: none !important; }
+html[data-motion="reduce"] :is(.bs-navitem, .bs-wordmark):active { transform: none; }

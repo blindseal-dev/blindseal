@@ -1,0 +1,12 @@
+/* Kit CSS carried verbatim (DECISIONS: FE port architecture). */
+@import '../kit/tokens.css';
+@import '../kit/fonts.css';
+@import '../kit/motion.css';
+@import '../kit/glass.css';
+@import '../kit/ui.css';
+@import '../kit/space.css';
+@import '../kit/diagrams.css';
+@import '../kit/crt.css';
+@import '../kit/site.css';
+
+html, body { margin: 0; background: var(--canvas); color: var(--ink); }

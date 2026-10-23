@@ -1,0 +1,265 @@
+/* ============================================================================
+   _shared/site.css — the marketing-site chrome (DECISIONS D05)
+   ----------------------------------------------------------------------------
+   Geometry is the notch nav's (the nav/hero spec);
+   palette and type are ours. Below the hero the site is the kit.
+
+   (a) THE NOTCH NAV — .site-notch (BS.mountSite renders it)
+       The page sits in a fixed 8px var(--canvas) frame whose inner window is
+       rounded 16 (.site-frame). Three opaque canvas tabs hang from the frame's
+       top edge: row at top 8 / left 8 / right 8, 54 high; logo tab radius
+       0 0 24 0 (padding 0 28 0 18), centre tab 0 0 24 24 (padding 0 9),
+       actions tab 0 0 0 24 (padding 0 9 0 18, gap 10). Sixteen-pixel concave
+       wings (SVG, fill var(--canvas)) blend each tab into the frame. Links are
+       38px pills, padding 0 14, 13px, --muted at rest → --ink on hover (160ms
+       in-out); the active link sits under the white sliding pill (--pill,
+       ink layer clipped to it, strong weight) — the dashboard shell's idiom.
+       Right: .glass-btn.primary "Open dashboard" alone (no theme toggle: light
+       mode will not be added; owner, 2026-10-22) (38 high, ≥148 wide, radius 10,
+       12px strong, −.01em). the notch nav is static on scroll: so is this.
+       Variant .site-notch--glass (BS.mountSite({ nav: "glass" })): the tabs
+       take the .glass-bar optics and float as 24-radius pills; no frame, no
+       wings.
+   (b) THE HERO — .hero: 100vh (min 720), the nebula in .hero__space
+       (BS.mountSpace), the notch nav's two shade gradients with our canvas
+       substituted, the text column at left 114 / max 760, vertically centred:
+       eyebrow (14/500 muted, accent live dot) · h1 56/1.06 −.03em with one
+       accented word · sub 18/30 · actions (the install block + "Read how it
+       works →") · trust row. Masthead rise: rise-16 450ms out-cubic at
+       0 / 30 / 180 / 260ms, trust items +60ms each.
+   (c) HOUSE SECTIONS — .site-section (max --site-max-w, padding 32 0,
+       hairline above, +32 between), .section-head (the "01 / NAME" mono
+       eyebrow 11px tracked, a 38px title, the split two-column copy;
+       .reveal + the split rise come from motion.css), .site-panel (flat
+       panel + hairline, r12, padding 28), .site-grid-2 / -3 (gap 24).
+   (d) THE FOOTER — .site-footer: the six routes, the one-liner, the version.
+
+   Every element works under html[data-motion=reduce] (end states, no rise).
+   ========================================================================== */
+
+html.bs-site { --toast-bottom: var(--frame); scroll-padding-top: calc(var(--notch-top) + var(--notch-h) + 16px); }
+html.bs-site body { background: var(--canvas); }
+.site-main { position: relative; display: block; min-width: 0; padding-bottom: 8px; }
+
+/* ══ the frame ═══════════════════════════════════════════════════════════ */
+.site-frame { position: fixed; inset: 0; z-index: var(--z-frame); pointer-events: none; }
+.site-frame::before {
+  content: ""; position: absolute; inset: var(--frame);
+  border-radius: var(--frame-r);
+  box-shadow: 0 0 0 64px var(--canvas), inset 0 0 0 1px var(--line);
+}
+html.bs-site-noframe .site-frame { display: none; }
+
+/* ══ (a) the notch nav ═══════════════════════════════════════════════════ */
+.site-notch { position: fixed; top: 0; left: 0; right: 0; z-index: var(--z-notch); height: 0; }
+.site-notch__row {
+  position: absolute; top: var(--notch-top); left: var(--frame); right: var(--frame);
+  max-width: var(--notch-max-w); margin-inline: auto;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: start;
+  height: var(--notch-h); pointer-events: none;
+}
+.notch {
+  position: relative; display: flex; align-items: center; height: var(--notch-h);
+  background: var(--canvas); pointer-events: auto;
+}
+/* the tab outline: a 1px hairline down the sides and along the bottom, open at the
+   top where the tab joins the frame (border-box: still 54 high) */
+.site-notch:not(.site-notch--glass) .notch { border: 1px solid var(--line); border-top: 0; padding-top: 1px; }   /* +1px top = the bottom border, so content stays centred on whole pixels (items at y 16) */
+.notch--logo { justify-self: start; padding: 0 28px 0 18px; border-radius: 0 0 var(--notch-r) 0; }
+.notch--center { justify-self: center; padding: 0 9px; border-radius: 0 0 var(--notch-r) var(--notch-r); }
+.notch--actions { justify-self: end; gap: 10px; padding: 0 9px 0 18px; border-radius: 0 0 0 var(--notch-r); }
+/* the concave wings: 16×16, filled with the tab colour */
+/* each wing overlaps its tab's hairline by 1px (17 × 16 / 16 × 17) so the fill
+   hides the straight segment and its arc stroke carries the outline into the
+   frame's line */
+.notch__wing { position: absolute; width: calc(var(--notch-wing) + 1px); height: var(--notch-wing); fill: var(--canvas); pointer-events: none; overflow: visible; }
+.notch__wing .notch__arc { fill: none; stroke: var(--line); stroke-width: 1; }
+.notch__wing--tr { top: 0; left: calc(100% - 1px); }       /* right of a tab, at the frame edge */
+.notch__wing--tl { top: 0; right: calc(100% - 1px); }      /* left of a tab, at the frame edge */
+.notch__wing--bl { top: calc(100% - 1px); left: 0; width: var(--notch-wing); height: calc(var(--notch-wing) + 1px); }   /* under the logo tab, at the frame's left edge */
+.notch__wing--br { top: calc(100% - 1px); right: 0; width: var(--notch-wing); height: calc(var(--notch-wing) + 1px); }  /* under the actions tab, at the frame's right edge */
+
+/* the brand: mark A (20) + the wordmark */
+.site-brand {
+  display: inline-flex; align-items: center; gap: 10px; padding: 1px 6px; border-radius: var(--r-control);
+  font: var(--fw-strong) var(--fs-16)/26px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); white-space: nowrap;
+  transition: color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+@media (hover: hover) and (pointer: fine) { .site-brand:hover { color: var(--muted); } }
+.site-brand:active { transform: scale(.98); }
+.site-brand:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* the links + the white sliding pill + its ink layer */
+.notch__items { position: relative; display: flex; align-items: center; gap: 2px; }
+.notch__item {
+  position: relative; z-index: 1; display: inline-grid; align-items: center; justify-items: center;
+  height: var(--notch-item-h); padding: 0 14px; border-radius: var(--r-full);
+  font: var(--fw-medium) var(--fs-13)/13px var(--font-sans); color: var(--muted); white-space: nowrap;
+  transition: color 160ms var(--ease-in-out), background-color 160ms var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+  -webkit-tap-highlight-color: transparent;
+}
+/* reserve the strong weight's width, so the active label never shifts its row */
+.notch__item > span, .notch__item::after { grid-area: 1 / 1; }
+.notch__item::after { content: attr(data-label); font-weight: var(--fw-strong); visibility: hidden; height: 0; overflow: hidden; }
+@media (hover: hover) and (pointer: fine) { .notch__item:not([aria-current="page"]):hover { color: var(--ink); background-color: var(--wash-1); } }
+.notch__item.is-hover { color: var(--ink); background-color: var(--wash-1); }
+.notch__item:active { transform: scale(.98); }
+.notch__item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.notch__item[aria-current="page"] { color: var(--pill-ink); font-weight: var(--fw-strong); }
+.notch__pill {
+  position: absolute; top: 0; left: 0; z-index: 0; width: 0; height: 0; transform-origin: 0 0;
+  border-radius: var(--r-full); background: var(--pill); box-shadow: var(--shadow-pill);
+  opacity: 0; pointer-events: none;
+}
+.notch__ink {
+  position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; gap: 2px;
+  pointer-events: none; background: var(--pill); clip-path: inset(0 100% 100% 0 round 19px); opacity: 0;
+}
+.notch__ink .notch__item { color: var(--pill-ink); font-weight: var(--fw-strong); }
+.notch__items.has-pill .notch__pill, .notch__items.has-pill .notch__ink { opacity: 1; }
+.notch__items.is-animated .notch__pill { transition: transform var(--d-240) var(--ease-out-quint); }
+.notch__items.is-animated .notch__ink { transition: clip-path var(--d-240) var(--ease-out-quint); }
+.notch__items.is-nofx :is(.notch__pill, .notch__ink) { transition: none !important; }
+
+/* the right tab: the primary action alone (the primary-action slot). .notch__theme
+   is kept only so an old page that still renders one gets the 38 square */
+.notch__theme.glass-btn, .notch__theme.glass-item { width: var(--notch-item-h); min-height: var(--notch-item-h); height: var(--notch-item-h); padding: 0; border-radius: 10px; }
+.notch__cta.glass-btn { min-height: var(--notch-item-h); height: var(--notch-item-h); min-width: 148px; padding: 0 18px; border-radius: 10px;
+  font: var(--fw-strong) var(--fs-12)/14.4px var(--font-sans); letter-spacing: -0.01em; }
+
+/* the glass variant (nav: "glass"): the brief's floating glass pills */
+.site-notch--glass .notch {
+  background-color: var(--tn-glass-bg); border: 1px solid var(--tn-glass-border); border-radius: var(--notch-r);
+  -webkit-backdrop-filter: blur(5px) saturate(1.9) brightness(1.05);
+  backdrop-filter: blur(5px) saturate(1.9) brightness(1.05) url(#bs-lg-refract);
+}
+.site-notch--glass .notch.glass-bar { border-width: 1px; box-shadow: var(--tn-glass-shadow); }
+.site-notch--glass .notch__wing { display: none; }
+.site-notch--glass .notch__items.has-pill .notch__ink { background: transparent; }
+
+/* ══ (b) the hero ════════════════════════════════════════════════════════ */
+.hero {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; align-items: center;
+  min-height: max(100vh, var(--hero-min-h)); min-height: max(100svh, var(--hero-min-h));
+  padding: calc(var(--notch-top) + var(--notch-h) + 24px) 0 64px;
+}
+.hero--panel { min-height: 560px; border-radius: var(--r-panel); }
+.hero__space { position: absolute; inset: 0; z-index: 0; }
+/* the notch nav's two shade gradients (legion-shade), verbatim stops, our canvas */
+.hero__shade {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--canvas) 91.8%, transparent) 0%,
+      color-mix(in srgb, var(--canvas) 65%, transparent) 27%,
+      color-mix(in srgb, var(--canvas) 14.5%, transparent) 57%,
+      color-mix(in srgb, var(--canvas) 7%, transparent) 100%),
+    linear-gradient(0deg,
+      var(--canvas) 0%,
+      color-mix(in srgb, var(--canvas) 61%, transparent) 13%,
+      transparent 42%,
+      color-mix(in srgb, var(--canvas) 33.3%, transparent) 100%);
+}
+.hero__content { position: relative; z-index: 2; width: 100%; padding-left: var(--site-pad); padding-right: 48px; }
+.hero__col { max-width: var(--hero-col); }
+.hero__eyebrow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; height: auto; min-height: 24px;
+  font: var(--fw-medium) var(--fs-14)/24px var(--font-sans); color: var(--muted); }
+.hero__dot { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--accent); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent); flex: none; }
+.hero__sep { color: var(--faint); }
+.hero__title {
+  width: max-content; max-width: calc(100vw - var(--site-pad) - 48px);
+  margin: 28px 0 24px;
+  font: var(--fw-medium) var(--fs-56)/1.06 var(--font-sans); letter-spacing: var(--ls-display); color: var(--ink);
+  text-wrap: balance;
+}
+.hero__title em { font-style: normal; color: var(--accent-text); }
+.hero__sub { max-width: 620px; font: var(--fw-body) var(--fs-18)/30px var(--font-sans); color: var(--muted); }
+.hero__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 30px; margin-top: 40px; }
+.hero__secondary {
+  display: inline-flex; align-items: center; gap: 12px; padding: 15px 0; border-radius: var(--r-control);
+  font: var(--fw-medium) var(--fs-16)/20px var(--font-sans); letter-spacing: -0.01em; color: var(--ink);
+  transition: color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+.hero__secondary svg { width: 18px; height: 18px; transition: transform var(--d-150) var(--ease-in-out); }
+@media (hover: hover) and (pointer: fine) { .hero__secondary:hover { color: var(--muted); } .hero__secondary:hover svg { transform: translateX(2px); } }
+.hero__secondary:active { transform: scale(.98); }
+.hero__secondary:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.hero__trust { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 24px; margin-top: 40px;
+  font: var(--fw-body) var(--fs-14)/20px var(--font-sans); color: var(--muted); }
+.hero__trust > li { display: inline-flex; align-items: center; gap: 12px; }
+.hero__trust > li + li::before { content: ""; width: 5px; height: 5px; margin-right: 12px; border-radius: var(--r-full); background: var(--faint); }
+.hero__trust-ico { display: grid; place-items: center; width: 38px; height: 38px; border-radius: var(--r-full); border: var(--hairline); color: var(--ink); flex: none; }
+.hero__trust-ico svg { width: 20px; height: 20px; }
+
+/* the install block in the primary's slot (the notch nav am-accent idiom) */
+.install {
+  display: inline-flex; align-items: center; gap: 14px; height: 56px; padding: 0 6px 0 5px;
+  border: var(--hairline); border-radius: var(--r-panel); background: var(--panel);
+}
+.install__tile { display: grid; place-items: center; width: 46px; height: 46px; border-radius: var(--r-row); background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line);
+  font: var(--fw-body) var(--fs-16)/1 var(--font-mono); color: var(--muted); user-select: none; }
+.install__cmd { font: var(--fw-body) var(--fs-15)/20px var(--font-mono); color: var(--ink); white-space: nowrap; }
+.install .copy { height: 36px; min-width: 36px; padding: 0 10px; border-radius: var(--r-row); background: transparent; }
+.install .copy svg { width: 15px; height: 15px; }
+
+/* masthead rise: rise-16 450 out-cubic at 0 / 30 / 180 / 260ms, trust +60ms */
+.bs-js .hero.is-rising .hero__eyebrow   { animation: rise-16 var(--d-450) var(--ease-out-cubic) 0ms both; }
+.bs-js .hero.is-rising .hero__title     { animation: rise-16 var(--d-450) var(--ease-out-cubic) 30ms both; }
+.bs-js .hero.is-rising .hero__sub       { animation: rise-16 var(--d-450) var(--ease-out-cubic) 180ms both; }
+.bs-js .hero.is-rising .hero__actions   { animation: rise-16 var(--d-450) var(--ease-out-cubic) 260ms both; }
+.bs-js .hero.is-rising .hero__trust > li { animation: rise-16 var(--d-450) var(--ease-out-cubic) calc(320ms + var(--i, 0) * 60ms) both; }
+
+/* ══ (c) house sections ═══════════════════════════════════════════════ */
+.site-section {
+  position: relative; width: min(var(--site-max-w), calc(100% - 96px)); margin-inline: auto;
+  padding: 32px 0; border-top: var(--hairline);
+}
+.site-section + .site-section { margin-top: 32px; }
+.site-section--flush { border-top: 0; }
+/* the head: eyebrow + title left, the copy right (the kit .pi-section__head) */
+.site-section .section-head, .section-head--split {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: end; margin: 16px 0 0;
+}
+.section-head__lead { display: grid; gap: 16px; min-width: 0; }
+.section-head__eyebrow { font: var(--fw-body) var(--fs-11)/17.6px var(--font-mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--muted); }
+.section-head__eyebrow b { font-weight: var(--fw-body); color: var(--ink); }
+.section-head__title { font: var(--fw-medium) clamp(28px, 2.7vw, 38px)/1.1 var(--font-sans); letter-spacing: -0.035em; color: var(--ink); text-wrap: balance; }
+.section-head__body { max-width: 480px; font: var(--fw-body) var(--fs-14)/22.4px var(--font-sans); color: var(--muted); }
+.site-section__lede { max-width: 688px; margin-top: 16px; font: var(--fw-body) var(--fs-15)/24px var(--font-sans); color: var(--muted); }
+.site-panel {
+  position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 28px; border: var(--hairline); border-radius: var(--r-panel); background: var(--panel);
+}
+.site-panel__n { font: var(--fw-body) var(--fs-11)/17.6px var(--font-mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--muted); }
+.site-panel__title { font: var(--fw-medium) var(--fs-20)/26px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); }
+.site-panel__body { font: var(--fw-body) var(--fs-14)/22.4px var(--font-sans); color: var(--muted); }
+.site-grid-2, .site-grid-3 { display: grid; gap: 24px; margin-top: 28px; }
+.site-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.site-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* a faint field behind a section head (D04 allows it there, never behind a table) */
+.site-section__space { position: absolute; inset: -32px -96px auto; height: 320px; z-index: -1; border-radius: var(--r-panel); overflow: hidden; }
+.site-section:has(> .site-section__space) { isolation: isolate; }
+
+/* ══ (d) the footer ══════════════════════════════════════════════════════ */
+.site-footer {
+  width: min(var(--site-max-w), calc(100% - 96px)); margin: 64px auto 0;
+  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 32px; align-items: start;
+  padding: 32px 0 40px; border-top: var(--hairline);
+}
+.site-footer__brand { display: grid; gap: 12px; justify-items: start; }
+.site-footer__line { max-width: 40ch; font: var(--fw-body) var(--fs-14)/22px var(--font-sans); color: var(--muted); }
+.site-footer__routes { display: grid; grid-template-columns: repeat(2, max-content); gap: 8px 32px; }
+.site-footer__routes a { font: var(--fw-medium) var(--fs-13)/20px var(--font-sans); color: var(--muted); border-radius: 3px;
+  transition: color var(--d-150) var(--ease-in-out); }
+@media (hover: hover) and (pointer: fine) { .site-footer__routes a:hover { color: var(--ink); } }
+.site-footer__routes a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.site-footer__routes a[aria-current="page"] { color: var(--ink); }
+.site-footer__ver { font: var(--fw-body) var(--fs-12)/20px var(--font-mono); color: var(--muted); white-space: nowrap; }
+
+/* ══ reduced motion ══════════════════════════════════════════════════════ */
+.site-footer__ver, .install__cmd, .hero__trust { font-variant-numeric: tabular-nums; }
+
+html[data-motion="reduce"] .hero :is(.hero__eyebrow, .hero__title, .hero__sub, .hero__actions, .hero__trust > li) { animation: none !important; opacity: 1 !important; transform: none !important; }
+html[data-motion="reduce"] :is(.notch__pill, .notch__ink, .notch__item, .hero__secondary svg) { transition: none !important; }
+html[data-motion="reduce"] :is(.notch__item, .site-brand, .hero__secondary):active { transform: none; }

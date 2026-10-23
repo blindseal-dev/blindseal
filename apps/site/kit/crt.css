@@ -1,0 +1,11 @@
+/* ============================================================================
+   _shared/crt.css — the CRT hero layer (D37; React Bits "CRT Warp", MIT, ported
+   in crt.js). crt.js also sets these as inline styles, so a page that forgets
+   this file still renders correctly; load it for the record.
+   The canvas fills .hero__space (absolute, inset 0), sits UNDER .hero__shade
+   (the the notch nav left darkening + bottom fade to the canvas) and never takes a
+   pointer: there is no interaction (D37).
+   ========================================================================== */
+.crt { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.crt__canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+.hero__space[data-bg="crt"] { background: var(--canvas); }
