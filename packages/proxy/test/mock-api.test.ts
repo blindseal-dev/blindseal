@@ -106,8 +106,9 @@ describe('mock API — CORS', () => {
 describe('mock API — policy & attestations', () => {
   it('GET policy returns rules + root', async () => {
     const p = await (await fetch(`${base}/policy`, auth)).json();
-    expect(p.rules.length).toBe(25);
-    expect(p.root).toMatch(/^0x/);
+    // The 22 committed L1 rules from detector-core (root is over 22 DFA leaves + 1 zero-width leaf).
+    expect(p.rules.length).toBe(22);
+    expect(p.root).toBe('0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397');
   });
   it('lists attestations and filters by status', async () => {
     const all = await (await fetch(`${base}/attestations`, auth)).json();

@@ -1,189 +1,215 @@
 {
-  "root": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
+  "root": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
   "version": 2,
-  "updatedAt": "2026-10-20T09:00:03.606Z",
+  "updatedAt": "2026-10-20T09:00:01.026Z",
+  "detectorVersion": "0x726faa56c0857bbace50727feedf504a76f37a98c975f565e44bf341fb29851d",
+  "leafCount": 23,
+  "parameters": {
+    "zeroWidthDensityThreshold": 0.1
+  },
+  "l0Decoders": [
+    "base64-decoded-run",
+    "hex-decoded-run",
+    "url-decoded-run",
+    "html-entity-decoded-run"
+  ],
   "rules": [
     {
-      "id": "l0-decoded-injection",
-      "layer": "L0",
-      "kind": "regex",
-      "value": "(?i)ignore (all|previous) instructions",
-      "enabled": true,
-      "note": "synthetic fixture rule"
-    },
-    {
-      "id": "l0-hex-payload",
-      "layer": "L0",
-      "kind": "threshold",
-      "value": "decoded_entropy>4.0",
+      "id": "unicode-tag-smuggling",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "unicode-tag-smuggling",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l1-ignore-previous",
+      "id": "bidi-override-smuggling",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "kind": "dfa",
+      "name": "bidi-override-smuggling",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l1-exfil-url",
+      "id": "html-entity-encoded-run",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)(curl|fetch|POST)\\s+https?://",
-      "enabled": false,
-      "note": "synthetic fixture rule"
-    },
-    {
-      "id": "l1-tool-override",
-      "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)you are now|new instructions:",
+      "kind": "dfa",
+      "name": "html-entity-encoded-run",
+      "severity": "Suspicious",
+      "verdict": "flag",
       "enabled": true
     },
     {
-      "id": "l1-zero-width",
+      "id": "instruction-prefix:ignore-previous",
       "layer": "L1",
-      "kind": "denylist",
-      "value": "\\u200b\\u200c\\u200d",
-      "enabled": false
-    },
-    {
-      "id": "l1-base64-blob",
-      "layer": "L1",
-      "kind": "threshold",
-      "value": "base64_run>256",
+      "kind": "dfa",
+      "name": "instruction-prefix:ignore-previous",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l0-decoded-injection-7",
-      "layer": "L0",
-      "kind": "regex",
-      "value": "(?i)ignore (all|previous) instructions",
-      "enabled": true,
-      "note": "synthetic fixture rule"
-    },
-    {
-      "id": "l0-hex-payload-8",
-      "layer": "L0",
-      "kind": "threshold",
-      "value": "decoded_entropy>4.0",
+      "id": "instruction-prefix:disregard-above",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "instruction-prefix:disregard-above",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l1-ignore-previous-9",
+      "id": "instruction-prefix:forget-previous",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "kind": "dfa",
+      "name": "instruction-prefix:forget-previous",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l1-exfil-url-10",
+      "id": "instruction-prefix:system-prefix",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "kind": "dfa",
+      "name": "instruction-prefix:system-prefix",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l1-tool-override-11",
+      "id": "instruction-prefix:you-are-now",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)you are now|new instructions:",
+      "kind": "dfa",
+      "name": "instruction-prefix:you-are-now",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l1-zero-width-12",
+      "id": "instruction-prefix:new-instructions",
       "layer": "L1",
-      "kind": "denylist",
-      "value": "\\u200b\\u200c\\u200d",
-      "enabled": true,
-      "note": "synthetic fixture rule"
-    },
-    {
-      "id": "l1-base64-blob-13",
-      "layer": "L1",
-      "kind": "threshold",
-      "value": "base64_run>256",
+      "kind": "dfa",
+      "name": "instruction-prefix:new-instructions",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l0-decoded-injection-14",
-      "layer": "L0",
-      "kind": "regex",
-      "value": "(?i)ignore (all|previous) instructions",
+      "id": "instruction-prefix:override-above",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "instruction-prefix:override-above",
+      "severity": "Malicious",
+      "verdict": "block",
       "enabled": true
     },
     {
-      "id": "l0-hex-payload-15",
-      "layer": "L0",
-      "kind": "threshold",
-      "value": "decoded_entropy>4.0",
-      "enabled": true,
-      "note": "synthetic fixture rule"
-    },
-    {
-      "id": "l1-ignore-previous-16",
+      "id": "html-comment-injection",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)ignore (the )?(above|previous|prior)",
+      "kind": "dfa",
+      "name": "html-comment-injection",
+      "severity": "Suspicious",
+      "verdict": "flag",
       "enabled": true
     },
     {
-      "id": "l1-exfil-url-17",
+      "id": "markdown-link-prompt-anchor",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "kind": "dfa",
+      "name": "markdown-link-prompt-anchor",
+      "severity": "Suspicious",
+      "verdict": "flag",
       "enabled": true
     },
     {
-      "id": "l1-tool-override-18",
+      "id": "large-base64-blob",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)you are now|new instructions:",
-      "enabled": true,
-      "note": "synthetic fixture rule"
-    },
-    {
-      "id": "l1-zero-width-19",
-      "layer": "L1",
-      "kind": "denylist",
-      "value": "\\u200b\\u200c\\u200d",
+      "kind": "dfa",
+      "name": "large-base64-blob",
+      "severity": "Suspicious",
+      "verdict": "flag",
       "enabled": true
     },
     {
-      "id": "l1-base64-blob-20",
+      "id": "bracket-ai-directive",
       "layer": "L1",
-      "kind": "threshold",
-      "value": "base64_run>256",
-      "enabled": false
-    },
-    {
-      "id": "l0-decoded-injection-21",
-      "layer": "L0",
-      "kind": "regex",
-      "value": "(?i)ignore (all|previous) instructions",
+      "kind": "dfa",
+      "name": "bracket-ai-directive",
+      "severity": "Suspicious",
+      "verdict": "flag",
       "enabled": true
     },
     {
-      "id": "l0-hex-payload-22",
-      "layer": "L0",
-      "kind": "threshold",
-      "value": "decoded_entropy>4.0",
-      "enabled": true,
-      "note": "synthetic fixture rule"
+      "id": "refusal-suppression-directive",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "refusal-suppression-directive",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
     },
     {
-      "id": "l1-ignore-previous-23",
+      "id": "memory-store-injection",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)ignore (the )?(above|previous|prior)",
-      "enabled": true,
-      "note": "synthetic fixture rule"
+      "kind": "dfa",
+      "name": "memory-store-injection",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
     },
     {
-      "id": "l1-exfil-url-24",
+      "id": "pipeline-authority-claim",
       "layer": "L1",
-      "kind": "regex",
-      "value": "(?i)(curl|fetch|POST)\\s+https?://",
+      "kind": "dfa",
+      "name": "pipeline-authority-claim",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
+    },
+    {
+      "id": "sleeper-trigger-setup",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "sleeper-trigger-setup",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "recursive-output-injection",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "recursive-output-injection",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "dan-dual-label",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "dan-dual-label",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
+    },
+    {
+      "id": "affirmative-prefix-elicitation",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "affirmative-prefix-elicitation",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "task-reassignment-directive",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "task-reassignment-directive",
+      "severity": "Suspicious",
+      "verdict": "flag",
       "enabled": true
     }
   ]

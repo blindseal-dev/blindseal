@@ -58,11 +58,42 @@ const SERVERS = [
   { name: 'solana-tools', tools: ['transfer_sol', 'spl_transfer', 'invoke_program'] },
 ];
 const REDACT_KINDS = ['api_key', 'private_key', 'seed_phrase', 'jwt', 'email', 'phone', 'card', 'ssn', 'high_entropy'];
-const L1_RULES = ['l1-ignore-previous', 'l1-exfil-url', 'l1-tool-override', 'l1-zero-width', 'l1-base64-blob'];
-const L0_RULES = ['l0-decoded-injection', 'l0-hex-payload'];
 
-const POLICY_ROOT = hex(32, 'policyRoot');
-const DETECTOR_VERSION = hex(32, 'detectorVersion'); // sp1 vkey hash placeholder
+// The 22 committed L1 rules, verbatim from crates/detector-core (name + severity). The policy
+// root is a Merkle over these 22 DFA leaves + 1 zero-width-threshold leaf = 23 leaves; it is NOT
+// reproducible in JS (leaves are serialized regex-automata DFA bytes), so it is pinned to the real
+// value emitted by detector-core's policy.rs test. See docs/FRONTEND-CONTRACT.md.
+const L1_RULE_DEFS = [
+  ['unicode-tag-smuggling', 'Malicious'],
+  ['bidi-override-smuggling', 'Malicious'],
+  ['html-entity-encoded-run', 'Suspicious'],
+  ['instruction-prefix:ignore-previous', 'Malicious'],
+  ['instruction-prefix:disregard-above', 'Malicious'],
+  ['instruction-prefix:forget-previous', 'Malicious'],
+  ['instruction-prefix:system-prefix', 'Malicious'],
+  ['instruction-prefix:you-are-now', 'Malicious'],
+  ['instruction-prefix:new-instructions', 'Malicious'],
+  ['instruction-prefix:override-above', 'Malicious'],
+  ['html-comment-injection', 'Suspicious'],
+  ['markdown-link-prompt-anchor', 'Suspicious'],
+  ['large-base64-blob', 'Suspicious'],
+  ['bracket-ai-directive', 'Suspicious'],
+  ['refusal-suppression-directive', 'Suspicious'],
+  ['memory-store-injection', 'Malicious'],
+  ['pipeline-authority-claim', 'Malicious'],
+  ['sleeper-trigger-setup', 'Suspicious'],
+  ['recursive-output-injection', 'Suspicious'],
+  ['dan-dual-label', 'Malicious'],
+  ['affirmative-prefix-elicitation', 'Suspicious'],
+  ['task-reassignment-directive', 'Suspicious'],
+];
+const L1_RULES = L1_RULE_DEFS.map((r) => r[0]);
+// L0 is decode-then-L1: a decoder surfaces hidden text that an L1 rule then catches.
+const L0_RULES = ['base64-decoded-run', 'hex-decoded-run', 'url-decoded-run', 'html-entity-decoded-run'];
+
+// Real committed policy root (detector-core default policy, 23 leaves) — see evals/vectors/policy-root.txt.
+const POLICY_ROOT = '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397';
+const DETECTOR_VERSION = hex(32, 'detectorVersion'); // sp1 vkey (0x+64hex); real value is the guest vkey
 
 // ---------- decisions ----------
 function layersFor(verdict, i) {
@@ -155,29 +186,30 @@ for (const d of decisions) {
 const head = { index: entries.length - 1, hash: prevHash, ts: entries[entries.length - 1].ts };
 const audit = { head, genesis: GENESIS, entries };
 
-// ---------- policy (25 rules L0/L1) ----------
-const rules = [];
-const ruleDefs = [
-  ['l0-decoded-injection', 'L0', 'regex', '(?i)ignore (all|previous) instructions'],
-  ['l0-hex-payload', 'L0', 'threshold', 'decoded_entropy>4.0'],
-  ['l1-ignore-previous', 'L1', 'regex', '(?i)ignore (the )?(above|previous|prior)'],
-  ['l1-exfil-url', 'L1', 'regex', '(?i)(curl|fetch|POST)\\s+https?://'],
-  ['l1-tool-override', 'L1', 'regex', '(?i)you are now|new instructions:'],
-  ['l1-zero-width', 'L1', 'denylist', '\\u200b\\u200c\\u200d'],
-  ['l1-base64-blob', 'L1', 'threshold', 'base64_run>256'],
-];
-for (let i = 0; i < 25; i++) {
-  const base = ruleDefs[i % ruleDefs.length];
-  rules.push({
-    id: i < ruleDefs.length ? base[0] : `${base[0]}-${i}`,
-    layer: base[1],
-    kind: base[2],
-    value: base[3],
-    enabled: !chance(0.08),
-    ...(chance(0.3) ? { note: 'synthetic fixture rule' } : {}),
-  });
-}
-const policy = { root: POLICY_ROOT, version: 2, updatedAt: iso(0), rules };
+// ---------- policy (22 committed L1 rules + zero-width threshold parameter) ----------
+// Mirrors crates/detector-core exactly: 22 L1 rules, each a DFA leaf; severity Malicious -> block
+// verdict, Suspicious -> flag. The committed root is over these 22 leaves + the zero-width
+// threshold leaf (23 leaves total), pinned to the real detector-core value.
+const SEV_VERDICT = { Malicious: 'block', Suspicious: 'flag' };
+const rules = L1_RULE_DEFS.map(([name, severity]) => ({
+  id: name,
+  layer: 'L1',
+  kind: 'dfa',
+  name,
+  severity,
+  verdict: SEV_VERDICT[severity],
+  enabled: true,
+}));
+const policy = {
+  root: POLICY_ROOT,
+  version: 2,
+  updatedAt: iso(0),
+  detectorVersion: DETECTOR_VERSION,
+  leafCount: 23,
+  parameters: { zeroWidthDensityThreshold: 0.1 },
+  l0Decoders: L0_RULES,
+  rules,
+};
 
 // ---------- attestations (6, all statuses) ----------
 const actionDecisions = decisions.filter((d) => d.action).slice(0, 6);

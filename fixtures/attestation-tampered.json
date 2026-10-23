@@ -3,14 +3,14 @@
   "id": "att_8e1c2a16",
   "decisionId": "1ZYXWVTSRQPNMKJHGFEDCBA987",
   "actionHash": "0x419f8b8a5a8fd350cdb4e4b109dc347faa61cef1da5f3e85c8432fcb9614a337",
-  "policyRoot": "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
+  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
   "detectorVersion": "0x726faa56c0857bbace50727feedf504a76f37a98c975f565e44bf341fb29851d",
   "expirySlot": 280200000,
   "nullifier": "0x949bcc04116aa64475b87e5a188ce6f4a109325a823dc12a6f83c431bcc00f21",
   "nonce": "0x8e1c2a16c62c803b8b94925554ebc12a3110e7744ebb06fc81b1943e998d3e6f",
   "publicInputs": [
     "0x880dcefa96c5ac45dcb65880cf9f83b244d5e5e034c39675b6741ef16e5d3fe7",
-    "0xf40b8c16b7fe3dc501367041e3be1d8856b072be02e37c5bd1b16689c417fa38",
+    "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
     "0x726faa56c0857bbace50727feedf504a76f37a98c975f565e44bf341fb29851d",
     "0xf138bb1972b30b2e19e8131164e9a357037ba18a9f3c8c24d86faa43a6f202a2",
     "0x949bcc04116aa64475b87e5a188ce6f4a109325a823dc12a6f83c431bcc00f21",
@@ -25,5 +25,5 @@
     "mode": "local"
   },
   "status": "rejected",
-  "createdAt": "2026-10-20T10:01:42.169Z"
+  "createdAt": "2026-10-20T10:01:40.031Z"
 }
