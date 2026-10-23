@@ -6,6 +6,7 @@ import { useKitBoot } from './kit/react';
 import { Decisions } from './pages/Decisions';
 import { DecisionDetail } from './pages/DecisionDetail';
 import { Audit } from './pages/Audit';
+import { Policy } from './pages/Policy';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -27,7 +28,7 @@ function Layout() {
           <Route path="/decisions" element={<Decisions />} />
           <Route path="/decisions/:id" element={<DecisionDetail />} />
           <Route path="/audit" element={<Audit />} />
-          <Route path="/policy" element={<Placeholder name="Policy" />} />
+          <Route path="/policy" element={<Policy />} />
           <Route path="/attestations" element={<Placeholder name="Attestations" />} />
           <Route path="/settings" element={<Placeholder name="Settings" />} />
         </Routes>
