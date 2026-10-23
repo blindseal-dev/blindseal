@@ -1,0 +1,288 @@
+<!doctype html>
+<!--
+  Blindseal mockups · J00 — the kitchen sink (site chrome)
+  ============================================================================
+  The marketing-site chrome live: the notch nav (mountSite, navigate:
+  false: a link click slides the white pill in place), the full hero over the
+  nebula, the nebula at both intensities, a house section head, three site
+  panels, the install block, the honest-scope callout, both logo marks, the
+  footer. The dashboard primitives are on kitchen-sink.html.
+
+  QA switches: ?motion=reduce | slow | full · ?nav=glass (the brief's glass-pill
+  variant) · ?data=1 (load fixtures.js).
+
+  Recipe for a SITE page (S01–S06), mockups/<JOB>/index.html — MASTER.md §9:
+    <!doctype html><html lang="en" class="bs-js"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>How it works · Blindseal</title><link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../_shared/tokens.css">
+    <link rel="stylesheet" href="../_shared/fonts.css">
+    <link rel="stylesheet" href="../_shared/glass.css">
+    <link rel="stylesheet" href="../_shared/motion.css">
+    <link rel="stylesheet" href="../_shared/space.css">
+    <link rel="stylesheet" href="../_shared/ui.css">
+    <link rel="stylesheet" href="../_shared/diagrams.css">   (only if the page draws a figure)
+    <link rel="stylesheet" href="../_shared/site.css">
+    <link rel="stylesheet" href="page.css">
+    </head><body>
+    <main id="main-content">
+      <section class="hero"> <div class="hero__space"></div><div class="hero__shade"></div>
+        <div class="hero__content"><div class="hero__col"> eyebrow · h1 · sub · actions · trust </div></div></section>
+      <section class="site-section reveal"> <div class="section-head"> … </div> … </section>
+    </main>
+    <script src="../_shared/constants.js"></script>
+    <script src="../_shared/fixtures.js"></script>
+    <script src="../_shared/icons.js"></script>
+    <script src="../_shared/motion.js"></script>
+    <script src="../_shared/reveal.js"></script>
+    <script src="../_shared/glass.js"></script>
+    <script src="../_shared/diagrams.js"></script>          (only if the page draws a figure)
+    <script src="../_shared/ui.js"></script>
+    <script src="../_shared/sheet.js"></script>
+    <script src="../_shared/space.js"></script>
+    <script src="../_shared/site.js"></script>
+    <script src="page.js"></script>
+    page.js:  BS.mountSite({ active: "how" });
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen sink · site · Blindseal</title>
+<meta name="description" content="Blindseal mockup kit: the marketing-site chrome — notch nav, hero over the nebula, house sections, footer, logo marks.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="glass.css">
+<link rel="stylesheet" href="motion.css">
+<link rel="stylesheet" href="space.css">
+<link rel="stylesheet" href="crt.css">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="site.css">
+<style>
+  /* sink layout only (kss-*). Tokens only, no colour literal. */
+  .kss-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 24px; }
+  .kss-controls .ks-label { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .kss-marks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 28px; }
+  .kss-mark { display: grid; gap: 20px; }
+  .kss-mark__row { display: flex; align-items: center; gap: 28px; color: var(--ink); }
+  .kss-mark__row.on-pill { gap: 14px; }
+  .kss-lockup { display: inline-flex; align-items: center; gap: 10px; font: var(--fw-strong) var(--fs-16)/1 var(--font-sans); letter-spacing: -0.02em; color: var(--ink); }
+  .kss-lockup--lg { gap: 14px; font-size: 28px; letter-spacing: -0.03em; }
+  .kss-chip { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-full); background: var(--pill); color: var(--pill-ink); }
+  .kss-tile { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-row); border: var(--hairline); background: var(--surface-raised); color: var(--ink); }
+  .kss-faint { position: relative; margin-top: 28px; }
+  .kss-faint .hero { min-height: 520px; padding: 48px 0; border: var(--hairline); border-radius: var(--r-panel); }
+  .kss-faint { margin-top: 28px; }
+  .kss-faint .hero__content { padding-left: 40px; padding-right: 24px; }
+  .kss-faint .hero__title { max-width: 100%; }
+  .kss-faint .hero__title { font-size: 40px; margin: 20px 0 16px; }
+  .kss-meas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 28px; background: var(--line); border: var(--hairline); border-radius: var(--r-panel); overflow: clip; }
+  .kss-meas > div { display: grid; gap: 4px; padding: 14px 16px; background: var(--panel); }
+  .kss-steps .site-panel { min-height: 230px; }
+  .kss-steps .site-panel .layers, .kss-steps .site-panel .verdict, .kss-steps .site-panel .status { align-self: flex-start; }
+  .kss-panel-foot { margin-top: auto; display: flex; align-items: center; gap: 10px; }
+</style>
+<script>if (/[?&]data=1\b/.test(location.search)) document.write('<script src="fixtures.js"><\/script>');</script>
+</head>
+<body>
+<main id="main-content">
+
+  <!-- the hero: hero composition over the nebula (intensity: hero) -->
+  <section class="hero" id="kss-hero" aria-label="Hero">
+    <div class="hero__space" data-bg="crt"></div>
+    <div class="hero__shade"></div>
+    <div class="hero__content"><div class="hero__col">
+      <p class="hero__eyebrow"><i class="hero__dot" aria-hidden="true"></i><span>Local proxy</span><span class="hero__sep">-</span><span>Zero-knowledge attestation</span><span class="hero__sep">-</span><span>Verified on Solana</span></p>
+      <h1 class="hero__title">Prove an agent's action was screened <br><em>without showing what it was</em>.</h1>
+      <p class="hero__sub">Blindseal is a privacy-preserving, verifiable screening layer for AI agents.<br>Nothing sensitive leaves the machine.</p>
+      <div class="hero__actions">
+        <div class="install"><span class="install__tile" aria-hidden="true">$</span><code class="install__cmd">npx @blindseal/proxy init</code><button type="button" class="copy" data-copy="npx @blindseal/proxy init" aria-label="Copy the install command"><i data-lucide="copy"></i></button></div>
+        <a class="hero__secondary" href="../S02/" data-sink-link>Read how it works<i data-lucide="arrow-right"></i></a>
+      </div>
+      <ul class="hero__trust">
+        <li><span class="hero__trust-ico"><i data-lucide="terminal"></i></span>Local-only dashboard</li>
+        <li><span class="hero__trust-ico"><i data-lucide="stamp"></i></span>Single-use attestations</li>
+        <li><span class="hero__trust-ico"><i data-lucide="git-commit-horizontal"></i></span>Content-free audit log</li>
+      </ul>
+    </div></div>
+  </section>
+
+  <!-- the sink's own controls -->
+  <section class="site-section site-section--flush" id="kss-controls">
+    <p class="section-head__eyebrow">J00 · kitchen sink · site chrome</p>
+    <div class="kss-controls">
+      <span class="ks-label">Nav</span>
+      <div class="glass-seg" id="kss-nav" aria-label="Nav variant"><button type="button" class="glass-seg__item" data-value="notch">Notch</button><button type="button" class="glass-seg__item" data-value="glass">Glass pills</button></div>
+      <span class="ks-label">CRT hero</span>
+      <div class="glass-seg" id="kss-int" aria-label="CRT hero loop"><button type="button" class="glass-seg__item" data-value="run">Running</button><button type="button" class="glass-seg__item" data-value="pause">Paused</button></div>
+      <span class="ks-label">Motion</span>
+      <div class="glass-seg" id="kss-motion" aria-label="Motion mode"><button type="button" class="glass-seg__item" data-value="system">System</button><button type="button" class="glass-seg__item" data-value="reduce">Reduce</button><button type="button" class="glass-seg__item" data-value="slow">Slow-mo</button></div>
+      <button type="button" class="btn secondary sm" id="kss-replay"><i data-lucide="rotate-ccw"></i>Replay hero rise</button>
+      <a class="btn link sm" href="kitchen-sink.html">Dashboard sink<i data-lucide="arrow-right" class="nudge"></i></a>
+    </div>
+    <div class="kss-meas" id="kss-meas"></div>
+  </section>
+
+  <!-- a house section head + three site panels -->
+  <section class="site-section reveal" id="kss-how">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>01</b> / How it works</p><h2 class="section-head__title">Screen every call.<br>Prove only what was asked.</h2></div>
+      <p class="section-head__body">Blindseal sits between an agent and its tools as a local proxy, inspecting every tool call with four layers of prompt-injection detection before the call executes.</p>
+    </div>
+    <div class="site-grid-3 reveal cascade kss-steps">
+      <article class="site-panel"><p class="site-panel__n">Screen</p><h3 class="site-panel__title">Four layers, on your machine</h3><p class="site-panel__body">Deterministic rules first, then the model-based judge, locally or inside a TEE. Secrets and PII are redacted before the judge sees them.</p><div class="kss-panel-foot"><span id="kss-strip"></span><span class="sub">L0 · L1 · L2 · L3</span></div></article>
+      <article class="site-panel"><p class="site-panel__n">Attest</p><h3 class="site-panel__title">A single-use stamp</h3><p class="site-panel__body">The attestation binds target program, recipient, amount, policy root and expiry, so it is worthless for any other call.</p><div class="kss-panel-foot"><span id="kss-status"></span><span class="sub">groth16 · bn254</span></div></article>
+      <article class="site-panel"><p class="site-panel__n">Verify</p><h3 class="site-panel__title">One Solana instruction</h3><p class="site-panel__body">Any program can gate agent actions without seeing the prompt, the arguments, the operator's rules, or which agent was screened.</p><div class="kss-panel-foot"><span id="kss-hash"></span></div></article>
+    </div>
+  </section>
+
+  <!-- install block + honest scope -->
+  <section class="site-section reveal" id="kss-claim">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>02</b> / What we claim</p><h2 class="section-head__title">A deliberately narrow claim.</h2></div>
+      <p class="section-head__body">The claim is deliberately narrow: this call was screened under policy R by detector version V. The model-based layers are attested, not proven.</p>
+    </div>
+    <div class="site-grid-2">
+      <div class="site-panel"><div class="callout"><p class="callout__title">What we claim</p><p class="callout__body" id="kss-honest"></p></div></div>
+      <div class="site-panel"><p class="site-panel__n">Install</p><div id="kss-code"></div><p class="site-panel__body">Mock mode serves fixtures with identical shapes and one decision every 3 s, so nothing blocks on the backend.</p></div>
+    </div>
+  </section>
+
+  <!-- the nebula (D04: S02–S06 mastheads + the Unauthorized screen) at both intensities -->
+  <section class="site-section reveal" id="kss-faint">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>03</b> / The nebula, both intensities</p><h2 class="section-head__title">Mastheads keep the nebula.</h2></div>
+      <p class="section-head__body">Only the Home hero is the CRT field (D37). BS.mountSpace(host, { intensity: "hero" | "faint" }) stays the background of the S02–S06 masthead bands and the Unauthorized screen: it drifts on the kit's wp-field-drift (12 s), pauses off screen, is static under reduced motion. Never behind a data table.</p>
+    </div>
+    <div class="kss-faint site-grid-2">
+      <div class="hero" aria-label="Nebula at hero intensity">
+        <div class="hero__space" data-bg="nebula" data-intensity="hero"></div>
+        <div class="hero__shade"></div>
+        <div class="hero__content"><div class="hero__col">
+          <p class="hero__eyebrow"><i class="hero__dot" aria-hidden="true"></i><span>nebula · intensity: hero</span></p>
+          <h2 class="hero__title">Nothing of value moves<br>through a pool.</h2>
+          <p class="hero__sub">The proof is the asset.</p>
+        </div></div>
+      </div>
+      <div class="hero" aria-label="Nebula at faint intensity">
+        <div class="hero__space" data-bg="nebula" data-intensity="faint"></div>
+        <div class="hero__shade"></div>
+        <div class="hero__content"><div class="hero__col">
+          <p class="hero__eyebrow"><i class="hero__dot" aria-hidden="true"></i><span>nebula · intensity: faint</span></p>
+          <h2 class="hero__title">Every alpha<br>halved.</h2>
+          <p class="hero__sub">Section heads and the Unauthorized screen.</p>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- the logo marks (D12) -->
+  <section class="site-section reveal" id="kss-marks">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>04</b> / The mark</p><h2 class="section-head__title">Two proposals. Pages use A.</h2></div>
+      <p class="section-head__body">Pure strokes in currentColor, 1.5 px at every size (20 / 28 / 40). A: a circle with a single closed slot. B: a wax seal reduced to geometry, twelve scallops and a small inner ring. The owner picks (O3).</p>
+    </div>
+    <div class="kss-marks">
+      <div class="site-panel kss-mark"><p class="site-panel__n">Mark A · a circle with a single closed slot</p>
+        <div class="kss-mark__row" id="kss-mark-a"></div>
+        <div class="kss-mark__row on-pill" id="kss-mark-a2"></div></div>
+      <div class="site-panel kss-mark"><p class="site-panel__n">Mark B · a wax seal, reduced to geometry</p>
+        <div class="kss-mark__row" id="kss-mark-b"></div>
+        <div class="kss-mark__row on-pill" id="kss-mark-b2"></div></div>
+    </div>
+  </section>
+
+  <!-- dev checks -->
+  <section class="site-section reveal" id="kss-dev">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>05</b> / Dev checks</p><h2 class="section-head__title">Kit self-test.</h2></div>
+      <p class="section-head__body">The never-write scan runs over this page's text; the measured notch geometry is read from the DOM.</p>
+    </div>
+    <div class="site-panel" style="margin-top:28px"><div class="kv kv--rows" id="kss-devchecks"></div></div>
+  </section>
+</main>
+
+<script src="constants.js"></script>
+<script src="icons.js"></script>
+<script src="motion.js"></script>
+<script src="reveal.js"></script>
+<script src="glass.js"></script>
+<script src="ui.js"></script>
+<script src="sheet.js"></script>
+<script src="space.js"></script>
+<script src="crt.js"></script>
+<script src="site.js"></script>
+<script>
+(function () {
+  "use strict";
+  var BS = window.BS, ui = BS.ui, M = BS.motion;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return [].slice.call((r || document).querySelectorAll(s)); };
+  var esc = ui.esc;
+  var navMode = /[?&]nav=glass\b/.test(location.search) ? "glass" : "notch";
+
+  BS.mountSite({ active: "how", navigate: false, nav: navMode });
+
+  /* in-sink links never leave the sink */
+  $$("[data-sink-link]").forEach(function (a) { a.addEventListener("click", function (e) { e.preventDefault(); BS.toast({ title: "Read how it works", body: "Links to S02 on a real page.", tone: "info", id: "sink" }); }); });
+
+  /* controls */
+  ui.seg($("#kss-nav"), { value: navMode, onChange: function (v) { BS.site.setNav(v); measure(); BS.toast({ title: v === "glass" ? "Glass pills (the brief's variant)" : "Notch (the notch tabs)", tone: "info", id: "nav" }); } });
+  ui.seg($("#kss-int"), { value: "run", onChange: function (v) { var c = BS.site.crt; if (!c) { BS.toast({ title: "No WebGL2: the hero fell back to the nebula", tone: "info", id: "crt" }); return; } if (v === "pause") c.pause(); else c.resume(); BS.toast({ title: v === "pause" ? "CRT loop paused" : "CRT loop running", tone: "info", id: "crt" }); } });
+  ui.seg($("#kss-motion"), { value: M.mode() === "full" ? "system" : M.mode(), onChange: function (v) { M.setMode(v); devChecks(); BS.toast({ title: "Motion: " + v, tone: "info", id: "mode" }); } });
+  $("#kss-replay").addEventListener("click", function () {
+    var h = $("#kss-hero");
+    if (M.reduced()) { BS.toast({ title: "Reduced motion", body: "End states only: nothing replays.", tone: "info", id: "replay" }); return; }
+    h.classList.remove("is-rising"); void h.offsetWidth; h.classList.add("is-rising");
+  });
+
+  /* samples on the panels */
+  var R = BS.space.rng(7);
+  function hex(n) { var s = "0x"; for (var i = 0; i < n; i++) s += "0123456789abcdef"[Math.floor(R() * 16)]; return s; }
+  $("#kss-strip").innerHTML = ui.layerStrip([{ layer: "L0", verdict: "pass", latencyMs: 2 }, { layer: "L1", verdict: "pass", latencyMs: 5 }, { layer: "L2", verdict: "pass", score: 0.12, latencyMs: 41 }, { layer: "L3", ran: false, verdict: "skip" }], { lg: true });
+  $("#kss-status").innerHTML = ui.status("consumed");
+  $("#kss-hash").innerHTML = '<span class="sub">policy root</span> ' + ui.hash(hex(64), { label: "Policy root", lg: true });
+  $("#kss-honest").textContent = BS.COPY.honestScope;
+  $("#kss-code").innerHTML = ui.code("$ npx @blindseal/proxy init\n$ blindseal run -- npx @modelcontextprotocol/server-github", { lang: "sh" });
+
+  /* the marks */
+  var m = BS.icons.mark;
+  $("#kss-mark-a").innerHTML = m("A", 20) + m("A", 28) + m("A", 40) + '<span class="kss-lockup">' + m("A", 20) + "Blindseal</span>" + '<span class="kss-lockup kss-lockup--lg">' + m("A", 40) + "Blindseal</span>";
+  $("#kss-mark-b").innerHTML = m("B", 20) + m("B", 28) + m("B", 40) + '<span class="kss-lockup">' + m("B", 20) + "Blindseal</span>" + '<span class="kss-lockup kss-lockup--lg">' + m("B", 40) + "Blindseal</span>";
+  $("#kss-mark-a2").innerHTML = '<span class="kss-chip">' + m("A", 28) + '</span><span class="kss-tile">' + m("A", 28) + '</span><span class="sub">on the pill · on a raised tile · favicon</span>';
+  $("#kss-mark-b2").innerHTML = '<span class="kss-chip">' + m("B", 28) + '</span><span class="kss-tile">' + m("B", 28) + '</span><span class="sub">on the pill · on a raised tile</span>';
+
+  /* measured geometry (the acceptance numbers, read from the DOM) */
+  function measure() {
+    var row = $(".site-notch__row"), tabs = $$(".notch"), item = $(".notch__item"), cta = $(".notch__cta"), wing = $(".notch__wing");
+    var r = function (el) { var b = el.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
+    var cs = getComputedStyle(tabs[1]);
+    var cells = [
+      ["Notch row", r(row).join(" · ")],
+      ["Tab h · centre radius", Math.round(tabs[1].getBoundingClientRect().height) + "px · " + cs.borderBottomLeftRadius],
+      ["Link h · cta", Math.round(item.getBoundingClientRect().height) + "px · " + r(cta).slice(2).join(" × ")],
+      ["Wings", wing && getComputedStyle(wing).display !== "none" ? "16 × 16 · on" : "off (glass)"]
+    ];
+    $("#kss-meas").innerHTML = cells.map(function (c) { return '<div><span class="stat__k">' + esc(c[0]) + '</span><span class="num" style="font:var(--fw-medium) var(--fs-14)/20px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink)">' + esc(c[1]) + "</span></div>"; }).join("");
+  }
+  measure();
+  if (document.fonts) document.fonts.ready.then(measure);
+
+  function devChecks() {
+    var hits = BS.neverWriteScan();
+    var rows = [
+      ["Never-write scan", hits.length ? hits.length + " hit(s): " + hits.join(", ") : "0 hits"],
+      ["Nav variant", navMode],
+      ["Nebula hosts mounted", String(BS.site.spaces.length)],
+      ["CRT hero (crt.js, D37)", BS.site.crt ? (BS.site.crt.paused ? "mounted · paused" : "mounted · running") : "fallback: nebula"],
+      ["Motion mode", M.mode() + (M.reduced() ? " · reduced" : "")],
+      ["BS.data (fixtures.js)", BS.data ? "loaded" : "absent (add ?data=1)"]
+    ];
+    $("#kss-devchecks").innerHTML = rows.map(function (r) { return '<div class="kv__item"><span class="kv__k">' + esc(r[0]) + '</span><span class="kv__v">' + esc(r[1]) + "</span></div>"; }).join("");
+  }
+  devChecks();
+})();
+</script>
+</body>
+</html>

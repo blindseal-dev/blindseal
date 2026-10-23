@@ -1,0 +1,116 @@
+<!doctype html>
+<!--
+  Blindseal mockups · D03 — Dashboard: Audit (/audit)
+  Chain head, Verify chain (intact / broken), the chain figure with the selected
+  range bracketed, a range selector (from / to by index, Last 100 · Last 24 h · All),
+  the content-free entries table and the Export disclosure sheet (downloads JSON).
+  Switches: ?state=chain-broken | empty | offline (comma list) · ?index=<n> (from D02:
+  scroll to and flash that entry) · ?disclose=<from>-<to> (open the sheet) ·
+  ?now=<ms> freezes the fixture clock · ?motion=reduce | slow | full.
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit · Blindseal</title>
+<meta name="description" content="Blindseal local dashboard: the hash-chained audit log, chain verification and content-free disclosure export.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/diagrams.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+  <div class="page d03" id="d03">
+
+    <!-- head band: the chain head + the verification cell -->
+    <section class="panel d03-head" id="d03-head" aria-label="Chain head" data-rise>
+      <div class="d03-head__main">
+        <p class="eyebrow d03-head__eyebrow"><span class="live-dot" aria-hidden="true"></span>Chain head</p>
+        <div class="d03-head__row">
+          <p class="d03-head__index" aria-live="polite"><span class="d03-head__hashmark" aria-hidden="true">#</span><span class="d03-odo" id="d03-odo">0</span></p>
+          <span class="d03-head__hash" id="d03-head-hash"></span>
+        </div>
+        <p class="meta-line d03-head__meta">
+          <span id="d03-head-ts"></span>
+          <span class="d03-dot" aria-hidden="true"></span>
+          <span>entries <b class="d03-ink num" id="d03-head-n">0</b></span>
+          <span class="d03-dot" aria-hidden="true"></span>
+          <span>signed by <span id="d03-signer"></span></span>
+        </p>
+        <p class="d03-head__copy">Every decision is written to a hash-chained local log. Entries carry hashes and verdicts, never content.</p>
+      </div>
+      <div class="d03-verify" id="d03-verify" aria-live="polite"></div>
+    </section>
+
+    <!-- range selector: flat bar -->
+    <section class="panel d03-range" id="d03-range" aria-label="Range" data-rise>
+      <div class="filter-bar">
+        <span class="filter-bar__label d03-range__label">Range</span>
+        <label class="d03-idx"><span class="d03-idx__k">From</span><span class="d03-idx__box"><span class="d03-idx__hash" aria-hidden="true">#</span>
+          <input class="input num d03-idx__in" id="d03-from" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="From audit index"></span></label>
+        <span class="d03-range__arrow" aria-hidden="true">→</span>
+        <label class="d03-idx"><span class="d03-idx__k">To</span><span class="d03-idx__box"><span class="d03-idx__hash" aria-hidden="true">#</span>
+          <input class="input num d03-idx__in" id="d03-to" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="To audit index"></span></label>
+        <span class="d03-sep" aria-hidden="true"></span>
+        <div class="tabs d03-presets" id="d03-presets" role="group" aria-label="Range presets">
+          <button type="button" class="tab" data-value="last100">Last 100</button>
+          <button type="button" class="tab" data-value="24h">Last 24 h</button>
+          <button type="button" class="tab" data-value="all">All</button>
+        </div>
+        <span class="filter-bar__spacer"></span>
+        <p class="d03-range__count"><b class="num d03-ink" id="d03-count">0</b> <span id="d03-count-unit">entries</span><span class="d03-range__span" id="d03-span"></span></p>
+      </div>
+    </section>
+
+    <!-- the chain figure, full width -->
+    <section class="panel d03-chain" id="d03-chain" aria-labelledby="d03-chain-title" data-rise>
+      <header class="panel__head">
+        <h2 class="panel__title" id="d03-chain-title">Chain</h2>
+        <p class="sub d03-chain__sub" id="d03-chain-sub"></p>
+      </header>
+      <figure class="fig d03-fig" id="d03-fig">
+        <div class="fig__art"><span class="d03-gap" id="d03-gap" tabindex="0" role="img" hidden><span class="d03-gap__dots" aria-hidden="true">⋯</span><span class="d03-gap__n" id="d03-gap-n" aria-hidden="true"></span></span>
+          <span class="d03-sweep" id="d03-sweep" aria-hidden="true"><i></i></span></div>
+      </figure>
+    </section>
+
+    <!-- the entries table: content-free by construction -->
+    <section class="table-box d03-tablebox" id="d03-tablebox" aria-label="Audit entries" data-rise>
+      <table class="table d03-table">
+        <colgroup><col class="c-idx"><col class="c-hash"><col class="c-prev"><col class="c-time"><col class="c-verdict"><col class="c-dec"><col class="c-pay"></colgroup>
+        <thead><tr>
+          <th scope="col">Index</th><th scope="col">Hash</th><th scope="col">Prev</th><th scope="col">Time</th>
+          <th scope="col">Verdict</th><th scope="col">Decision</th><th scope="col">Payload hash</th>
+        </tr></thead>
+        <tbody id="d03-rows"></tbody>
+      </table>
+      <div class="d03-none" id="d03-none" hidden></div>
+    </section>
+
+    <!-- pagination -->
+    <div class="d03-more" id="d03-more" data-rise>
+      <p class="d03-more__note">Showing <span class="num" id="d03-shown">0</span> of <span class="num" id="d03-of">0</span></p>
+      <button type="button" class="btn secondary" id="d03-loadmore"><i data-lucide="chevron-down"></i><span id="d03-more-label">Load more</span></button>
+    </div>
+  </div>
+</main>
+
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/diagrams.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/shell.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

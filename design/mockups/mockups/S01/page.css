@@ -1,0 +1,107 @@
+/* ============================================================================
+   S01 — Site: Home · page styles (tokens only; no colour literal)
+   ----------------------------------------------------------------------------
+   The hero, notch, sections, panels, callout, code and footer are the kit's
+   (site.css / ui.css). This file only lays out what the kit has no class for.
+   Spacing on the kit's 4 px scale (--s-*) wherever a step exists.
+   Invented values (logged on the board): problem lines 22/32 gap 20 · flow
+   columns on the flow4 node grid (36 / 186 / 68 of 1020) · hidden-row hatch
+   widths 96 / 72 / 104 / 64 · public values behind 10 px mono keys, the last
+   row stacked (both panels' 4th row 80 high so rows stay aligned) · callout
+   body 18/30 on the home page · install block 20/28 mono · steps grid
+   1fr 1.5fr 1fr · CTA padding 40.
+   ========================================================================== */
+
+/* ── 01 / the problem: three sentences, no title, no cards ─────────────── */
+/* at 22 px within 760 the three sentences wrap to five visual lines: a choice, logged */
+.s01-problem__lines { display: grid; gap: var(--s-5); max-width: 760px; margin-top: var(--s-7); }
+.s01-problem__line {
+  font: var(--fw-body) 22px/32px var(--font-sans); letter-spacing: -0.01em; color: var(--ink);
+  text-wrap: pretty;
+}
+
+/* ── 02 / how it works: the figure, then four columns on its node grid ─── */
+.s01-flow { margin: var(--s-10) 0 0; }
+/* flow4's viewBox is 1020 wide: nodes start at 36, are 186 wide, 68 apart.
+   padding 36/1020 of the width; the gap is 68/948 of the content box. */
+.s01-cols {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: calc(100% * 68 / 948); padding: 0 calc(100% * 36 / 1020);
+  margin: var(--s-7) 0 0; list-style: none;
+}
+.s01-col { display: grid; align-content: start; gap: 10px; padding-top: var(--s-4); border-top: var(--hairline); min-width: 0; }
+.s01-col__k { font: var(--fw-body) var(--fs-11)/17.6px var(--font-mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--muted); }
+.s01-col__p { font: var(--fw-body) var(--fs-14)/22.4px var(--font-sans); color: var(--muted); text-wrap: pretty; }
+.s01-more { margin-top: var(--s-8); padding-left: calc(100% * 36 / 1020); }
+.s01-link.btn.link { gap: var(--s-2); font-size: var(--fs-14); line-height: 20px; }
+
+/* ── 03 / hidden vs public: two flat panels, hairline rows ─────────────── */
+.s01-hp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-6); margin-top: var(--s-7); }
+.s01-hp__panel.site-panel { gap: 0; padding: 22px var(--s-7) 6px; }
+.s01-hp__head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); padding-bottom: var(--s-4);
+  font: var(--fw-body) var(--fs-11)/17.6px var(--font-mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--ink);
+}
+.s01-hp__note { letter-spacing: .04em; text-transform: none; color: var(--muted); }
+.s01-hp__rows { list-style: none; margin: 0; padding: 0; }
+.s01-hp__row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); min-height: 56px; padding: var(--s-2) 0;
+  border-top: var(--hairline);
+  font: var(--fw-body) var(--fs-15)/22px var(--font-sans);
+}
+/* the 4th row carries three values: it stacks on the public side; both panels give it the same height */
+.s01-hp__row:nth-child(4) { min-height: 80px; }
+.s01-hp__row:has(.s01-hp__vals) { flex-wrap: wrap; row-gap: 6px; align-content: center; }
+.s01-hp__row:has(.s01-hp__vals) .s01-hp__term { flex: 1 0 100%; }
+.s01-hp__vals { display: flex; align-items: center; gap: var(--s-5); margin-left: auto; }
+.s01-hp__term { min-width: 0; color: var(--ink); }
+.s01-hp__panel:first-child .s01-hp__term { color: var(--muted); }
+/* a redaction mark, not a value: the diagrams' hatch idiom, in hairline tokens */
+.s01-hp__redact {
+  flex: none; width: 96px; height: 10px; border-radius: 2px;
+  background: repeating-linear-gradient(135deg, var(--line-strong) 0 1px, transparent 1px 5px);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.s01-hp__row:nth-child(2) .s01-hp__redact { width: 72px; }
+.s01-hp__row:nth-child(3) .s01-hp__redact { width: 104px; }
+.s01-hp__row:nth-child(4) .s01-hp__redact { width: 64px; }
+.s01-hp__val {
+  display: inline-flex; align-items: center; gap: var(--s-2); flex: none; white-space: nowrap;
+  font: var(--fw-body) var(--hash-size)/22px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.s01-hp__k { font: var(--fw-medium) var(--fs-10)/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.s01-hp__mono { color: var(--muted); }   /* same weight as the hashes beside it */
+.s01-hp__val .hash { margin-right: -4px; }   /* the hash's own 4px pad: its glyphs align with the panel edge */
+
+/* ── 04 / what we claim ─────────────────────────────────────────────────── */
+.s01-claim { max-width: 760px; margin-top: var(--s-8); gap: 10px; padding-left: var(--s-5); }
+.s01-claim .callout__body { font-size: var(--fs-18); line-height: 30px; text-wrap: pretty; }
+
+/* ── 05 / install ───────────────────────────────────────────────────────── */
+.s01-install.code { margin-top: var(--s-7); padding: 22px 132px 22px var(--s-6); border-radius: var(--r-panel); font-size: var(--fs-20); line-height: 28px; }
+.s01-install .code__copy { top: calc(50% - 16px); right: var(--s-4); height: 32px; min-width: 96px; padding: 0 var(--s-3); gap: 6px; }
+.s01-install .code__copy svg { width: 14px; height: 14px; }
+.s01-steps {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--s-6);
+  margin: var(--s-6) 0 0; padding: 0; list-style: none;
+}
+.s01-step.site-panel { gap: 10px; }
+.s01-step .site-panel__title { margin-top: var(--s-1); }
+.s01-step__art { display: grid; gap: 14px; justify-items: start; margin-top: auto; padding-top: 10px; }
+.s01-step__art > .code { width: 100%; }
+.s01-url {
+  display: flex; align-items: center; width: 100%; height: 40px; padding: 0 var(--s-3);
+  border: var(--hairline); border-radius: var(--r-row); background: var(--surface-raised);
+  font: var(--fw-body) var(--fs-12)/20px var(--font-mono); color: var(--ink); white-space: nowrap;
+}
+.s01-url__frag { color: var(--muted); }
+
+/* ── CTA: one panel. The glass buttons sit outside every .reveal ────────── */
+.s01-cta.site-panel { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--s-8); padding: var(--s-10); }
+.s01-cta__copy { display: grid; gap: var(--s-3); min-width: 0; }
+.s01-cta__title { font: var(--fw-medium) clamp(28px, 2.7vw, 38px)/1.1 var(--font-sans); letter-spacing: -0.035em; color: var(--ink); }
+.s01-cta__sub { font: var(--fw-body) var(--fs-15)/24px var(--font-sans); color: var(--muted); }
+.s01-cta__actions { display: flex; align-items: center; gap: var(--s-3); flex: none; }
+/* held until the panel is in view, then BS.motion.staggerFade (opacity only, on the buttons themselves) */
+.bs-js .s01-cta__actions.is-pending > * { opacity: 0; }
+html[data-motion="reduce"] .s01-cta__actions.is-pending > * { opacity: 1; }

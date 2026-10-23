@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Blindseal mockups · D04 — Policy (/policy)
+  Edit the committed policy and watch the Merkle root change; test a payload
+  against it without logging anything.
+  Rules are edited in a working copy (memory only). Save = BS.data.savePolicy
+  (PUT /policy {rules}: the server recomputes the root, version + 1); Discard
+  restores the saved copy. Dry run = POST /policy/dry-run {payload} → a
+  Decision that is not logged and not chained.
+  Switches: ?now=<ms> · ?motion=reduce | slow | full · ?state=offline (Save
+  rejects OFFLINE) · ?example=block | pass (preload the dry-run textarea).
+  page.js renders #d04 from BS.data.
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Policy · Blindseal</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content"><div class="page d04" id="d04"></div></main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/shell.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

@@ -1,0 +1,824 @@
+<!doctype html>
+<!--
+  Blindseal mockups · J00 — the kitchen sink (dashboard shell)
+  ============================================================================
+  Every primitive of the kit inside the dashboard shell, on realistic Blindseal
+  samples. BS.data (fixtures.js, J0F) is used when present (?data=1 loads it
+  here); without it the page runs on the hardcoded samples below. The shell
+  runs with navigate:false: a nav click slides the pill, plays the route cover
+  and swaps the title in place. The site chrome has its own sink:
+  kitchen-sink-site.html.
+
+  QA switches: ?motion=reduce | slow | full · ?transparency=reduce
+  · ?state=offline (the shell's connection) · ?data=1 (load fixtures.js).
+  No colour literal on this page: swatch hex and contrast are READ from the
+  tokens at runtime.
+
+  THE PAGE KIT RECIPE (MASTER.md §9 has the full text)
+  ----------------------------------------------------------------------------
+  A DASHBOARD page (D01–D06), mockups/<JOB>/index.html:
+
+    <!doctype html><html lang="en" class="bs-js"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Decisions · Blindseal</title><link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../_shared/tokens.css">
+    <link rel="stylesheet" href="../_shared/fonts.css">
+    <link rel="stylesheet" href="../_shared/glass.css">
+    <link rel="stylesheet" href="../_shared/motion.css">
+    <link rel="stylesheet" href="../_shared/ui.css">
+    <link rel="stylesheet" href="../_shared/diagrams.css">   (only if the page draws a figure)
+    <link rel="stylesheet" href="../_shared/shell.css">
+    <link rel="stylesheet" href="page.css">
+    </head><body>
+    <main id="main-content"><div class="page"> …your page… </div></main>
+    <script src="../_shared/constants.js"></script>
+    <script src="../_shared/fixtures.js"></script>
+    <script src="../_shared/icons.js"></script>
+    <script src="../_shared/motion.js"></script>
+    <script src="../_shared/reveal.js"></script>
+    <script src="../_shared/glass.js"></script>
+    <script src="../_shared/diagrams.js"></script>          (only if the page draws a figure)
+    <script src="../_shared/ui.js"></script>
+    <script src="../_shared/sheet.js"></script>
+    <script src="../_shared/shell.js"></script>
+    <script src="page.js"></script>
+    page.js:  BS.mountShell({ active: "decisions", title: "Decisions", actions: "<button …>" });
+
+  A SITE page (S01–S06): the same head with site.css + space.css instead of
+  shell.css; body = <main id="main-content"> <section class="hero"> … or
+  <section class="site-section reveal"> … </main>; scripts as above with
+  space.js + site.js instead of shell.js;
+    page.js:  BS.mountSite({ active: "how" });
+
+  ?state=<name> is read by fixtures.js (BS.state); ?now=<ms> freezes the
+  fixture clock (or window.BS_NOW before fixtures.js); ?motion=reduce|slow.
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen sink · Blindseal</title>
+<meta name="description" content="Blindseal mockup kit: tokens, type, glass, house motion, the dashboard shell and every UI primitive.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="glass.css">
+<link rel="stylesheet" href="motion.css">
+<link rel="stylesheet" href="space.css">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  /* kitchen-sink layout only (ks-*). Tokens only, no colour literal. */
+  .ks-index { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ks-index a { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--r-control); border: 1px solid var(--line-faint);
+    font: var(--fw-strong) var(--t-sub) var(--font-sans); color: var(--muted); transition: color var(--d-150) var(--ease-in-out), border-color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint); }
+  @media (hover: hover) and (pointer: fine) { .ks-index a:hover { color: var(--ink); border-color: var(--line); } }
+  .ks-index a:active { transform: scale(.98); }
+  .ks-note { font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); max-width: 84ch; }
+  .ks-note code { font-size: 11.5px; color: var(--ink); }
+  .ks-group { display: grid; gap: 10px; align-content: start; }
+  .ks-group > :is(.seg, .tabs, .tabs-text, .glass-seg) { justify-self: start; }
+  .ks-caption { font: var(--fw-medium) var(--t-sub) var(--font-sans); color: var(--muted); }
+  .ks-h2 { display: flex; align-items: baseline; gap: 10px; }
+  .ks-h2 .eyebrow { color: var(--muted); }
+
+  /* tokens */
+  .ks-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+  .ks-sw { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px; border: var(--hairline); border-radius: var(--r-row); background: var(--panel); min-width: 0; }
+  .ks-sw__chip { width: 40px; height: 40px; border-radius: var(--r-control); box-shadow: inset 0 0 0 1px var(--line); }
+  .ks-sw__t { display: grid; min-width: 0; }
+  .ks-sw__name { font: var(--fw-body) var(--t-sub) var(--font-mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ks-sw__hex { font: var(--fw-medium) var(--t-sub) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ks-sw__cr { font: var(--fw-body) var(--fs-10)/14px var(--font-sans); color: var(--muted); }
+  .ks-sw__cr b { color: var(--ink); font-weight: var(--fw-medium); }
+  .ks-scale { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .ks-radius { display: grid; justify-items: center; gap: 6px; }
+  .ks-radius i { display: block; width: 56px; height: 40px; border: 1px solid var(--line-strong); background: var(--panel); }
+  .ks-space { display: grid; justify-items: start; gap: 6px; }
+  .ks-space i { display: block; height: 12px; background: var(--accent-tint); border-left: 1px solid var(--accent); }
+
+  /* type */
+  .ks-ladders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--page-gap); }
+  .ks-ladder { display: grid; gap: 6px; }
+  .ks-ladder p { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; padding: 6px 0; border-top: var(--hairline); font-size: var(--fs-18); line-height: 26px; color: var(--ink); }
+  .ks-ladder p:first-of-type { border-top: 0; }
+  .ks-ladder small { font: var(--fw-body) var(--t-sub) var(--font-mono); color: var(--muted); white-space: nowrap; }
+  .ks-type { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr) minmax(120px, 210px); align-items: baseline; gap: 16px; padding: 10px 0; border-top: var(--hairline); }
+  .ks-type:first-child { border-top: 0; }
+  .ks-type .spec { font: var(--fw-body) var(--t-sub) var(--font-mono); color: var(--muted); text-align: right; }
+
+  /* five-state grid */
+  .panel:has(> .ks-states) { overflow-x: auto; }
+  .ks-states { display: grid; grid-template-columns: 160px repeat(5, minmax(max-content, 1fr)); align-items: center; gap: 12px 16px; }
+  .ks-states > .label { justify-self: start; font-family: var(--font-mono); font-weight: var(--fw-body); }
+  .ks-states > .ks-col { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  /* hashes: the no-wrap proof */
+  .ks-hashes { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 10px 16px; align-items: center; }
+  .ks-hashes > span:nth-child(odd) { font: var(--fw-medium) var(--t-sub) var(--font-sans); color: var(--muted); }
+  .ks-narrow { display: flex; flex-wrap: wrap; gap: 6px 14px; width: 260px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--r-row); }
+
+  /* glass stage: a busy backdrop under every glass element */
+  .ks-stage { position: relative; height: 520px; border-radius: var(--r-panel); overflow: hidden; border: var(--hairline); background: var(--canvas); isolation: isolate; }
+  .ks-stage__bg { position: absolute; inset: 0; z-index: 0; }
+  .ks-stage__rows { position: absolute; inset: -10px; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; transform: rotate(-3deg) scale(1.08); }
+  .ks-stage__rows .panel { padding: 10px 12px; display: grid; gap: 6px; }
+  .ks-stage__word { position: absolute; z-index: 2; left: 120px; top: 260px; font: var(--fw-strong) 128px/1 var(--font-sans); letter-spacing: -0.05em; color: var(--ink); pointer-events: none; }
+  .ks-stage__layer { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-rows: auto auto 1fr auto; pointer-events: none; }
+  .ks-stage__layer > * { pointer-events: auto; }
+  .ks-stage .glass-bar { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+  .ks-stage .glass-head { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
+  .ks-stage__mid { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px; }
+  .ks-stage__ctl { display: grid; gap: 14px; justify-items: start; }
+  .ks-stage__foot { display: flex; justify-content: flex-end; padding: 16px; }
+  .ks-stage .glass-toast { width: 320px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; padding: 12px 10px 12px 14px; }
+  .ks-stage .menu--static { position: relative; opacity: 1; visibility: visible; transform: none; pointer-events: auto; z-index: auto; width: 230px; }
+
+  /* odometers */
+  .ks-odo { display: grid; gap: 4px; }
+  .ks-odo .headline-num { display: inline-flex; align-items: baseline; }
+
+  /* motion stage */
+  .ks-eases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  .ks-ease { display: grid; gap: 8px; align-content: start; padding: 10px; border: var(--hairline); border-radius: var(--r-row); background: var(--panel); text-align: left; cursor: pointer;
+    transition: border-color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint); }
+  @media (hover: hover) and (pointer: fine) { .ks-ease:hover { border-color: var(--line-strong); } }
+  .ks-ease:active { transform: scale(.98); }
+  .ks-ease__track { position: relative; height: 10px; border-radius: var(--r-full); background: var(--surface-hover); }
+  .ks-ease__dot { position: absolute; left: 0; top: 0; width: 10px; height: 10px; border-radius: var(--r-full); background: var(--accent); transform: translateX(0); }
+  .ks-ease.is-run .ks-ease__dot { transform: translateX(calc(var(--w, 120px) - 10px)); transition: transform var(--d-900) var(--e); }
+  .ks-ease b { font: var(--fw-strong) var(--t-sub) var(--font-sans); color: var(--ink); }
+  .ks-ease span { font: var(--fw-body) var(--fs-10)/14px var(--font-mono); color: var(--muted); }
+  .ks-reveal-demo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .ks-reveal-demo > div { padding: 14px; border: var(--hairline); border-radius: var(--r-row); background: var(--panel); }
+  .ks-ledger { max-height: 300px; overflow: hidden; }
+  .ks-check-ok { color: var(--ink); }
+</style>
+<script>if (/[?&]data=1\b/.test(location.search)) document.write('<script src="fixtures.js"><\/script>');</script>
+</head>
+<body>
+<main id="main-content">
+<div class="page">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">J00 · foundation kit</p>
+      <h1 class="title-1">Kitchen sink · dashboard</h1>
+      <p class="lead">Every primitive on Blindseal samples, inside the shell (navigate: false). The site chrome — notch nav, hero over the nebula, house sections, footer, logo marks — is on the <a class="link" href="kitchen-sink-site.html">site sink</a>.</p>
+      <nav class="ks-index" aria-label="Sections">
+        <a href="#ks-tokens">Tokens</a><a href="#ks-type">Type</a><a href="#ks-buttons">Buttons</a><a href="#ks-controls">Controls</a><a href="#ks-inputs">Inputs</a>
+        <a href="#ks-cards">Cards · rows · table</a><a href="#ks-hashes">Hashes</a><a href="#ks-verdicts">Verdicts · layers</a><a href="#ks-status">Status</a>
+        <a href="#ks-code">Code · callout</a><a href="#ks-checks">Checklist · kv</a><a href="#ks-numbers">Odometers</a><a href="#ks-glass">Glass</a>
+        <a href="#ks-overlays">Overlays</a><a href="#ks-motion">Motion</a><a href="#ks-dev">Dev checks</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- 1 · tokens -->
+  <section class="section reveal" id="ks-tokens">
+    <div class="section-head"><div><h2 class="title-2">Tokens</h2><p class="ks-note">the Blindseal palette verbatim (layer 1), the kit names re-pointed (layer 2), Blindseal's verdict and status colours (layer 3). Hex is read live from <code>tokens.css</code>; contrast is against the page <code>--canvas</code> and the panel <code>--panel</code>, translucent colours composited first.</p></div></div>
+    <div class="ks-group"><p class="ks-caption">Layer 1 · Blindseal palette</p><div class="ks-swatches" data-swatches="--color-bg-primary --color-bg-secondary --color-bg-tertiary --color-bg-tertiary-solid --color-text-primary --color-text-secondary --color-text-tertiary --color-accent-primary --color-accent-primary-transparent --color-accent-secondary --color-accent-gradient-start --color-yellow --color-yellow-transparent --color-red --color-red-transparent --color-green --color-warning"></div></div>
+    <div class="ks-group" style="margin-top:16px"><p class="ks-caption">Layer 2 · kit names</p><div class="ks-swatches" data-swatches="--canvas --panel --surface-raised --surface-hover --line --line-strong --ink --muted --faint --accent --accent-hover --accent-tint --ring --pill"></div></div>
+    <div class="ks-group" style="margin-top:16px"><p class="ks-caption">Layer 3 · Blindseal (D03): pass is boring, block is the accent, flag is amber, red only for a rejected / failed attestation</p><div class="ks-swatches" data-swatches="--verdict-pass --verdict-pass-line --verdict-block --verdict-block-bg --verdict-flag --verdict-flag-bg --status-danger --status-danger-bg"></div></div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="panel ks-group"><p class="panel__title">Radii · 4 chips · 6 controls · 8 rows · 12 panels · 9999 pills</p>
+        <div class="ks-scale"><span class="ks-radius"><i style="border-radius:var(--r-chip)"></i><span class="label">4</span></span><span class="ks-radius"><i style="border-radius:var(--r-control)"></i><span class="label">6</span></span><span class="ks-radius"><i style="border-radius:var(--r-row)"></i><span class="label">8</span></span><span class="ks-radius"><i style="border-radius:var(--r-panel)"></i><span class="label">12</span></span><span class="ks-radius"><i style="border-radius:var(--r-full)"></i><span class="label">9999</span></span></div></div>
+      <div class="panel ks-group"><p class="panel__title">Spacing · 4px base</p>
+        <div class="ks-scale"><span class="ks-space"><i style="width:4px"></i><span class="label">4</span></span><span class="ks-space"><i style="width:8px"></i><span class="label">8</span></span><span class="ks-space"><i style="width:12px"></i><span class="label">12</span></span><span class="ks-space"><i style="width:16px"></i><span class="label">16</span></span><span class="ks-space"><i style="width:24px"></i><span class="label">24</span></span><span class="ks-space"><i style="width:32px"></i><span class="label">32</span></span><span class="ks-space"><i style="width:48px"></i><span class="label">48</span></span><span class="ks-space"><i style="width:64px"></i><span class="label">64</span></span></div></div>
+    </div>
+  </section>
+
+  <!-- 2 · type -->
+  <section class="section reveal" id="ks-type">
+    <div class="section-head"><div><h2 class="title-2">Type</h2><p class="ks-note">Geist (sans) and Geist Mono, self-hosted (SIL OFL 1.1), no external request. <code>--fw-medium 500</code> is the default; <code>--fw-strong</code> is 600. Active face: <b id="ks-gate">Geist</b>.</p></div></div>
+    <div class="ks-ladders">
+      <div class="panel ks-ladder"><p class="panel__title" style="font-size:var(--fs-14);border:0">Geist (sans)</p>
+        <p style="font-family:var(--font-sans);font-weight:400">Screened under policy R <small>Regular 400 · body</small></p>
+        <p style="font-family:var(--font-sans);font-weight:500">Screened under policy R <small>Medium 500 · default</small></p>
+        <p style="font-family:var(--font-sans);font-weight:600">Screened under policy R <small>Semibold 600 · strong</small></p></div>
+      <div class="panel ks-ladder"><p class="panel__title" style="font-size:var(--fs-14);border:0">Geist Mono (hashes, code)</p>
+        <p style="font-family:var(--font-mono);font-weight:400;font-size:var(--fs-15)">0x7c3f9a2e14b8…d8e714 <small>Mono 400</small></p>
+        <p style="font-family:var(--font-mono);font-weight:600;font-size:var(--fs-15)">0x6a0d1e62…29331e <small>Mono 600 · detector vkey</small></p></div>
+    </div>
+    <div class="panel" style="margin-top:var(--page-gap)">
+      <div class="ks-type"><span class="label">.eyebrow</span><span class="eyebrow">01 / How it works</span><span class="spec">mono 11/17.6 · .12em · upper</span></div>
+      <div class="ks-type"><span class="label">.title-1</span><span class="title-1">Every tool call, screened locally</span><span class="spec">24/30 · medium · −.02em</span></div>
+      <div class="ks-type"><span class="label">.title-2</span><span class="title-2">Decision 01JB7Q…X4T9</span><span class="spec">18/28 · medium</span></div>
+      <div class="ks-type"><span class="label">.body</span><span class="body">github-mcp · create_issue · request · 47 ms</span><span class="spec">14/20 · body 400</span></div>
+      <div class="ks-type"><span class="label">.copy-text</span><span class="copy-text">Secrets and PII are redacted before the judge sees them, and the judge runs locally or inside a TEE whose attestation you can present on demand.</span><span class="spec">14/22 · muted</span></div>
+      <div class="ks-type"><span class="label">.sub / .label</span><span><span class="sub">4,182 decisions · 7 days</span> · <span class="label">updated 15:58:12 UTC</span></span><span class="spec">12/16 · muted / faint</span></div>
+      <div class="ks-type"><span class="label">.headline-num</span><span class="headline-num">4,182<span class="unit">decisions</span></span><span class="spec">30/34 · tabular</span></div>
+      <div class="ks-type"><span class="label">.hash / .hash.lg</span><span class="row-flex" id="ks-type-hash"></span><span class="spec">mono 12 / 13 · tabular</span></div>
+    </div>
+  </section>
+
+  <!-- 3 · buttons -->
+  <section class="section" id="ks-buttons"><!-- no .reveal: glass inside (backdrop-root rule) -->
+    <div class="section-head"><div><h2 class="title-2">Buttons · five states</h2><p class="ks-note">Default · hover (colour or hairline, never a scale) · focus-visible (2px accent ring) · active (scale .98, 160ms out-quint) · disabled (.45). The middle three are forced with <code>.is-hover / .is-focus / .is-active</code> so they show at rest. Sizes 26 · 32 · 42.</p></div></div>
+    <div class="panel"><div class="ks-states" id="ks-states">
+      <span></span><span class="ks-col">Default</span><span class="ks-col">Hover</span><span class="ks-col">Focus</span><span class="ks-col">Active</span><span class="ks-col">Disabled</span>
+    </div></div>
+  </section>
+
+  <!-- 4 · controls -->
+  <section class="section" id="ks-controls"><!-- no .reveal: glass inside -->
+    <div class="section-head"><div><h2 class="title-2">Segments · tabs · chips</h2></div></div>
+    <div class="grid-3">
+      <div class="panel ks-group"><p class="ks-caption">.seg — the verdict filter</p>
+        <div class="seg" id="ks-seg"><button type="button" class="seg__item" data-value="all">All <span class="count">200</span></button><button type="button" class="seg__item" data-value="pass">Pass</button><button type="button" class="seg__item" data-value="block">Block</button><button type="button" class="seg__item" data-value="flag">Flag</button></div>
+        <p class="ks-caption">.tabs — attestation status</p>
+        <div class="tabs" id="ks-tabs"><button type="button" class="tab" data-value="all">All</button><button type="button" class="tab" data-value="open">Open <span class="count">2</span></button><button type="button" class="tab" data-value="done">Consumed</button><button type="button" class="tab" data-value="x" disabled>Archived</button></div>
+        <p class="ks-caption">.tabs-text</p>
+        <div class="tabs-text" id="ks-tabs-text"><button type="button" class="tab-text" data-value="layers">Layers</button><button type="button" class="tab-text" data-value="redaction">Redaction</button><button type="button" class="tab-text" data-value="hashes">Hashes</button></div></div>
+      <div class="panel ks-group"><p class="ks-caption">.glass-seg — the sliding wash pill (240ms out-quint, never on first paint)</p>
+        <div class="glass-seg" id="ks-gseg"><button type="button" class="glass-seg__item" data-value="1h">1h</button><button type="button" class="glass-seg__item" data-value="24h">24h</button><button type="button" class="glass-seg__item" data-value="7d">7 days</button><button type="button" class="glass-seg__item" data-value="all">All time</button></div>
+        <p class="ks-caption">.switch — a rule's enabled toggle</p>
+        <div class="row-flex"><button type="button" class="switch" id="ks-switch" aria-checked="true" aria-label="Rule L1-regex-04 enabled"></button><span class="sub">L1-regex-04 · ignore-previous-instructions</span></div>
+        <div class="row-flex"><button type="button" class="switch" aria-checked="false" aria-label="Disabled rule" disabled></button><span class="sub">disabled</span></div></div>
+      <div class="panel ks-group"><p class="ks-caption">.chip (10/15 strong, r4)</p>
+        <div class="row-flex"><span class="chip neutral">stdio</span><span class="chip outline">local</span><span class="chip accent">action</span><span class="chip flag">2 redactions</span><span class="chip mock">MOCK</span></div>
+        <p class="ks-caption">.kbd · .badge-count · .live-dot</p>
+        <div class="row-flex"><span class="kbd">⌘</span><span class="kbd">K</span><span class="kbd">/</span><span class="badge-count">3</span><span class="sub row-flex" style="gap:6px"><span class="live-dot" style="color:var(--accent)"></span>Screening</span></div>
+        <p class="ks-caption">.conn — the connection pill (all three states)</p>
+        <div class="row-flex"><span class="conn" data-state="connected"><span class="live-dot"></span>Connected<span class="conn__addr">127.0.0.1:7777</span></span><span class="conn" data-state="reconnecting"><span class="live-dot"></span>Reconnecting…</span><span class="conn" data-state="offline"><span class="live-dot"></span>Offline</span></div></div>
+    </div>
+  </section>
+
+  <!-- 5 · inputs -->
+  <section class="section reveal" id="ks-inputs">
+    <div class="section-head"><div><h2 class="title-2">Inputs</h2></div></div>
+    <div class="grid-2">
+      <div class="panel ks-group">
+        <div class="field"><label for="ks-q">Search decisions</label>
+          <div class="input-group has-end">${ICON:search}<input class="input" id="ks-q" placeholder="Tool, server, decision id or hash…"><span class="input-group__end"><span class="kbd">/</span></span></div></div>
+        <div class="grid-2">
+          <div class="field"><label for="ks-server">Server</label><span class="select-wrap"><select class="select" id="ks-server"><option>All servers</option><option>github-mcp</option><option>filesystem</option><option>solana-rpc</option><option>postgres</option><option>slack</option><option>browser</option></select>${ICON:chevron-down}</span></div>
+          <div class="field"><label for="ks-from">Audit range · from</label><input class="input num" id="ks-from" value="4,032" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label for="ks-rule">Rule value</label><input class="input mono" id="ks-rule" value="(?i)ignore (all )?previous instructions" aria-invalid="true"><p class="field__err">${ICON:triangle-alert}VALIDATION · the pattern must compile under RE2 (lookbehind is not supported).</p></div>
+        <div class="field"><label for="ks-dis">Dashboard token</label><input class="input mono" id="ks-dis" value="read from #token= on first load" disabled></div>
+      </div>
+      <div class="panel ks-group">
+        <div class="field"><label for="ks-dry">Dry run payload</label><textarea class="textarea mono" id="ks-dry" placeholder='{ "tool": "send_transaction", "args": { … } }'></textarea><p class="help">Not logged, not chained. Runs L0–L3 against the current policy.</p></div>
+        <div class="row-flex" style="gap:16px"><label class="choice"><input type="checkbox" class="checkbox" checked>Include responses</label><label class="choice"><input type="checkbox" class="checkbox">Only with action fields</label><label class="choice"><input type="radio" class="checkbox" name="ks-cl" checked>devnet</label><label class="choice"><input type="radio" class="checkbox" name="ks-cl">mainnet-beta</label></div>
+        <div class="filter-bar" id="ks-filter">
+          <span class="filter-bar__label">Filter</span>
+          <div class="seg" id="ks-filter-seg"><button type="button" class="seg__item" data-value="all">All</button><button type="button" class="seg__item" data-value="pass">Pass</button><button type="button" class="seg__item" data-value="block">Block</button><button type="button" class="seg__item" data-value="flag">Flag</button></div>
+          <span class="select-wrap"><select class="select" aria-label="Tool"><option>Any tool</option><option>send_transaction</option><option>create_issue</option></select>${ICON:chevron-down}</span>
+          <span class="filter-bar__spacer"></span>
+          <span class="filter-bar__count" id="ks-filter-count">200 decisions</span>
+          <button type="button" class="btn link sm" id="ks-filter-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · cards, rows, table -->
+  <section class="section reveal" id="ks-cards">
+    <div class="section-head"><div><h2 class="title-2">Cards · rows · table · stats · states</h2><p class="ks-note">Flat panels with the hairline; the table is dense (40px rows, 11px tracked heads, sticky head under the glass top bar, right-aligned numbers). Row click opens the menu.</p></div></div>
+    <div class="stat-grid" style="--cols:4" id="ks-stats"></div>
+    <div class="table-box" style="margin-top:var(--page-gap)">
+      <table class="table"><thead><tr><th>Time</th><th>Server</th><th>Tool</th><th>Verdict</th><th>Layers</th><th class="num">Redactions</th><th>Action</th><th>Attestation</th><th class="num">Latency</th><th>Payload</th></tr></thead><tbody id="ks-table"></tbody></table>
+    </div>
+    <div class="grid-3" style="margin-top:var(--page-gap)">
+      <div class="panel panel--flush"><div class="panel__head"><p class="panel__title">Upstream servers <span class="count">6</span></p><span class="sub">status.upstreams</span></div><div class="rows rows--lined" id="ks-upstreams" style="padding:0 6px 6px"></div></div>
+      <div class="panel" id="ks-empty"></div>
+      <div class="panel"><div class="panel__head"><p class="panel__title">Loading</p><span class="ks-caption">solid 45% sweep, 1.1s</span></div><div id="ks-skel"></div></div>
+    </div>
+  </section>
+
+  <!-- 7 · hashes -->
+  <section class="section reveal" id="ks-hashes">
+    <div class="section-head"><div><h2 class="title-2">Hashes · D09</h2><p class="ks-note">Mono, <code>0x1234…abcd</code> (first 6 + last 4), base58 first 4 + last 4. Click copies the full value; the label reads "Copied" for 1.4s and the width holds. Hover or focus shows the full value (400ms first, instant within 300ms of the last). <code>white-space: nowrap</code>, never a CSS ellipsis — the dashed box below is 260px wide and nothing breaks.</p></div></div>
+    <div class="grid-2">
+      <div class="panel"><div class="ks-hashes" id="ks-hash-list"></div></div>
+      <div class="panel ks-group"><p class="ks-caption">A 260px box: hashes wrap as whole units, never mid-hash</p><div class="ks-narrow" id="ks-narrow"></div>
+        <p class="ks-caption" id="ks-copy-log">Last copied: —</p></div>
+    </div>
+  </section>
+
+  <!-- 8 · verdicts + layers -->
+  <section class="section reveal" id="ks-verdicts">
+    <div class="section-head"><div><h2 class="title-2">Verdicts · layer strips</h2><p class="ks-note">PASS is muted on a hairline and must look boring. BLOCK is the accent on its 16%. FLAG is amber. The strip: four 10×10 cells, 3px gap; skip = hairline outline, pass = dim muted fill, block = accent, flag = amber. Hover a cell for "L2 · 0.81 · 42 ms".</p></div></div>
+    <div class="grid-2">
+      <div class="panel ks-group"><div class="row-flex" style="gap:10px" id="ks-verdict-row"></div>
+        <div class="rows rows--lined" id="ks-strips"></div></div>
+      <div class="panel ks-group"><p class="panel__title">Layer breakdown · decision 01JB7QF3K2…</p><div class="kv kv--rows" id="ks-layer-rows"></div></div>
+    </div>
+  </section>
+
+  <!-- 9 · status -->
+  <section class="section reveal" id="ks-status">
+    <div class="section-head"><div><h2 class="title-2">Attestation status</h2><p class="ks-note">Seven statuses. <code>generating</code> is the accent outline with its % and a 2px bar; <code>consumed</code> carries a check; <code>rejected</code> / <code>failed</code> are the one place red appears.</p></div>
+      <button type="button" class="btn primary" id="ks-gen">${ICON:play}Request attestation</button></div>
+    <div class="panel ks-group">
+      <div class="row-flex" style="gap:10px" id="ks-status-row"></div>
+      <div class="row-flex" style="gap:14px;margin-top:6px"><span class="sub">Live demo:</span><span id="ks-status-live"></span><span class="sub num" id="ks-status-note">idle</span></div>
+      <div class="progress" style="max-width:420px"><i id="ks-progress" style="--p:0"></i></div>
+    </div>
+  </section>
+
+  <!-- 10 · code + callout -->
+  <section class="section reveal" id="ks-code">
+    <div class="section-head"><div><h2 class="title-2">Code block · callout</h2></div></div>
+    <div class="grid-2">
+      <div class="ks-group" id="ks-code-blocks"></div>
+      <div class="panel ks-group"><div class="callout"><p class="callout__title">What we claim</p><p class="callout__body" id="ks-honest"></p></div>
+        <div class="callout muted"><p class="callout__title">Mock mode</p><p class="callout__body">Every number on this page comes from fixtures. Point an agent at the proxy and the stream switches to live traffic.</p></div></div>
+    </div>
+  </section>
+
+  <!-- 11 · checklist + kv -->
+  <section class="section reveal" id="ks-checks">
+    <div class="section-head"><div><h2 class="title-2">Checklist · key–value</h2><p class="ks-note">The verify page's checklist: pending, running (the loading sweep), pass, fail (✕ + a reason line). Run plays it in order; a failed step stops the ones after it.</p></div>
+      <div class="row-flex"><button type="button" class="btn secondary" id="ks-run-ok">${ICON:play}Verify sample</button><button type="button" class="btn secondary" id="ks-run-bad">${ICON:play}Verify tampered</button></div></div>
+    <div class="grid-2">
+      <div class="panel"><ul class="checklist" id="ks-checklist"></ul></div>
+      <div class="panel ks-group"><p class="panel__title">Public inputs · decoded</p><div class="kv" style="--kv-cols:2" id="ks-kv"></div></div>
+    </div>
+  </section>
+
+  <!-- 12 · numbers -->
+  <section class="section reveal" id="ks-numbers">
+    <div class="section-head"><div><h2 class="title-2">Numbers · odometers</h2><p class="ks-note">Every live number is an odometer. Roll: only changed digits roll down (360ms out-quint). Tick: cells keyed from the right roll up (out 160 in-quick, in 220 out-expo). The status bar's audit # ticks on its own every 3.2s here; the buttons drive it too.</p></div></div>
+    <div class="grid-3">
+      <div class="panel ks-odo"><p class="stat__k">Decisions · roll</p><span class="headline-num" id="ks-odo-roll"></span><span class="sub">pass <span class="num" id="ks-odo-pass"></span> · block <span class="num" id="ks-odo-block"></span> · flag <span class="num" id="ks-odo-flag"></span></span></div>
+      <div class="panel ks-odo"><p class="stat__k">Audit head · tick</p><span class="headline-num" id="ks-odo-tick"></span><span class="sub" id="ks-odo-hash"></span></div>
+      <div class="panel ks-group"><p class="stat__k">Drive them</p>
+        <div class="row-flex"><button type="button" class="btn secondary sm" id="ks-step">${ICON:plus}New decision</button><button type="button" class="btn secondary sm" id="ks-jump">Jump +250</button><button type="button" class="btn secondary sm" id="ks-pause-tick">${ICON:pause}Pause auto-tick</button></div>
+        <p class="ks-caption">BS.motion.odometer(el, value, { mode: "roll" | "tick", format })</p></div>
+    </div>
+  </section>
+
+  <!-- 13 · glass stage (no .reveal: nothing with opacity / transform above glass) -->
+  <section class="section" id="ks-glass">
+    <div class="section-head"><div><h2 class="title-2">Glass stage</h2><p class="ks-note">The liquid glass over a busy backdrop (a faint nebula, decision cards, a word). Move the cursor near any glass edge for the accent rim (t = 1 − d/120, opacity t²·0.5). Glass is for chrome and controls only — never a card, a table or a panel.</p></div></div>
+    <div class="ks-stage" id="ks-stage">
+      <div class="ks-stage__bg" id="ks-stage-space" data-space="faint" data-fade="false"></div>
+      <div class="ks-stage__rows" id="ks-stage-rows" aria-hidden="true"></div>
+      <div class="ks-stage__word" aria-hidden="true">Blindseal</div>
+      <div class="ks-stage__layer">
+        <div class="glass-bar glass-bar--top"><span class="title-3">.glass-bar</span><span class="sub">top bar · 68px in the shell</span><span style="flex:1"></span><button type="button" class="glass-item">${ICON:refresh-cw}Refresh</button><button type="button" class="glass-item icon" aria-label="Settings">${ICON:settings}</button></div>
+        <div class="glass-head"><span class="title-3">.glass-head</span><span class="sub">sheet header</span><span style="flex:1"></span><button type="button" class="glass-item icon sm" aria-label="Close">${ICON:x}</button></div>
+        <div class="ks-stage__mid">
+          <div class="ks-stage__ctl">
+            <div class="row-flex"><button type="button" class="glass-btn primary">${ICON:stamp}Request attestation</button><button type="button" class="glass-btn">${ICON:download}Export disclosure</button><button type="button" class="glass-btn icon" aria-label="Filter">${ICON:filter}</button></div>
+            <div class="row-flex"><span class="glass-pill"><span class="live-dot" style="color:var(--accent)"></span>Live</span><button type="button" class="glass-pill">${ICON:filter}Block only</button><button type="button" class="glass-pill" aria-pressed="true">7 days</button></div>
+            <div class="glass-seg" id="ks-stage-seg"><button type="button" class="glass-seg__item" data-value="d">Decisions</button><button type="button" class="glass-seg__item" data-value="a">Audit</button><button type="button" class="glass-seg__item" data-value="p">Policy</button></div>
+          </div>
+          <div class="glass-menu menu menu--static" role="menu" aria-label="Static menu sample">
+            <div class="menu__head"><div><b>Decision 01JB7QF3K2</b><span>block · solana-rpc · send_transaction</span></div></div>
+            <button type="button" class="menu__row" role="menuitem">${ICON:arrow-up-right}<span>Open decision</span></button>
+            <button type="button" class="menu__row" role="menuitem">${ICON:copy}<span>Copy decision id</span></button>
+            <button type="button" class="menu__row" role="menuitem">${ICON:stamp}<span>Request attestation</span><span class="menu__meta">L0–L3</span></button>
+          </div>
+        </div>
+        <div class="ks-stage__foot"><div class="glass-toast" role="status"><span class="toast__icon" style="color:var(--accent)">${ICON:info}</span><div class="toast__copy"><p class="toast__title">Attestation generated</p><p class="toast__body">att_01JB8… · 4.18 s · ready to submit</p></div><button type="button" class="toast__x" aria-label="Dismiss">${ICON:x}</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 14 · overlays -->
+  <section class="section reveal" id="ks-overlays">
+    <div class="section-head"><div><h2 class="title-2">Overlays</h2><p class="ks-note">Toasts stack bottom-right above the status bar (≤3; 260ms rise in, 140ms out; hover pauses). The menu is glass (150 in / 140 out). The sheet slides 340ms out-quint with a glass header and leaves on a frozen ghost (200ms). The dialog is dialog-in 180ms with the scrim.</p></div></div>
+    <div class="panel"><div class="row-flex">
+      <button type="button" class="btn secondary" id="ks-toast">${ICON:info}Toast</button>
+      <button type="button" class="btn secondary" id="ks-toast3">Three toasts</button>
+      <button type="button" class="btn secondary" id="ks-menu-btn">${ICON:chevron-down}Row menu</button>
+      <button type="button" class="btn secondary" id="ks-sheet-btn">${ICON:stamp}Attestation sheet</button>
+      <button type="button" class="btn primary" id="ks-dialog-btn">Reveal payload…</button>
+    </div></div>
+  </section>
+
+  <!-- 15 · motion -->
+  <section class="section" id="ks-motion"><!-- no .reveal: glass inside -->
+    <div class="section-head"><div><h2 class="title-2">Motion stage · the kit</h2><p class="ks-note">Entrances rise ≤ 16px on out-cubic, state changes 150–200ms in-out, reveals fire once, nothing bounces. Reduce kills every animation and keeps end states; Slow-mo plays everything at ¼ speed (×4 timers).</p></div>
+      <div class="row-flex">
+        <div class="glass-seg" id="ks-motion-mode" aria-label="Motion mode"><button type="button" class="glass-seg__item" data-value="system">System</button><button type="button" class="glass-seg__item" data-value="reduce">Reduce</button><button type="button" class="glass-seg__item" data-value="slow">Slow-mo</button></div>
+        <button type="button" class="glass-btn sm" id="ks-cover">${ICON:rotate-ccw}Replay route cover</button>
+        <button type="button" class="glass-btn sm" id="ks-rail">${ICON:panel-left}Rail</button>
+      </div></div>
+    <div class="ks-group"><p class="ks-caption">The five easings · click one to play (900ms each)</p><div class="ks-eases" id="ks-eases"></div></div>
+    <div class="grid-2" style="margin-top:var(--page-gap)">
+      <div class="panel ks-group">
+        <div class="panel__head" style="margin:0"><p class="panel__title">Reveal · cascade · fires once</p><button type="button" class="btn secondary sm" id="ks-rearm">Re-arm</button></div>
+        <div class="ks-reveal-demo reveal cascade" id="ks-reveal-demo"><div><p class="sub">rise-14</p><p class="title-3">.12s</p></div><div><p class="sub">+60ms</p><p class="title-3">.18s</p></div><div><p class="sub">+60ms</p><p class="title-3">.24s</p></div><div><p class="sub">+60ms</p><p class="title-3">.30s</p></div></div>
+        <div class="panel__head" style="margin:8px 0 0"><p class="panel__title">Rise ladder 8 / 10 / 14 / 16 · +60ms</p><button type="button" class="btn secondary sm" id="ks-rise">${ICON:play}Play</button></div>
+        <div class="rows" id="ks-stagger"></div>
+      </div>
+      <div class="panel ks-group">
+        <div class="panel__head" style="margin:0"><p class="panel__title">Live decisions · row-in 320 out-expo + flash</p><span class="row-flex"><button type="button" class="btn secondary sm" id="ks-addrow">${ICON:plus}Decision</button><button type="button" class="btn secondary sm" id="ks-addblock">Block</button></span></div>
+        <div class="ks-ledger"><table class="table"><tbody id="ks-ledger"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 · dev checks -->
+  <section class="section reveal" id="ks-dev">
+    <div class="section-head"><div><h2 class="title-2">Dev checks</h2></div></div>
+    <div class="panel"><div class="kv kv--rows" id="ks-devchecks"></div></div>
+  </section>
+</div>
+</main>
+
+<script src="constants.js"></script>
+<script src="icons.js"></script>
+<script src="motion.js"></script>
+<script src="reveal.js"></script>
+<script src="glass.js"></script>
+<script src="ui.js"></script>
+<script src="sheet.js"></script>
+<script src="space.js"></script>
+<script src="shell.js"></script>
+<script>
+(function () {
+  "use strict";
+  var BS = window.BS, ui = BS.ui, fmt = BS.fmt, M = BS.motion;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return [].slice.call((r || document).querySelectorAll(s)); };
+  var esc = ui.esc, ico = BS.icon, H = ui.hash;
+
+  /* ${ICON:name} placeholders in the static markup → inline Lucide */
+  var mainEl = document.getElementById("main-content");
+  mainEl.innerHTML = mainEl.innerHTML.replace(/\$\{ICON:([a-z0-9-]+)\}/g, function (m, n) { return ico(n); });
+
+  /* ── samples: BS.data when fixtures.js is loaded, else seeded synthetic ── */
+  var D = BS.data || null;
+  var R = BS.space.rng(2026);
+  function hex(n) { var s = "0x"; for (var i = 0; i < n; i++) s += "0123456789abcdef"[Math.floor(R() * 16)]; return s; }
+  var B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  function b58(n) { var s = ""; for (var i = 0; i < n; i++) s += B58[Math.floor(R() * B58.length)]; return s; }
+  function ulid() { var s = "01JB"; var c = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; for (var i = 0; i < 22; i++) s += c[Math.floor(R() * c.length)]; return s; }
+  var NOW = Date.parse("2026-10-22T16:00:00Z");
+  var TOOLS = [["github-mcp", "create_issue"], ["filesystem", "read_file"], ["solana-rpc", "send_transaction"], ["postgres", "query"], ["slack", "post_message"], ["browser", "fetch_page"], ["github-mcp", "search_code"], ["filesystem", "write_file"], ["solana-rpc", "get_balance"]];
+  function layersFor(v) {
+    var l2 = v === "pass" ? 0.08 + R() * 0.25 : 0.55 + R() * 0.4;
+    var l3ran = v !== "pass" || l2 >= 0.35;
+    return [
+      { layer: "L0", ran: true, verdict: v === "block" && R() < .5 ? "block" : "pass", latencyMs: 1 + Math.floor(R() * 3), ruleIds: v === "block" ? ["L0-exact-02"] : [] },
+      { layer: "L1", ran: true, verdict: v === "flag" ? "flag" : "pass", latencyMs: 2 + Math.floor(R() * 6) },
+      { layer: "L2", ran: true, verdict: v === "pass" ? "pass" : v, score: l2, latencyMs: 20 + Math.floor(R() * 70), mode: "local" },
+      l3ran ? { layer: "L3", ran: true, verdict: v, score: 0.6 + R() * 0.38, latencyMs: 180 + Math.floor(R() * 700), mode: "local" } : { layer: "L3", ran: false, verdict: "skip", latencyMs: 0 }
+    ];
+  }
+  function sampleDecision(i, v) {
+    var t = TOOLS[i % TOOLS.length];
+    v = v || (i % 7 === 2 ? "block" : i % 11 === 5 ? "flag" : "pass");
+    var layers = layersFor(v);
+    var act = t[1] === "send_transaction";
+    return {
+      id: ulid(), ts: new Date(NOW - i * 97000).toISOString(), server: t[0], tool: t[1], direction: i % 9 === 4 ? "response" : "request",
+      verdict: v, layers: layers, payloadHash: hex(64), redactedHash: hex(64),
+      redactions: i % 3 === 0 ? [{ kind: "api_key", count: 1 + (i % 2) }] : [],
+      action: act ? { chain: "solana", targetProgram: b58(44), instruction: "transfer_checked", recipient: b58(44), amount: "250000000", mint: b58(44) } : undefined,
+      attestationId: act && i % 2 === 0 ? "att_" + ulid().slice(4, 14) : undefined,
+      latencyMs: layers.reduce(function (a, l) { return a + l.latencyMs; }, 0) + 2, auditIndex: 4182 - i, auditHash: hex(64)
+    };
+  }
+  var DECISIONS = D && D.decisions && D.decisions.length ? D.decisions.slice(0, 8) : [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { return sampleDecision(i); });
+  var STATUS = BS.shell && BS.shell.status;   /* filled after mount */
+  var SIGNER = b58(44), POLICY_ROOT = hex(64), NULLIFIER = hex(64), ACTION_HASH = hex(64), TXSIG = b58(88);
+
+  /* ── mount the shell (navigate:false: in-place swaps) ─────────────────── */
+  BS.mountShell({
+    active: "decisions", title: "Kitchen sink", navigate: false,
+    actions: '<span class="chip outline">J00</span><button type="button" class="glass-item sm" id="ks-top-action">' + ico("refresh-cw") + "Replay cover</button>",
+    onNavigate: function (id) { BS.toast({ title: "In-place swap: " + id, body: "Pill slid 240ms, cover in 180 · hold 100 · out 240.", tone: "info", id: "nav" }); }
+  });
+  STATUS = BS.shell.status;
+  $("#ks-top-action").addEventListener("click", function () { BS.shell.replayCover(); });
+
+  /* ── 1 · swatches: hex + contrast read live from the tokens ───────────── */
+  var probe = document.createElement("span"); probe.style.display = "none"; document.body.appendChild(probe);
+  function resolve(n) { probe.style.color = "var(" + n + ")"; return getComputedStyle(probe).color; }
+  function parse(c) {
+    var m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(c);
+    if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] == null ? 1 : +m[4] };
+    m = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?/.exec(c);
+    if (m) return { r: m[1] * 255, g: m[2] * 255, b: m[3] * 255, a: m[4] == null ? 1 : +m[4] };
+    return { r: 0, g: 0, b: 0, a: 0 };
+  }
+  function toHex(c) { var h = function (x) { return ("0" + Math.round(x).toString(16)).slice(-2); }; return "#" + h(c.r) + h(c.g) + h(c.b); }
+  function over(fg, bg) { return { r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 }; }
+  function lum(c) { var f = function (x) { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); }
+  function ratio(a, b) { var l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); }
+  var canvasC = parse(resolve("--canvas")), panelC = parse(resolve("--panel"));
+  $$("[data-swatches]").forEach(function (box) {
+    box.innerHTML = box.getAttribute("data-swatches").split(" ").map(function (n) {
+      var c = parse(resolve(n));
+      var r1 = ratio(over(c, canvasC), canvasC), r2 = ratio(over(c, panelC), panelC);
+      var grade = function (r) { return r >= 7 ? "AAA" : r >= 4.5 ? "AA" : r >= 3 ? "AA large" : "—"; };
+      return '<div class="ks-sw"><span class="ks-sw__chip" style="background:var(' + n + ')"></span><span class="ks-sw__t">' +
+        '<span class="ks-sw__name">' + esc(n) + '</span><span class="ks-sw__hex">' + toHex(c) + (c.a < 1 ? " · " + Math.round(c.a * 100) + "%" : "") + "</span>" +
+        '<span class="ks-sw__cr">on page <b>' + r1.toFixed(1) + ":1</b> " + grade(r1) + " · on panel <b>" + r2.toFixed(1) + ":1</b></span></span></div>";
+    }).join("");
+  });
+  $("#ks-gate").textContent = "Geist";
+  $("#ks-type-hash").innerHTML = H(POLICY_ROOT, { label: "Policy root" }) + H(POLICY_ROOT, { lg: true, label: "Policy root" });
+
+  /* ── 3 · buttons, five states ─────────────────────────────────────────── */
+  var KINDS = [
+    [".btn.primary", '<button type="button" class="btn primary{S}"{D}>Run dry run</button>'],
+    [".btn.primary.lg", '<button type="button" class="btn primary lg{S}"{D}>' + ico("stamp") + "Request attestation</button>"],
+    [".btn.secondary", '<button type="button" class="btn secondary{S}"{D}>' + ico("download") + "Export</button>"],
+    [".btn.secondary.sm", '<button type="button" class="btn secondary sm{S}"{D}>' + ico("filter") + "Filters</button>"],
+    [".btn.ghost", '<button type="button" class="btn ghost{S}"{D}>Discard</button>'],
+    [".btn.link", '<button type="button" class="btn link{S}"{D}>Open in audit<svg class="nudge" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>'],
+    [".glass-btn.primary", '<button type="button" class="glass-btn primary{S}"{D}>Open dashboard</button>'],
+    [".glass-btn", '<button type="button" class="glass-btn{S}"{D}>' + ico("refresh-cw") + "Verify chain</button>"],
+    [".icon-btn", '<button type="button" class="icon-btn{S}"{D} aria-label="Collapse">' + ico("panel-left") + "</button>"],
+    [".hash", H(POLICY_ROOT, { label: "Policy root", cls: "{S0}" }).replace("<button ", "<button {D} ")]
+  ];
+  var STATES = ["", " is-hover", " is-focus", " is-active", ""];
+  var grid = $("#ks-states");
+  KINDS.forEach(function (k) {
+    var h = '<span class="label">' + esc(k[0]) + "</span>";
+    STATES.forEach(function (s, i) { h += "<span>" + k[1].replace(/\{S\}/g, s).replace(/\{S0\}/g, s.trim()).replace(/\{D\}/g, i === 4 ? " disabled" : "") + "</span>"; });
+    grid.insertAdjacentHTML("beforeend", h);
+  });
+  $$("#ks-states button").forEach(function (b) {
+    if (b.disabled) return;
+    if (b.classList.contains("hash")) return;   /* hashes copy (delegated) */
+    b.addEventListener("click", function () { BS.toast({ title: b.textContent.trim() || b.getAttribute("aria-label"), body: "Every button does something visible.", tone: "info", id: "state" }); });
+  });
+
+  /* ── 4 · controls ─────────────────────────────────────────────────────── */
+  ui.seg($("#ks-seg"), { value: "all", onChange: function (v) { BS.toast({ title: "Verdict: " + v, tone: "info", id: "seg" }); } });
+  ui.tabs($("#ks-tabs"), { value: "all" });
+  ui.tabs($("#ks-tabs-text"), { value: "layers" });
+  ui.seg($("#ks-gseg"), { value: "24h" });
+  ui.switch($("#ks-switch"), { onChange: function (on) { BS.toast({ title: on ? "Rule enabled" : "Rule disabled", body: "Unsaved: the policy root changes on save.", tone: "info", id: "sw" }); } });
+
+  /* ── 5 · inputs ───────────────────────────────────────────────────────── */
+  ui.seg($("#ks-filter-seg"), { value: "all", onChange: function (v) { $("#ks-filter-count").textContent = (v === "all" ? 200 : v === "pass" ? 171 : v === "block" ? 19 : 10) + " decisions"; } });
+  $("#ks-filter-clear").addEventListener("click", function () { $("#ks-filter-seg [data-value=all]").click(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); $("#ks-q").focus(); } });
+
+  /* ── 6 · cards, rows, table ───────────────────────────────────────────── */
+  var counts = { total: 4182, pass: 3561, block: 412, flag: 209 };
+  $("#ks-stats").innerHTML = [["Decisions · 7d", counts.total, "all upstreams"], ["Blocked", counts.block, "9.9% of traffic"], ["Flagged", counts.flag, "5.0% of traffic"], ["p50 latency", "47 ms", "L0–L3, local"]].map(function (s) {
+    return '<div class="stat"><p class="stat__k">' + s[0] + '</p><p class="stat__v num">' + (typeof s[1] === "number" ? fmt.int(s[1]) : s[1]) + '</p><p class="stat__d">' + s[2] + "</p></div>";
+  }).join("");
+  function redCount(d) { return (d.redactions || []).reduce(function (a, r) { return a + r.count; }, 0); }
+  function rowHtml(d) {
+    var rc = redCount(d);
+    return '<tr class="table__row is-clickable" tabindex="0" data-id="' + esc(d.id) + '">' +
+      '<td class="is-time">' + fmt.time(d.ts) + "</td><td>" + esc(d.server) + '</td><td class="is-muted">' + esc(d.tool) + "</td>" +
+      "<td>" + ui.verdict(d.verdict) + "</td><td>" + ui.layerStrip(d.layers) + "</td>" +
+      '<td class="num ' + (rc ? "" : "is-muted") + '">' + (rc || "—") + "</td>" +
+      "<td>" + (d.action ? '<span class="chip accent">' + esc(d.action.chain) + "</span>" : '<span class="faint">—</span>') + "</td>" +
+      "<td>" + (d.attestationId ? ui.status(d.verdict === "pass" ? "consumed" : "generated") : '<span class="faint">—</span>') + "</td>" +
+      '<td class="num">' + fmt.ms(d.latencyMs) + "</td><td>" + H(d.payloadHash, { label: "Payload hash" }) + "</td></tr>";
+  }
+  $("#ks-table").innerHTML = DECISIONS.map(rowHtml).join("");
+  var rowMenu = null;
+  $("#ks-table").addEventListener("click", function (e) {
+    if (e.target.closest(".hash")) return;
+    var tr = e.target.closest("tr"); if (!tr) return;
+    $$("#ks-table tr.is-open").forEach(function (r) { r.classList.remove("is-open"); });
+    tr.classList.add("is-open");
+    BS.toast({ title: "Decision " + tr.getAttribute("data-id").slice(0, 10) + "…", body: "Row click → /decisions/:id (D02).", tone: "info", id: "row" });
+  });
+  $("#ks-upstreams").innerHTML = [["github-mcp", "stdio", true], ["filesystem", "stdio", true], ["solana-rpc", "http", true], ["postgres", "stdio", true], ["slack", "http", false], ["browser", "stdio", true]].map(function (u) {
+    return '<button type="button" class="row row--btn"><span class="row__lead">' + ico(u[1] === "http" ? "radio" : "terminal") + '</span><span class="row__main"><span class="row__name">' + u[0] + '</span><span class="row__sub">' + u[1] + "</span></span>" +
+      '<span class="row__end">' + (u[2] ? '<span class="chip neutral">healthy</span>' : '<span class="chip flag">unhealthy</span>') + "</span></button>";
+  }).join("");
+  $$("#ks-upstreams .row").forEach(function (r) { r.addEventListener("click", function () { BS.toast({ title: r.querySelector(".row__name").textContent, body: "Upstream details live on Settings (D06).", tone: "info", id: "up" }); }); });
+  $("#ks-empty").innerHTML = ui.empty({ icon: "list", title: "No decisions yet", body: "Point an agent at the proxy: set its MCP command to blindseal run -- <server>. Mock mode streams fixtures.", actions: '<button type="button" class="btn secondary sm" id="ks-empty-btn">' + ico("copy") + "Copy config</button>" });
+  $("#ks-empty-btn").addEventListener("click", function () { ui.writeClipboard("blindseal run -- npx @modelcontextprotocol/server-github", function () { BS.toast({ title: "Config copied", tone: "ok", id: "cfg" }); }); });
+  $("#ks-skel").innerHTML = ui.skeleton("rows", 3);
+
+  /* ── 7 · hashes ───────────────────────────────────────────────────────── */
+  var HASHES = [
+    ["payloadHash (hex)", DECISIONS[0].payloadHash, {}],
+    ["policyRoot · .lg", POLICY_ROOT, { lg: true }],
+    ["signer (base58)", SIGNER, {}],
+    ["txSig (base58, 88)", TXSIG, {}],
+    ["nullifier · full", NULLIFIER, { short: false }]
+  ];
+  $("#ks-hash-list").innerHTML = HASHES.map(function (h) { return "<span>" + esc(h[0]) + "</span><span>" + H(h[1], Object.assign({ label: h[0] }, h[2])) + "</span>"; }).join("");
+  $("#ks-narrow").innerHTML = [POLICY_ROOT, ACTION_HASH, NULLIFIER, SIGNER, TXSIG, DECISIONS[1].payloadHash].map(function (v) { return H(v); }).join("");
+  document.addEventListener("bs:copy", function (e) { $("#ks-copy-log").textContent = "Last copied: " + e.detail.value; });
+
+  /* ── 8 · verdicts + layers ────────────────────────────────────────────── */
+  $("#ks-verdict-row").innerHTML = ui.verdict("pass") + ui.verdict("block") + ui.verdict("flag");
+  var STRIPS = [["pass · L3 skipped", "pass,pass,pass,skip"], ["block at L0", "block,pass,block,block"], ["flag at L1, L3 ran", "pass,flag,flag,flag"], ["block by the judge", "pass,pass,block,block"]];
+  $("#ks-strips").innerHTML = STRIPS.map(function (s) {
+    var v = s[1].indexOf("block") >= 0 ? "block" : s[1].indexOf("flag") >= 0 ? "flag" : "pass";
+    return '<div class="row" style="grid-template-columns:auto minmax(0,1fr) auto"><span>' + ui.layerStrip(s[1]) + '</span><span class="row__sub">' + s[0] + '</span><span class="row__end">' + ui.verdict(v) + "</span></div>";
+  }).join("");
+  var LD = layersFor("block");
+  $("#ks-layer-rows").innerHTML = LD.map(function (l) {
+    var v = l.ran ? l.verdict : "skip";
+    return '<div class="kv__item"><span class="kv__k">' + l.layer + " · " + (l.layer === "L0" || l.layer === "L1" ? "deterministic" : "model · " + (l.mode || "local")) + '</span><span class="kv__v">' +
+      (l.score != null ? '<span class="num muted">' + l.score.toFixed(2) + "</span>" : "") + '<span class="num muted">' + (l.ran ? l.latencyMs + " ms" : "skipped") + "</span>" + (v === "skip" ? '<span class="chip outline">skip</span>' : ui.verdict(v)) + "</span></div>";
+  }).join("");
+
+  /* ── 9 · status chips + the live progress demo ────────────────────────── */
+  $("#ks-status-row").innerHTML = ["generating", "generated", "submitted", "consumed", "expired", "rejected", "failed"].map(function (s) { return ui.status(s, { progress: 62 }); }).join("");
+  $("#ks-status-live").innerHTML = ui.status("generated");
+  var genBusy = false;
+  $("#ks-gen").addEventListener("click", function () {
+    if (genBusy) return; genBusy = true;
+    var chip = $("#ks-status-live .status"), note = $("#ks-status-note"), bar = $("#ks-progress"), btn = this;
+    btn.setAttribute("aria-busy", "true");
+    ui.setStatus(chip, "generating", { progress: 0 });
+    var steps = [8, 19, 27, 41, 48, 62, 71, 83, 91, 100], i = 0;
+    var tick = function () {
+      var p = steps[i++];
+      ui.setStatus(chip, "generating", { progress: p }); ui.progress(bar, p / 100);
+      note.textContent = "groth16 · bn254 · " + p + "%";
+      if (i < steps.length) setTimeout(tick, M.scale(380 + (i % 3) * 260));
+      else setTimeout(function () {
+        ui.setStatus(chip, "generated"); note.textContent = "generated in 4.18 s"; btn.removeAttribute("aria-busy"); genBusy = false;
+        BS.toast({ title: "Attestation generated", body: "Ready to submit to devnet.", tone: "ok", id: "gen" });
+      }, M.scale(400));
+    };
+    tick();
+  });
+
+  /* ── 10 · code + callout ──────────────────────────────────────────────── */
+  $("#ks-code-blocks").innerHTML =
+    ui.code("$ npx @blindseal/proxy init", { lang: "sh" }) +
+    ui.code('# point an agent at the proxy (claude_desktop_config.json)\n{ "command": "blindseal", "args": ["run", "--", "npx", "@modelcontextprotocol/server-github"] }', { lang: "json" }) +
+    ui.code("$ BLINDSEAL_MOCK=1 blindseal run\n# serving fixtures on 127.0.0.1:7777 · one decision every 3s", { lang: "sh" });
+  $("#ks-honest").textContent = BS.COPY.honestScope;
+
+  /* ── 11 · checklist + kv ──────────────────────────────────────────────── */
+  var CHECKS = [
+    { n: 1, title: "Schema valid", detail: "version 1 · groth16 · bn254 · required fields present" },
+    { n: 2, title: "Proof verifies", detail: "in the browser, @blindseal/verifier-wasm (mock)" },
+    { n: 3, title: "Public inputs decoded", detail: "action hash, policy root, detector version, expiry slot, nullifier" },
+    { n: 4, title: "Nullifier status on chain", detail: "optional · devnet" }
+  ];
+  function paintChecks(states, reason) {
+    $("#ks-checklist").innerHTML = CHECKS.map(function (c, i) { return ui.checkItem(Object.assign({ state: states[i], reason: i === 1 ? reason : "" }, c)); }).join("");
+  }
+  paintChecks(["pass", "running", "fail", "pending"], "public input 1 (policyRoot) does not match the proof");
+  $$("#ks-checklist .check")[2].querySelector(".check__reason span").textContent = "Stopped: the proof did not verify.";
+  var runToken = 0;
+  function run(ok) {
+    var tok = ++runToken;
+    paintChecks(["pending", "pending", "pending", "pending"]);
+    var lis = $$("#ks-checklist .check"), i = 0;
+    var step = function () {
+      if (tok !== runToken) return;
+      if (i >= lis.length) return;
+      ui.check(lis[i], "running");
+      setTimeout(function () {
+        if (tok !== runToken) return;
+        var fail = !ok && i === 1;
+        ui.check(lis[i], fail ? "fail" : "pass", { reason: fail ? "public input 1 (policyRoot) does not match the proof" : "", end: fail ? "" : (i === 1 ? "212 ms" : "") });
+        if (fail) { BS.toast({ title: "Attestation rejected", body: "The proof does not verify against its public inputs.", tone: "danger", id: "verify" }); return; }
+        i++; step();
+      }, M.scale(i === 1 ? 900 : 600));
+    };
+    step();
+  }
+  $("#ks-run-ok").addEventListener("click", function () { run(true); });
+  $("#ks-run-bad").addEventListener("click", function () { run(false); });
+  $("#ks-kv").innerHTML = [["Action hash", H(ACTION_HASH, { label: "Action hash" })], ["Policy root", H(POLICY_ROOT, { label: "Policy root" })], ["Detector", '<span class="num">det-2026.10.1</span>'], ["Expiry slot", '<span class="num">' + fmt.int(331408112) + "</span>"], ["Nullifier", H(NULLIFIER, { label: "Nullifier" })], ["Proof", '<span class="sub">groth16 · bn254 · 256 B</span>']].map(function (p) {
+    return '<div class="kv__item"><span class="kv__k">' + p[0] + '</span><span class="kv__v">' + p[1] + "</span></div>";
+  }).join("");
+
+  /* ── 12 · odometers (and the status bar's audit head) ─────────────────── */
+  var odoRoll = M.odometer($("#ks-odo-roll"), counts.total, { format: fmt.int });
+  var odoP = M.odometer($("#ks-odo-pass"), counts.pass, { format: fmt.int });
+  var odoB = M.odometer($("#ks-odo-block"), counts.block, { format: fmt.int });
+  var odoF = M.odometer($("#ks-odo-flag"), counts.flag, { format: fmt.int });
+  var head = { index: STATUS.audit.index, hash: STATUS.audit.hash };
+  var odoTick = M.odometer($("#ks-odo-tick"), head.index, { mode: "tick", format: function (v) { return "#" + fmt.int(v); } });
+  $("#ks-odo-hash").innerHTML = H(head.hash, { label: "Audit head hash" });
+  function advance(n, verdict) {
+    n = n || 1;
+    counts.total += n;
+    var v = verdict || (R() < 0.85 ? "pass" : R() < 0.66 ? "block" : "flag");
+    counts[v] += n;
+    odoRoll.set(counts.total); odoP.set(counts.pass); odoB.set(counts.block); odoF.set(counts.flag);
+    head = { index: head.index + n, hash: hex(64), ts: new Date().toISOString() };
+    odoTick.set(head.index);
+    $("#ks-odo-hash").innerHTML = H(head.hash, { label: "Audit head hash" });
+    document.dispatchEvent(new CustomEvent("bs:audit", { detail: head }));   /* the shell's status bar listens */
+    return v;
+  }
+  $("#ks-step").addEventListener("click", function () { advance(1); });
+  $("#ks-jump").addEventListener("click", function () { advance(250); });
+  var autoTick = true;
+  $("#ks-pause-tick").addEventListener("click", function () {
+    autoTick = !autoTick;
+    this.innerHTML = ico(autoTick ? "pause" : "play") + (autoTick ? "Pause auto-tick" : "Resume auto-tick");
+  });
+  (function loop() { setTimeout(function () { if (autoTick && !document.hidden) advance(1); loop(); }, M.scale(3200)); })();
+
+  /* ── 13 · glass stage ─────────────────────────────────────────────────── */
+  BS.mountSpace($("#ks-stage-space"), { intensity: "faint", fade: false, seed: 11 });
+  $("#ks-stage-rows").innerHTML = DECISIONS.concat(DECISIONS).slice(0, 12).map(function (d) {
+    return '<div class="panel"><div class="row-flex" style="justify-content:space-between"><span class="title-3">' + esc(d.tool) + "</span>" + ui.verdict(d.verdict) + '</div><span class="sub">' + esc(d.server) + " · " + fmt.time(d.ts) + "</span>" +
+      '<span class="row-flex">' + ui.layerStrip(d.layers) + H(d.payloadHash, { label: "Payload hash" }) + "</span></div>";
+  }).join("");
+  ui.seg($("#ks-stage-seg"), { value: "d" });
+  $$("#ks-stage button:not(.glass-seg__item)").forEach(function (b) { b.addEventListener("click", function () { BS.toast({ title: (b.textContent || b.getAttribute("aria-label") || "Glass").trim(), body: "Glass control on the stage.", tone: "info", id: "stage" }); }); });
+
+  /* ── 14 · overlays ────────────────────────────────────────────────────── */
+  var toastN = 0;
+  var TOASTS = [
+    { title: "Decision blocked", body: "solana-rpc · send_transaction · L0-exact-02", tone: "info" },
+    { title: "Chain intact", body: "Verified #0 → #4,182 in 38 ms.", tone: "ok" },
+    { title: "Prover unavailable", body: "PROVER_UNAVAILABLE · check Settings.", tone: "warn" }
+  ];
+  $("#ks-toast").addEventListener("click", function () { BS.toast(TOASTS[toastN++ % 3]); });
+  $("#ks-toast3").addEventListener("click", function () { TOASTS.forEach(function (t, i) { setTimeout(function () { BS.toast(t); }, M.scale(i * 140)); }); });
+  ui.menu($("#ks-menu-btn"), [
+    { label: "Open decision", icon: "arrow-up-right", onSelect: function () { BS.toast({ title: "Open decision", tone: "info" }); } },
+    { label: "Copy decision id", icon: "copy", meta: "01JB7Q…", onSelect: function () { ui.writeClipboard(DECISIONS[0].id, function () { BS.toast({ title: "Copied", body: DECISIONS[0].id, tone: "ok" }); }); } },
+    { label: "Request attestation", icon: "stamp", onSelect: function () { $("#ks-gen").click(); } },
+    "-",
+    { label: "Export JSON", icon: "file-json", onSelect: function () { BS.toast({ title: "Export", body: "decision-01JB7Q.json (content-free)", tone: "info" }); } }
+  ], { head: { title: "Decision " + DECISIONS[0].id.slice(0, 10) + "…", sub: DECISIONS[0].server + " · " + DECISIONS[0].tool } });
+  $("#ks-sheet-btn").addEventListener("click", function (e) {
+    var kv = function (rows) { return '<div class="kv kv--rows">' + rows.map(function (r) { return '<div class="kv__item"><span class="kv__k">' + r[0] + '</span><span class="kv__v">' + r[1] + "</span></div>"; }).join("") + "</div>"; };
+    var sheet = BS.openSheet({
+      main: [
+        '<p class="sheet__h">Public inputs</p>' + kv([["Action hash", H(ACTION_HASH)], ["Policy root", H(POLICY_ROOT)], ["Detector", "det-2026.10.1"], ["Expiry slot", '<span class="num">331,408,112</span>'], ["Nullifier", H(NULLIFIER)], ["Nonce", H(hex(32))]]),
+        '<p class="sheet__h">Proof</p>' + kv([["Protocol", "groth16 · bn254"], ["Bytes", '<span class="num">256 B</span>'], ["Generated", '<span class="num">4.18 s</span>'], ["TEE", "local"]]),
+        '<div class="callout muted"><p class="callout__body">Single-use. The attestation binds target program, recipient, amount, policy root and expiry, so it is worthless for any other call.</p></div>'
+      ],
+      side: [
+        '<p class="sheet__h">Status</p><div class="row-flex">' + ui.status("generated") + '<span class="sub">ready to submit</span></div>',
+        '<p class="sheet__h">Submit</p><div class="stack"><div class="seg" id="ks-cluster"><button type="button" class="seg__item" data-value="devnet">devnet</button><button type="button" class="seg__item" data-value="mainnet-beta">mainnet-beta</button></div><button type="button" class="btn primary" id="ks-submit">' + ico("upload") + "Submit</button></div>",
+        '<p class="sheet__h">Export</p><button type="button" class="btn secondary" id="ks-export">' + ico("file-json") + "attestation.json</button>"
+      ]
+    }, { eyebrow: "Attestation", id: "att_01JB8K2M", title: "transfer_checked · solana-rpc", trigger: e.currentTarget });
+    ui.seg($("#ks-cluster"), { value: "devnet" });
+    $("#ks-submit").addEventListener("click", function () { this.setAttribute("aria-busy", "true"); var b = this; setTimeout(function () { b.removeAttribute("aria-busy"); BS.toast({ title: "Submitted", body: "txSig " + fmt.shortB58(TXSIG), tone: "ok" }); }, M.scale(1500)); });
+    $("#ks-export").addEventListener("click", function () { BS.toast({ title: "Export", body: "attestation.json would download (mock).", tone: "info" }); });
+    return sheet;
+  });
+  $("#ks-dialog-btn").addEventListener("click", function () {
+    ui.dialog({
+      title: "Reveal the raw payload?",
+      body: "The payload is fetched with X-Confirm: reveal, shown in memory only and hidden again when you leave. It is never stored in the browser.",
+      actions: [
+        { label: "Cancel", cls: "btn ghost" },
+        { label: "Reveal", cls: "btn primary", onClick: function () { BS.toast({ title: "Payload revealed", body: "In memory only · hidden on navigation.", tone: "warn", id: "reveal" }); } }
+      ]
+    });
+  });
+
+  /* ── 15 · motion stage ────────────────────────────────────────────────── */
+  var modeSeg = ui.seg($("#ks-motion-mode"), { value: M.mode() === "full" ? "system" : M.mode(), onChange: function (v) { M.setMode(v); BS.toast({ title: "Motion: " + v, tone: "info", id: "mode" }); } });
+  $("#ks-cover").addEventListener("click", function () { BS.shell.replayCover(); });
+  $("#ks-rail").addEventListener("click", function () { BS.shell.setRail(!BS.shell.refs.app.classList.contains("is-rail")); });
+  var EASES = [["in-out", "--ease-in-out", "state changes"], ["out-cubic", "--ease-out-cubic", "entrances"], ["out-expo", "--ease-out-expo", "arrivals"], ["out-quint", "--ease-out-quint", "mechanical travel"], ["in-quick", "--ease-in-quick", "exits only"]];
+  $("#ks-eases").innerHTML = EASES.map(function (e) { return '<button type="button" class="ks-ease" style="--e:var(' + e[1] + ')"><b>' + e[0] + "</b><span>" + e[2] + '</span><div class="ks-ease__track"><i class="ks-ease__dot"></i></div></button>'; }).join("");
+  $$(".ks-ease").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var tr = b.querySelector(".ks-ease__track"); b.style.setProperty("--w", tr.offsetWidth + "px");
+      if (b.classList.contains("is-run")) { b.classList.add("is-nofx"); b.classList.remove("is-run"); void b.offsetWidth; b.classList.remove("is-nofx"); }
+      requestAnimationFrame(function () { b.classList.add("is-run"); });
+    });
+  });
+  $("#ks-rearm").addEventListener("click", function () {
+    var d = $("#ks-reveal-demo");
+    d.classList.remove("is-inview"); d.removeAttribute("data-reveal-armed");
+    void d.offsetWidth;
+    M.mountReveals(d.parentElement);
+  });
+  var LADDER = [["rise-8", "inline, small", 8], ["rise-10", "copy", 10], ["rise-14", "cards, masthead copy", 14], ["rise-16", "sections, heroes", 16]];
+  $("#ks-stagger").innerHTML = LADDER.map(function (l) { return '<div class="row"><span class="row__lead">' + ico("layers") + '</span><span class="row__main"><span class="row__name">' + l[0] + '</span><span class="row__sub">' + l[1] + '</span></span><span class="row__end num">' + l[2] + "px</span></div>"; }).join("");
+  $("#ks-rise").addEventListener("click", function () { $$("#ks-stagger .row").forEach(function (r, i) { M.rise(r, { y: LADDER[i][2], from: i, now: true }); }); });
+  var ledger = $("#ks-ledger");
+  ledger.innerHTML = DECISIONS.slice(0, 5).map(rowHtml).join("");
+  var li = 20;
+  function addRow(v) {
+    var d = sampleDecision(li++, v);
+    d.ts = new Date().toISOString();
+    ledger.insertAdjacentHTML("afterbegin", rowHtml(d));
+    var tr = ledger.firstElementChild;
+    M.enterRow(tr);
+    if (d.verdict !== "pass") M.flash(tr);
+    while (ledger.children.length > 7) ledger.lastElementChild.remove();
+    advance(1, d.verdict);
+  }
+  $("#ks-addrow").addEventListener("click", function () { addRow(); });
+  $("#ks-addblock").addEventListener("click", function () { addRow("block"); });
+
+  /* ── 16 · dev checks ──────────────────────────────────────────────────── */
+  function devChecks() {
+    var hits = BS.neverWriteScan();
+    var forbidden = ["shield", "lock", "eye", "eye-off", "mask"].filter(function (n) { return BS.ICONS[n]; });
+    var rows = [
+      ["Never-write scan (BS.NEVER_WRITE over document.body.innerText)", hits.length ? hits.length + " hit(s): " + hits.join(", ") : "0 hits"],
+      ["Avoid-list icons present in BS.ICONS", forbidden.length ? forbidden.join(", ") : "none"],
+      ["BS.data (fixtures.js)", D ? "loaded · " + (D.decisions ? D.decisions.length : 0) + " decisions" : "absent · hardcoded samples (add ?data=1)"],
+      ["Motion mode", M.mode() + (M.reduced() ? " · reduced" : "")],
+      ["Typeface", "Geist + Geist Mono"]
+    ];
+    $("#ks-devchecks").innerHTML = rows.map(function (r) { return '<div class="kv__item"><span class="kv__k">' + esc(r[0]) + '</span><span class="kv__v ks-check-ok">' + esc(r[1]) + "</span></div>"; }).join("");
+  }
+  devChecks();
+  document.addEventListener("bs:motion", devChecks);
+  window.__ksNeverWrite = BS.neverWriteScan;
+})();
+</script>
+</body>
+</html>

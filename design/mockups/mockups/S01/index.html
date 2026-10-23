@@ -1,0 +1,181 @@
+<!doctype html>
+<!--
+  Blindseal mockups · S01 — Site: Home (docs/briefs/S01-home.md)
+  Sections in the brief's fixed order (FRONTEND §1.1): hero · 01 the problem · 02 how it works ·
+  03 hidden vs public · 04 what we claim · 05 install · CTA · footer (kit).
+  Copy: FRONTEND §4 verbatim (the one-liner, Dumb, Detailed, the table, the honest-scope callout).
+  Hashes and fixture values are filled by page.js from BS.data (never hardcoded).
+  QA: ?motion=reduce | slow | full · ?now=<ms>
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blindseal · Prove an agent's action was screened — without showing what it was</title>
+<meta name="description" content="Blindseal is a privacy-preserving, verifiable screening layer for AI agents.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/crt.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/diagrams.css">
+<link rel="stylesheet" href="../_shared/site.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+
+  <!-- HERO — the hero composition over the nebula (the nav/hero spec) -->
+  <section class="hero" id="hero" aria-label="Introduction">
+    <div class="hero__space" data-bg="crt" data-intensity="hero"></div>
+    <div class="hero__shade"></div>
+    <div class="hero__content"><div class="hero__col">
+      <p class="hero__eyebrow"><i class="hero__dot" aria-hidden="true"></i><span>Local proxy</span><span class="hero__sep" aria-hidden="true">-</span><span>Zero-knowledge attestation</span><span class="hero__sep" aria-hidden="true">-</span><span>Verified on Solana</span></p>
+      <h1 class="hero__title">Prove an agent's action was screened <br><em>without showing what it was</em>.</h1>
+      <p class="hero__sub">Blindseal is a privacy-preserving, verifiable screening layer for AI agents.<br>Nothing sensitive leaves the machine.</p>
+      <div class="hero__actions">
+        <div class="install"><span class="install__tile" aria-hidden="true">$</span><code class="install__cmd">npx @blindseal/proxy init</code><button type="button" class="copy" data-copy="npx @blindseal/proxy init" aria-label="Copy the install command"><i data-lucide="copy"></i></button></div>
+        <a class="hero__secondary" href="../S02/index.html">Read how it works<i data-lucide="arrow-right"></i></a>
+      </div>
+      <ul class="hero__trust">
+        <li><span class="hero__trust-ico"><i data-lucide="terminal"></i></span>Local-only dashboard</li>
+        <li><span class="hero__trust-ico"><i data-lucide="stamp"></i></span>Single-use attestations</li>
+        <li><span class="hero__trust-ico"><i data-lucide="git-commit-horizontal"></i></span>Content-free audit log</li>
+      </ul>
+    </div></div>
+  </section>
+
+  <!-- 01 / THE PROBLEM — the Dumb copy's first paragraph, one sentence per line (FRONTEND: "three lines, no more") -->
+  <section class="site-section s01-problem" id="problem" aria-labelledby="problem-h">
+    <p class="section-head__eyebrow reveal" id="problem-h"><b>01</b> / The problem</p>
+    <div class="s01-problem__lines">
+      <p class="s01-problem__line reveal" style="--reveal-delay: 60ms">AI agents are easy to trick — put the wrong text in front of one and it does what the attacker wants.</p>
+      <p class="s01-problem__line reveal" style="--reveal-delay: 120ms">When a tricked agent shows up at an app, the app can't tell.</p>
+      <p class="s01-problem__line reveal" style="--reveal-delay: 180ms">The only fix today is a service that reads all your agent's prompts, so proving you're safe means handing over your secrets.</p>
+    </div>
+  </section>
+
+  <!-- 02 / HOW IT WORKS — flow4 full width, four columns under its nodes (Detailed copy, verbatim clauses) -->
+  <section class="site-section reveal s01-how" id="how" aria-labelledby="how-h">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>02</b> / How it works</p><h2 class="section-head__title" id="how-h">Screen, attest, prove, verify.</h2></div>
+      <p class="section-head__body">Blindseal checks every action your agent takes, on your own machine, and never sends your data anywhere. When your agent needs to prove it was checked, Blindseal gives it a one-time stamp.</p>
+    </div>
+    <figure class="fig s01-flow" id="flow"></figure>
+    <ol class="s01-cols reveal cascade" aria-label="The four steps">
+      <li class="s01-col"><span class="s01-col__k">Screen</span><p class="s01-col__p">It sits between an agent and its tools as a local proxy, inspecting every tool call with four layers of prompt-injection detection before the call executes.</p></li>
+      <li class="s01-col"><span class="s01-col__k">Attest</span><p class="s01-col__p">Blindseal produces a zero-knowledge attestation that a specific tool call passed a committed policy.</p></li>
+      <li class="s01-col"><span class="s01-col__k">Prove</span><p class="s01-col__p">The proof is generated locally. It is single-use.</p></li>
+      <li class="s01-col"><span class="s01-col__k">Verify</span><p class="s01-col__p">Verified with one Solana instruction, so any program can gate agent actions without seeing the prompt, the arguments, the operator's rules, or which agent was screened.</p></li>
+    </ol>
+    <p class="s01-more"><a class="btn link s01-link" href="../S02/index.html">Read the long version<i data-lucide="arrow-right" class="nudge"></i></a></p>
+  </section>
+
+  <!-- 03 / HIDDEN VS PUBLIC — the copy-bank table verbatim, two flat panels, cascade rows -->
+  <section class="site-section reveal" id="hidden-public" aria-labelledby="hp-h">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>03</b> / Hidden vs public</p><h2 class="section-head__title" id="hp-h">What stays on the machine,<br>and what the app sees.</h2></div>
+      <p class="section-head__body">The app sees the stamp and nothing else — not what the agent was asked, what it did, or who it is. Each stamp works once.</p>
+    </div>
+    <div class="s01-hp">
+      <section class="site-panel s01-hp__panel" aria-labelledby="hp-hidden">
+        <h3 class="s01-hp__head" id="hp-hidden"><span>Hidden</span><span class="s01-hp__note">never leaves the machine</span></h3>
+        <ul class="s01-hp__rows reveal cascade">
+          <li class="s01-hp__row" style="--i: 0"><span class="s01-hp__term">Prompt and tool arguments</span><span class="s01-hp__redact" aria-hidden="true"></span></li>
+          <li class="s01-hp__row" style="--i: 1"><span class="s01-hp__term">Policy contents, thresholds, custom lists</span><span class="s01-hp__redact" aria-hidden="true"></span></li>
+          <li class="s01-hp__row" style="--i: 2"><span class="s01-hp__term">Which agent / operator was screened</span><span class="s01-hp__redact" aria-hidden="true"></span></li>
+          <li class="s01-hp__row" style="--i: 3"><span class="s01-hp__term">Model-layer scores</span><span class="s01-hp__redact" aria-hidden="true"></span></li>
+        </ul>
+      </section>
+      <section class="site-panel s01-hp__panel" aria-labelledby="hp-public">
+        <h3 class="s01-hp__head" id="hp-public"><span>Public</span><span class="s01-hp__note">in the attestation</span></h3>
+        <ul class="s01-hp__rows reveal cascade">
+          <li class="s01-hp__row" style="--i: 1"><span class="s01-hp__term">That a valid attestation exists</span><span class="s01-hp__val" data-hp="proof"></span></li>
+          <li class="s01-hp__row" style="--i: 2"><span class="s01-hp__term">Policy root (a hash)</span><span class="s01-hp__val" data-hp="root"></span></li>
+          <li class="s01-hp__row" style="--i: 3"><span class="s01-hp__term">Detector version</span><span class="s01-hp__val" data-hp="detector"></span></li>
+          <li class="s01-hp__row" style="--i: 4"><span class="s01-hp__term">Action hash, expiry, nullifier</span><span class="s01-hp__vals"><span class="s01-hp__val" data-hp="action"></span><span class="s01-hp__val" data-hp="expiry"></span><span class="s01-hp__val" data-hp="nullifier"></span></span></li>
+        </ul>
+      </section>
+    </div>
+  </section>
+
+  <!-- 04 / WHAT WE CLAIM — the honest-scope callout verbatim -->
+  <section class="site-section reveal" id="claim" aria-labelledby="claim-h">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>04</b> / What we claim</p><h2 class="section-head__title" id="claim-h">A deliberately narrow claim.</h2></div>
+      <p class="section-head__body">Every decision is written to a hash-chained local log with selective disclosure: prove a time window was clean, or that a specific event occurred, without exposing traffic.</p>
+    </div>
+    <div class="callout s01-claim">
+      <p class="callout__title">The claim, exactly</p>
+      <p class="callout__body">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the deterministic layers passed. The model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn't pass through the proxy.</p>
+    </div>
+  </section>
+
+  <!-- 05 / INSTALL — the large install block + three numbered steps -->
+  <section class="site-section reveal" id="install" aria-labelledby="install-h">
+    <div class="section-head">
+      <div class="section-head__lead"><p class="section-head__eyebrow"><b>05</b> / Install</p><h2 class="section-head__title" id="install-h">One command on your machine.</h2></div>
+      <p class="section-head__body">Nothing sensitive leaves the machine: secrets and PII are redacted before the judge sees them, and the judge runs locally or inside a TEE whose attestation you can present on demand.</p>
+    </div>
+    <div class="code s01-install">
+      <pre><code><span class="code__prompt">$ </span>npx @blindseal/proxy init</code></pre>
+      <button type="button" class="copy code__copy s01-install__copy" data-copy="npx @blindseal/proxy init" aria-label="Copy the install command"><i data-lucide="copy"></i><span>Copy</span></button>
+    </div>
+    <ol class="s01-steps reveal cascade" aria-label="Install steps">
+      <li class="site-panel s01-step">
+        <p class="site-panel__n">01 · Install</p>
+        <h3 class="site-panel__title">Run the proxy locally</h3>
+        <p class="site-panel__body">Init sets up the proxy on this machine. The dashboard token is printed when the proxy starts.</p>
+        <div class="s01-step__art" id="step-run"></div>
+      </li>
+      <li class="site-panel s01-step">
+        <p class="site-panel__n">02 · Point an agent at the proxy</p>
+        <h3 class="site-panel__title">Wrap each MCP server</h3>
+        <p class="site-panel__body">The agent keeps its tools. Every tool call now passes the proxy before it executes.</p>
+        <div class="s01-step__art" id="step-mcp"></div>
+      </li>
+      <li class="site-panel s01-step">
+        <p class="site-panel__n">03 · Open the dashboard</p>
+        <h3 class="site-panel__title">Served on 127.0.0.1</h3>
+        <p class="site-panel__body">The dashboard makes no request beyond 127.0.0.1. It reads the token from the link once and keeps it in memory.</p>
+        <div class="s01-step__art">
+          <p class="s01-url"><span>http://127.0.0.1:7777/</span><span class="s01-url__frag">#token=…</span></p>
+          <a class="btn link s01-link" href="../D01/index.html">Open dashboard<i data-lucide="arrow-right" class="nudge"></i></a>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- CTA — one panel, docs primary, verify secondary. No .reveal around the glass (MASTER §5 backdrop-root rule) -->
+  <section class="site-section s01-cta-wrap" id="cta" aria-labelledby="cta-h">
+    <div class="site-panel s01-cta">
+      <div class="s01-cta__copy reveal">
+        <h2 class="s01-cta__title" id="cta-h">The proof is the asset.</h2>
+        <p class="s01-cta__sub">The proof is generated locally and verified with one Solana instruction.</p>
+      </div>
+      <div class="s01-cta__actions" id="cta-actions">
+        <a class="glass-btn primary lg" href="../S04/index.html">Read the docs<i data-lucide="arrow-right" class="nudge"></i></a>
+        <a class="glass-btn lg" href="../S03/index.html">Verify an attestation<i data-lucide="arrow-right" class="nudge"></i></a>
+      </div>
+    </div>
+  </section>
+
+</main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/diagrams.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/crt.js"></script>
+<script src="../_shared/site.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

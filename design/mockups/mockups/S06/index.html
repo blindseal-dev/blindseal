@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Blindseal mockups · S06 — Changelog (/changelog), dated release notes.
+  A short masthead (S03 / S05's band at 260), then two columns: a sticky
+  version list (scroll-spy, the latest with the accent dot) and the entries,
+  one flat panel per release from BS.data.changelog (newest first), grouped
+  Added · Changed · Fixed. Every entry has an anchor (#v0.4.0) and a "#"
+  button that copies its URL ("Copied", 1.4 s). The footer's version is the
+  latest entry's and links to it.
+  QA: ?now=1792684800000 · ?motion=reduce | slow | full · deep links
+      #v0.3.2, #v0.4.0-dashboard, #v0.3.0-proxy (scroll there, rail lit).
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog · Blindseal</title>
+<meta name="description" content="Dated release notes for the proxy, the dashboard and the site.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/site.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+
+  <!-- ══ masthead: the S03 / S05 band (flat panel over the faint nebula), 260 high ══ -->
+  <header class="cl-mast" aria-labelledby="cl-title">
+    <div class="cl-mast__space" aria-hidden="true"></div>
+    <div class="cl-mast__copy">
+      <p class="cl-mast__eyebrow">Changelog</p>
+      <h1 class="cl-mast__title" id="cl-title">Releases.</h1>
+      <p class="cl-mast__lede">Proxy, dashboard and site, dated. Nothing here changes a claim.</p>
+    </div>
+  </header>
+
+  <!-- ══ body: version rail + entries ═══════════════════════════════════ -->
+  <div class="cl" id="cl">
+    <aside class="cl-rail-col">
+      <nav class="cl-rail" aria-label="Versions">
+        <p class="cl-rail__head">Versions</p>
+        <div class="cl-rail__body">
+          <div class="cl-rail__track" aria-hidden="true"><span class="cl-rail__fill"></span></div>
+          <ol class="cl-rail__list" id="cl-rail-list"></ol>
+        </div>
+        <button type="button" class="cl-rail__top" data-top disabled><i data-lucide="chevron-up"></i>Back to top</button>
+      </nav>
+    </aside>
+
+    <section class="cl-entries" id="cl-entries" aria-label="Releases, newest first"></section>
+  </div>
+
+</main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/site.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

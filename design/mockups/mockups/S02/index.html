@@ -1,0 +1,276 @@
+<!doctype html>
+<!--
+  Blindseal mockups · S02 — How it works (/how-it-works), the long form.
+  the kit's docs flow format: a masthead, then a sticky table of contents
+  (damped progress fill + scroll-spy, (reference study)/whitepaper/Whitepaper.tsx)
+  beside a content column of numbered sections (protocol.css .pi-section),
+  four figures that draw themselves in (BS.diagrams), each with a replay link.
+  QA: ?motion=reduce | slow | full · ?now=<ms> · ?state=chain-broken (the
+  "Walk the chain" check fails at #143).
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works · Blindseal</title>
+<meta name="description" content="How Blindseal screens an agent's tool calls on the machine and proves it, without showing what they were.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/diagrams.css">
+<link rel="stylesheet" href="../_shared/site.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+
+  <!-- ══ masthead: a flat panel band over the faint nebula ══════════════ -->
+  <header class="hiw-mast" aria-labelledby="hiw-title">
+    <div class="hiw-mast__space" aria-hidden="true"></div>
+    <div class="hiw-mast__copy">
+      <p class="hiw-mast__eyebrow">How it works</p>
+      <h1 class="hiw-mast__title" id="hiw-title">A screening layer that can prove it ran.</h1>
+      <p class="hiw-mast__lede">Blindseal is a privacy-preserving, verifiable screening layer for AI agents. It sits between an agent and its tools as a local proxy, inspecting every tool call with four layers of prompt-injection detection before the call executes. Nothing sensitive leaves the machine: secrets and PII are redacted before the judge sees them, and the judge runs locally or inside a TEE whose attestation you can present on demand.</p>
+    </div>
+  </header>
+
+  <!-- ══ body: TOC rail + content column ═══════════════════════════════ -->
+  <div class="hiw">
+    <aside class="hiw-toc-col">
+      <nav class="hiw-toc" aria-label="Contents">
+        <p class="hiw-toc__head">Contents</p>
+        <div class="hiw-toc__rail">
+          <div class="hiw-toc__track" aria-hidden="true"><span class="hiw-toc__fill"></span></div>
+          <ol class="hiw-toc__list">
+            <li><a class="hiw-toc__link" href="#architecture" data-toc="architecture"><span class="hiw-toc__n">01</span>Architecture</a></li>
+            <li><a class="hiw-toc__link" href="#four-layers" data-toc="four-layers"><span class="hiw-toc__n">02</span>Four layers</a></li>
+            <li><a class="hiw-toc__link" href="#redaction" data-toc="redaction"><span class="hiw-toc__n">03</span>Redaction before the judge</a></li>
+            <li><a class="hiw-toc__link" href="#attestation" data-toc="attestation"><span class="hiw-toc__n">04</span>The attestation</a></li>
+            <li><a class="hiw-toc__link" href="#binding" data-toc="binding"><span class="hiw-toc__n">05</span>What binds it</a></li>
+            <li><a class="hiw-toc__link" href="#audit-chain" data-toc="audit-chain"><span class="hiw-toc__n">06</span>The audit chain</a></li>
+            <li><a class="hiw-toc__link" href="#claim" data-toc="claim"><span class="hiw-toc__n">07</span>What we claim</a></li>
+            <li><a class="hiw-toc__link" href="#next" data-toc="next"><span class="hiw-toc__n">08</span>Next</a></li>
+          </ol>
+        </div>
+        <button type="button" class="hiw-toc__top" data-top><i data-lucide="chevron-up"></i>Back to top</button>
+      </nav>
+    </aside>
+
+    <article class="hiw-body">
+
+      <!-- 01 ─ architecture -->
+      <section class="hiw-sec" id="architecture" aria-labelledby="h-architecture">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>01</b> / Architecture</p><h2 class="section-head__title" id="h-architecture">One proxy between the agent and its tools.</h2></div>
+            <p class="section-head__body">The agent's MCP client talks to 127.0.0.1 instead of the server; the proxy screens, forwards and logs every call.</p>
+          </div>
+        </div>
+        <figure class="hiw-fig" id="fig-architecture" data-fig="architecture" data-fig-n="1"></figure>
+        <div class="hiw-grid2 reveal cascade">
+          <div class="hiw-art">
+            <p class="hiw-art__eyebrow">The path</p>
+            <h3 class="hiw-art__title">Every call goes through 127.0.0.1</h3>
+            <p class="hiw-art__body">The agent's MCP client talks to the proxy instead of the server. The proxy screens each call, forwards what passes to the upstream server, and writes the decision to the local log either way.</p>
+            <p class="hiw-route"><span>Agent</span><span aria-hidden="true">→</span><span>Proxy <span class="hiw-route__port" data-port></span></span><span aria-hidden="true">→</span><strong data-upstreams>Tools</strong></p>
+          </div>
+          <div class="hiw-art">
+            <p class="hiw-art__eyebrow">What stays on the machine</p>
+            <h3 class="hiw-art__title">Only a proof crosses the line</h3>
+            <p class="hiw-art__body">The prompt, the tool arguments, the operator's rules and every model score stay on the machine. A proof and its five public inputs leave it, and only when something downstream asks for one.</p>
+            <p class="hiw-route"><span>Decision</span><span aria-hidden="true">→</span><span>Prover</span><span aria-hidden="true">→</span><strong>Solana verifier</strong></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 ─ four layers -->
+      <section class="hiw-sec" id="four-layers" aria-labelledby="h-four-layers">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>02</b> / Four layers</p><h2 class="section-head__title" id="h-four-layers">Two layers that match, two that judge.</h2></div>
+            <p class="section-head__body">L0 and L1 are deterministic: the same payload always gets the same answer, so the proof can cover them. L2 and L3 are model-based; they run locally or in a TEE and are attested, not proven.</p>
+          </div>
+        </div>
+        <div class="hiw-layers">
+          <figure class="hiw-fig hiw-fig--narrow" id="fig-layers" data-fig="layers" data-fig-n="2"></figure>
+          <ul class="hiw-flows reveal cascade" aria-label="The four layers">
+            <li><span class="hiw-flows__k"><b>L0</b>Rules</span><span class="hiw-flows__v">Exact matches, allowlists and denylists over the raw payload: program ids, recipients, tool paths. <span data-count="L0"></span></span><span class="chip outline">Proven</span></li>
+            <li><span class="hiw-flows__k"><b>L1</b>Patterns</span><span class="hiw-flows__v">Expressions for override phrasing, prompt extraction, hidden unicode, role tags and exfiltration links. <span data-count="L1"></span></span><span class="chip outline">Proven</span></li>
+            <li><span class="hiw-flows__k"><b>L2</b>Similarity</span><span class="hiw-flows__v">Scores the redacted payload against known injections, from 0 to 1. Runs locally or in a TEE.</span><span class="chip neutral">Attested</span></li>
+            <li><span class="hiw-flows__k"><b>L3</b>Judge</span><span class="hiw-flows__v">Reads the redacted payload when L2 or a rule raises a doubt, and can clear an L2 flag. Runs locally or in a TEE.</span><span class="chip neutral">Attested</span></li>
+          </ul>
+        </div>
+        <div class="hiw-example reveal" data-example>
+          <p class="hiw-example__k">An example decision</p>
+          <div class="hiw-example__row">
+            <span class="hiw-example__tool" data-ex-tool></span>
+            <span data-ex-strip></span>
+            <span data-ex-verdict></span>
+            <p class="hiw-example__note" data-ex-note></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 ─ redaction -->
+      <section class="hiw-sec" id="redaction" aria-labelledby="h-redaction">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>03</b> / Redaction before the judge</p><h2 class="section-head__title" id="h-redaction">The judge sees less than the agent sent.</h2></div>
+            <p class="section-head__body">Nothing sensitive leaves the machine: secrets and PII are redacted before the judge sees them, and the judge runs locally or inside a TEE whose attestation you can present on demand.</p>
+          </div>
+        </div>
+        <div class="hiw-redact reveal" data-redact>
+          <div class="hiw-redact__side">
+            <p class="hiw-redact__k">payloadHash</p>
+            <div class="hiw-redact__v" data-ph></div>
+            <p class="hiw-redact__sub">The canonical call as the agent sent it. L0 and L1 read this.</p>
+          </div>
+          <div class="hiw-redact__arrow" aria-hidden="true">
+            <svg viewBox="0 0 120 24" focusable="false"><path data-draw pathLength="1" d="M2 12H116" style="--i:0"/><path data-draw="fast" pathLength="1" d="M108 5l8 7-8 7" style="--i:3"/></svg>
+            <span class="hiw-redact__step" data-draw-label>redact</span>
+          </div>
+          <div class="hiw-redact__side">
+            <p class="hiw-redact__k">redactedHash</p>
+            <div class="hiw-redact__v" data-rh></div>
+            <p class="hiw-redact__sub">What L2 and L3 actually saw. The two hashes differ because something was removed.</p>
+          </div>
+          <div class="hiw-redact__foot">
+            <span class="hiw-redact__label">Redacted</span>
+            <span class="hiw-redact__chips" data-kinds></span>
+            <span class="hiw-redact__note">The payload itself is never on this page, only its hashes.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 ─ the attestation -->
+      <section class="hiw-sec" id="attestation" aria-labelledby="h-attestation">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>04</b> / The attestation</p><h2 class="section-head__title" id="h-attestation">One attestation, one action, one use.</h2></div>
+            <p class="section-head__body">An attestation starts from one screened decision and ends in one Solana instruction. Everything in between happens on the machine.</p>
+          </div>
+        </div>
+        <figure class="hiw-fig" id="fig-lifecycle" data-fig="lifecycle" data-fig-n="3"></figure>
+        <p class="hiw-cols reveal">When something downstream needs proof — an escrow contract, a counterparty, an auditor — Blindseal produces a zero-knowledge attestation that a specific tool call passed a committed policy. The attestation binds to the action itself: target program, recipient, amount, policy root, and expiry are hashed into it, so it is worthless for any other call. It is single-use. The proof is generated locally and verified with one Solana instruction, so any program can gate agent actions without seeing the prompt, the arguments, the operator's rules, or which agent was screened.</p>
+        <div class="hiw-panel reveal">
+          <p class="hiw-panel__k">The attestation in the figure</p>
+          <div class="kv hiw-kv" style="--kv-cols: 5" data-att-kv></div>
+        </div>
+      </section>
+
+      <!-- 05 ─ what binds it -->
+      <section class="hiw-sec" id="binding" aria-labelledby="h-binding">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>05</b> / What binds it</p><h2 class="section-head__title" id="h-binding">Hashed into the attestation.</h2></div>
+            <p class="section-head__body">The attestation binds to the action itself: target program, recipient, amount, policy root, and expiry are hashed into it, so it is worthless for any other call.</p>
+          </div>
+        </div>
+        <div class="hiw-bind reveal" data-bind>
+          <div class="kv hiw-kv" style="--kv-cols: 5" data-bind-kv></div>
+          <div class="hiw-bind__out">
+            <div class="hiw-bind__res">
+              <span class="hiw-bind__k">Action hash · public input 0</span>
+              <span class="hiw-bind__v" data-bind-hash></span>
+              <span class="hiw-bind__state" data-bind-state></span>
+            </div>
+            <button type="button" class="btn secondary sm" data-bind-toggle aria-pressed="false"><i data-lucide="refresh-cw"></i><span>Change the amount by one lamport</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 06 ─ the audit chain -->
+      <section class="hiw-sec" id="audit-chain" aria-labelledby="h-audit-chain">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>06</b> / The audit chain</p><h2 class="section-head__title" id="h-audit-chain">A log that commits to itself.</h2></div>
+            <p class="section-head__body">Every decision is written to a hash-chained local log with selective disclosure: prove a time window was clean, or that a specific event occurred, without exposing traffic.</p>
+          </div>
+        </div>
+        <figure class="hiw-fig" id="fig-chain" data-fig="chain" data-fig-n="4"></figure>
+        <div class="hiw-grid2 reveal cascade">
+          <div class="hiw-art">
+            <p class="hiw-art__eyebrow">Hash-chained</p>
+            <h3 class="hiw-art__title">Change one entry, break every hash after it</h3>
+            <p class="hiw-art__body">Each entry stores the hash of the one before it, its decision id, its payload hash and its verdict. Anyone holding the head can walk the chain back and recompute every link.</p>
+            <ul class="checklist hiw-walk" data-walk></ul>
+            <div><button type="button" class="btn secondary sm" data-walk-btn><i data-lucide="link"></i><span>Walk the chain</span></button></div>
+          </div>
+          <div class="hiw-art">
+            <p class="hiw-art__eyebrow">Selective disclosure</p>
+            <h3 class="hiw-art__title">Show a window, not the traffic</h3>
+            <p class="hiw-art__body">A disclosure is a signed range of entries: the hashes and verdicts from the highlighted window, checkable against the head, with no payload in it.</p>
+            <div class="kv hiw-kv" style="--kv-cols: 2" data-head-kv></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 07 ─ what we claim -->
+      <section class="hiw-sec" id="claim" aria-labelledby="h-claim">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>07</b> / What we claim</p><h2 class="section-head__title" id="h-claim">A deliberately narrow claim.</h2></div>
+            <p class="section-head__body">One claim per call, and a plain line where it stops. The left column is what a verifier never learns; the right is all it gets.</p>
+          </div>
+        </div>
+        <div class="hiw-claim reveal cascade">
+          <div class="site-panel hiw-claim__panel">
+            <div class="callout"><p class="callout__title">What we claim</p><p class="callout__body" data-honest>Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the deterministic layers passed. The model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn't pass through the proxy.</p></div>
+          </div>
+          <figure class="hiw-table" aria-label="Hidden versus public">
+            <table>
+              <thead><tr><th scope="col">Hidden</th><th scope="col">Public</th></tr></thead>
+              <tbody>
+                <tr><td>Prompt and tool arguments</td><td>That a valid attestation exists</td></tr>
+                <tr><td>Policy contents, thresholds, custom lists</td><td>Policy root (a hash)</td></tr>
+                <tr><td>Which agent / operator was screened</td><td>Detector version</td></tr>
+                <tr><td>Model-layer scores</td><td>Action hash, expiry, nullifier</td></tr>
+              </tbody>
+            </table>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 08 ─ next -->
+      <section class="hiw-sec" id="next" aria-labelledby="h-next">
+        <div class="hiw-head reveal">
+          <div class="section-head">
+            <div class="section-head__lead"><p class="section-head__eyebrow"><b>08</b> / Next</p><h2 class="section-head__title" id="h-next">Check it yourself.</h2></div>
+            <p class="section-head__body">Paste an attestation into the verifier, or read how to point an agent at the proxy.</p>
+          </div>
+        </div>
+        <div class="hiw-next reveal cascade">
+          <a class="site-panel card--interactive hiw-next__card" href="../S03/index.html">
+            <span class="site-panel__n">Verify</span>
+            <span class="hiw-next__title">Verify an attestation <i data-lucide="arrow-right"></i></span>
+            <span class="site-panel__body">Paste or drop attestation.json. The proof is checked in your browser; nothing is uploaded.</span>
+          </a>
+          <a class="site-panel card--interactive hiw-next__card" href="../S04/index.html">
+            <span class="site-panel__n">Docs</span>
+            <span class="hiw-next__title">Read the docs <i data-lucide="arrow-right"></i></span>
+            <span class="site-panel__body">Install the proxy, point an agent at it, write policy rules, and read the local API.</span>
+          </a>
+        </div>
+      </section>
+
+    </article>
+  </div>
+</main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/diagrams.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/site.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

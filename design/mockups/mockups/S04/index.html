@@ -1,0 +1,82 @@
+<!doctype html>
+<!--
+  Blindseal mockups · S04 — Docs (/docs), the MDX shell + the Local API reference.
+  the kit's whitepaper layout ((reference study)/whitepaper, D08) in the brief's
+  three columns: the sidebar tree (240, sticky) · the content column (≤ 720) ·
+  the on-this-page outline (200, sticky, scroll-spy + the damped progress fill).
+  Everything in the columns is rendered by page.js from BS.data.docs and
+  BS.data.apiReference (FRONTEND §5); this file is only the frame.
+  QA: ?page=<slug> (install · point-an-agent · mock-mode · dashboard ·
+  policy-rules · attestations · audit-and-disclosure · tee-mode · api (alias of
+  api-reference) · changelog) · ?motion=reduce | slow | full · ?now=<ms>.
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs · Blindseal</title>
+<meta name="description" content="Install the Blindseal proxy, point an agent at it, and read the local API.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/site.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+  <div class="docs" data-docs>
+
+    <!-- ══ left: the sidebar tree ══════════════════════════════════════ -->
+    <aside class="docs-side" aria-label="Documentation">
+      <div class="docs-side__in">
+        <div class="docs-search">
+          <label class="sr-only" for="docs-search">Search the docs</label>
+          <div class="input-group has-end">
+            <i data-lucide="search"></i>
+            <input class="input docs-search__input" id="docs-search" type="search" placeholder="Search the docs" autocomplete="off" spellcheck="false">
+            <span class="input-group__end"><kbd class="kbd" aria-hidden="true">/</kbd></span>
+          </div>
+        </div>
+        <nav class="docs-tree" aria-label="Docs pages" data-tree></nav>
+        <div class="docs-side__foot" data-side-foot></div>
+      </div>
+    </aside>
+
+    <!-- ══ centre: the page ═════════════════════════════════════════════ -->
+    <div class="docs-main">
+      <div class="docs-stage" data-stage>
+        <article class="docs-page" data-doc aria-live="polite"></article>
+      </div>
+    </div>
+
+    <!-- ══ right: on this page ══════════════════════════════════════════ -->
+    <aside class="docs-otp-col" aria-label="On this page">
+      <nav class="docs-otp" data-otp>
+        <p class="docs-otp__head">On this page</p>
+        <div class="docs-otp__rail">
+          <div class="docs-otp__track" aria-hidden="true"><span class="docs-otp__fill" data-fill></span></div>
+          <ol class="docs-otp__list" data-otp-list></ol>
+        </div>
+        <button type="button" class="docs-otp__top" data-top disabled><i data-lucide="chevron-up"></i>Back to top</button>
+      </nav>
+    </aside>
+
+  </div>
+</main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/site.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

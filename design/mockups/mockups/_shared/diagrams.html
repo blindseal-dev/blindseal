@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blindseal · Diagrams (J0D)</title>
+<link rel="icon" href="data:,">
+<!--
+  Diagrams demo. Loads the shared kit stylesheets and motion; every file is local to
+  _shared/, so there is no external request and no cross-project fallback. diagrams.css
+  self-hosts its own font fallback.
+-->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="fonts.css" onerror="this.remove()">
+<link rel="stylesheet" href="motion.css">
+<link rel="stylesheet" href="diagrams.css">
+<script src="motion.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; }
+  body {
+    background: var(--canvas, Canvas);
+    color: var(--ink, CanvasText);
+    font-family: var(--font-sans, "BS Diagram Sans", ui-sans-serif, system-ui, sans-serif);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+  .dgd { max-width: 1180px; margin: 0 auto; padding: 56px 40px 120px; }
+  .dgd-eyebrow {
+    margin: 0;
+    font-family: var(--font-mono, "BS Diagram Mono", ui-monospace, monospace);
+    font-size: 11px; line-height: 16px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted, GrayText);
+  }
+  .dgd-hero h1 { margin: 14px 0 0; font-size: 48px; line-height: 52px; letter-spacing: -.03em; font-weight: 500; }
+  .dgd-hero p { margin: 16px 0 0; max-width: 640px; font-size: 16px; line-height: 24px; color: var(--muted, GrayText); }
+  .dgd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 28px; }
+  .dgd-hero .dgd-meta {
+    margin: 0; max-width: none;
+    font-family: var(--font-mono, "BS Diagram Mono", ui-monospace, monospace);
+    font-size: 11px; letter-spacing: .04em; color: var(--muted, GrayText);
+  }
+  .dgd-meta b { font-weight: 400; color: var(--ink, CanvasText); }
+
+  .dgd-sec { padding: 32px 0 8px; margin-top: 48px; border-top: 1px solid var(--line, color-mix(in srgb, currentColor 14%, transparent)); }
+  .dgd-head { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: end; margin-top: 16px; }
+  .dgd-head h2 { margin: 0; font-size: 38.4px; line-height: 42.24px; letter-spacing: -1.344px; font-weight: 500; }
+  .dgd-head p { margin: 0; max-width: 480px; font-size: 15px; line-height: 23px; color: var(--muted, GrayText); }
+  .dgd-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 28px; }
+  .dgd-group { display: inline-flex; align-items: center; gap: 8px; }
+  .dgd-group > span {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, GrayText); font-weight: 500;
+  }
+  .dgd-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-control, 6px); background: var(--panel, color-mix(in srgb, currentColor 5%, transparent)); border: 1px solid var(--line, color-mix(in srgb, currentColor 14%, transparent)); }
+  .dgd-btn {
+    appearance: none; display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px; margin: 0;
+    font: inherit; font-size: 12px; line-height: 16px; font-weight: 500;
+    color: var(--muted, GrayText); text-decoration: none; cursor: pointer;
+    background: transparent; border: 1px solid transparent; border-radius: calc(var(--r-control, 6px) - 2px);
+    transition: color 150ms var(--ease-in-out, ease), background-color 150ms var(--ease-in-out, ease),
+                border-color 150ms var(--ease-in-out, ease), transform 160ms var(--ease-out-quint, cubic-bezier(.22,1,.36,1));
+  }
+  .dgd-btn--solo { height: 30px; background: var(--panel, transparent); border-color: var(--line, color-mix(in srgb, currentColor 14%, transparent)); border-radius: var(--r-control, 6px); }
+  @media (hover: hover) and (pointer: fine) {
+    .dgd-btn:hover:not(:disabled) { color: var(--ink, CanvasText); background: var(--surface-hover, color-mix(in srgb, currentColor 8%, transparent)); }
+    .dgd-btn--solo:hover:not(:disabled) { border-color: var(--line-strong, color-mix(in srgb, currentColor 30%, transparent)); }
+  }
+  .dgd-btn:focus-visible { outline: 2px solid var(--ring, var(--accent, Highlight)); outline-offset: 2px; }
+  .dgd-btn:active:not(:disabled) { transform: scale(.98); }
+  .dgd-btn[aria-pressed="true"], .dgd-btn[aria-current="true"] { color: var(--ink, CanvasText); background: var(--surface-hover, color-mix(in srgb, currentColor 10%, transparent)); border-color: var(--line, transparent); }
+  .dgd-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .dgd-btn svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+  .dgd-call {
+    display: block; margin-top: 14px; min-height: 16px;
+    font-family: var(--font-mono, "BS Diagram Mono", ui-monospace, monospace);
+    font-size: 11px; line-height: 16px; color: var(--muted, GrayText); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .dgd-call b { font-weight: 400; color: var(--muted, GrayText); }
+  .dgd .fig { margin: 24px 0 0; }
+  .dgd .fig--narrow { max-width: 620px; }
+  @media (max-width: 1100px) { .dgd-head { grid-template-columns: 1fr; gap: 16px; } }
+</style>
+</head>
+<body>
+<main id="main-content" class="dgd">
+
+  <header class="dgd-hero">
+    <p class="dgd-eyebrow">J0D / Diagrams</p>
+    <h1>Figures that draw themselves in.</h1>
+    <p>Five figures for the site and the dashboard, drawn the way the kit draws: hairline strokes on a normalised path length, 80&nbsp;ms apart, labels after the lines. Scroll to draw each one once; replay it, change its state, or slow it down.</p>
+    <div class="dgd-bar">
+      <div class="dgd-group"><span>Motion</span>
+        <nav class="dgd-seg" aria-label="Motion mode">
+          <a class="dgd-btn" href="?motion=full" data-mode="full">Full</a>
+          <a class="dgd-btn" href="?motion=slow" data-mode="slow">Slow-mo ×4</a>
+          <a class="dgd-btn" href="?motion=reduce" data-mode="reduce">Reduced</a>
+        </nav>
+      </div>
+      <button class="dgd-btn dgd-btn--solo" type="button" data-replay-all>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 6a3.8 3.8 0 1 0 1.1-2.7M2 1.6v2.2h2.2"/></svg>Replay all
+      </button>
+      <p class="dgd-meta" id="dgd-engine">engine <b>…</b></p>
+    </div>
+  </header>
+
+  <section class="dgd-sec" aria-labelledby="h-flow">
+    <p class="dgd-eyebrow">01 / Flow</p>
+    <div class="dgd-head">
+      <h2 id="h-flow">Screen, attest, prove, verify.</h2>
+      <p>Blindseal checks every action your agent takes, on your own machine, and never sends your data anywhere. When your agent needs to prove it was checked, Blindseal gives it a one-time stamp.</p>
+    </div>
+    <div class="dgd-tools" data-for="flow4">
+      <div class="dgd-group"><span>active</span>
+        <div class="dgd-seg" role="group" aria-label="Active step">
+          <button class="dgd-btn" type="button" data-opt="active" data-val="" aria-pressed="true">none</button>
+          <button class="dgd-btn" type="button" data-opt="active" data-val="screen" aria-pressed="false">screen</button>
+          <button class="dgd-btn" type="button" data-opt="active" data-val="attest" aria-pressed="false">attest</button>
+          <button class="dgd-btn" type="button" data-opt="active" data-val="prove" aria-pressed="false">prove</button>
+          <button class="dgd-btn" type="button" data-opt="active" data-val="verify" aria-pressed="false">verify</button>
+        </div>
+      </div>
+      <button class="dgd-btn dgd-btn--solo" type="button" data-replay>Replay</button>
+    </div>
+    <figure class="fig" id="fig-flow4"></figure>
+    <code class="dgd-call" data-call-for="flow4"></code>
+  </section>
+
+  <section class="dgd-sec" aria-labelledby="h-arch">
+    <p class="dgd-eyebrow">02 / Architecture</p>
+    <div class="dgd-head">
+      <h2 id="h-arch">One proxy between the agent and its tools.</h2>
+      <p>It sits between an agent and its tools as a local proxy, inspecting every tool call with four layers of prompt-injection detection before the call executes.</p>
+    </div>
+    <div class="dgd-tools" data-for="architecture">
+      <div class="dgd-group"><span>focus</span>
+        <div class="dgd-seg" role="group" aria-label="Focus">
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="" aria-pressed="true">none</button>
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="agent" aria-pressed="false">agent</button>
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="proxy" aria-pressed="false">proxy</button>
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="tools" aria-pressed="false">tools</button>
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="audit" aria-pressed="false">audit log</button>
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="prover" aria-pressed="false">prover</button>
+          <button class="dgd-btn" type="button" data-opt="focus" data-val="verifier" aria-pressed="false">verifier</button>
+        </div>
+      </div>
+      <button class="dgd-btn dgd-btn--solo" type="button" data-replay>Replay</button>
+    </div>
+    <figure class="fig" id="fig-architecture"></figure>
+    <code class="dgd-call" data-call-for="architecture"></code>
+  </section>
+
+  <section class="dgd-sec" aria-labelledby="h-life">
+    <p class="dgd-eyebrow">03 / Lifecycle</p>
+    <div class="dgd-head">
+      <h2 id="h-life">One attestation, one action, one use.</h2>
+      <p>The attestation binds to the action itself: target program, recipient, amount, policy root, and expiry are hashed into it, so it is worthless for any other call. It is single-use.</p>
+    </div>
+    <div class="dgd-tools" data-for="lifecycle">
+      <div class="dgd-group"><span>status</span>
+        <div class="dgd-seg" role="group" aria-label="Status">
+          <button class="dgd-btn" type="button" data-opt="status" data-val="requested" aria-pressed="false">requested</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="generating" aria-pressed="false">generating</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="generated" aria-pressed="false">generated</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="submitted" aria-pressed="false">submitted</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="consumed" aria-pressed="true">consumed</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="expired" aria-pressed="false">expired</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="rejected" aria-pressed="false">rejected</button>
+          <button class="dgd-btn" type="button" data-opt="status" data-val="failed" aria-pressed="false">failed</button>
+        </div>
+      </div>
+      <button class="dgd-btn dgd-btn--solo" type="button" data-replay>Replay</button>
+    </div>
+    <figure class="fig" id="fig-lifecycle"></figure>
+    <code class="dgd-call" data-call-for="lifecycle"></code>
+  </section>
+
+  <section class="dgd-sec" aria-labelledby="h-chain">
+    <p class="dgd-eyebrow">04 / Audit chain</p>
+    <div class="dgd-head">
+      <h2 id="h-chain">A log that commits to itself.</h2>
+      <p>Every decision is written to a hash-chained local log with selective disclosure: prove a time window was clean, or that a specific event occurred, without exposing traffic.</p>
+    </div>
+    <div class="dgd-tools" data-for="chain">
+      <div class="dgd-group"><span>window</span>
+        <div class="dgd-seg" role="group" aria-label="Disclosure window">
+          <button class="dgd-btn" type="button" data-opt="window" data-val="" aria-pressed="true">none</button>
+          <button class="dgd-btn" type="button" data-opt="window" data-val="1043,1046" aria-pressed="false">#1043–#1046</button>
+          <button class="dgd-btn" type="button" data-opt="window" data-val="1046,1050" aria-pressed="false">#1046–#1050</button>
+        </div>
+      </div>
+      <div class="dgd-group"><span>brokenAt</span>
+        <div class="dgd-seg" role="group" aria-label="Broken at">
+          <button class="dgd-btn" type="button" data-opt="brokenAt" data-val="" aria-pressed="true">none</button>
+          <button class="dgd-btn" type="button" data-opt="brokenAt" data-val="1048" aria-pressed="false">#1048</button>
+        </div>
+      </div>
+      <button class="dgd-btn dgd-btn--solo" type="button" data-replay>Replay</button>
+    </div>
+    <figure class="fig" id="fig-chain"></figure>
+    <code class="dgd-call" data-call-for="chain"></code>
+  </section>
+
+  <section class="dgd-sec" aria-labelledby="h-layers">
+    <p class="dgd-eyebrow">05 / Layers</p>
+    <div class="dgd-head">
+      <h2 id="h-layers">Four layers, two kinds of evidence.</h2>
+      <p>The model-based layers run locally or in a TEE and are attested, not proven. Nothing sensitive leaves the machine: secrets and PII are redacted before the judge sees them.</p>
+    </div>
+    <div class="dgd-tools" data-for="layers">
+      <div class="dgd-group"><span>highlight</span>
+        <div class="dgd-seg" role="group" aria-label="Highlight layer">
+          <button class="dgd-btn" type="button" data-opt="highlight" data-val="" aria-pressed="false">none</button>
+          <button class="dgd-btn" type="button" data-opt="highlight" data-val="L0" aria-pressed="false">L0</button>
+          <button class="dgd-btn" type="button" data-opt="highlight" data-val="L1" aria-pressed="true">L1</button>
+          <button class="dgd-btn" type="button" data-opt="highlight" data-val="L2" aria-pressed="false">L2</button>
+          <button class="dgd-btn" type="button" data-opt="highlight" data-val="L3" aria-pressed="false">L3</button>
+        </div>
+      </div>
+      <div class="dgd-group"><span>verdict</span>
+        <div class="dgd-seg" role="group" aria-label="Verdict">
+          <button class="dgd-btn" type="button" data-opt="verdict" data-val="pass" aria-pressed="false">pass</button>
+          <button class="dgd-btn" type="button" data-opt="verdict" data-val="block" aria-pressed="true">block</button>
+          <button class="dgd-btn" type="button" data-opt="verdict" data-val="flag" aria-pressed="false">flag</button>
+          <button class="dgd-btn" type="button" data-opt="verdict" data-val="skip" aria-pressed="false">skip</button>
+        </div>
+      </div>
+      <button class="dgd-btn dgd-btn--solo" type="button" data-replay>Replay</button>
+    </div>
+    <figure class="fig fig--narrow" id="fig-layers"></figure>
+    <code class="dgd-call" data-call-for="layers"></code>
+  </section>
+
+</main>
+<script src="diagrams.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.BS.diagrams;
+  var state = {
+    flow4: {},
+    architecture: {},
+    lifecycle: { status: "consumed" },
+    chain: { start: 1041 },
+    layers: { highlight: "L1", verdict: "block" }
+  };
+  function host(name) { return document.getElementById("fig-" + name); }
+  function showCall(name) {
+    var o = {}, s = state[name];
+    Object.keys(s).forEach(function (k) { if (s[k] !== undefined && s[k] !== "") o[k] = s[k]; });
+    var el = document.querySelector('[data-call-for="' + name + '"]');
+    el.innerHTML = "BS.diagrams.render(<b>\"" + name + "\"</b>, fig, <b>" + JSON.stringify(o).replace(/</g, "&lt;") + "</b>)";
+  }
+  function draw(name) { D.render(name, host(name), state[name]); showCall(name); }
+
+  function mode() {
+    var a = document.documentElement.getAttribute("data-motion");
+    if (a) return a;
+    return window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduce" : "full";
+  }
+
+  function start() {
+    D.list.forEach(draw);
+
+    /* option toggles */
+    [].forEach.call(document.querySelectorAll("[data-opt]"), function (btn) {
+      btn.addEventListener("click", function () {
+        var name = btn.closest("[data-for]").getAttribute("data-for");
+        var key = btn.getAttribute("data-opt"), raw = btn.getAttribute("data-val"), val = raw;
+        if (raw === "") val = undefined;
+        else if (key === "window") val = raw.split(",").map(Number);
+        else if (key === "brokenAt") val = Number(raw);
+        state[name][key] = val;
+        [].forEach.call(btn.parentNode.querySelectorAll("[data-opt]"), function (b) { b.setAttribute("aria-pressed", String(b === btn)); });
+        draw(name);
+      });
+    });
+
+    /* replay */
+    var still = mode() === "reduce";
+    [].forEach.call(document.querySelectorAll("[data-replay]"), function (btn) {
+      if (still) { btn.disabled = true; btn.title = "Reduced motion: every figure is already drawn"; return; }
+      btn.addEventListener("click", function () { D.replay(host(btn.closest("[data-for]").getAttribute("data-for"))); });
+    });
+    var all = document.querySelector("[data-replay-all]");
+    if (still) { all.disabled = true; all.title = "Reduced motion: every figure is already drawn"; }
+    else all.addEventListener("click", function () { D.list.forEach(function (n) { D.replay(host(n)); }); });
+
+    /* motion mode links + engine readout */
+    var m = mode();
+    [].forEach.call(document.querySelectorAll("[data-mode]"), function (a) {
+      if (a.getAttribute("data-mode") === m) a.setAttribute("aria-current", "true");
+    });
+    var eng = host("flow4").getAttribute("data-dg-engine") === "kit" ? "BS.motion.mountDrawIn" : "own IntersectionObserver";
+    var rate = host("flow4").getAttribute("data-dg-rate") === "kit" ? "kit playbackRate" : "css --dg-k";
+    document.getElementById("dgd-engine").innerHTML = "engine <b>" + eng + "</b> · motion <b>" + m + "</b> · slow-mo via <b>" + rate + "</b>";
+
+    /* self-check: every drawn path is normalised */
+    var r = D.check(document), to = document.querySelectorAll("path[data-draw-to]:not([pathLength='1'])").length;
+    if (r.missing.length || to) console.warn("[diagrams] self-check FAILED: " + (r.missing.length + to) + " draw path(s) without pathLength=\"1\"", r.missing);
+    else console.info("[diagrams] self-check: " + r.paths + " path[data-draw] across " + D.list.length + " figures, all pathLength=\"1\"");
+  }
+  if (document.readyState === "complete") start();
+  else window.addEventListener("load", start);
+})();
+</script>
+</body>
+</html>

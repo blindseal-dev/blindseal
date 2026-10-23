@@ -1,0 +1,108 @@
+<!doctype html>
+<!--
+  Blindseal mockups · D01 — Dashboard: Decisions (/decisions)
+  The live stream + table, its filters and counts, plus three ?state= variants:
+    ?state=empty         the onboarding empty state (fresh install)
+    ?state=unauthorized  the full-screen token screen (no shell)
+    ?state=offline       proxy unreachable: banner + countdown, cached rows dimmed
+  (?state=reconnecting gets a quieter banner; the shell handles its pill.)
+  QA: ?now=1792684800000 freezes the fixture clock · ?motion=reduce|slow|full
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisions · Blindseal</title>
+<meta name="description" content="Blindseal local dashboard: every screened tool call, live, with filters by verdict, server, tool and time.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+  <div class="page d01" id="d01-page">
+
+    <!-- offline / reconnecting banner (filled by page.js) -->
+    <div class="d01-banner" id="d01-banner" role="status" aria-live="polite" hidden></div>
+
+    <!-- filter bar: flat, 56px -->
+    <section class="panel d01-filters reveal" id="d01-filters" aria-label="Filters">
+      <div class="filter-bar">
+        <div class="seg d01-vseg" id="d01-verdict" aria-label="Verdict">
+          <button type="button" class="seg__item" data-value="all">All <span class="count num" data-count="total">0</span></button>
+          <button type="button" class="seg__item" data-value="pass">Pass <span class="count num" data-count="pass">0</span></button>
+          <button type="button" class="seg__item" data-value="block">Block <span class="count num" data-count="block">0</span></button>
+          <button type="button" class="seg__item" data-value="flag">Flag <span class="count num" data-count="flag">0</span></button>
+        </div>
+        <span class="d01-sep" aria-hidden="true"></span>
+        <span class="select-wrap d01-sel"><select class="select" id="d01-server" aria-label="Server"><option value="">All servers</option></select><i data-lucide="chevron-down"></i></span>
+        <span class="select-wrap d01-sel d01-sel--tool"><select class="select" id="d01-tool" aria-label="Tool"><option value="">All tools</option></select><i data-lucide="chevron-down"></i></span>
+        <span class="d01-sep" aria-hidden="true"></span>
+        <div class="tabs d01-range" id="d01-range" aria-label="Time range">
+          <button type="button" class="tab" data-value="1h">1h</button>
+          <button type="button" class="tab" data-value="24h">24h</button>
+          <button type="button" class="tab" data-value="7d">7d</button>
+          <button type="button" class="tab" data-value="all">All</button>
+        </div>
+        <span class="d01-when">
+          <input class="input num d01-dt" id="d01-from" type="text" inputmode="numeric" placeholder="From" aria-label="From (UTC, YYYY-MM-DD HH:MM)" autocomplete="off" spellcheck="false">
+          <span class="d01-when__dash" aria-hidden="true">–</span>
+          <input class="input num d01-dt" id="d01-to" type="text" inputmode="numeric" placeholder="To · now" aria-label="To (UTC, YYYY-MM-DD HH:MM)" autocomplete="off" spellcheck="false">
+        </span>
+        <span class="filter-bar__spacer"></span>
+        <button type="button" class="btn link sm d01-clear" id="d01-clear">Clear</button>
+      </div>
+    </section>
+
+    <!-- counts for the current filter -->
+    <section class="stat-grid d01-counts reveal" id="d01-counts" style="--cols:4" aria-label="Counts for the current filter">
+      <div class="stat"><p class="stat__k">Matching</p><p class="stat__v num" data-odo="total">0</p><p class="stat__d">of <span class="num" data-of>200</span> decisions</p></div>
+      <div class="stat"><p class="stat__k"><span class="d01-key" data-v="pass"></span>Pass</p><p class="stat__v num" data-odo="pass">0</p><p class="stat__d" data-share="pass">—</p></div>
+      <div class="stat"><p class="stat__k"><span class="d01-key" data-v="block"></span>Block</p><p class="stat__v num" data-odo="block">0</p><p class="stat__d" data-share="block">—</p></div>
+      <div class="stat"><p class="stat__k"><span class="d01-key" data-v="flag"></span>Flag</p><p class="stat__v num" data-odo="flag">0</p><p class="stat__d" data-share="flag">—</p></div>
+    </section>
+
+    <!-- the table -->
+    <section class="table-box d01-tablebox reveal" id="d01-tablebox" aria-label="Decisions">
+      <table class="table d01-table">
+        <colgroup><col class="c-time"><col class="c-server"><col class="c-tool"><col class="c-dir"><col class="c-verdict"><col class="c-layers"><col class="c-red"><col class="c-act"><col class="c-att"><col class="c-lat"><col class="c-hash"></colgroup>
+        <thead><tr>
+          <th scope="col">Time</th><th scope="col">Server</th><th scope="col">Tool</th><th scope="col">Dir</th><th scope="col">Verdict</th>
+          <th scope="col">Layers</th><th scope="col" class="num">Redactions</th><th scope="col">Action</th><th scope="col">Attestation</th>
+          <th scope="col" class="num">Latency</th><th scope="col">Payload</th>
+        </tr></thead>
+        <tbody id="d01-rows"></tbody>
+      </table>
+      <div class="d01-none" id="d01-none" hidden></div>
+    </section>
+
+    <!-- pagination -->
+    <div class="d01-more" id="d01-more">
+      <p class="d01-more__note">Showing <span class="num" data-shown>0</span> of <span class="num" data-matching>0</span></p>
+      <button type="button" class="btn secondary" id="d01-loadmore"><i data-lucide="chevron-down"></i><span data-more-label>Load more</span></button>
+    </div>
+
+    <!-- fresh install: the onboarding empty state (?state=empty) -->
+    <section class="panel d01-onboard reveal" id="d01-onboard" aria-labelledby="d01-onboard-title" hidden></section>
+  </div>
+</main>
+
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/shell.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

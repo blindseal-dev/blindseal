@@ -55,9 +55,3 @@ test-ledger/
 # prover run output
 crates/prover/attestation.json
 
-# Vendored FE reference: trial Söhne font cuts (commercial — licence before use, HANDOFF §4/§8).
-# The mockups fall back to system fonts without them; Aeonik placeholder txt stays tracked.
-frontend-reference/mockups/_shared/fonts/*.woff2
-frontend-reference/mockups/_shared/fonts/*.woff
-frontend-reference/mockups/_shared/fonts/*.ttf
-frontend-reference/mockups/_shared/fonts/*.otf

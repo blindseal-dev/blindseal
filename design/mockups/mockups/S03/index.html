@@ -1,0 +1,128 @@
+<!doctype html>
+<!--
+  Blindseal mockups · S03 — Verify (/verify), the client-side attestation checker.
+  A short masthead, then two columns (5 / 7 of the 1212 site column): the input
+  panel (drop zone, paste textarea, Load sample / Load tampered / Verify / Clear)
+  and the checklist panel (result banner, four .check rows that fill in order,
+  and the "What this does not reveal" panel, a product feature, not a check).
+  Everything runs in this tab against BS.data (the mock verifier-wasm). Nothing
+  is uploaded and nothing is written to localStorage, sessionStorage,
+  IndexedDB or cookies. The nullifier lookup is the only "network" step and
+  only runs on its button.
+  QA: ?motion=reduce | slow | full · ?now=<ms> · ?state=offline (step 4 fails:
+  "RPC unavailable · try again"; the rest of the page is unaffected).
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify · Blindseal</title>
+<meta name="description" content="Check a Blindseal attestation in your browser. Nothing is uploaded, nothing is stored.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/site.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+
+  <!-- ══ masthead: a flat panel band over the faint nebula (S02's band, 300 high) ══ -->
+  <header class="vf-mast" aria-labelledby="vf-title">
+    <div class="vf-mast__space" aria-hidden="true"></div>
+    <div class="vf-mast__copy">
+      <p class="vf-mast__eyebrow">Verify</p>
+      <h1 class="vf-mast__title" id="vf-title">Check an attestation.</h1>
+      <p class="vf-mast__lede">Runs in your browser. Nothing is uploaded, nothing is stored.</p>
+    </div>
+  </header>
+
+  <!-- ══ the checker: input 5 / checklist 7 ═════════════════════════════ -->
+  <div class="vf">
+
+    <!-- left: input (no animation on this panel itself: it holds a glass button) -->
+    <section class="vf-in site-panel" aria-labelledby="vf-in-title">
+      <div class="vf-head vf-enter">
+        <p class="site-panel__n">Input</p>
+        <h2 class="site-panel__title" id="vf-in-title">Your attestation</h2>
+      </div>
+
+      <button type="button" class="vf-drop vf-enter" id="vf-drop" aria-describedby="vf-drop-sub">
+        <span class="vf-drop__ico"><i data-lucide="upload"></i></span>
+        <span class="vf-drop__title">Drop attestation.json</span>
+        <span class="vf-drop__sub" id="vf-drop-sub">or choose a file · it is read in this tab, never uploaded</span>
+      </button>
+      <input type="file" id="vf-file" accept=".json,application/json" hidden>
+
+      <div class="field vf-field vf-enter">
+        <label for="vf-text">…or paste it</label>
+        <textarea class="textarea mono vf-text" id="vf-text" rows="10" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"
+          placeholder='{ "version": 1, "actionHash": "0x…", … }' aria-describedby="vf-help"></textarea>
+        <p class="help vf-help" id="vf-help" aria-live="polite">Paste the JSON, or load a sample below.</p>
+      </div>
+
+      <div class="vf-actions">
+        <button type="button" class="btn secondary vf-enter" id="vf-load-sample"><i data-lucide="file-check"></i>Load sample</button>
+        <button type="button" class="btn secondary vf-enter" id="vf-load-tampered"><i data-lucide="file-json"></i>Load tampered</button>
+        <span class="vf-actions__spacer"></span>
+        <button type="button" class="btn link vf-enter" id="vf-clear">Clear</button>
+        <button type="button" class="glass-btn primary sm vf-enter vf-verify" id="vf-verify" disabled>Verify</button>
+      </div>
+
+      <p class="vf-note vf-enter"><i data-lucide="cpu"></i><span>Verification runs in the browser via the WASM verifier. The nullifier check is optional and is the only step that touches the network.</span></p>
+    </section>
+
+    <!-- right: checklist -->
+    <section class="vf-out site-panel" aria-labelledby="vf-out-title">
+      <div class="vf-head vf-head--split vf-enter">
+        <div>
+          <p class="site-panel__n">Checklist</p>
+          <h2 class="site-panel__title" id="vf-out-title">What the verifier finds</h2>
+        </div>
+        <span class="vf-source" id="vf-source" hidden></span>
+      </div>
+
+      <div class="vf-banner vf-enter" id="vf-banner" data-tone="idle" role="status" aria-live="polite">
+        <span class="vf-banner__mark" aria-hidden="true"></span>
+        <div class="vf-banner__main">
+          <p class="vf-banner__title">Waiting for an attestation</p>
+          <p class="vf-banner__sub">Load a sample, drop a file or paste JSON. The checks fill in, in order.</p>
+        </div>
+        <span class="vf-banner__end"></span>
+      </div>
+
+      <ol class="checklist vf-checks vf-enter" id="vf-checks" aria-label="Verification steps"></ol>
+
+      <section class="vf-hidden" id="vf-hidden" aria-labelledby="vf-hidden-title" hidden>
+        <div class="vf-hidden__head">
+          <p class="vf-hidden__n">05</p>
+          <h3 class="vf-hidden__title" id="vf-hidden-title">What this does not reveal</h3>
+          <p class="vf-hidden__lede">The attestation carries hashes and a proof. These stay on the machine that screened the call.</p>
+        </div>
+        <ul class="vf-hidden__rows" id="vf-hidden-rows"></ul>
+        <div class="vf-hidden__foot">
+          <p class="vf-hidden__k">Public</p>
+          <p class="vf-hidden__pub">That a valid attestation exists · Policy root (a hash) · Detector version · Action hash, expiry, nullifier</p>
+        </div>
+      </section>
+    </section>
+
+  </div>
+</main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/site.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

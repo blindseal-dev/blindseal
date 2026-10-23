@@ -1,0 +1,42 @@
+<!doctype html>
+<!--
+  Blindseal mockups · D06 — Dashboard: Settings (/settings)
+  What the proxy is connected to and how the judge runs; rotate the dashboard
+  token. Read-mostly: the one write (token rotation) asks first.
+  Head band (proxy address, version, uptime, four tick stats) over a 7 / 5
+  grid of flat panels: Upstream servers + Judge (L3) on the left; Prover,
+  Dashboard token and About on the right.
+  Switches: ?state=tee (TEE mode + the quote panel) · ?state=prover-down ·
+  ?state=upstream-down (comma-combinable) · ?now=<ms> freezes the fixture
+  clock · ?motion=reduce | slow | full.
+  page.js renders #d06 from BS.data (Status, tee, teeQuote, rotateToken).
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Blindseal</title>
+<meta name="description" content="Blindseal local dashboard: upstream servers, the L3 judge mode and TEE quote, prover status, the dashboard token and build details.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content"><div class="page d06" id="d06"></div></main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/shell.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

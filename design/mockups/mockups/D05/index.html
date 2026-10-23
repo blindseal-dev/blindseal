@@ -1,0 +1,89 @@
+<!doctype html>
+<!--
+  Blindseal mockups · D05 — Dashboard: Attestations (/attestations)
+  Every proof from request to consumption: the status filter, the lifecycle
+  strip (the legend of the statuses), the list with live progress, and the
+  detail side sheet (public inputs decoded, proof, TEE, submit, export).
+    ?id=<attestationId>  opens the detail sheet on load (D02 links here)
+    ?state=empty         "No attestations yet."
+  QA: ?now=1792684800000 freezes the fixture clock · ?motion=reduce|slow|full
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attestations · Blindseal</title>
+<meta name="description" content="Blindseal local dashboard: every attestation from request to consumption, with submit and export.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/diagrams.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+  <div class="page d05" id="d05-page">
+
+    <!-- status filter: flat, 56px -->
+    <section class="panel d05-filters reveal" id="d05-filters" aria-label="Filter by status">
+      <div class="filter-bar">
+        <div class="seg d05-seg" id="d05-seg" aria-label="Status">
+          <button type="button" class="seg__item" data-value="all">All <span class="count num" data-count="all">0</span></button>
+          <button type="button" class="seg__item" data-value="generating">Generating <span class="count num" data-count="generating">0</span></button>
+          <button type="button" class="seg__item" data-value="generated">Generated <span class="count num" data-count="generated">0</span></button>
+          <button type="button" class="seg__item" data-value="submitted">Submitted <span class="count num" data-count="submitted">0</span></button>
+          <button type="button" class="seg__item" data-value="consumed">Consumed <span class="count num" data-count="consumed">0</span></button>
+          <button type="button" class="seg__item" data-value="expired">Expired <span class="count num" data-count="expired">0</span></button>
+          <button type="button" class="seg__item" data-value="rejected">Rejected <span class="count num" data-count="rejected">0</span></button>
+          <button type="button" class="seg__item" data-value="failed">Failed <span class="count num" data-count="failed">0</span></button>
+        </div>
+        <span class="filter-bar__spacer"></span>
+        <p class="filter-bar__count d05-shown" id="d05-shown">Showing <span class="num" data-shown>0</span> of <span class="num" data-total>0</span></p>
+      </div>
+    </section>
+
+    <!-- the lifecycle strip: the legend of the statuses -->
+    <section class="panel d05-life reveal" id="d05-life" aria-labelledby="d05-life-title">
+      <header class="d05-life__head">
+        <h2 class="panel__title" id="d05-life-title">Lifecycle</h2>
+        <p class="d05-life__note" id="d05-life-note" aria-live="polite"></p>
+        <p class="d05-life__rule">One attestation, one action, one use.</p>
+      </header>
+      <figure class="d05-life__fig" id="d05-life-fig"></figure>
+    </section>
+
+    <!-- the list -->
+    <section class="table-box d05-tablebox reveal" id="d05-tablebox" aria-label="Attestations">
+      <table class="table d05-table">
+        <colgroup><col class="c-id"><col class="c-dec"><col class="c-status"><col class="c-created"><col class="c-expiry"><col class="c-tx"><col class="c-tee"></colgroup>
+        <thead><tr>
+          <th scope="col">Id</th><th scope="col">Decision</th><th scope="col">Status</th><th scope="col">Created</th>
+          <th scope="col" class="num">Expiry slot</th><th scope="col">Tx</th><th scope="col">TEE</th>
+        </tr></thead>
+        <tbody id="d05-rows"></tbody>
+      </table>
+      <div class="d05-none" id="d05-none" hidden></div>
+    </section>
+
+    <!-- ?state=empty -->
+    <section class="d05-empty reveal" id="d05-empty" aria-label="No attestations" hidden></section>
+  </div>
+</main>
+
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/diagrams.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/shell.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

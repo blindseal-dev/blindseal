@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  Blindseal mockups · D02 — Decision detail (/decisions/:id)
+  Everything the proxy knows about one decision; the raw payload stays hidden
+  until a confirm, lives in memory only, and is dropped on prev / next.
+  Switches: ?id=<ulid> · ?state=no-action | not-found | prover-down (comma list)
+  · ?now=<ms> · ?motion=reduce | slow | full. page.js renders #d02 from BS.data.
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision · Blindseal</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/diagrams.css">
+<link rel="stylesheet" href="../_shared/shell.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content"><div class="page d02" id="d02" aria-live="off"></div></main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/diagrams.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/shell.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

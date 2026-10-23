@@ -1,0 +1,148 @@
+<!doctype html>
+<!--
+  Blindseal mockups · S05 — Explorer (/explorer), the devnet reader.
+  Reads only: attestations consumed (total, last 24 h, per day over 7 / 30 / 90
+  days), distinct policy roots (the roots themselves, as hashes) and consumer
+  programs (public program ids), the cluster and the last-updated slot.
+  No content, ever. If a metric could identify an agent, it is not shown:
+  no per-attestation rows, no nullifiers, no transaction signatures, no time
+  finer than a UTC day, no operator, no agent, no decision.
+  Data: BS.data.explorerLoad() (≈ 700 ms, the fixture in the final shape).
+  QA: ?now=1792684800000 · ?motion=reduce | slow | full ·
+      ?state=loading (skeleton sweeps, odometers at 0, never resolves) ·
+      ?state=offline (inline "Devnet RPC unavailable" + Retry, re-runs the load) ·
+      ?state=empty ("No attestations consumed yet" in place of chart and lists).
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explorer · Blindseal</title>
+<meta name="description" content="Attestations consumed on devnet. Counts and hashes only: no content, no agents, no operators.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../_shared/tokens.css">
+<link rel="stylesheet" href="../_shared/fonts.css">
+<link rel="stylesheet" href="../_shared/glass.css">
+<link rel="stylesheet" href="../_shared/motion.css">
+<link rel="stylesheet" href="../_shared/space.css">
+<link rel="stylesheet" href="../_shared/ui.css">
+<link rel="stylesheet" href="../_shared/site.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main id="main-content">
+
+  <!-- ══ masthead: the S02 / S03 band (flat panel over the faint nebula, 300 high) ══ -->
+  <header class="ex-mast" aria-labelledby="ex-title">
+    <div class="ex-mast__space" aria-hidden="true"></div>
+    <div class="ex-mast__copy">
+      <p class="ex-mast__eyebrow">Explorer</p>
+      <h1 class="ex-mast__title" id="ex-title">Attestations on devnet.</h1>
+      <p class="ex-mast__lede">What the verifier program has consumed. No content, no agents, no operators.</p>
+    </div>
+    <div class="ex-mast__end">
+      <p class="ex-cluster" id="ex-cluster" data-state="loading" aria-live="polite">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="ex-cluster__net">devnet</span>
+        <span class="ex-cluster__sep" aria-hidden="true"></span>
+        <span class="ex-cluster__k">slot</span>
+        <span class="ex-cluster__slot" id="ex-slot"><span class="skeleton ex-sk-slot" aria-hidden="true"></span><span class="sr-only">reading</span></span>
+      </p>
+      <p class="ex-cluster__sub" id="ex-updated">Reading the verifier program…</p>
+    </div>
+  </header>
+
+  <div class="ex" id="ex" data-view="loading" aria-busy="true">
+
+    <!-- ══ the four totals ═══════════════════════════════════════════════ -->
+    <section class="ex-stats ex-enter" aria-label="Totals on devnet">
+      <div class="stat ex-stat ex-stat--lead">
+        <p class="stat__k">Attestations consumed</p>
+        <p class="stat__v ex-stat__v ex-stat__v--lg" data-odo="total">0</p>
+        <p class="stat__d" data-sub="total"><span>All time on devnet</span></p>
+      </div>
+      <div class="stat ex-stat">
+        <p class="stat__k">Last 24 h</p>
+        <p class="stat__v ex-stat__v" data-odo="day">0</p>
+        <p class="stat__d" data-sub="day"><span>Rolling window, UTC</span></p>
+      </div>
+      <div class="stat ex-stat">
+        <p class="stat__k">Distinct policy roots</p>
+        <p class="stat__v ex-stat__v" data-odo="roots">0</p>
+        <p class="stat__d" data-sub="roots"><span>Hashes only; the rules stay local</span></p>
+      </div>
+      <div class="stat ex-stat">
+        <p class="stat__k">Consumer programs</p>
+        <p class="stat__v ex-stat__v" data-odo="programs">0</p>
+        <p class="stat__d" data-sub="programs"><span>Programs that called the verifier</span></p>
+      </div>
+    </section>
+
+    <!-- ══ per day ═══════════════════════════════════════════════════════ -->
+    <section class="site-panel ex-chart ex-enter" id="ex-chart" aria-labelledby="ex-chart-title">
+      <div class="ex-chart__head">
+        <div class="ex-chart__lead">
+          <p class="site-panel__n">Per day · UTC</p>
+          <h2 class="site-panel__title" id="ex-chart-title">Consumed per day</h2>
+          <p class="ex-chart__sum"><span class="ex-chart__sum-v" id="ex-sum">0</span> <span id="ex-sum-label">in the last 30 days</span></p>
+        </div>
+        <div class="seg ex-range" id="ex-range" aria-label="Range">
+          <button type="button" class="seg__item" data-value="7">7 d</button>
+          <button type="button" class="seg__item is-active" data-value="30">30 d</button>
+          <button type="button" class="seg__item" data-value="90">90 d</button>
+        </div>
+      </div>
+      <div class="ex-plot" id="ex-plot">
+        <div class="ex-plot__sk" aria-hidden="true"></div>
+        <div class="ex-plot__svg" id="ex-plot-svg" tabindex="0" role="group" aria-roledescription="bar chart"
+             aria-label="Attestations consumed per day. Arrow keys read each day." aria-describedby="ex-plot-help"></div>
+        <div class="ex-tip" id="ex-tip" aria-hidden="true"><span class="ex-tip__d"></span><span class="ex-tip__sep">·</span><span class="ex-tip__v"></span><span class="ex-tip__note"></span></div>
+        <p class="sr-only" id="ex-plot-help">Left and right arrows move one day; Home and End jump to the first and last day.</p>
+        <p class="sr-only" id="ex-plot-live" aria-live="polite"></p>
+        <table class="sr-only" id="ex-table"><caption></caption><thead><tr><th scope="col">Day (UTC)</th><th scope="col">Consumed</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <!-- ══ offline / empty: one block in place of the chart and the lists ══ -->
+    <section class="ex-alt" id="ex-alt" hidden aria-live="polite"></section>
+
+    <!-- ══ the two lists ═════════════════════════════════════════════════ -->
+    <div class="ex-lists site-grid-2 reveal cascade" id="ex-lists">
+      <section class="site-panel ex-list" id="ex-roots" aria-labelledby="ex-roots-title">
+        <div class="ex-list__head">
+          <p class="site-panel__n">Policy roots</p>
+          <h2 class="site-panel__title" id="ex-roots-title">Committed policies in use</h2>
+          <p class="ex-list__lede">A root is a Merkle hash of a policy. The rules behind it never leave the operator's machine.</p>
+        </div>
+        <div class="ex-cols" aria-hidden="true"><span>#</span><span>Root</span><span class="ex-cols__num">Consumed</span><span class="ex-cols__num">Share</span></div>
+        <ol class="ex-rows" id="ex-roots-rows" aria-label="Policy roots by attestations consumed"></ol>
+        <p class="ex-list__foot" id="ex-roots-foot"></p>
+      </section>
+      <section class="site-panel ex-list" id="ex-programs" aria-labelledby="ex-programs-title">
+        <div class="ex-list__head">
+          <p class="site-panel__n">Consumer programs</p>
+          <h2 class="site-panel__title" id="ex-programs-title">Programs that called the verifier</h2>
+          <p class="ex-list__lede">Program ids are public on chain. A name shows only where the program publishes one.</p>
+        </div>
+        <div class="ex-cols" aria-hidden="true"><span>#</span><span>Program id</span><span class="ex-cols__num">Consumed</span><span class="ex-cols__num">Share</span></div>
+        <ol class="ex-rows" id="ex-programs-rows" aria-label="Consumer programs by attestations consumed"></ol>
+        <p class="ex-list__foot" id="ex-programs-foot"></p>
+      </section>
+    </div>
+
+    <p class="ex-foot">Nothing here can identify an agent or an operator. Policy roots are hashes; program ids are public.</p>
+  </div>
+</main>
+<script src="../_shared/constants.js"></script>
+<script src="../_shared/fixtures.js"></script>
+<script src="../_shared/icons.js"></script>
+<script src="../_shared/motion.js"></script>
+<script src="../_shared/reveal.js"></script>
+<script src="../_shared/glass.js"></script>
+<script src="../_shared/ui.js"></script>
+<script src="../_shared/sheet.js"></script>
+<script src="../_shared/space.js"></script>
+<script src="../_shared/site.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

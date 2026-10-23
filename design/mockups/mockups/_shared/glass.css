@@ -1,0 +1,346 @@
+/* ============================================================================
+   _shared/glass.css — the liquid glass (Blindseal J00: the glass.css, VERBATIM)
+   ----------------------------------------------------------------------------
+   Source: (the kit)/_shared/glass.css (itself stylesheet verbatim),
+   DECISIONS Q5 / Q6. Recipe kept: 1px border · blur(5px) saturate(1.9)
+   brightness(1.05) + the SVG refraction filter (feTurbulence → blur →
+   displacement, injected by glass.js) · the six-layer inset shadow + one drop ·
+   three sheens (top, 115° streak at .7, screen-blended edges) · the
+   cursor-proximity rim (glass.js: opacity t²·0.5, t = 1 − d/120, 80px mask).
+
+   RE-TINT (the Blindseal kit, kept as-is for Blindseal; the only departures from the shell values):
+     label rest            #d4d4d8          → var(--muted)  (text-secondary,
+                                                the measured large secondary button)
+     label hover           #ffffff          → var(--ink)    (#f7f7f7)
+     glow rim              white .40        → var(--accent) (brief: rim on the accent)
+     focus ring            white            → var(--ring)   (= accent)
+     dropdown fill         rgba(11,11,14,.74) → rgba(6,5,16,.74) (bg-primary)
+     scrim                 rgba(0,0,0,.55)  (kept, brief)
+     primary button        white fill       → var(--accent) under the glass
+     radii                 18 (all controls) → 12 at 40px, 8 at 32px (the large-
+                                              button radius; pills stay full)
+     STRIP SHEENS (.glass-bar / .glass-head only; review round 1, measured):
+       the verbatim sheens are sized for a ~40px control. Stretched across a
+       1196×68 strip they summed to a lavender band (top 8px #312f42–#383649,
+       the 115° streak #29273c, mid-height #1b1a2f, against #060510 canvas and
+       #12111a panels; the top bar is flat). For strips only:
+         top sheen   .16 → .07 at 0, .02@34% → .01@40%, transparent at 60%
+         streak      opacity .7 → .2
+         edges       18%-wide band → a fixed 24px band at each end
+       Result over plain canvas at rest: ≈#121027 mid-height, ≈#1e1d32 at the
+       top edge, ≈#131127 at the ends; scrolled content still frosts through.
+       Controls, pills, menus, toasts keep the verbatim sheens.
+     strip shadow          the six-inset bar shadow → 3 layers on .glass-bar /
+                           .glass-head (top specular .14, one inner lift .08,
+                           the drop); .glass-bar--bottom drops the drop and
+                           lifts from its top edge instead
+   Kept verbatim: fill rgba(214,224,255,.05) (cool, sits in a cool-grey
+   family), hairline rgba(255,255,255,.12), every inset and sheen.
+
+      WHERE GLASS IS ALLOWED (Blindseal DECISIONS D06): the site's notch-nav
+   controls (and the nav itself in the nav:"glass" variant), the dashboard top
+   bar and status bar, controls (buttons, pills, segments), menus, toasts and
+   sheet headers. Cards, tables and panels are FLAT var(--panel) + the hairline.
+   Never put .glass on a card, a table or a panel.
+
+   This file, tokens.css and the star alphas in space.css are the only places
+   allowed to hold colour literals.
+
+   BACKDROP ROOT RULE: no ancestor of a glass element may carry opacity < 1,
+   filter, backdrop-filter, mask, clip-path, mix-blend-mode or will-change of
+   those, or the glass has nothing behind it to frost (it becomes a backdrop
+   root and the glass only sees its own subtree). Animate a glass element's
+   own opacity, or its siblings, never a wrapper's. Glass nested inside glass
+   frosts nothing: inside a glass surface use .glass-item, never .glass-btn.
+
+   Engines: only Chromium applies url() inside backdrop-filter; the -webkit-
+   line (Safari) carries blur/saturate/brightness only — exactly as the shell.
+   ========================================================================== */
+
+:root {
+  --tn-label: var(--muted);
+  --tn-label-hover: var(--ink);
+  --tn-item-hover-bg: rgba(255,255,255,.10);
+  --tn-glow-rim: var(--accent);
+  --tn-glass-bg: rgba(214,224,255,.05);
+  --tn-glass-bg-hover: rgba(255,255,255,.14);   /* the bar's .05 under an item's .10 wash */
+  --tn-glass-border: rgba(255,255,255,.12);
+  --tn-glass-shadow:
+    inset 0 1px .5px rgba(255,255,255,.65),       /* 1 top specular line */
+    inset 0 0 0 1px rgba(255,255,255,.08),        /* 2 inner hairline    */
+    inset 0 -8px 12px -8px rgba(255,255,255,.22), /* 3 bottom lift       */
+    inset 0 8px 12px -10px rgba(255,255,255,.35), /* 4 top lift          */
+    inset 4px 0 12px -8px rgba(255,255,255,.10),  /* 5 left edge         */
+    inset -4px 0 12px -8px rgba(255,255,255,.08), /* 6 right edge        */
+    0 12px 40px -8px rgba(0,0,0,.55);             /* 7 drop              */
+  /* the same six insets at control scale (a 40px button) */
+  --tn-glass-shadow-ctl:
+    inset 0 1px .5px rgba(255,255,255,.65),
+    inset 0 0 0 1px rgba(255,255,255,.08),
+    inset 0 -8px 12px -8px rgba(255,255,255,.22),
+    inset 0 8px 12px -10px rgba(255,255,255,.35),
+    inset 4px 0 12px -8px rgba(255,255,255,.10),
+    inset -4px 0 12px -8px rgba(255,255,255,.08),
+    0 8px 24px -10px rgba(0,0,0,.55);
+  /* at pill scale (24px): insets scaled to the height so the lifts never meet */
+  --tn-glass-shadow-pill:
+    inset 0 1px .5px rgba(255,255,255,.5),
+    inset 0 0 0 1px rgba(255,255,255,.06),
+    inset 0 -5px 8px -6px rgba(255,255,255,.18),
+    inset 0 5px 8px -7px rgba(255,255,255,.26),
+    inset 3px 0 8px -6px rgba(255,255,255,.08),
+    inset -3px 0 8px -6px rgba(255,255,255,.06),
+    0 4px 12px -6px rgba(0,0,0,.5);
+  /* the primary: accent under the glass — the specular stays, the lift darkens */
+  --tn-glass-shadow-primary:
+    inset 0 1px .5px rgba(255,255,255,.55),
+    inset 0 0 0 1px rgba(255,255,255,.10),
+    inset 0 -8px 12px -8px rgba(0,0,0,.28),
+    inset 0 8px 12px -10px rgba(255,255,255,.30),
+    0 8px 24px -10px rgba(0,0,0,.6);
+  --tn-sheen-top: linear-gradient(to bottom, rgba(255,255,255,.16) 0%, rgba(255,255,255,.02) 34%, transparent 60%);
+  --tn-sheen-streak: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.12) 46%, rgba(255,255,255,.02) 52%, transparent 60%);
+  --tn-sheen-edges: linear-gradient(90deg, rgba(255,255,255,.06) 0%, transparent 18%, transparent 82%, rgba(255,255,255,.06) 100%);
+  --tn-scrim: rgba(0,0,0,.55);
+  --tn-dd-glass-bg: rgba(6,5,16,.74);
+  --tn-sep: rgba(255,255,255,.10);
+  --tn-ease: var(--ease-in-out);
+
+  /* radii — INVENTED for this palette: the radius ladder at glass scale
+     (40px button = 12, the large-button radius; 32px = 8; pills = full) */
+  --glass-radius: 12px;
+  --glass-radius-sm: 8px;
+}
+
+/* ══ 1 · the surface (every glass family member) ═════════════════════════ */
+.glass, .glass-btn, .glass-pill, .glass-seg, .glass-bar, .glass-head, .glass-menu, .glass-toast, .glass-dock {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--tn-glass-border);
+  background-color: var(--tn-glass-bg);
+  -webkit-backdrop-filter: blur(5px) saturate(1.9) brightness(1.05);
+  backdrop-filter: blur(5px) saturate(1.9) brightness(1.05) url(#bs-lg-refract);
+  box-shadow: var(--tn-glass-shadow);
+}
+.glass { border-radius: var(--glass-radius); }
+
+/* the three sheens + the rim, injected by glass.js as the first children.
+   z-index:-1 inside the isolated element = above its own fill and shadow,
+   below its content. */
+.glass-sheen, .glass-glow { pointer-events: none; position: absolute; inset: 0; z-index: -1; border-radius: inherit; }
+.glass-sheen--top    { background: var(--tn-sheen-top); }
+.glass-sheen--streak { opacity: .7; background: var(--tn-sheen-streak); }
+.glass-sheen--edges  { mix-blend-mode: screen; background: var(--tn-sheen-edges); }
+/* the strips (top bar, status bar, sheet header): scaled sheens (header note) */
+.glass-bar > .glass-sheen--top, .glass-head > .glass-sheen--top { background: linear-gradient(to bottom, rgba(255,255,255,.07) 0%, rgba(255,255,255,.01) 40%, transparent 60%); }
+.glass-bar > .glass-sheen--streak, .glass-head > .glass-sheen--streak { opacity: .2; }
+.glass-bar > .glass-sheen--edges, .glass-head > .glass-sheen--edges { background: linear-gradient(90deg, rgba(255,255,255,.06) 0, transparent 24px, transparent calc(100% - 24px), rgba(255,255,255,.06) 100%); }
+/* the cursor-proximity rim: glass.js writes opacity + the mask; colour = accent */
+.glass-glow { opacity: 0; box-shadow: inset 0 0 0 1px var(--tn-glow-rim); transition: opacity .3s var(--tn-ease); }
+
+/* ══ 2 · .glass-btn ══════════════════════════════════════════════════════
+   40px tall, radius 12, 14/20 Bold (controls are 700). REST: muted label,
+   icon .55. HOVER (fine pointers): the held wash + ink label + icon 1.
+   CURRENT (aria-pressed / -current / -expanded): hover, held. PRESS: scale
+   .98. FOCUS: 2px accent ring, offset 2. DISABLED: .45, no pointer. */
+.glass-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; padding: 0 16px;
+  border-radius: var(--glass-radius);
+  -webkit-backdrop-filter: blur(5px) saturate(1.9) brightness(1.05);
+  backdrop-filter: blur(5px) saturate(1.9) brightness(1.05) url(#bs-lg-refract-sm);
+  box-shadow: var(--tn-glass-shadow-ctl);
+  color: var(--tn-label);
+  font: var(--fw-bold) var(--fs-14)/20px var(--font-sans);
+  white-space: nowrap; text-decoration: none; cursor: pointer; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--d-150) var(--tn-ease), background-color var(--d-200) var(--tn-ease), box-shadow var(--d-200) var(--tn-ease), transform var(--d-160) var(--ease-out-quint);
+}
+.glass-btn svg { width: 16px; height: 16px; flex: none; opacity: .55; transition: opacity var(--d-200) var(--tn-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .glass-btn:hover { color: var(--tn-label-hover); background-color: var(--tn-glass-bg-hover); }
+  .glass-btn:hover svg { opacity: 1; }
+}
+.glass-btn.is-hover { color: var(--tn-label-hover); background-color: var(--tn-glass-bg-hover); }
+.glass-btn.is-hover svg { opacity: 1; }
+.glass-btn[aria-pressed="true"], .glass-btn[aria-current="page"], .glass-btn[aria-expanded="true"] { color: var(--tn-label-hover); background-color: var(--tn-glass-bg-hover); }
+.glass-btn[aria-pressed="true"] svg, .glass-btn[aria-current="page"] svg, .glass-btn[aria-expanded="true"] svg { opacity: 1; }
+.glass-btn:active, .glass-btn.is-active { transform: scale(.98); }
+.glass-btn:focus-visible, .glass-btn.is-focus { outline: 2px solid var(--ring); outline-offset: 2px; }
+.glass-btn:disabled, .glass-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+
+/* PRIMARY — the accent under the glass. Opaque, so no backdrop is sampled;
+   the sheens and the specular keep it in the glass family. */
+.glass-btn.primary {
+  background-color: var(--action);
+  border-color: rgba(255,255,255,.16);
+  color: var(--action-ink);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: var(--tn-glass-shadow-primary);
+}
+.glass-btn.primary svg { opacity: 1; }
+/* hover never lightens the fill (D33–D36): the rest fill stays, a brighter
+   specular hairline marks it (white text stays ≥ 4.5:1) */
+@media (hover: hover) and (pointer: fine) { .glass-btn.primary:hover { color: var(--action-ink); background-color: var(--action); box-shadow: inset 0 0 0 1px rgba(255,255,255,.32), var(--tn-glass-shadow-primary); } }
+.glass-btn.primary.is-hover, .glass-btn.primary[aria-pressed="true"] { color: var(--action-ink); background-color: var(--action); box-shadow: inset 0 0 0 1px rgba(255,255,255,.32), var(--tn-glass-shadow-primary); }
+
+/* sizes */
+.glass-btn.sm { min-height: 32px; padding: 0 12px; gap: 6px; border-radius: var(--glass-radius-sm); font-size: var(--fs-12); line-height: 16px; }
+.glass-btn.sm svg { width: 14px; height: 14px; }
+.glass-btn.lg { min-height: 44px; padding: 0 20px; font-size: var(--fs-16); line-height: 24px; }
+.glass-btn.icon { padding: 0; width: 40px; }
+.glass-btn.icon.sm { width: 32px; }
+.glass-btn.icon svg { width: 18px; height: 18px; }
+.glass-btn.icon.sm svg { width: 16px; height: 16px; }
+.glass-btn.block { display: flex; width: 100%; }
+
+/* busy: the label stays, a 45% sweep runs under it */
+.glass-btn[aria-busy="true"] { pointer-events: none; overflow: hidden; }
+.glass-btn[aria-busy="true"]::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 45%;
+  background: currentColor; opacity: .55; border-radius: 2px;
+  animation: loading-sweep var(--d-1100) var(--ease-in-out) infinite;
+}
+/* the arrow that nudges 2px on hover (the kit #30) */
+.glass-btn .nudge { transition: transform var(--d-150) var(--tn-ease); }
+@media (hover: hover) and (pointer: fine) { .glass-btn:hover .nudge { transform: translateX(2px); } }
+
+/* ══ 2b · .glass-item — a control INSIDE a glass surface ═════════════════
+   Transparent, radius 8, hover wash .10, icon .55 → 1. glass.js gives it the
+   rim but no sheens. Used in the top bar, status bar, sheet header, toasts. */
+.glass-item {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 36px; padding: 0 12px; border-radius: var(--r-row);
+  color: var(--tn-label); background: transparent; border: 0;
+  font: var(--fw-bold) var(--fs-12)/16px var(--font-sans);
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--d-200) var(--tn-ease), color var(--d-150) var(--tn-ease), transform var(--d-160) var(--ease-out-quint);
+}
+.glass-item svg { width: 16px; height: 16px; flex: none; opacity: .55; transition: opacity var(--d-200) var(--tn-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .glass-item:hover { background-color: var(--tn-item-hover-bg); color: var(--tn-label-hover); }
+  .glass-item:hover svg { opacity: 1; }
+}
+.glass-item[aria-current="page"], .glass-item[aria-pressed="true"], .glass-item[aria-expanded="true"] { background-color: var(--tn-item-hover-bg); color: var(--tn-label-hover); }
+.glass-item[aria-expanded="true"] svg { opacity: 1; }
+.glass-item:active { transform: scale(.98); }
+.glass-item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.glass-item:disabled { opacity: .45; cursor: not-allowed; }
+.glass-item.icon { width: 36px; padding: 0; }
+.glass-item.icon svg { width: 18px; height: 18px; }
+.glass-item.sm { min-height: 28px; padding: 0 8px; gap: 6px; }
+.glass-item.sm svg { width: 14px; height: 14px; }
+.glass-item.sm.icon { width: 28px; padding: 0; }
+
+/* ══ 3 · .glass-pill — filters, live badges, overlay pills on card art ═══ */
+.glass-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 10px;
+  border-radius: var(--r-full);
+  -webkit-backdrop-filter: blur(5px) saturate(1.9) brightness(1.05);
+  backdrop-filter: blur(5px) saturate(1.9) brightness(1.05) url(#bs-lg-refract-sm);
+  box-shadow: var(--tn-glass-shadow-pill);
+  color: var(--ink);
+  font: var(--fw-bold) var(--fs-12)/1 var(--font-sans);
+  white-space: nowrap;
+  transition: color var(--d-150) var(--tn-ease), background-color var(--d-200) var(--tn-ease), transform var(--d-160) var(--ease-out-quint);
+}
+.glass-pill svg { width: 13px; height: 13px; flex: none; }
+.glass-pill.lg { height: 28px; padding: 0 12px; }
+button.glass-pill, a.glass-pill { cursor: pointer; color: var(--tn-label); }
+@media (hover: hover) and (pointer: fine) { button.glass-pill:hover, a.glass-pill:hover { color: var(--tn-label-hover); background-color: var(--tn-glass-bg-hover); } }
+.glass-pill[aria-pressed="true"] { color: var(--tn-label-hover); background-color: var(--tn-glass-bg-hover); }
+button.glass-pill:active, a.glass-pill:active { transform: scale(.98); }
+.glass-pill:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ══ 4 · .glass-seg — a segmented control on glass (sort pills, timeframes)
+   The container is glass; items are transparent; the active item sits under
+   a sliding wash (.glass-seg__pill, BS.ui.seg: translate + scaleX, 240ms
+   out-quint, never on first paint). */
+.glass-seg {
+  display: inline-flex; align-items: center; gap: 2px; padding: 3px; justify-self: start;
+  border-radius: var(--glass-radius);
+  -webkit-backdrop-filter: blur(5px) saturate(1.9) brightness(1.05);
+  backdrop-filter: blur(5px) saturate(1.9) brightness(1.05) url(#bs-lg-refract-sm);
+  box-shadow: var(--tn-glass-shadow-ctl);
+}
+.glass-seg__pill {
+  position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 0; transform-origin: 0 0;
+  border-radius: var(--glass-radius-sm); background: var(--tn-item-hover-bg);
+  box-shadow: inset 0 1px .5px rgba(255,255,255,.25);
+  opacity: 0; pointer-events: none;
+}
+.glass-seg.has-pill .glass-seg__pill { opacity: 1; }
+.glass-seg.is-animated .glass-seg__pill { transition: transform var(--d-240) var(--ease-out-quint); }
+.glass-seg.is-nofx .glass-seg__pill { transition: none !important; }
+.glass-seg__item {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 28px; padding: 0 12px; border-radius: var(--glass-radius-sm);
+  color: var(--tn-label); font: var(--fw-bold) var(--fs-12)/16px var(--font-sans); white-space: nowrap; cursor: pointer;
+  transition: color var(--d-150) var(--tn-ease), background-color var(--d-150) var(--tn-ease), transform var(--d-160) var(--ease-out-quint);
+}
+@media (hover: hover) and (pointer: fine) { .glass-seg__item:hover { color: var(--tn-label-hover); } }
+.glass-seg__item.is-active { color: var(--tn-label-hover); background: var(--tn-item-hover-bg); }
+.glass-seg.has-pill .glass-seg__item.is-active { background: transparent; }
+.glass-seg__item:active { transform: scale(.98); }
+.glass-seg__item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.glass-seg__item:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ══ 5 · .glass-bar (top bar, status bar) · .glass-head (sheet header) ════
+   Edge-to-edge strips: no radius, one hairline on the open side, the full
+   refraction (displacement 34) because content scrolls underneath. */
+.glass-bar, .glass-head { border-radius: 0; }
+.glass-bar  { border-width: 0; }
+.glass-bar--top    { border-bottom-width: 1px; }
+.glass-bar--bottom { border-top-width: 1px; }
+.glass-bar, .glass-head { box-shadow:
+    inset 0 1px .5px rgba(255,255,255,.14),
+    inset 0 -8px 12px -8px rgba(255,255,255,.08),
+    0 12px 40px -8px rgba(0,0,0,.55); }
+.glass-bar--bottom { box-shadow: inset 0 1px .5px rgba(255,255,255,.14), inset 0 8px 12px -10px rgba(255,255,255,.10); }
+.glass-head { border-width: 0 0 1px 0; }
+
+/* ══ 6 · .glass-menu / .glass-toast — the denser dropdown glass ══════════ */
+.glass-menu, .glass-toast {
+  background-color: var(--tn-dd-glass-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6) brightness(1.05);
+  backdrop-filter: blur(14px) saturate(1.6) brightness(1.05) url(#bs-lg-refract);
+}
+.glass-menu  { border-radius: var(--r-panel); }
+.glass-toast { border-radius: var(--r-panel); }
+
+/* ══ 7 · .glass-dock — the chat dock pill (messages, DECISIONS Q12) ══════ */
+.glass-dock {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 44px; padding: 0 8px 0 14px; border-radius: var(--r-full);
+  color: var(--ink); font: var(--fw-bold) var(--fs-14)/20px var(--font-sans); cursor: pointer;
+  -webkit-backdrop-filter: blur(14px) saturate(1.6) brightness(1.05);
+  backdrop-filter: blur(14px) saturate(1.6) brightness(1.05) url(#bs-lg-refract-sm);
+  background-color: var(--tn-dd-glass-bg);
+  transition: background-color var(--d-200) var(--tn-ease), transform var(--d-160) var(--ease-out-quint);
+}
+.glass-dock svg { width: 18px; height: 18px; flex: none; }
+@media (hover: hover) and (pointer: fine) { .glass-dock:hover { background-color: var(--tn-glass-bg-hover); } }
+.glass-dock:active { transform: scale(.98); }
+.glass-dock:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ══ 8 · fallbacks ═══════════════════════════════════════════════════════ */
+@media (prefers-reduced-transparency: reduce) {
+  :is(.glass, .glass-btn:not(.primary), .glass-pill, .glass-seg, .glass-bar, .glass-head, .glass-menu, .glass-toast, .glass-dock) {
+    background-color: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+html[data-transparency="reduce"] :is(.glass, .glass-btn:not(.primary), .glass-pill, .glass-seg, .glass-bar, .glass-head, .glass-menu, .glass-toast, .glass-dock) {
+  background-color: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :is(.glass, .glass-btn:not(.primary), .glass-pill, .glass-seg, .glass-bar, .glass-head, .glass-menu, .glass-toast, .glass-dock) { background-color: var(--panel); }
+}
+/* reduced motion: no transitions, no press scale (motion.css layer 1 covers the rest) */
+html[data-motion="reduce"] :is(.glass-btn, .glass-item, .glass-pill, .glass-seg__item, .glass-dock, .glass-glow, .glass-seg__pill) { transition: none !important; }
+html[data-motion="reduce"] :is(.glass-btn, .glass-item, button.glass-pill, .glass-seg__item, .glass-dock):active { transform: none; }
+html[data-motion="reduce"] .glass-btn[aria-busy="true"]::after { animation: none !important; transform: translateX(60%); }
+
+/* the hidden SVG that carries the refraction filters */
+.bs-glass-defs { position: absolute; width: 0; height: 0; overflow: hidden; }

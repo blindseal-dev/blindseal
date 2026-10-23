@@ -1,0 +1,172 @@
+<!doctype html>
+<!--
+  Blindseal mockups — the gallery. Written by J00, refreshed by the Q01 sweep.
+  One card per job: the link, the one-line scope, the board status, and a "How to review"
+  line with every ?state= variant the page answers to plus the two motion switches.
+  Statuses: an embedded snapshot of board/jobs.json (the board on :4830 sends no CORS
+  header, so it is linked, never fetched). Every link freezes the fixture clock at
+  ?now=1792684800000 (D30). No colour literal here: every value is a kit token.
+-->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blindseal mockups</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="_shared/tokens.css">
+<link rel="stylesheet" href="_shared/fonts.css">
+<link rel="stylesheet" href="_shared/glass.css">
+<link rel="stylesheet" href="_shared/motion.css">
+<link rel="stylesheet" href="_shared/space.css">
+<link rel="stylesheet" href="_shared/ui.css">
+<style>
+  body { overflow-y: auto; }
+  .gx-top { position: relative; isolation: isolate; overflow: hidden; border-bottom: var(--hairline); }
+  .gx-top__space { position: absolute; inset: 0; z-index: 0; }
+  .gx-head { position: relative; z-index: 1; max-width: var(--site-max-w); margin: 0 auto; padding: 56px 32px 40px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  .gx-head > div:first-child { display: grid; gap: 12px; }
+  .gx-brand { display: inline-flex; align-items: center; gap: 10px; font: var(--fw-strong) var(--fs-16)/1 var(--font-sans); letter-spacing: -0.02em; color: var(--ink); }
+  .gx-title { font: var(--fw-medium) var(--fs-38)/1.1 var(--font-sans); letter-spacing: -0.035em; color: var(--ink); }
+  .gx-head .lead { max-width: 76ch; }
+  .gx-mono { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--ink); white-space: nowrap; }
+  .gx-head__end { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .gx { max-width: var(--site-max-w); margin: 0 auto; padding: 32px 32px 80px; display: grid; gap: 40px; }
+  .gx-sec { display: grid; gap: 14px; }
+  .gx-sec__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .gx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+
+  /* a card is a flat panel: the main link on top, the review links under a hairline */
+  .gx-card { display: grid; grid-template-rows: 1fr auto; border: var(--hairline); border-radius: var(--r-panel); background: var(--panel);
+    transition: border-color var(--d-150) var(--ease-in-out); }
+  .gx-card__main { display: grid; gap: 8px; align-content: start; padding: 14px 16px 12px; border-radius: var(--r-panel) var(--r-panel) 0 0; color: inherit;
+    transition: transform var(--d-160) var(--ease-out-quint); }
+  @media (hover: hover) and (pointer: fine) {
+    .gx-card:has(.gx-card__main:hover) { border-color: var(--line-strong); }
+    .gx-card__main:hover .gx-go { color: var(--ink); transform: translateX(2px); }
+    .gx-how a:hover { color: var(--ink); }
+  }
+  .gx-card__main:active { transform: scale(.99); }
+  .gx-how a:active { opacity: .8; }
+  .gx-card__main:focus-visible, .gx-how a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .gx-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .gx-id { font: var(--fw-body) var(--fs-12)/16px var(--font-mono); color: var(--muted); }
+  .gx-t { font: var(--fw-medium) var(--t-body) var(--font-sans); color: var(--ink); }
+  .gx-d { font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
+  .gx-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .gx-go { display: inline-flex; color: var(--muted); transition: color var(--d-150) var(--ease-in-out), transform var(--d-150) var(--ease-in-out); }
+  .gx-go svg { width: 16px; height: 16px; }
+  .gx-src { font: var(--fw-body) var(--t-sub) var(--font-mono); color: var(--muted); }
+
+  .gx-how { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 16px 12px; border-top: var(--hairline);
+    font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
+  .gx-how__k { width: 100%; font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .gx-how__g { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .gx-how a { font: var(--fw-body) var(--fs-12)/16px var(--font-mono); color: var(--accent-hover); border-radius: 3px;
+    transition: color var(--d-150) var(--ease-in-out); }
+  .gx-how__note { width: 100%; color: var(--muted); }
+
+  /* the board statuses on the kit's chips */
+  .gx-st { font-family: var(--font-mono); letter-spacing: .04em; }
+  .gx-st[data-s="queued"] { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+  .gx-st[data-s="checked-out"], .gx-st[data-s="in-progress"] { color: var(--accent-hover); background: var(--accent-tint); }
+  .gx-st[data-s="review"] { color: var(--verdict-flag); background: var(--verdict-flag-bg); }
+  .gx-st[data-s="blocked"], .gx-st[data-s="done"] { color: var(--ink); background: var(--surface-hover); }
+  html[data-motion="reduce"] .gx-go, html[data-motion="reduce"] .gx-card, html[data-motion="reduce"] .gx-card__main, html[data-motion="reduce"] .gx-how a { transition: none; }
+</style>
+</head>
+<body>
+<header class="gx-top">
+  <div class="gx-top__space" id="gx-space"></div>
+  <div class="gx-head">
+    <div>
+      <span class="gx-brand" id="gx-brand">Blindseal</span>
+      <h1 class="gx-title">Blindseal mockups</h1>
+      <p class="lead">Static pages at 1440 × 900, dark only, self-hosted fonts, fixture data, working house motion. Every page has passed the red / green review. Review each at 1440 wide; every link below freezes the clock at <span class="gx-mono">?now=1792684800000</span>. Add <span class="gx-mono">?motion=reduce</span> for end states only, <span class="gx-mono">?motion=slow</span> for quarter-speed timings. Live status: the board at <a class="link" href="(the internal job board)">localhost:4830</a>.</p>
+    </div>
+    <div class="gx-head__end">
+      <a class="btn secondary" href="_shared/kitchen-sink.html?now=1792684800000"><i data-lucide="layers"></i>Dashboard sink</a>
+      <a class="btn secondary" href="_shared/kitchen-sink-site.html?now=1792684800000"><i data-lucide="box"></i>Site sink</a>
+    </div>
+  </div>
+</header>
+<main class="gx" id="main-content">
+  <section class="gx-sec"><div class="gx-sec__head"><h2 class="title-2">Foundation</h2><span class="gx-src" id="gx-src"></span></div><div class="gx-grid" data-group="F"></div></section>
+  <section class="gx-sec"><div class="gx-sec__head"><h2 class="title-2">Marketing site</h2><span class="sub">S01–S06 · BS.mountSite</span></div><div class="gx-grid" data-group="S"></div></section>
+  <section class="gx-sec"><div class="gx-sec__head"><h2 class="title-2">Local dashboard</h2><span class="sub">D01–D06 · BS.mountShell</span></div><div class="gx-grid" data-group="D"></div></section>
+</main>
+<script src="_shared/constants.js"></script>
+<script src="_shared/icons.js"></script>
+<script src="_shared/motion.js"></script>
+<script src="_shared/reveal.js"></script>
+<script src="_shared/glass.js"></script>
+<script src="_shared/ui.js"></script>
+<script src="_shared/space.js"></script>
+<script>
+(function () {
+  "use strict";
+  var BS = window.BS, esc = BS.ui.esc;
+  var NOW = "now=1792684800000";
+  /* [group, id, title, one-line scope, page, review { states: [query…], extra: [[label, href]…], note }] */
+  var JOBS = [
+    ["F", "J00", "Foundation kit", "Tokens, fonts, glass, house motion, the nebula, site chrome, dashboard shell, UI primitives, MASTER.md", "_shared/kitchen-sink.html",
+      { extra: [["site sink", "_shared/kitchen-sink-site.html?" + NOW]], note: "Every primitive in its five states, both chromes live." }],
+    ["F", "J0F", "Fixtures", "window.BS.data in the brief's §5 shapes: decisions, policy + Merkle root, hash chain, attestations, mock verifier, ?state= switches", "_shared/fixtures-test.html",
+      { note: "Self-test page; the ?state= switches are exercised on the pages below." }],
+    ["F", "J0D", "Diagrams", "house draw-in figures: the four-step flow, architecture, attestation lifecycle, audit chain, layer stack", "_shared/diagrams.html",
+      { note: "Replay on each figure; slow-mo shows the stroke order." }],
+    ["S", "S01", "Home", "\"Protecting agentic finance one pwn at a time.\" over the CRT warp field (WebGL2; reduce = still frame); the problem, how it works, hidden vs public, the honest-scope callout, install, CTA", "S01/index.html", {}],
+    ["S", "S02", "How it works", "The long form: architecture, the four layers, redaction, attestation lifecycle, audit chain, TOC with scroll-spy", "S02/index.html",
+      { states: ["state=chain-broken"] }],
+    ["S", "S03", "Verify", "Drop or paste attestation.json; the checklist fills in; \"What this does not reveal\"", "S03/index.html",
+      { states: ["state=offline"], note: "Load sample, Load tampered, then Check on devnet." }],
+    ["S", "S04", "Docs", "Whitepaper layout, section tree, the local API reference from §5", "S04/index.html",
+      { states: ["page=api", "page=attestations", "page=point-an-agent"] }],
+    ["S", "S05", "Explorer", "Attestations consumed, distinct policy roots, consumer programs; devnet, no per-agent view", "S05/index.html",
+      { states: ["state=loading", "state=offline", "state=empty"] }],
+    ["S", "S06", "Changelog", "Dated release notes: Added / Changed / Fixed, an anchor per version", "S06/index.html",
+      { extra: [["#v0.3.2", "S06/index.html?" + NOW + "#v0.3.2"]] }],
+    ["D", "D01", "Decisions", "Live stream + table, filters, the onboarding empty state, the unauthorized screen", "D01/index.html",
+      { states: ["state=empty", "state=unauthorized", "state=offline", "state=reconnecting"] }],
+    ["D", "D02", "Decision detail", "Layer-by-layer breakdown, redaction summary, hashes, request attestation, reveal payload", "D02/index.html",
+      { states: ["state=no-action", "state=not-found", "state=prover-down"] }],
+    ["D", "D03", "Audit", "Chain head, verify, range, entries, export disclosure", "D03/index.html",
+      { states: ["state=chain-broken", "state=empty", "state=offline"] }],
+    ["D", "D04", "Policy", "Rules, enable / edit, the live Merkle root, dry run", "D04/index.html",
+      { states: ["state=offline", "example=block"] }],
+    ["D", "D05", "Attestations", "List with status, the detail sheet, submit / export", "D05/index.html",
+      { states: ["state=empty"] }],
+    ["D", "D06", "Settings", "Upstreams, L3 mode, prover status, token rotate, about", "D06/index.html",
+      { states: ["state=tee", "state=prover-down", "state=upstream-down"] }]
+  ];
+  /* board/jobs.json (updated 2026-10-23T02:18:05Z), snapshot taken at the end of the Q01 re-sweep */
+  var SNAPSHOT = {"at":"2026-10-23 02:18 UTC","statuses":{"J00":"done","J0F":"done","J0D":"done","S01":"done","S02":"done","S03":"done","S04":"done","S05":"done","S06":"done","D01":"done","D02":"done","D03":"done","D04":"done","D05":"done","D06":"done"}};
+
+  function url(page, q) { return page + "?" + (q ? q + "&" : "") + NOW; }
+  function chip(s) { return '<span class="chip gx-st" data-s="' + esc(s) + '">' + esc(s) + "</span>"; }
+  function link(label, href) { return '<a href="' + esc(href) + '">' + esc(label) + "</a>"; }
+  function how(j) {
+    var r = j[5] || {}, page = j[4], g = [];
+    var main = [link("1440 wide", url(page))];
+    (r.states || []).forEach(function (q) { main.push(link("?" + q, url(page, q))); });
+    (r.extra || []).forEach(function (e) { main.push(link(e[0], e[1])); });
+    main.push(link("?motion=reduce", url(page, "motion=reduce")), link("?motion=slow", url(page, "motion=slow")));
+    g.push('<span class="gx-how__g">' + main.join("") + "</span>");
+    if (r.note) g.push('<span class="gx-how__note">' + esc(r.note) + "</span>");
+    return '<p class="gx-how"><span class="gx-how__k">How to review</span>' + g.join("") + "</p>";
+  }
+  function render(statuses, src) {
+    JOBS.forEach(function (j) {
+      var box = document.querySelector('[data-group="' + j[0] + '"]');
+      var main = '<a class="gx-card__main" href="' + esc(url(j[4])) + '"><span class="gx-card__top"><span class="gx-id">' + j[1] + "</span>" + chip(statuses[j[1]] || "queued") + "</span>" +
+        '<span class="gx-t">' + esc(j[2]) + '</span><span class="gx-d">' + esc(j[3]) + '</span><span class="gx-foot"><span class="gx-src">' + esc(j[4]) + '</span><span class="gx-go">' + BS.icon("arrow-right") + "</span></span></a>";
+      box.insertAdjacentHTML("beforeend", '<article class="gx-card" data-job="' + j[1] + '">' + main + how(j) + "</article>");
+    });
+    document.getElementById("gx-src").textContent = src;
+  }
+  render(SNAPSHOT.statuses, "status: board snapshot · " + SNAPSHOT.at);
+  document.getElementById("gx-brand").insertAdjacentHTML("afterbegin", BS.mark("A", 20));
+  BS.mountSpace(document.getElementById("gx-space"), { intensity: "faint" });
+})();
+</script>
+</body>
+</html>

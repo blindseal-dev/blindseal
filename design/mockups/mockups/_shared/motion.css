@@ -1,0 +1,237 @@
+/* ============================================================================
+   _shared/motion.css — THE HOUSE MOTION SYSTEM (the only motion source)
+   Blindseal J00: the motion.css, VERBATIM, re-namespaced
+   (pf-js → bs-js, .pf-rise → .bs-rise). Nothing added to the vocabulary.
+   ----------------------------------------------------------------------------
+   No framer-motion, GSAP, anime.js, react-spring or any other animation
+   library, ever. This file + motion.js + the §14 tokens in tokens.css ARE the
+   library. Sources: (reference study)/motion.css (§1-§3 keyframes, verbatim),
+   (reference study)/reference-motion.md §1, (the kit)/_shared/motion.css, and
+   three adopted keyframes.
+
+   The grammar (interaction thesis):
+     in-out    .4,0,.2,1      state changes (hover, colour, crossfade) 150–200ms
+     out-cubic .215,.61,.355,1 entrances: every rise / settle, 350–550ms
+     out-expo  .16,1,.3,1     arrivals: odometer digit in, new row
+     out-quint .22,1,.36,1    mechanical travel: nav pill, sheet, digit roll
+     in-quick  .4,0,1,1       exits only
+   Rise ladder 8 / 10 / 14 / 16px (never more), stagger +60ms, draw-ins
+   600–900ms. Hover is a colour or hairline change, never a scale. Scroll
+   reveals fire once. Ambient motion = live dots, the hero shimmer and the
+   trending marquee, all paused off screen. No bounce, spring or parallax, no
+   layout-property animation. One overshoot moment, reserved for an order fill
+   (mark-issued / result-mark-in); tick-in's −4% is the odometer's own.
+
+   §1 house keyframes · §2 shared page keyframes · §3 additions ·
+   §4 motion trio · §5 utilities · §6 odometers · §7 slow-mo · §8 reduced
+   ========================================================================== */
+
+/* ── §1 · the kit verbatim ─────────────────────────────────────────────── */
+@keyframes rise-8 { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes rise-10 { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rise-14 { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes rise-16 { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes settle-1035 { from { opacity: 0; transform: scale(1.035); } to { opacity: 1; transform: none; } }
+@keyframes settle-104 { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+@keyframes settle-1045 { from { opacity: 0; transform: scale(1.045); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes breathe-40 { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes breathe-55 { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes breathe-35 { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-0.25rem); } to { opacity: 1; transform: none; } }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(0.5rem) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes loading-sweep { from { transform: translateX(-120%); } to { transform: translateX(340%); } }
+/* odometer cells */
+@keyframes tick-in {
+  0% { transform: translateY(100%); opacity: 0; }
+  70% { transform: translateY(-4%); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes tick-out {
+  from { transform: none; opacity: 1; }
+  to { transform: translateY(-100%); opacity: 0; }
+}
+@keyframes digit-roll-down { from { transform: translateY(-1em); } to { transform: translateY(0); } }
+
+/* ── §2 · the kit page keyframes, shared names ────────────────────────── */
+/* the ONLY overshoot in the product: reserved for an order fill */
+@keyframes mark-issued {
+  0% { transform: scale(0.45); background: var(--surface-raised); }
+  62% { transform: scale(1.16); }
+  100% { transform: none; background: var(--accent); }
+}
+@keyframes mark-yours-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  55% { transform: scale(1.8); }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes mark-yours-ring {
+  0%, 100% { box-shadow: 0 0 0 3px var(--accent-tint); }
+  50% { box-shadow: 0 0 0 6px var(--accent-tint); }
+}
+@keyframes result-mark-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  60% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes result-dialog-in { from { opacity: 0; transform: translateY(1.25rem) scale(0.96); } to { opacity: 1; transform: none; } }
+/* a new ledger row drops in from above */
+@keyframes row-in { from { opacity: 0; transform: translateY(-0.4rem); } to { opacity: 1; transform: none; } }
+/* the now-dot ring (animates the SVG r attribute) */
+@keyframes auc-ring { from { r: 3.5; opacity: 0.35; } to { r: 9; opacity: 0; } }
+/* disclosure / dropdown children */
+@keyframes details-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* ── §3 · additions (each derived from a the kit idiom) ───────────────── */
+/* row highlight after a data change, on the accent's 16% */
+@keyframes row-flash { from { background-color: var(--accent-tint); } to { background-color: transparent; } }
+/* a crossed milestone tick lights once */
+@keyframes tick-light { 0% { box-shadow: 0 0 0 0 var(--accent); } 100% { box-shadow: 0 0 0 6px transparent; } }
+/* a minor marker flashes once */
+@keyframes marker-flash { 0%, 100% { opacity: 1; } 40% { opacity: 0.25; } }
+/* toast / panel exit — shorter than the entrance, accelerates away */
+@keyframes fade-out-down { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(4px); } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+/* rail flyout — rise-8 turned sideways */
+@keyframes slide-in-8 { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+/* a group's sub-items drop in on the menus' 150ms */
+@keyframes menu-sub-in { from { opacity: 0; transform: translateY(calc(var(--menu-rise) * -1)); } to { opacity: 1; transform: none; } }
+
+/* ── §4 · the motion trio, renamed onto the kit (the kit grammar already) ── */
+/* cardIn: 380ms out-quint, 6px, delay 45ms × min(i, 11) */
+@keyframes card-in { 0% { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+/* gridShimmerH: a beam crossing its container, 6s linear (needs container-type) */
+@keyframes grid-shimmer { 0% { transform: translate(-45cqw); } to { transform: translate(145cqw); } }
+/* marquee: a doubled track slides half its width, 30–60s linear */
+@keyframes marquee { 0% { transform: translate(0); } to { transform: translate(-50%); } }
+
+/* ── §5 · utilities ─────────────────────────────────────────────────────── */
+/* REVEAL — once, on scroll (IntersectionObserver −12% on the scroll root,
+   main#main-content in the shell; reveal.js). The .bs-js gate keeps content
+   visible if scripts never run. */
+.bs-js .reveal:not(.is-inview) { opacity: 0; }
+.reveal.is-inview { opacity: 1; animation: rise-16 var(--d-400) var(--ease-out-cubic) var(--reveal-delay, 0s) both; }
+/* the section-head split: title block, then the 2nd child +0.15s */
+.reveal.is-inview .section-head > * { animation: rise-16 var(--d-350) var(--ease-out-cubic) both; }
+.reveal.is-inview .section-head > *:nth-child(2) { animation-delay: .15s; }
+/* CASCADE — a revealed parent shows at once, its cells rise-14 at .12s + i × 60ms */
+.reveal.cascade.is-inview { animation: none; opacity: 1; }
+.reveal.cascade.is-inview > * { animation: rise-14 var(--d-400) var(--ease-out-cubic) calc(.12s + var(--i, 0) * var(--stagger)) both; }
+
+.rise-8  { animation: rise-8  var(--d-400) var(--ease-out-cubic) both; }
+.rise-10 { animation: rise-10 var(--d-400) var(--ease-out-cubic) both; }
+.rise-14 { animation: rise-14 var(--d-400) var(--ease-out-cubic) both; }
+.rise-16 { animation: rise-16 var(--d-450) var(--ease-out-cubic) both; }
+.fade-in { animation: fade-in var(--d-200) var(--ease-in-out) both; }
+/* the +0.06s ladder: put --i on each child (style="--i:3"), or let reveal.js index it */
+.stagger > * { animation-delay: calc(var(--rise-delay, 0s) + var(--i, 0) * var(--stagger)); }
+/* JS rise (BS.motion.rise): distance by --rise, held until the route cover lifts */
+.bs-rise {
+  animation-name: var(--rise, rise-16);
+  animation-duration: var(--rise-dur, .4s);
+  animation-timing-function: var(--ease-out-cubic);
+  animation-delay: calc(var(--rise-delay, 0s) + var(--i, 0) * var(--rise-stagger, .06s));
+  animation-fill-mode: both;
+}
+
+/* NEW ROW + FLASH (BS.motion.enterRow / flash) */
+.is-entering-row { animation: row-in var(--d-320) var(--ease-out-expo) both; }
+.is-flash { animation: row-flash var(--d-2400) var(--ease-in-out) both; }
+/* enterRow + flash together: both animations run (the single-name rules above would override each other) */
+.is-entering-row.is-flash { animation: row-in var(--d-320) var(--ease-out-expo) both, row-flash var(--d-2400) var(--ease-in-out) both; }
+
+/* LIVE dot — 2.4s breathe; colour = currentColor (green "Stable", accent "Open") */
+.live-dot {
+  display: inline-block; flex: none; width: 6px; height: 6px; border-radius: var(--r-full);
+  background: currentColor; animation: breathe-55 var(--d-2400) ease-in-out infinite;
+}
+
+/* CARD-IN — the grid's entrance on sort / filter (BS.motion.cardIn sets --i) */
+.card-in { animation: card-in var(--d-card-in) var(--ease-out-quint) calc(min(var(--i, 0), 11) * var(--stagger-card)) both; }
+
+/* SHIMMER — the hero's beam field. The host is the container; beams are
+   children with .grid-shimmer (stagger them with animation-delay). */
+.shimmer-field { container-type: inline-size; position: relative; overflow: hidden; }
+.grid-shimmer { animation: grid-shimmer var(--d-shimmer) linear infinite; }
+
+/* MARQUEE — put the item list twice inside .marquee__track */
+.marquee { overflow: hidden; }
+.marquee__track { display: flex; width: max-content; animation: marquee var(--marquee-dur, var(--d-marquee)) linear infinite; }
+@media (hover: hover) and (pointer: fine) { .marquee:hover .marquee__track { animation-play-state: paused; } }
+
+/* AMBIENT PAUSE — nothing loops off screen or in a hidden tab (BS.motion.mountPause) */
+.is-paused, .is-paused * { animation-play-state: paused !important; }
+
+/* DRAW-IN — SVG paths with pathLength="1" carry [data-draw] (+ style="--i:n");
+   labels carry [data-draw-label]. BS.motion.mountDrawIn(host) arms, then draws
+   on the second rAF after intersecting. */
+.is-armed [data-draw] {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--draw-dur, var(--d-900)) var(--ease-out-cubic) calc(var(--i, 0) * var(--stagger-series));
+}
+.is-armed.is-drawn [data-draw] { stroke-dashoffset: 0; }
+.is-armed [data-draw-fade] { opacity: 0; transition: opacity var(--d-600) ease calc(var(--d-200)); }
+.is-armed.is-drawn [data-draw-fade] { opacity: 1; }
+.is-armed [data-draw-label] { opacity: 0; transition: opacity var(--d-400) var(--ease-out-cubic) var(--labels-at, .4s); }
+.is-armed.is-drawn [data-draw-label] { opacity: 1; }
+.is-nofx, .is-nofx * { transition: none !important; }
+
+/* ── §6 · odometers (reference-motion.md §2.5, globals.css:219-238) ──────── */
+/* roll (PriceTicker): only changed digits roll DOWN, 0.36s out-quint */
+.price-ticker { display: inline-flex; align-items: baseline; font-variant-numeric: tabular-nums; white-space: pre; }
+.price-ticker__cells { display: inline-flex; align-items: baseline; white-space: pre; }
+.price-digit { display: inline-block; height: 1em; overflow: hidden; line-height: 1; vertical-align: -0.08em; }
+.price-digit__track { display: flex; flex-direction: column; height: 2em; animation: digit-roll-down var(--d-360) var(--ease-out-quint); }
+.price-digit__track > span { display: block; height: 1em; }
+/* tick (Ticking): cells keyed from the right roll UP; out 160 in-quick, in 220 out-expo */
+.ticking { display: inline-flex; font-variant-numeric: tabular-nums; }
+.ticking__cells { display: inline-flex; align-items: baseline; line-height: 1; }
+.ticking__cell { position: relative; display: block; height: 0.88em; overflow: hidden; }
+.ticking__in, .ticking__out { display: block; height: 1em; margin-top: -0.105em; line-height: 1; white-space: pre; }
+.ticking__out { position: absolute; top: 0; right: 0; left: 0; animation: tick-out var(--d-160) var(--ease-in-quick) both; }
+.ticking__cell:has(.ticking__out) .ticking__in { animation: tick-in var(--d-220) var(--ease-out-expo) both; }
+
+/* ── §7 · slow-mo (dev panel / kitchen sink) ────────────────────────────
+   CSS cannot multiply every duration in place, so slow-mo lives in JS
+   (motion.js syncMotionAttr): while html[data-motion="slow"] is set, every
+   running animation and transition gets playbackRate 0.25 and JS timers go
+   through BS.motion.scale() (×4). Nothing to declare here. */
+
+/* ── §8 · reduced motion — layer 1 (nuke) + layer 2 (end states) ─────────
+   Keyed on the OS query AND html[data-motion="reduce"] (set live by motion.js
+   from the OS, the dev panel, or ?motion=reduce). Layer 1 still RUNS every
+   animation for 0.001ms (fill both applies), so layer 2 pins the finished
+   state: reveals visible, rows in place, draw-ins drawn, loops stopped. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+html[data-motion="reduce"] { scroll-behavior: auto !important; }
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+/* layer 2 — the end states (OS query and the override share one block via :root[data-motion]) */
+html[data-motion="reduce"] :is(.reveal, .reveal.cascade > *, .reveal .section-head > *, .rise-8, .rise-10, .rise-14, .rise-16,
+  .bs-rise, .fade-in, .is-entering-row, .card-in) {
+  opacity: 1 !important; transform: none !important; animation: none !important;
+}
+html[data-motion="reduce"] :is(.is-flash, .live-dot, .grid-shimmer, .marquee__track, .price-digit__track) { animation: none !important; }
+html[data-motion="reduce"] .ticking__out { display: none; }
+html[data-motion="reduce"] .ticking__in { animation: none !important; }
+html[data-motion="reduce"] .is-armed [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
+html[data-motion="reduce"] .is-armed :is([data-draw-label], [data-draw-fade]) { opacity: 1 !important; transition: none !important; }
+html[data-motion="reduce"] .grid-shimmer { opacity: 0; }
