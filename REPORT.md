@@ -161,3 +161,9 @@ trailer; the first commit's subject and ~25 early blobs named the base project.
 New commits made after this point still get the harness's `Co-Authored-By` trailer, so the rewrite
 is rerun (idempotent, ~1 s) immediately before the repo goes public. Steps 3–5 are queued in the
 launch checklist and not started.
+
+## security.txt (pre-public pass, step 3) — 2026-10-23
+Both programs embed a neodyme `security.txt` (`solana-security-txt 1.1.1`; contact `blindseal@users.noreply.github.com`
+until the domain is live, policy `SECURITY.md`). M2 suite on the new binaries: 15/15.
+- `transfer_gate` upgraded on mainnet: `57tz1JLdBkHGoNNDhxT2mkjkK4tKGZ3qLVNoeFmDtqYMxuXWonMt29dVjkXb898GktNr5Kn67rtJrV39pV5k5Wxf`
+- `blindseal_verify`: upgrade not sent — buffer rent ≈ 2.29 SOL vs 1.40 SOL on the authority (docs/LAUNCH-CHECKLIST.md).

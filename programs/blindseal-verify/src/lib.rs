@@ -30,6 +30,16 @@ use anchor_lang::solana_program::{
 
 declare_id!("merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb");
 
+#[cfg(not(feature = "no-entrypoint"))]
+solana_security_txt::security_txt! {
+    name: "Blindseal verifier",
+    project_url: "https://github.com/blindseal",
+    contacts: "email:blindseal@users.noreply.github.com",
+    policy: "https://github.com/blindseal/blindseal/blob/main/SECURITY.md",
+    preferred_languages: "en",
+    source_code: "https://github.com/blindseal/blindseal"
+}
+
 /// Domain separators — identical to detector-core (§3.3).
 pub const ACTION_DOMAIN: &[u8] = b"blindseal.action.v1";
 pub const NULLIFIER_DOMAIN: &[u8] = b"blindseal.nullifier.v1";
