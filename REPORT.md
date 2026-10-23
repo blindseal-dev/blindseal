@@ -46,8 +46,9 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 - M0.5: on-chain VERIFIED on localnet + tampered rejected; **227,375 CU**, tx 584 B (`m05-localnet-metrics.json`).
 
 ## First thing tomorrow
-1. **Wire the real verifier**: `wasm-bindgen` `crates/verifier-wasm` → `@blindseal/verifier-wasm`, swap the
-   isolated `verifier.ts` import on both verify pages (compile-to-wasm already proven).
+1. ~~Wire the real verifier~~ **DONE 2026-10-23**: `@blindseal/verifier-wasm` (wasm-bindgen) runs the
+   real Groth16 check in both verify pages; mock verifier removed. (The earlier "compile-to-wasm proven"
+   was wrong — the 295 B module was empty; the real module is 406 KB and both links and runs.)
 2. **M2 on-chain**: Anchor verify program + transfer-gate + devnet deploy (budget ~230k CU + logic, per M0.5).
 3. Raise dashboard motion fidelity (sliding pill, row flash) and the site CRT hero; add a §5 counts endpoint
    to unblock `/decisions` counts + `/policy` root preview.

@@ -36,3 +36,20 @@ pub fn verify_attestation(json: &str) -> Outcome {
         Err(e) => Outcome { ok: false, reason: Some(format!("{e:?}")) },
     }
 }
+
+// ── wasm32 export ────────────────────────────────────────────────────────────
+// Only compiled for wasm32 (the verify page). Returns a JSON string {"ok":bool,"reason":?}
+// so no serde-wasm-bindgen is needed. Native builds (CLI, tamper suite) skip this entirely.
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn verify_attestation_json(json: &str) -> String {
+    let o = verify_attestation(json);
+    let reason = match &o.reason {
+        Some(r) => serde_json::Value::String(r.clone()),
+        None => serde_json::Value::Null,
+    };
+    serde_json::json!({ "ok": o.ok, "reason": reason }).to_string()
+}

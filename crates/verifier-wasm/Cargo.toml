@@ -17,3 +17,7 @@ path = "src/main.rs"
 [dependencies]
 sp1-verifier = "=5.0.0"
 serde_json = "1"
+
+# wasm32 only: expose verify_attestation to JS. Native (CLI, tests) never pulls this.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"

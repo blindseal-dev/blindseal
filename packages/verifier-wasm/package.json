@@ -1,0 +1,21 @@
+{
+  "name": "@blindseal/verifier-wasm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Off-chain SP1 v5 Groth16 attestation verifier compiled to wasm (wasm-bindgen build of crates/verifier-wasm). Generated — rebuild with ./build.sh.",
+  "main": "./pkg/blindseal_verifier.js",
+  "module": "./pkg/blindseal_verifier.js",
+  "types": "./pkg/blindseal_verifier.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/blindseal_verifier.d.ts",
+      "default": "./pkg/blindseal_verifier.js"
+    },
+    "./bg.wasm": "./pkg/blindseal_verifier_bg.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": ["pkg", "build.sh"],
+  "sideEffects": ["./pkg/blindseal_verifier.js"]
+}

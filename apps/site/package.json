@@ -7,12 +7,16 @@
     "build": "next build",
     "start": "next start -p 3004",
     "typecheck": "tsc --noEmit",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "sync-wasm": "node scripts/sync-wasm.mjs",
+    "predev": "node scripts/sync-wasm.mjs",
+    "prebuild": "node scripts/sync-wasm.mjs"
   },
   "dependencies": {
     "next": "14.2.15",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "@blindseal/verifier-wasm": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.9.0",

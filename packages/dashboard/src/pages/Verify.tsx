@@ -1,22 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { api } from '../api/client';
 import type { Attestation } from '../api/types';
 import { Icon } from '../kit/react';
 import { verifyAttestation, tamper, type VerifyResult } from '../verify/verifier';
 
 // The verify page stores nothing: the pasted JSON and the result live in component state only.
+// Verification runs the real Groth16 check in-browser via @blindseal/verifier-wasm.
 export function Verify() {
   const [text, setText] = useState('');
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [busy, setBusy] = useState(false);
-  // The canonical good attestation, for the mock verifier's bit-for-bit comparison (the real WASM
-  // verifier ignores it). Fetched once; not stored.
-  const canonical = useRef<string | undefined>(undefined);
-  useEffect(() => { api.get<Attestation>('/attestations/sample').then((a) => { canonical.current = JSON.stringify(a); }).catch(() => {}); }, []);
 
   const run = async (json: string) => {
     setBusy(true);
-    setResult(await verifyAttestation(json, canonical.current));
+    setResult(await verifyAttestation(json));
     setBusy(false);
   };
   const loadSample = async (t: boolean) => {

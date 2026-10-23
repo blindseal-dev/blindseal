@@ -10,6 +10,9 @@ importers:
 
   apps/site:
     dependencies:
+      '@blindseal/verifier-wasm':
+        specifier: workspace:*
+        version: link:../../packages/verifier-wasm
       next:
         specifier: 14.2.15
         version: 14.2.15(@playwright/test@1.48.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -87,6 +90,9 @@ importers:
 
   packages/dashboard:
     dependencies:
+      '@blindseal/verifier-wasm':
+        specifier: workspace:*
+        version: link:../verifier-wasm
       '@tanstack/react-query':
         specifier: 5.59.20
         version: 5.59.20(react@18.3.1)
@@ -182,6 +188,8 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.19)(jsdom@25.0.1)
+
+  packages/verifier-wasm: {}
 
 packages:
 

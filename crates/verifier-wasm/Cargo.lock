@@ -342,6 +342,7 @@ version = "0.0.0"
 dependencies = [
  "serde_json",
  "sp1-verifier",
+ "wasm-bindgen",
 ]
 
 [[package]]
