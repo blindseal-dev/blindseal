@@ -135,3 +135,29 @@ container so event delegation survives). Visual diffs vs `design/mockups`: `docs
 | D01 decisions | 4.44% | shell (sidebar/pill/top bar/status bar) identical; fixture rows vs the mock API's rows, odometer frame |
 
 Candidates for a faithful port, in order of pixel distance: S05 explorer, S02 how-it-works, S04 docs.
+
+---
+
+# Pre-public pass — steps 1–2 done (2026-10-23); stopped for the owner's review
+
+**Step 1 — identities across the full history (before):** one author/committer identity on all 64
+commits, `blindseal <blindseal@users.noreply.github.com>`; every commit carried a `Co-Authored-By`
+trailer; the first commit's subject and ~25 early blobs named the base project.
+
+**Step 2 — `scripts/history-rewrite.sh` (local; no remote exists; nothing pushed):**
+- backups: `refs/backup/original` = `9605675` (the untouched history), `refs/backup/pre-rewrite`, and
+  five bundles in `~/.blindseal/backup/`
+- rewrite: author + committer normalized on every commit; `Co-Authored-By` / session-URL trailers
+  stripped; base-project names substituted in every text blob except the §7-allowed paths (LICENSE,
+  BLINDSEAL.md, DECISIONS.md, README.md, FRONTEND.md, RH-INTEGRATION.md, docs/, the two sweep scripts)
+  and in every message; three never-Blindseal directories (the base product's trade/demo/installer
+  packages, already absent from the tree) dropped from every revision; the old CLI banner renamed
+- **result, swept over `git log -p main` (every diff, message, identity):** 69 commits · identities:
+  `blindseal <blindseal@users.noreply.github.com>` only · trailers remaining 0 · PART A hits 0 ·
+  PART B occurrences outside the allowed paths 0 · dead directories in any revision 0
+- the grep/substitution lists live only in local gitignored files (`.identity-sweep`, `.history-subs`,
+  `.history-msg-subs`, `.history-drop-paths`); the scripts carry no names
+
+New commits made after this point still get the harness's `Co-Authored-By` trailer, so the rewrite
+is rerun (idempotent, ~1 s) immediately before the repo goes public. Steps 3–5 are queued in the
+launch checklist and not started.
