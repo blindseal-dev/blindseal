@@ -21,3 +21,9 @@ fn policy_root_is_deterministic_and_nonempty() {
     .expect("write policy-root.txt");
     eprintln!("policy root = {hex} ({} leaves)", policy_leaf_count());
 }
+
+#[test]
+fn policy_root_from_serialized_matches() {
+    use blindseal_detector_core::{policy_root, policy_root_from_serialized, serialize_l1};
+    assert_eq!(policy_root_from_serialized(&serialize_l1()), policy_root());
+}

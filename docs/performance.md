@@ -91,3 +91,10 @@ First end-to-end proof from the real guest (minimal: L1 only, commits payloadHas
 `from_bytes_unchecked` applied (sound — committed policy bytes). L1-only guest cycle count via
 `BLINDSEAL_EXECUTE=1` (SP1 executor, no proof): **77,572,157 cycles**. Use `execute` to iterate
 guest logic in seconds; prove only to checkpoint (full proof wall-clock re-measure pending).
+
+### M1 full guest (L1 + action binding) — execute
+Guest now recomputes payloadHash + policyRoot, runs L1 (serialized), binds the action
+(actionHash + nullifier), commits 6 public values. Cycle count (execute): **346,102,430**
+(up from 77.6M L1-only — the in-zkVM policyRoot merkle over ~22 DFA byte-blobs dominates).
+Optimization: patch sha2 with the SP1 sha256 precompile to cut the hashing cost. Validated
+public values: policyRoot = 0x36a9e9… (matches detector-core), detectorVersion = guest vkey.

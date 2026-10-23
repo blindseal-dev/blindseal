@@ -583,3 +583,20 @@ pub fn nullifier(action_hash: &[u8; 32]) -> [u8; 32] {
     h.update(action_hash);
     h.finalize().into()
 }
+
+/// policyRoot recomputed from PROVIDED serialized DFA bytes (what the guest holds as input),
+/// without rebuilding DFAs. Must equal `policy_root()` for the same rule set — the guest
+/// commits this so the proof binds the policy it actually ran. (Proven equal by test.)
+pub fn policy_root_from_serialized(pol: &SerializedL1) -> [u8; 32] {
+    let mut leaves: Vec<(String, [u8; 32])> = RULES
+        .iter()
+        .enumerate()
+        .map(|(i, r)| (r.name.to_string(), leaf_hash(r.name, "L1", "regex", &pol.dfas[i])))
+        .collect();
+    leaves.push((
+        "zero-width-density".to_string(),
+        leaf_hash("zero-width-density", "L1", "threshold", b"zero_width_utf16_ratio>0.02"),
+    ));
+    leaves.sort_by(|a, b| a.0.cmp(&b.0));
+    merkle_root(leaves.into_iter().map(|(_, h)| h).collect())
+}
