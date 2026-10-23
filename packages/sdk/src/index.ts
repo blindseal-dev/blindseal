@@ -5,6 +5,7 @@
 // so the SDK needs no IDL at runtime and nothing but @solana/web3.js. The on-chain program's
 // IDL is shipped alongside for consumers that want the Anchor client (idl/).
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import {
   ComputeBudgetProgram, Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction,
   type Signer,
@@ -201,7 +202,6 @@ export interface VerifyResult { ok: boolean; reason: string | null; }
 export async function verifyOffchain(att: Attestation): Promise<VerifyResult> {
   const wasm = await import('@blindseal/verifier-wasm');
   const { readFileSync } = await import('node:fs');
-  const { createRequire } = await import('node:module');
   const req = createRequire(import.meta.url);
   const bytes = readFileSync(req.resolve('@blindseal/verifier-wasm/bg.wasm'));
   wasm.initSync({ module: bytes });

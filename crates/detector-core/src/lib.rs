@@ -1,4 +1,4 @@
-//! Blindseal L0 + L1 detector core — a Rust port of Blindseal's TS `layer1-heuristics.ts`
+//! Blindseal L0 + L1 detector core — a Rust port of the proxy's TS `layer1-heuristics.ts`
 //! (regex heuristics) and `layer0-decoder.ts` (decode-then-L1), behaviour-identical and
 //! gated by the parity harness in `evals/`. Built on regex-automata DFAs (the engine the
 //! SP1 guest runs, §3.4). The raw L0/L1 verdict here is what the proof commits to — NOT the

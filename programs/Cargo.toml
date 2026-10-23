@@ -1,0 +1,16 @@
+# Blindseal Anchor programs — their OWN Cargo workspace, isolated from the host workspace so the
+# SBF build resolves only on-chain-safe deps (the m05 lesson: a shared lock pulled host-only
+# crates/getrandom into cargo build-sbf). Built with `anchor build` from the repo root.
+[workspace]
+resolver = "2"
+members = ["blindseal-verify", "transfer-gate"]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

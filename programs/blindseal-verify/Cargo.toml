@@ -1,5 +1,6 @@
-# Blindseal on-chain verifier (M0 stub) — Anchor program, built with `anchor build`.
-# M2: Groth16 verify via sp1-solana + nullifier set + policy allowlist (BLINDSEAL.md §3.7).
+# Blindseal on-chain verifier (M2) — Anchor program, built with `anchor build`.
+# Groth16 verify via sp1-solana (SP1 v5 VK) + nullifier set + vkey/policy allowlists
+# (BLINDSEAL.md §3.7). Versions pinned in DECISIONS.md: anchor 0.31.1, sp1-solana 0.1.0.
 [package]
 name = "blindseal-verify"
 version = "0.0.0"
@@ -14,6 +15,10 @@ name = "blindseal_verify"
 default = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-# anchor-lang = "0.30"  # pinned in M2; sp1-solana crate version pinned in DECISIONS.md
+anchor-lang = "=0.31.1"
+sp1-solana = "=0.1.0"

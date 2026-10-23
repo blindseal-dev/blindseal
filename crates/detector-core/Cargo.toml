@@ -1,4 +1,4 @@
-# Blindseal L0 + L1 detector core. Ports Blindseal's TS L0 (decode-then-L1) and L1 (regex
+# Blindseal L0 + L1 detector core. Ports the proxy's TS L0 (decode-then-L1) and L1 (regex
 # heuristics) to Rust, behaviour-identical, gated by a parity harness (evals/). Built on
 # regex-automata DFAs — the engine the SP1 guest runs (BLINDSEAL.md §3.4). No std-only deps
 # that break the succinct toolchain (MSRV 1.85). Versions pinned: serialized DFA bytes feed
