@@ -121,15 +121,24 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
   const fx = loadFixtures(opts.fixturesDir);
   const startedAt = Date.now();
 
-  const status = () => ({
+  // Mock state switch (FRONTEND.md / the mockups' ?state=): BLINDSEAL_MOCK_STATE=<state> is the
+  // default, overridable per request with ?state=<state> so the dashboard can flip states without a
+  // restart. Server-meaningful states are handled here; no-action/not-found/loading are data/UI-side.
+  const envState = process.env.BLINDSEAL_MOCK_STATE ?? '';
+  const stateOf = (url: URL) => url.searchParams.get('state') ?? envState;
+
+  const TEE_QUOTE = { quote: sha('mock-tee-quote').slice(2), quoteHash: sha('mock-tee-quote-hash') };
+
+  const status = (st: string) => ({
     version: '0.0.0-mock',
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
-    upstreams: [{ name: 'mock-upstream', transport: 'stdio' as const, healthy: true }],
+    connection: st === 'offline' ? 'offline' : st === 'reconnecting' ? 'reconnecting' : 'live',
+    upstreams: [{ name: 'mock-upstream', transport: 'stdio' as const, healthy: st !== 'upstream-down' }],
     policyRoot: fx.policy.root,
     detectorVersion: fx.decisions[0]?.detectorVersion ?? '0x',
-    audit: fx.audit.head,
-    prover: { available: false },
-    l3: { mode: 'off' as const },
+    audit: st === 'empty' ? { index: -1, hash: fx.audit.genesis, ts: new Date(startedAt).toISOString() } : fx.audit.head,
+    prover: { available: st === 'prover-down' ? false : true },
+    l3: { mode: st === 'tee' ? ('tee' as const) : ('local' as const) },
     mock: true,
   });
 
@@ -165,15 +174,20 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
     if (!p.startsWith('/api/')) return sendErr(res, 404, 'NOT_FOUND', 'unknown path');
     if (!bearerOk(req, token, url)) return sendErr(res, 401, 'UNAUTHORIZED', 'missing or invalid bearer token');
     const seg = p.slice('/api/'.length).split('/').filter(Boolean);
+    const st = stateOf(url);
+
+    // state: unauthorized → every call 401; offline → every data call fails but status still answers.
+    if (st === 'unauthorized') return sendErr(res, 401, 'UNAUTHORIZED', 'missing or invalid dashboard token');
+    if (st === 'offline' && !(seg[0] === 'status')) return sendErr(res, 503, 'OFFLINE', 'the proxy is unreachable');
 
     try {
       // GET /api/status
-      if (method === 'GET' && seg[0] === 'status' && seg.length === 1) return sendJson(res, 200, status());
+      if (method === 'GET' && seg[0] === 'status' && seg.length === 1) return sendJson(res, 200, status(st));
 
       // GET /api/decisions  (cursor/limit/verdict/server/tool/from/to)
       if (method === 'GET' && seg[0] === 'decisions' && seg.length === 1) {
         const q = url.searchParams;
-        let items = fx.decisions.slice();
+        let items = st === 'empty' ? [] : fx.decisions.slice();
         const vd = q.get('verdict'); if (vd) items = items.filter((d) => d.verdict === vd);
         const sv = q.get('server'); if (sv) items = items.filter((d) => d.server === sv);
         const tl = q.get('tool'); if (tl) items = items.filter((d) => d.tool === tl);
@@ -201,13 +215,19 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
 
       // GET /api/audit/head | /api/audit/entries | POST /api/audit/verify | /api/audit/disclose
       if (seg[0] === 'audit') {
-        if (method === 'GET' && seg[1] === 'head') return sendJson(res, 200, fx.audit.head);
+        if (method === 'GET' && seg[1] === 'head') {
+          if (st === 'empty') return sendJson(res, 200, { index: -1, hash: fx.audit.genesis, ts: new Date(startedAt).toISOString() });
+          return sendJson(res, 200, fx.audit.head);
+        }
         if (method === 'GET' && seg[1] === 'entries') {
+          if (st === 'empty') return sendJson(res, 200, []);
           const from = Number.parseInt(url.searchParams.get('from') ?? '0', 10) || 0;
           const to = Number.parseInt(url.searchParams.get('to') ?? String(fx.audit.head.index), 10);
           return sendJson(res, 200, fx.audit.entries.filter((e) => e.index >= from && e.index <= to));
         }
         if (method === 'POST' && seg[1] === 'verify') {
+          // chain-broken state: report the canonical break at #143 (mirrors the mockups).
+          if (st === 'chain-broken') return sendJson(res, 200, { ok: false, checkedFrom: 0, checkedTo: fx.audit.head.index, brokenAt: 143 });
           // recompute the chain from genesis
           let prev = fx.audit.genesis;
           let brokenAt: number | undefined;
@@ -227,6 +247,8 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
         if (method === 'POST' && seg[1] === 'disclose') {
           const body = await readBody(req);
           if (!body || typeof body.from !== 'number' || typeof body.to !== 'number') return sendErr(res, 400, 'VALIDATION', 'from/to required');
+          if (st === 'chain-broken' && body.from <= 143 && body.to >= 143)
+            return sendErr(res, 409, 'CHAIN_BROKEN', 'the chain is broken at #143; cannot disclose a range over it');
           const entries = fx.audit.entries.filter((e) => e.index >= body.from && e.index <= body.to);
           return sendJson(res, 200, {
             from: body.from, to: body.to, head: fx.audit.head, entries,
@@ -257,11 +279,13 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
       // GET /api/attestations | GET /api/attestations/:id | POST create/submit/export
       if (seg[0] === 'attestations') {
         if (method === 'GET' && seg.length === 1) {
-          const st = url.searchParams.get('status');
-          const items = st ? fx.attestations.filter((a) => a.status === st) : fx.attestations;
+          if (st === 'empty') return sendJson(res, 200, []);
+          const statusFilter = url.searchParams.get('status');
+          const items = statusFilter ? fx.attestations.filter((a) => a.status === statusFilter) : fx.attestations;
           return sendJson(res, 200, items);
         }
         if (method === 'POST' && seg.length === 1) {
+          if (st === 'prover-down') return sendErr(res, 503, 'PROVER_UNAVAILABLE', 'the local prover is not running');
           const body = await readBody(req);
           if (!body || typeof body.decisionId !== 'string') return sendErr(res, 400, 'VALIDATION', 'decisionId required');
           const d = fx.decisions.find((x) => x.id === body.decisionId);
@@ -303,6 +327,7 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
 
       // GET /api/tee/quote
       if (method === 'GET' && seg[0] === 'tee' && seg[1] === 'quote') {
+        if (st === 'tee') return sendJson(res, 200, { mode: 'tee', quote: TEE_QUOTE.quote, quoteHash: TEE_QUOTE.quoteHash });
         return sendJson(res, 200, { mode: 'local' });
       }
 
@@ -331,7 +356,7 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
       `Sec-WebSocket-Accept: ${wsAccept(key)}\r\n\r\n`,
     );
     wsClients.add(socket);
-    socket.write(wsFrame(JSON.stringify({ type: 'status', data: status() })));
+    socket.write(wsFrame(JSON.stringify({ type: 'status', data: status(envState) })));
     socket.on('close', () => wsClients.delete(socket));
     socket.on('error', () => wsClients.delete(socket));
   });

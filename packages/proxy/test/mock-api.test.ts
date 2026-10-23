@@ -36,8 +36,20 @@ describe('mock API — status', () => {
     expect(typeof s.version).toBe('string');
     expect(s.policyRoot).toMatch(/^0x[0-9a-f]+$/);
     expect(s.audit).toHaveProperty('index');
-    expect(s.l3.mode).toBe('off');
-    expect(s.prover.available).toBe(false);
+    // Matches the mockups' fixtures.js default: L3 local (→ 'tee' under ?state=tee), prover healthy,
+    // connection live. The ?state= / BLINDSEAL_MOCK_STATE switches flip these.
+    expect(s.l3.mode).toBe('local');
+    expect(s.prover.available).toBe(true);
+    expect(s.connection).toBe('live');
+  });
+
+  it('honors ?state= switches (empty, tee, unauthorized)', async () => {
+    const empty = await (await fetch(`${base}/decisions?state=empty`, auth)).json();
+    expect(empty.items).toHaveLength(0);
+    const tee = await (await fetch(`${base}/status?state=tee`, auth)).json();
+    expect(tee.l3.mode).toBe('tee');
+    const un = await fetch(`${base}/decisions?state=unauthorized`, auth);
+    expect(un.status).toBe(401);
   });
 });
 
