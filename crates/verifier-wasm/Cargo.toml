@@ -1,10 +1,19 @@
+# Blindseal off-chain Groth16 verifier (M1). Verifies an attestation.json with sp1-verifier
+# (the off-chain counterpart to sp1-solana), using the SP1 v5 Groth16 VK. Standalone (own
+# Cargo.lock; also the base for a wasm32 build for the verify page). lib + a CLI bin.
 [package]
-name = "blindseal-verifier-wasm"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+name = "blindseal-verifier"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "blindseal-verify"
+path = "src/main.rs"
+
 [dependencies]
+sp1-verifier = "=5.0.0"
+serde_json = "1"

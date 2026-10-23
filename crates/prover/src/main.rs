@@ -78,6 +78,9 @@ fn main() {
     let prove_ms = t.elapsed().as_millis();
     let proof_bytes = proof.bytes();
 
+    // Raw committed public-values blob (what sp1-verifier / sp1-solana verify against) — capture
+    // before reading advances the cursor.
+    let pub_blob = proof.public_values.as_slice().to_vec();
     let mut pv = proof.public_values;
     let payload_hash: [u8; 32] = pv.read();
     let policy_root: [u8; 32] = pv.read();
@@ -94,6 +97,7 @@ fn main() {
         "actionHash": hex_str(&action_hash),
         "nullifier": hex_str(&null),
         "expirySlot": exp,
+        "publicInputs": [hex_str(&pub_blob)],
         "proof": { "protocol": "groth16", "curve": "bn254", "bytes": hex_str(&proof_bytes) },
         "proveMs": prove_ms,
         "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)"
