@@ -9,8 +9,9 @@
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "sync-wasm": "node scripts/sync-wasm.mjs",
-    "predev": "node scripts/sync-wasm.mjs",
-    "prebuild": "node scripts/sync-wasm.mjs"
+    "predev": "node scripts/sync-wasm.mjs && node scripts/bundle-kit.mjs",
+    "prebuild": "node scripts/sync-wasm.mjs && node scripts/bundle-kit.mjs",
+    "bundle-kit": "node scripts/bundle-kit.mjs"
   },
   "dependencies": {
     "next": "14.2.15",

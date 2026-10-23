@@ -1,6 +1,7 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import Script from 'next/script';
 
 // The ONE place the kit is mounted. The kit JS (window.BS) loads via <Script> in the layout; the
 // mockups run their mount sequence on DOMContentLoaded — here it runs after hydration and again on
@@ -63,16 +64,21 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
 }
 
 let mounted = false;
+const kitReady = () => !!(window as unknown as { BS?: BSKit }).BS?.mountSite;
 
 export function KitProvider() {
   const path = usePathname();
+  // the bundle loads after hydration; on client-side navigations it is already there
+  const [ready, setReady] = useState(false);
+  useEffect(() => { if (kitReady()) setReady(true); }, []);
   useEffect(() => {
+    if (!ready) return;
     const BS = (window as unknown as { BS?: BSKit }).BS;
     if (!BS) return;
     const first = !mounted; mounted = true;
-    // after hydration: next frame, so React's DOM is final before the kit decorates it
+    // next frame, so React's DOM for this route is final before the kit decorates it
     const raf = requestAnimationFrame(() => mountSequence(BS, first, activeFor(path)));
     return () => cancelAnimationFrame(raf);
-  }, [path]);
-  return null;
+  }, [ready, path]);
+  return <Script src="/kit/kit.js" strategy="afterInteractive" onLoad={() => setReady(true)} />;
 }
