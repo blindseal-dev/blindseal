@@ -81,10 +81,19 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 ## Pending (in order)
 1. ~~Test proof → suite → numbers~~ **DONE** `441b3f6`: 15/15 on localnet; gated transfer **262,507 CU**, tx **893 B** (`docs/performance.md`).
 2. ~~Mainnet proof~~ **DONE**: `blindseal attest` screened `tests/fixtures/mainnet-toolcall.json` with the real layers (clean), appended decision `d_ff1be0d3f891beef` to the hash-chained audit log (entry #0, chain INTACT), and proved it in 2 h 02 m → `tests/fixtures/attestation-mainnet.json` (VALID natively; binds authority `88sR7X…` → `6HwAr9…`, 0.001 SOL via transfer-gate, nullifier `0xfea1d3ec…`).
-3. **Owner gate:** fund `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj` (BLOCKERS.md) → `scripts/mainnet-deploy.sh`
-   → `scripts/mainnet-acceptance.mts` → both signatures here. Nothing below is claimed until they exist.
+3. ~~Owner gate~~ **DONE 2026-10-23 13:28 PDT**: funded 3.995 SOL → `scripts/mainnet-deploy.sh` deployed both
+   programs (upgrade authority = `88sR7X…`), initialized Config, registered the default root →
+   `scripts/mainnet-acceptance.mts` consumed the real attestation through the gate and the replay was rejected.
 4. ~~Quickstart on a fresh clone~~ **DONE**; site **live** at https://dv8pdxqyec.us-east-1.awsapprunner.com (App Runner, container image, `scripts/deploy-site.sh`).
 
-## Mainnet signatures
-- gated transfer (verify + consume + transfer): _pending funding_
-- replay rejected: _pending funding_
+## Mainnet signatures (Solana mainnet-beta, 2026-10-23)
+| Step | Signature / id |
+|---|---|
+| `blindseal-verify` deployed (328,264 B, slot 460578969) | program `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb` · deploy tx `5792KrcnK6cQNvQcpMwYfwBnANeEeuUu9wSR54mxTZfvkduba1unLGTGWwCqjPj4djyejZ9xbsWP2aAnsGctW7kP` |
+| `transfer-gate` deployed (169,816 B, slot 460579053) | program `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG` · `23LjzgpHhW61thoQjWiLhKdsKW5AixsA1ma1J24eK5MFhhgPLcCXdPEahEBQWw1p4Lx7VQrHW8AQAEkJS7nX39jS` |
+| `initialize` (allowed_vkeys=[0x006a0d1e…331e], allowlist_policies=false, paused=false) | `uwY37Y8uTha1smFkvGykjs4JEiVJWmnp47y151PpH5HvfquutRKipywLCDwFWfayBzTedzsBKKqiHuU3M2uiLzq` |
+| `register_policy_root` (0x36a9e945…8397) | `5y2dTDj534wbrkVAmSGSpkrFwJY9SLsPrwTGsdBRmRHSnLhYXcXfYVqBQsfjLaEF4DcXUFBi3u8czGfBvMJYnCV9` |
+| **gated transfer — verify + consume + 0.001 SOL** (decision `d_ff1be0d3f891beef`, nullifier `0xfea1d3ec…15f1`), 259,324 CU, 893 B | **`7iwA4nxnBG73o8H8j8XUESYsmyGhGrxU5HiqXww8Nzp1YRC9oa7oE2ArWsd2fZN736vyhMatECyd2zw5agedpye`** |
+| **replay of the same attestation — rejected** (`NullifierAlreadyConsumed`, custom error 6006, in the tx logs) | **`42QVDVFjBN7Sp9dpkgfUcKSeZZq67ji4hGRvtuJMJyA3jbxFT6GuJwQaWKSj3oTZoX9jgQjWhmN3iCU2L5w87y3E`** |
+
+Authority after: 1.4536 SOL. Site live: https://dv8pdxqyec.us-east-1.awsapprunner.com (explorer reads these accounts live).

@@ -146,3 +146,8 @@ Program ids (localnet = mainnet): verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cS
 transfer-gate `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`. Pins: anchor 0.31.1, sp1-solana 0.1.0
 (`GROTH16_VK_5_0_0_BYTES`), SP1 5.0.0. Mainnet figures are recorded in REPORT.md when the
 acceptance transfer runs.
+
+### Mainnet (2026-10-23)
+The acceptance transaction `7iwA4nxn…` (REPORT.md) — verify + consume + 0.001 SOL through `transfer-gate` —
+consumed **259,324 CU** on mainnet-beta with an 893-byte transaction; the replay `42QVDVFj…` failed at step 6
+after 8,176 CU in the verifier (`NullifierAlreadyConsumed`). Program rent: verifier 2.29 SOL, gate 1.18 SOL.

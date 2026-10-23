@@ -42,9 +42,12 @@ async function main() {
       if (anchorErr) console.log('  ', anchorErr);
       console.log('   CU:', t?.meta?.computeUnitsConsumed, 'tx bytes:', tx.serialize().length);
       return { sig, err };
-    } catch (e) {
-      console.log(`${label}: send failed: ${e instanceof Error ? e.message : e}`);
-      return { sig: null, err: e };
+    } catch (e: any) {
+      // a rejected replay still lands as a failed tx when the RPC accepted it; surface its signature
+      const sig: string | null = e?.signature ?? (typeof e?.message === 'string' && /signature (\w{80,})/.exec(e.message)?.[1]) ?? null;
+      const logs: string[] = e?.logs ?? e?.transactionLogs ?? [];
+      console.log(`${label}: failed${sig ? ' ' + sig : ''} — ${logs.find((l) => l.includes('AnchorError')) ?? (e?.message ?? JSON.stringify(e))}`);
+      return { sig, err: e };
     }
   };
   const first = await send('1) gated transfer');
