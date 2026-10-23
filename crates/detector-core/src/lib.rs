@@ -505,7 +505,12 @@ impl Aligned {
 
 fn dfa_is_match_serialized(dfa_bytes: &[u8], text: &str) -> bool {
     let aligned = Aligned::new(dfa_bytes);
-    let (dfa, _) = dense::DFA::from_bytes(aligned.bytes()).expect("deserialize forward DFA");
+    // SAFETY: from_bytes_unchecked skips the O(n) transition-table validation pass (the bulk of
+    // the in-zkVM deserialization cost). Sound here because these bytes are produced by our own
+    // `serialize_l1`/policy DFAs and are committed via policy_root — they are not attacker-
+    // controlled. The build-time path (`run_layer1`) and the parity test guard correctness.
+    let (dfa, _) = unsafe { dense::DFA::from_bytes_unchecked(aligned.bytes()) }
+        .expect("deserialize forward DFA");
     dfa.try_search_fwd(&Input::new(text)).ok().flatten().is_some()
 }
 

@@ -32,6 +32,15 @@ fn main() {
     stdin.write(&payload);
     stdin.write(&dfas);
 
+    // Fast path for iterating guest performance: run in the zkVM executor (no proof) and print
+    // the cycle count. `BLINDSEAL_EXECUTE=1 cargo run --release`.
+    if std::env::var("BLINDSEAL_EXECUTE").is_ok() {
+        let (output, report) = client.execute(GUEST_ELF, &stdin).run().expect("execute failed");
+        println!("CYCLES {}", report.total_instruction_count());
+        println!("PUBLIC_VALUES_BYTES {}", output.as_slice().len());
+        return;
+    }
+
     let t = Instant::now();
     let proof = client.prove(&pk, &stdin).groth16().run().expect("groth16 prove failed");
     let prove_ms = t.elapsed().as_millis();

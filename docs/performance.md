@@ -86,3 +86,8 @@ First end-to-end proof from the real guest (minimal: L1 only, commits payloadHas
 | Peak host RSS | 11.6 GB |
 
 **Concern — proving is slow.** Running 22 serialized DFAs in-zkVM is ~17x the trivial M0.5 guest (~4 min). The likely bulk is `dense::DFA::from_bytes` validation per rule. Mitigations before adding L0 (which adds decoder DFAs + nested runs): use `from_bytes_unchecked` (sound — the policy DFAs are our own committed bytes), and iterate guest logic with `ProverClient::execute` (cycle count, no proof) rather than full proves. The spec (§3.5) anticipates slow async proving and the M4 TEE prover; 73 min still argues for the matcher optimization.
+
+### M1 guest perf iteration (execute mode)
+`from_bytes_unchecked` applied (sound — committed policy bytes). L1-only guest cycle count via
+`BLINDSEAL_EXECUTE=1` (SP1 executor, no proof): **77,572,157 cycles**. Use `execute` to iterate
+guest logic in seconds; prove only to checkpoint (full proof wall-clock re-measure pending).
