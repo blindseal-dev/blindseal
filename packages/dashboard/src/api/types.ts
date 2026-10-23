@@ -110,6 +110,32 @@ export interface AuditHead {
   ts: string;
 }
 
+export interface AuditEntry {
+  index: number;
+  hash: string;
+  prevHash: string;
+  ts: string;
+  verdict: Verdict;
+  decisionId: string;
+  payloadHash: string;
+}
+
+export interface VerifyResult {
+  ok: boolean;
+  checkedFrom: number;
+  checkedTo: number;
+  brokenAt?: number;
+}
+
+export interface Disclosure {
+  from: number;
+  to: number;
+  head: AuditHead;
+  entries: AuditEntry[];
+  signerPubkey: string;
+  signature: string;
+}
+
 // Matches mock-server.ts `status()` exactly.
 export interface Status {
   version: string;

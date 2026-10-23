@@ -3,6 +3,7 @@
 // polling.
 import { useEffect, useRef, useState } from 'react';
 import {
+  useMutation,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -10,11 +11,16 @@ import {
 import { api, eventsUrl } from './client';
 import type {
   Attestation,
+  AuditEntry,
+  AuditHead,
   Decision,
   DecisionPage,
+  Disclosure,
   EventFrame,
   Policy,
+  PolicyRule,
   Status,
+  VerifyResult,
 } from './types';
 
 export function useStatus() {
@@ -49,6 +55,58 @@ export function useAttestations(status?: string) {
   return useQuery({
     queryKey: ['attestations', status ?? ''],
     queryFn: () => api.get<Attestation[]>(`/attestations${suffix}`),
+  });
+}
+
+export function useAttestation(id: string | undefined) {
+  return useQuery({
+    queryKey: ['attestation', id],
+    queryFn: () => api.get<Attestation>(`/attestations/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useSubmitAttestation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; cluster: 'devnet' | 'mainnet-beta' }) =>
+      api.post<{ txSig: string }>(`/attestations/${v.id}/submit`, { cluster: v.cluster }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['attestations'] }),
+  });
+}
+
+export function useAuditHead() {
+  return useQuery({ queryKey: ['audit', 'head'], queryFn: () => api.get<AuditHead>('/audit/head') });
+}
+
+export function useAuditEntries(from: number, to: number) {
+  return useQuery({
+    queryKey: ['audit', 'entries', from, to],
+    queryFn: () => api.get<AuditEntry[]>(`/audit/entries?from=${from}&to=${to}`),
+  });
+}
+
+export function useVerifyChain() {
+  return useMutation({ mutationFn: () => api.post<VerifyResult>('/audit/verify') });
+}
+
+export function useDisclose() {
+  return useMutation({
+    mutationFn: (v: { from: number; to: number }) => api.post<Disclosure>('/audit/disclose', v),
+  });
+}
+
+export function useSavePolicy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rules: PolicyRule[]) => api.put<Policy>('/policy', { rules }),
+    onSuccess: (p) => qc.setQueryData(['policy'], p),
+  });
+}
+
+export function useDryRun() {
+  return useMutation({
+    mutationFn: (payload: string) => api.post<Decision>('/policy/dry-run', { payload }),
   });
 }
 
