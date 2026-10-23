@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # Pre-public history rewrite (BLINDSEAL.md §7). LOCAL ONLY — never pushes.
 #   1. backup: refs/backup/pre-rewrite + a git bundle under ~/.blindseal/backup/
-#   2. git filter-repo over refs/heads/main: every commit's author AND committer = the project
-#      identity; Co-Authored-By / session-URL trailers stripped; the substitutions in the local,
-#      uncommitted `.history-subs` (old<TAB>new per line: the base project's names → Blindseal) are
-#      applied to every text blob AND every commit message; the local `.identity-sweep` patterns are
-#      replaced in blobs/messages too. Neither list is ever committed — this script carries no names.
-#   3. sweep the WHOLE history (git log -p --all: every diff, message and identity) — exit 1 on a hit.
+#   2. git filter-repo over refs/heads/main:
+#        - every commit's author AND committer = the project identity
+#        - Co-Authored-By / session-URL trailers stripped from messages
+#        - messages: the local `.history-msg-subs` pairs (old<TAB>new) applied
+#        - blobs: the local `.history-subs` pairs applied to every TEXT blob EXCEPT blobs that belong
+#          (in any revision) to the paths where the base project's name is allowed by §7 — LICENSE,
+#          the named docs, docs/, and the two sweep scripts (which carry the grep lists by design);
+#          the local `.identity-sweep` patterns are replaced in every blob and message
+#      Neither list is ever committed — this script carries no names.
+#   3. sweep refs/heads/main only (not the backup ref): every diff, message and identity.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 export PATH="/opt/homebrew/bin:$PATH"
 NAME="blindseal"; EMAIL="blindseal@users.noreply.github.com"
-[ -f .identity-sweep ] || { echo ".identity-sweep missing (local PART A list)"; exit 1; }
-[ -f .history-subs ] || { echo ".history-subs missing (local old<TAB>new substitutions)"; exit 1; }
+ALLOWED_PATHS=(LICENSE BLINDSEAL.md DECISIONS.md README.md FRONTEND.md RH-INTEGRATION.md docs scripts/identity-sweep.sh scripts/history-rewrite.sh)
+for f in .identity-sweep .history-subs .history-msg-subs; do [ -f "$f" ] || { echo "$f missing (local list)"; exit 1; }; done
 A_RE="$(grep -v '^#' .identity-sweep | grep . | tr '\n' '|' | sed 's/|$//')"
 B_RE="$(grep -v '^#' .history-subs | grep . | cut -f1 | tr '\n' '|' | sed 's/|$//')"
 [ -z "$(git remote)" ] || { echo "remotes exist: $(git remote | tr '\n' ' ') — remove them first (this never pushes)"; exit 1; }
@@ -24,23 +28,36 @@ git update-ref refs/backup/pre-rewrite HEAD
 git bundle create "$HOME/.blindseal/backup/blindseal-pre-rewrite-$(date -u +%Y%m%dT%H%M%SZ).bundle" --all >/dev/null
 echo "   refs/backup/pre-rewrite = $(git rev-parse --short refs/backup/pre-rewrite); bundle in ~/.blindseal/backup/"
 
-echo "→ rewrite (identity, trailers, substitutions in blobs + messages)"
-# a python module with the substitutions (built from the local lists; deleted after the run)
+echo "→ blobs on allowed paths (every revision of main)"
+git rev-list refs/heads/main | while read -r c; do git ls-tree -r "$c" -- "${ALLOWED_PATHS[@]}" 2>/dev/null; done | awk '{print $3}' | sort -u > /tmp/bs_allowed_blobs.txt
+echo "   $(wc -l < /tmp/bs_allowed_blobs.txt | tr -d ' ') blob ids exempt from the PART B substitutions"
+
+echo "→ rewrite"
 python3 - "$A_RE" <<'PY' > /tmp/bs_subs.py
 import sys, re
 pats = [p for p in sys.argv[1].split("|") if p]
-pairs = []
-for line in open(".history-subs", encoding="utf-8"):
-    line = line.rstrip("\n")
-    if not line or line.startswith("#") or "\t" not in line: continue
-    a, b = line.split("\t", 1); pairs.append((a.encode(), b.encode()))
+def pairs(path):
+    out = []
+    for line in open(path, encoding="utf-8"):
+        line = line.rstrip("\n")
+        if not line or line.startswith("#") or "\t" not in line: continue
+        a, b = line.split("\t", 1); out.append((a.encode(), b.encode()))
+    return out
 print("import re")
-print("PAIRS = " + repr(pairs))
+print("B_PAIRS = " + repr(pairs(".history-subs")))
+print("M_PAIRS = " + repr(pairs(".history-msg-subs")))
 print("A_PATS = " + repr([re.escape(p).encode() for p in pats]))
-print("def scrub(d):")
-print("    for a, b in PAIRS: d = d.replace(a, b)")
+print("ALLOWED = set(l.strip().encode() for l in open('/tmp/bs_allowed_blobs.txt') if l.strip())")
+print("def scrub_a(d):")
 print("    for p in A_PATS: d = re.sub(b'(?i)' + p, b'blindseal', d)")
 print("    return d")
+print("def scrub_blob(d, oid):")
+print("    if oid not in ALLOWED:")
+print("        for a, b in B_PAIRS: d = d.replace(a, b)")
+print("    return scrub_a(d)")
+print("def scrub_msg(d):")
+print("    for a, b in M_PAIRS: d = d.replace(a, b)")
+print("    return scrub_a(d)")
 PY
 COMMIT_CB="$(cat <<PY
 import re, sys
@@ -50,30 +67,29 @@ commit.committer_name = b"$NAME"; commit.committer_email = b"$EMAIL"
 lines = commit.message.split(b"\n")
 keep = [l for l in lines if not re.match(rb"^(Co-Authored-By|Co-authored-by|Signed-off-by|Session|Session-URL|Claude-Session):", l)
         and not re.search(rb"https?://claude\.ai/", l)]
-commit.message = bs_subs.scrub(b"\n".join(keep).rstrip(b"\n") + b"\n")
+commit.message = bs_subs.scrub_msg(b"\n".join(keep).rstrip(b"\n") + b"\n")
 PY
 )"
 BLOB_CB="$(cat <<'PY'
 import sys
 sys.path.insert(0, "/tmp"); import bs_subs
 if b"\x00" not in blob.data[:8000]:
-    blob.data = bs_subs.scrub(blob.data)
+    blob.data = bs_subs.scrub_blob(blob.data, blob.original_id)
 PY
 )"
 git filter-repo --force --refs refs/heads/main --commit-callback "$COMMIT_CB" --blob-callback "$BLOB_CB"
-rm -f /tmp/bs_subs.py
+rm -f /tmp/bs_subs.py /tmp/bs_allowed_blobs.txt
 
-echo "→ history sweep"
+echo "→ history sweep (refs/heads/main only)"
 fail=0
-ids=$(git log --all --format='%an <%ae>%n%cn <%ce>' | grep -v '^$' | sort -u)
+ids=$(git log refs/heads/main --format='%an <%ae>%n%cn <%ce>' | grep -v '^$' | sort -u)
 echo "   identities: $(echo "$ids" | tr '\n' ';')"
 [ "$ids" = "$NAME <$EMAIL>" ] || { echo "   ✗ an identity other than the project's remains"; fail=1; }
-git log --all --format='%B' | grep -qE "^Co-Authored-By:|claude\.ai/" && { echo "   ✗ trailers remain"; fail=1; }
-hits=$(git log -p --all --format='commit %H%n%an %ae %cn %ce%n%B' | grep -ciE "$A_RE" || true)
-echo "   PART A hits across every diff + message + identity: $hits"
-[ "$hits" = "0" ] || fail=1
-bhits=$(git log -p --all --format='%B' -- . ':!LICENSE' ':!BLINDSEAL.md' ':!DECISIONS.md' ':!README.md' ':!FRONTEND.md' ':!RH-INTEGRATION.md' ':!docs/*.md' | grep -ciE "$B_RE" || true)
-echo "   PART B occurrences across every diff + message outside the allowed docs: $bhits"
-[ "$bhits" = "0" ] || fail=1
+tr=$(git log refs/heads/main --format='%B' | grep -cE "^Co-Authored-By:|claude\.ai/" || true)
+echo "   trailers remaining: $tr"; [ "$tr" = "0" ] || fail=1
+ahits=$(git log -p refs/heads/main --format='commit %H%n%an %ae %cn %ce%n%B' | grep -ciE "$A_RE" || true)
+echo "   PART A hits across every diff + message + identity: $ahits"; [ "$ahits" = "0" ] || fail=1
+bhits=$(git log -p refs/heads/main --format='%B' -- . ':!LICENSE' ':!BLINDSEAL.md' ':!DECISIONS.md' ':!README.md' ':!FRONTEND.md' ':!RH-INTEGRATION.md' ':!docs' ':!scripts/identity-sweep.sh' ':!scripts/history-rewrite.sh' | grep -ciE "$B_RE" || true)
+echo "   PART B occurrences across every diff + message outside the allowed paths: $bhits"; [ "$bhits" = "0" ] || fail=1
 [ $fail -eq 0 ] && echo "history sweep: clean" || { echo "history sweep: FAILED"; exit 1; }
 echo "done — review: git log --oneline | head; backup at refs/backup/pre-rewrite (delete after the owner's review)"
