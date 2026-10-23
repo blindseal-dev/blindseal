@@ -1,0 +1,30 @@
+{
+  "action": {
+    "amount": "1000000",
+    "instruction": "0x981894646560fc2b",
+    "mint": "",
+    "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+    "sourceAuthority": "88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj",
+    "targetProgram": "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+  },
+  "actionHash": "0x16dbbf62d9817675e9beb01df6d6b978a4ec6f6cdbb79b3ad416c26c875a8452",
+  "chainId": 1,
+  "decisionId": "d_ff1be0d3f891beef",
+  "detectorVersion": "0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e",
+  "expirySlot": 2000000000,
+  "nonce": "0x7615626e7516c4b6e1b689cb735049de5832e46be48f7d5e293c50ca59cc5cb0",
+  "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)",
+  "nullifier": "0xfea1d3eca4c3ee68eadf478f8096599b1725acdbcf2975fbb5b7de96b96a15f1",
+  "payloadHash": "0x817664c75240624e9d41b9d39c891ea9a0979887f2125a40ad945669d0b32cdc",
+  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "proof": {
+    "bytes": "0xa4594c59068ddaa12ccb8ed28bac678b5b9bcd2615dc715f59c3ff38f306d9445c833f671ef37f2e5016878d026ff679879ed0a40823b8bfe2407b87287fbe12f0ab32a42a3bc564ceb3712ea8547259f3d58ac0206ec791757d59cab605bd3cd1fcb68401bb141ed9baca574f0be9fdf3ae05267ad815e1606977f200e1177c46ec21e30460f25723f1ca989e7b4d1d421babfdff8f60a4d58aa6785d7572d745a6162e0238eadf68799f9eeadbf03bedaac35d3b2480af83909c9893f2f7d680767fe411cb84375eb848bbe2e54cdf7466ee7d1e36e7dc582ca458ca34fb54f34bd116295d298990d6b4ee5d6469210b1a828ffa663e3857db6dbe15d2a3763d32e33a",
+    "curve": "bn254",
+    "protocol": "groth16"
+  },
+  "proveMs": 7318913,
+  "publicInputs": [
+    "0x817664c75240624e9d41b9d39c891ea9a0979887f2125a40ad945669d0b32cdc36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e16dbbf62d9817675e9beb01df6d6b978a4ec6f6cdbb79b3ad416c26c875a8452fea1d3eca4c3ee68eadf478f8096599b1725acdbcf2975fbb5b7de96b96a15f10094357700000000"
+  ],
+  "version": 1
+}

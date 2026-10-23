@@ -80,7 +80,7 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 
 ## Pending (in order)
 1. ~~Test proof → suite → numbers~~ **DONE** `441b3f6`: 15/15 on localnet; gated transfer **262,507 CU**, tx **893 B** (`docs/performance.md`).
-2. Mainnet proof from a real screened decision (`blindseal attest tests/fixtures/mainnet-toolcall.json …`, another ~2.3 h).
+2. ~~Mainnet proof~~ **DONE**: `blindseal attest` screened `tests/fixtures/mainnet-toolcall.json` with the real layers (clean), appended decision `d_ff1be0d3f891beef` to the hash-chained audit log (entry #0, chain INTACT), and proved it in 2 h 02 m → `tests/fixtures/attestation-mainnet.json` (VALID natively; binds authority `88sR7X…` → `6HwAr9…`, 0.001 SOL via transfer-gate, nullifier `0xfea1d3ec…`).
 3. **Owner gate:** fund `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj` (BLOCKERS.md) → `scripts/mainnet-deploy.sh`
    → `scripts/mainnet-acceptance.mts` → both signatures here. Nothing below is claimed until they exist.
 4. Quickstart on a fresh clone; launch checklist boxes.
