@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const PAGES = ['/', '/how-it-works', '/verify', '/docs', '/docs/concepts', '/docs/hashing', '/docs/integrate', '/docs/scope', '/explorer', '/changelog'];
 
@@ -27,21 +29,37 @@ test('home reduced-motion reaches end state', async ({ page }) => {
 });
 
 
-test('verify: sample valid, tampered invalid, nothing stored, wasm fetched same-origin', async ({ page }) => {
+test('verify: sample valid, tampered invalid, disclosure accepted, nothing stored, wasm fetched same-origin', async ({ page }) => {
   const off: string[] = [];
   // This is the only test that triggers the lazy wasm fetch — assert it stays same-origin.
   page.on('request', (r) => { try { const h = new URL(r.url()).hostname; if (!['localhost','127.0.0.1',''].includes(h) && r.url().startsWith('http')) off.push(r.url()); } catch {} });
   await page.goto('/verify');
-  await page.getByRole('button', { name: 'Load sample' }).click();
-  await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid');
-  await page.getByRole('button', { name: 'Load tampered' }).click();
-  await expect(page.locator('.s03-result .panel__title')).toHaveText('Invalid');
-  // The real Groth16 verifier ran: a flipped proof fails the on-curve check.
-  await expect(page.locator('.s03-result')).toContainText('NotOnCurve');
-  // a disclosure.json is accepted too (ed25519 + chain recompute, in the browser)
-  await page.getByRole('button', { name: 'Load disclosure' }).click();
-  await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid', { timeout: 10_000 });
-  await expect(page.locator('.s03-result')).toContainText('content-free entries');
+  // the kit paints the idle checklist (four pending steps) once it has mounted
+  await expect(page.locator('#vf-checks .check')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Load sample', exact: true }).click();
+  await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
+  await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Valid attestation');
+  await expect(page.locator('#vf-checks .check').nth(1)).toHaveAttribute('data-state', 'pass');
+  // step 3 decoded the single public-input blob into its six fields
+  await expect(page.locator('#vf-checks .vf-kv .kv__item')).toHaveCount(7);
+  // step 4 is on demand; the e2e server runs with BLINDSEAL_RPC_URL=off, so the same-origin read says unavailable
+  await page.locator('#vf-checks [data-n4]').click();
+  await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'fail', { timeout: 10_000 });
+  await expect(page.locator('#vf-checks .check').nth(3)).toContainText('RPC unavailable');
+  await page.getByRole('button', { name: 'Load tampered', exact: true }).click();
+  await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'fail', { timeout: 20_000 });
+  await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Does not verify');
+  // The real Groth16 verifier ran: a flipped proof fails the on-curve check at step 2; 3 and 4 are skipped.
+  await expect(page.locator('#vf-checks .check').nth(1)).toHaveAttribute('data-state', 'fail');
+  await expect(page.locator('#vf-checks .check').nth(1)).toContainText('NotOnCurve');
+  await expect(page.locator('#vf-checks .check').nth(2)).toHaveAttribute('data-state', 'skip');
+  // a pasted disclosure.json is accepted too (ed25519 + chain recompute, in the browser)
+  const disclosure = readFileSync(join(__dirname, '../app/verify/disclosure-sample.json'), 'utf8');
+  await page.locator('#vf-text').fill(disclosure);
+  await page.locator('#vf-verify').click();
+  await expect(page.locator('#vf-checks .check').nth(2)).toHaveAttribute('data-state', 'pass', { timeout: 15_000 });
+  await expect(page.locator('#vf-checks .check').nth(2)).toContainText('recomputed from their six fields');
+  await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Valid disclosure');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
   expect(off, `off-host: ${off.join(', ')}`).toEqual([]);
 });

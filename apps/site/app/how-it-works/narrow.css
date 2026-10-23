@@ -1,0 +1,32 @@
+/* S02 · How it works — narrow-viewport rules only. The mockup's page.css (kit/pages/s02.css, loaded
+   verbatim) has no width queries and overflows under ~720px (the 220px rail + 56 gap grid, the
+   three-column redaction panel, the five-column kv). Nothing here applies at the mockup's 1440 width.
+   Tokens only; no colour literal. */
+@media (max-width: 720px) {
+  .hiw-mast { width: calc(100% - 32px); height: auto; min-height: 0; padding: 36px 0; }
+  .hiw-mast__copy { padding: 0 24px; }
+  .hiw-mast__title { font-size: var(--fs-28); line-height: 1.15; }
+  .hiw-mast__lede { font-size: var(--fs-15); line-height: 24px; }
+
+  .hiw { grid-template-columns: minmax(0, 1fr); gap: 28px; width: calc(100% - 32px); margin-top: 32px; }
+  /* the sticky rail has no home at phone width (and would push section 01 below the first screen): the
+     column is hidden; the sections read in order and the notch nav stays */
+  .hiw-toc-col { display: none; }
+
+  .hiw-sec .section-head { grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+  .hiw-sec .section-head__body { max-width: none; }
+  .hiw-grid2, .hiw-layers, .hiw-claim, .hiw-next { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .hiw-flows__v { max-width: none; }
+  .hiw-fig.fig { grid-template-columns: minmax(0, 1fr); }
+  .hiw-replay { grid-column: 1; justify-self: start; margin: 0; }
+
+  .hiw-redact { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; }
+  .hiw-redact__arrow { grid-auto-flow: column; justify-items: start; justify-content: start; align-items: center; gap: 12px; }
+  .hiw-redact__arrow svg { width: 60px; }
+  .hiw-redact__sub { max-width: none; }
+  .hiw-redact__note { margin-left: 0; }
+
+  .hiw-panel, .hiw-bind { padding: 20px; }
+  .kv.hiw-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hiw-table { padding: 4px 12px; }
+}

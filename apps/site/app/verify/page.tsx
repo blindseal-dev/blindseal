@@ -1,59 +1,100 @@
-'use client';
-import { useState } from 'react';
-import { verifyAttestation, tamper, type VerifyResult } from './verifier';
-import sample from './sample.json';
-import disclosureSample from './disclosure-sample.json';
+import type { Metadata } from 'next';
+import { VerifyClient } from './verify-client';
 
-const CANON = JSON.stringify(sample);
-const DISCLOSURE = JSON.stringify(disclosureSample, null, 2);
+// S03 · Verify (/verify) — the mockup's static markup, server-rendered one-to-one
+// (design/mockups/mockups/S03/index.html). Everything page.js painted (the idle checklist, the
+// banner's demo links, panel 5's rows, the result states) is filled by VerifyClient after the kit
+// mounts, so nothing here depends on time, randomness or the viewport.
+export const metadata: Metadata = {
+  title: 'Verify · Blindseal',
+  description: 'Check a Blindseal attestation in your browser. Nothing is uploaded, nothing is stored.',
+};
 
 export default function VerifyPage() {
-  const [text, setText] = useState('');
-  const [result, setResult] = useState<VerifyResult | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const run = async (json: string) => { setBusy(true); try { setResult(await verifyAttestation(json)); } finally { setBusy(false); } };
-  const load = (t: boolean) => { const j = t ? tamper(CANON) : JSON.stringify(sample, null, 2); setText(j); run(j); };
-  const onDrop = (e: React.DragEvent) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) f.text().then((t) => { setText(t); run(t); }); };
-
   return (
-    <section className="site-section s03" aria-labelledby="v-h">
-      <div className="section-head"><div className="section-head__lead"><p className="section-head__eyebrow"><b>·</b> / Verify</p>
-        <h1 className="section-head__title" id="v-h">Verify an attestation.</h1></div>
-        <p className="section-head__body">Drop or paste an <code>attestation.json</code>. It is verified in your browser — nothing is uploaded or stored.</p></div>
-
-      <div className="site-panel s03-drop" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-        <textarea className="input s03-ta" rows={8} value={text} placeholder="Paste attestation.json…" spellCheck={false}
-          onChange={(e) => setText(e.target.value)} style={{ fontFamily: 'var(--font-mono)', fontSize: 13, width: '100%' }} />
-        <div className="s03-actions">
-          <button type="button" className="btn primary" disabled={!text || busy} onClick={() => run(text)}>{busy ? 'Verifying…' : 'Verify'}</button>
-          <button type="button" className="btn secondary" onClick={() => load(false)}>Load sample</button>
-          <button type="button" className="btn secondary" onClick={() => load(true)}>Load tampered</button>
-          <button type="button" className="btn secondary" onClick={() => { setText(DISCLOSURE); run(DISCLOSURE); }}>Load disclosure</button>
-          <button type="button" className="btn link" onClick={() => { setText(''); setResult(null); }}>Clear</button>
+    <>
+      {/* ══ masthead: a flat panel band over the faint nebula (S02's band, 300 high) ══ */}
+      <header className="vf-mast" aria-labelledby="vf-title">
+        <div className="vf-mast__space" aria-hidden="true" />
+        <div className="vf-mast__copy">
+          <p className="vf-mast__eyebrow">Verify</p>
+          <h1 className="vf-mast__title" id="vf-title">Check an attestation.</h1>
+          <p className="vf-mast__lede">Runs in your browser. Nothing is uploaded, nothing is stored.</p>
         </div>
-      </div>
+      </header>
 
-      {result && (
-        <div className="site-panel s03-result" aria-live="polite">
-          <h2 className="panel__title">{result.error ? 'Could not read' : result.valid ? 'Valid' : 'Invalid'}</h2>
-          {result.error ? <p className="is-muted">{result.error}</p> : (
-            <ol className="s03-checklist">
-              {result.steps.map((s) => (
-                <li key={s.id} className="s03-step" data-ok={String(s.ok)}>
-                  <i data-lucide={s.ok === true ? 'circle-check' : s.ok === false ? 'triangle-alert' : 'minus'} />
-                  <div><p className="s03-step__t">{s.label}</p><p className="s03-step__d is-faint">{s.detail}</p></div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
+      {/* ══ the checker: input 5 / checklist 7 ═════════════════════════════ */}
+      <div className="vf">
 
-      <div className="site-panel s03-hidden-panel">
-        <h2 className="panel__title">What this does not reveal</h2>
-        <ul className="s03-hidden"><li>The prompt and tool arguments</li><li>The policy contents and thresholds</li><li>Which agent or operator was screened</li><li>The model-layer scores</li></ul>
+        {/* left: input (no animation on this panel itself: it holds a glass button) */}
+        <section className="vf-in site-panel" aria-labelledby="vf-in-title">
+          <div className="vf-head vf-enter">
+            <p className="site-panel__n">Input</p>
+            <h2 className="site-panel__title" id="vf-in-title">Your attestation</h2>
+          </div>
+
+          <button type="button" className="vf-drop vf-enter" id="vf-drop" aria-describedby="vf-drop-sub">
+            <span className="vf-drop__ico"><i data-lucide="upload" /></span>
+            <span className="vf-drop__title">Drop attestation.json</span>
+            <span className="vf-drop__sub" id="vf-drop-sub">or choose a file · it is read in this tab, never uploaded</span>
+          </button>
+          <input type="file" id="vf-file" accept=".json,application/json" hidden />
+
+          <div className="field vf-field vf-enter">
+            <label htmlFor="vf-text">…or paste it</label>
+            <textarea className="textarea mono vf-text" id="vf-text" rows={10} spellCheck={false} autoComplete="off" autoCapitalize="off" wrap="off"
+              placeholder='{ "version": 1, "actionHash": "0x…", … }' aria-describedby="vf-help" defaultValue="" />
+            <p className="help vf-help" id="vf-help" aria-live="polite">Paste the JSON, or load a sample below.</p>
+          </div>
+
+          <div className="vf-actions">
+            <button type="button" className="btn secondary vf-enter" id="vf-load-sample"><i data-lucide="file-check" />Load sample</button>
+            <button type="button" className="btn secondary vf-enter" id="vf-load-tampered"><i data-lucide="file-json" />Load tampered</button>
+            <span className="vf-actions__spacer" />
+            <button type="button" className="btn link vf-enter" id="vf-clear">Clear</button>
+            <button type="button" className="glass-btn primary sm vf-enter vf-verify" id="vf-verify" disabled>Verify</button>
+          </div>
+
+          <p className="vf-note vf-enter"><i data-lucide="cpu" /><span>Verification runs in the browser via the WASM verifier. The nullifier check is optional and is the only step that touches the network.</span></p>
+        </section>
+
+        {/* right: checklist */}
+        <section className="vf-out site-panel" aria-labelledby="vf-out-title">
+          <div className="vf-head vf-head--split vf-enter">
+            <div>
+              <p className="site-panel__n">Checklist</p>
+              <h2 className="site-panel__title" id="vf-out-title">What the verifier finds</h2>
+            </div>
+            <span className="vf-source" id="vf-source" hidden />
+          </div>
+
+          <div className="vf-banner vf-enter" id="vf-banner" data-tone="idle" role="status" aria-live="polite">
+            <span className="vf-banner__mark" aria-hidden="true" />
+            <div className="vf-banner__main">
+              <p className="vf-banner__title">Waiting for an attestation</p>
+              <p className="vf-banner__sub">Load a sample, drop a file or paste JSON. The checks fill in, in order.</p>
+            </div>
+            <span className="vf-banner__end" />
+          </div>
+
+          <ol className="checklist vf-checks vf-enter" id="vf-checks" aria-label="Verification steps" />
+
+          <section className="vf-hidden" id="vf-hidden" aria-labelledby="vf-hidden-title" hidden>
+            <div className="vf-hidden__head">
+              <p className="vf-hidden__n">05</p>
+              <h3 className="vf-hidden__title" id="vf-hidden-title">What this does not reveal</h3>
+              <p className="vf-hidden__lede">The attestation carries hashes and a proof. These stay on the machine that screened the call.</p>
+            </div>
+            <ul className="vf-hidden__rows" id="vf-hidden-rows" />
+            <div className="vf-hidden__foot">
+              <p className="vf-hidden__k">Public</p>
+              <p className="vf-hidden__pub">That a valid attestation exists · Policy root (a hash) · Detector version · Action hash, expiry, nullifier</p>
+            </div>
+          </section>
+        </section>
+
       </div>
-    </section>
+      <VerifyClient />
+    </>
   );
 }

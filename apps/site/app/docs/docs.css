@@ -1,0 +1,24 @@
+/* A code line longer than the column scrolls; the kit's 48px right padding would put the lang label
+   (right: 44px) over its text, so the docs column keeps the text clear of it. */
+.docs .code { padding-right: 96px; }
+
+/* S04 below the mockup's 1440 frame: page.css fixes the grid at 240 · 720 · 200 and has no breakpoints
+   (the mockup overflows sideways at phone width). The rails fold here so nothing scrolls sideways:
+   the outline goes first (under 1024), then the sidebar stacks above the page (under 768). */
+@media (max-width: 1023px) {
+  .docs { grid-template-columns: 240px minmax(0, 1fr); column-gap: 40px; }
+  .docs-otp-col { display: none; }
+}
+@media (max-width: 767px) {
+  .docs { --docs-top: 88px; grid-template-columns: minmax(0, 1fr); column-gap: 0; row-gap: 28px; }
+  .docs-side__in { position: static; max-height: none; overflow: visible; margin: 0; padding: 0; gap: 16px; }
+  .docs-tree { gap: 12px; }
+  .docs-side__foot { margin-top: 0; }
+  .docs-title { font-size: 28px; line-height: 34px; }
+  .docs-pn { grid-template-columns: minmax(0, 1fr); }
+  .docs-pn__card--next, .docs-pn__end { grid-column: 1; }
+}
+@media (max-width: 767px) {
+  /* a long inline code run (the public-input order) wraps rather than widening the page */
+  .docs-ic { white-space: normal; overflow-wrap: anywhere; }
+}

@@ -12,6 +12,13 @@ import './kit/ui.css';
 import './kit/space.css';
 import './kit/shell.css';
 import './kit/diagrams.css';
+// The mockups' per-page stylesheets, verbatim (D01–D06 page.css; classes are page-scoped d0x-*).
+import './kit/pages/d01.css';
+import './kit/pages/d02.css';
+import './kit/pages/d03.css';
+import './kit/pages/d04.css';
+import './kit/pages/d05.css';
+import './kit/pages/d06.css';
 import './app.css';
 
 // Kit JS primitives populate window.BS (order matters: constants → icons → motion → reveal → …).

@@ -1,0 +1,145 @@
+/* ============================================================================
+   D05 — Dashboard: Attestations (page.css)
+   Tokens only: no colour literal in this file. Hover = colour / hairline,
+   press = scale .98 on 160 ms out-quint (rows .99, the kit's), focus = the
+   2 px accent ring. Red lives only inside the kit's .status chip.
+   Invented values (logged on the board): filter panel 56 · lifecycle strip
+   = the figure's track cropped to viewBox y 26–132 (106 of 220 units, ≈ 115 px
+   at this width) · columns 196 / 204 / 156 / 112 / 140 / 150 / auto · sheet
+   560 (brief) with a flat sticky actions footer · cluster select 148 ·
+   public-input index tag 16.
+   ========================================================================== */
+
+/* ── the status filter: flat panel, 56 px (D01's bar) ──────────────────── */
+.d05-filters { display: flex; align-items: center; height: 56px; padding: 0 16px 0 14px; }
+.d05-filters .filter-bar { flex: 1; flex-wrap: nowrap; gap: 8px; min-width: 0; }
+.d05-filters .filter-bar > * { flex: none; }
+.d05-filters .filter-bar > .filter-bar__spacer { flex: 1 1 auto; }
+.d05-seg { flex-wrap: nowrap; gap: 4px; }
+.d05-seg .seg__item { height: 28px; padding: 0 9px; gap: 6px; }
+.d05-seg .count { font-variant-numeric: tabular-nums; }
+.d05-seg .seg__item.is-active .count { color: var(--ink); }
+.d05-shown .num { color: var(--ink); }
+
+/* ── the lifecycle strip ───────────────────────────────────────────────── */
+.d05-life { padding: 14px 16px 10px; }
+.d05-life__head { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+.d05-life__head .panel__title { flex: none; }
+.d05-life__note { flex: 1 1 auto; min-width: 0; font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d05-life__rule { flex: none; font: var(--fw-body) var(--fs-11)/16px var(--font-mono); letter-spacing: var(--ls-eyebrow, .12em); text-transform: uppercase; color: var(--muted); }
+.d05-life__fig.fig { margin: 4px 0 0; }
+/* crop the figure to its track (numbers, labels, nodes, the nullifier) — the bottom rows are told in the note above */
+.d05-life__fig .fig__art { aspect-ratio: 1020 / 106; min-height: 0; overflow: hidden; }
+.d05-life__fig .fig__art > svg { margin-top: -2.549%; }        /* 26 / 1020: margin % resolves against the width */
+
+/* ── the table ─────────────────────────────────────────────────────────── */
+.d05-table { table-layout: fixed; }
+.d05-table tbody { --stagger-card: 20ms; }
+.d05-table col.c-id { width: 196px; } .d05-table col.c-dec { width: 204px; } .d05-table col.c-status { width: 156px; }
+.d05-table col.c-created { width: 112px; } .d05-table col.c-expiry { width: 140px; } .d05-table col.c-tx { width: 150px; }
+.d05-table th:nth-child(5), .d05-table td:nth-child(5) { padding-right: 28px; }
+.d05-table td { overflow: hidden; text-overflow: clip; }
+.d05-table td .hash { margin-left: -4px; }
+.d05-row:focus-visible td { background: var(--surface-hover); }
+.d05-table td.d05-slot { font-family: var(--font-mono); font-size: var(--fs-12); font-weight: var(--fw-body); color: var(--ink); }
+.d05-table td.d05-slot.is-past { color: var(--muted); }
+.d05-nil { color: var(--faint); }
+.d05-tee { gap: 4px; font-family: var(--font-mono); font-weight: var(--fw-medium); letter-spacing: .02em; }
+.d05-tee svg { width: 11px; height: 11px; }
+
+.d05-dec { display: inline-flex; align-items: center; gap: 2px; }
+.d05-go {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--r-chip); color: var(--faint);
+  transition: color var(--d-150) var(--ease-in-out), background-color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+.d05-go svg { width: 13px; height: 13px; }
+@media (hover: hover) and (pointer: fine) { .d05-go:hover { color: var(--ink); background: var(--surface-hover); } }
+.d05-go:active { transform: scale(.98); }
+.d05-go:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; color: var(--ink); }
+
+/* a live row: the kit's flash; a row that starts matching the filter enters with row-in */
+.d05-row.is-entering-row.is-flash { animation: row-in var(--d-320) var(--ease-out-expo) both, row-flash var(--d-2400) var(--ease-in-out) both; }
+
+.d05-none { padding: 8px 0 12px; }
+.d05-tablebox.is-none .d05-table thead th { box-shadow: inset 0 -1px 0 var(--line); }
+
+/* ── ?state=empty ──────────────────────────────────────────────────────── */
+.d05-empty .empty { padding: 56px 24px 52px; background: var(--panel); }
+.d05-empty__go svg { width: 14px; height: 14px; }
+
+/* ── the detail sheet: 560, one column, sticky flat actions footer ─────── */
+.sheet--attestation { --sheet-w: 560px; }
+.sheet--attestation .sheet__body { display: flex; flex-direction: column; gap: 18px; padding: 20px 24px 0; }
+.sheet--attestation .sheet__block { min-width: 0; }
+.sheet--attestation .sheet__h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.d05-h-sub { font: var(--fw-body) var(--fs-11)/16px var(--font-sans); color: var(--faint); }
+
+/* the glass header: eyebrow · id · status */
+.d05-lead { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.d05-lead .hash { color: var(--ink); }
+
+/* bound to */
+.d05-bound { display: grid; gap: 6px; padding: 12px 14px; border: var(--hairline); border-radius: var(--r-row); background: var(--panel); }
+.d05-bound__call { display: flex; align-items: center; gap: 6px; font: var(--fw-medium) var(--t-body) var(--font-sans); color: var(--ink); }
+.d05-act { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
+.d05-act .num { color: var(--ink); font-weight: var(--fw-medium); }
+.d05-act .hash { margin-left: -2px; }
+.d05-act__ix { font-family: var(--font-mono); font-size: var(--fs-12); }
+.d05-act__sep { color: var(--faint); }
+.d05-bound__sub { display: flex; align-items: center; gap: 6px; font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
+.d05-bound__sub .hash { margin-left: -2px; }
+
+/* key–value rows */
+.d05-kv > .kv__item { min-height: 40px; align-content: center; }   /* the kit item is align-content: start; rows centre key and value on the 40 px line */
+.d05-kv .kv__k { display: inline-flex; align-items: center; gap: 8px; }
+.d05-kv .kv__v .hash { margin-left: 0; margin-right: -4px; }
+.d05-pi {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: var(--r-chip);
+  font: var(--fw-body) var(--fs-10)/1 var(--font-mono); letter-spacing: 0; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line);
+}
+.d05-det {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--r-chip);
+  font: var(--fw-body) var(--fs-12)/1 var(--font-mono); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.d05-slotv { font: var(--fw-medium) var(--fs-13)/1 var(--font-mono); color: var(--ink); }
+.d05-mono { font: var(--fw-medium) var(--fs-13)/1 var(--font-mono); color: var(--ink); }
+
+/* proof state lines */
+.d05-proofstate { margin-top: 10px; }
+.d05-proving { display: grid; gap: 8px; padding: 12px 14px; border: var(--hairline); border-radius: var(--r-row); }
+.d05-proving__t { font: var(--fw-medium) var(--t-sub) var(--font-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+.d05-proving__t .num { display: inline-block; min-width: 2ch; text-align: right; }
+.d05-proofline, .d05-reason { display: flex; align-items: flex-start; gap: 8px; font: var(--fw-body) var(--t-sub) var(--font-sans); }
+.d05-proofline { color: var(--muted); }
+.d05-reason { padding: 12px 14px; border: var(--hairline); border-radius: var(--r-row); color: var(--ink); line-height: 18px; }
+.d05-proofline svg, .d05-reason svg { width: 14px; height: 14px; flex: none; margin-top: 1px; color: var(--muted); }
+.d05-note { margin-top: 8px; font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
+
+/* the actions footer: flat, sticky to the panel's bottom edge */
+.d05-foot {
+  position: sticky; bottom: 0; z-index: 2; margin: auto -24px 0; padding: 14px 24px 18px;
+  display: grid; gap: 10px; background: var(--canvas); border-top: var(--hairline);
+}
+.sheet__block.d05-swap { animation: fade-in var(--d-200) var(--ease-in-out) both; }
+.d05-txline { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.d05-txline__k { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.d05-cluster { font-family: var(--font-mono); letter-spacing: .02em; }
+.d05-explorer { margin-left: auto; }
+.d05-actions { display: flex; align-items: center; gap: 8px; }
+.d05-actions__spacer { flex: 1 1 auto; }
+.d05-cluster-sel .select { width: 148px; min-height: 32px; height: 32px; font-size: var(--fs-13); border-radius: var(--r-control); padding-right: 30px; }
+.d05-submit { min-width: 118px; justify-content: center; }   /* = the busy label "Submitting…": the button never jumps */
+.d05-export { min-height: 32px; }
+.d05-export-wrap { display: inline-flex; }                    /* a disabled button gets no hover: the tip lives on the wrapper */
+.d05-export svg { width: 15px; height: 15px; }
+.d05-foot__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.d05-why { font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
+.d05-open { flex: none; gap: 4px; }
+.d05-open svg { width: 14px; height: 14px; }
+
+/* ── reduced motion: end states ────────────────────────────────────────── */
+html[data-motion="reduce"] :is(.d05-row.is-entering-row.is-flash, .sheet__block.d05-swap) { animation: none !important; opacity: 1 !important; transform: none !important; }
+html[data-motion="reduce"] :is(.d05-go, .d05-row):active { transform: none; }
+
+/* while the sheet is open, toasts stand left of it so they never cover the action just taken */
+body:has(.sheet--attestation:not(.is-ghost)) .toasts { right: calc(560px + 16px); }

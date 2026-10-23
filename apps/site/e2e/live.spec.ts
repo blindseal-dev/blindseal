@@ -73,3 +73,28 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
   expect(errors, `console errors: ${errors.join(' | ')}`).toEqual([]);
   console.log(`      hidden reveals per route: ${JSON.stringify(hidden)} · notch fixed=${notch.position === 'fixed'} backdrop=${notch.backdrop} · hero canvas=${hero.canvas} webgl2=${hero.webgl2} · console errors=${errors.length}`);
 });
+
+// 5) hydration: zero pageerror / console error on every route at 1440×900 and 443×714, listeners attached
+//    BEFORE goto and waitUntil 'load'; no .reveal left hidden inside the first screen; and when a .reveal
+//    sits in the first screen it is in view within 500 ms of load.
+for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) {
+  test(`live: hydration clean at ${vp.width}x${vp.height}`, async ({ browser }) => {
+    const page = await browser.newPage({ viewport: vp });
+    for (const r of ROUTES) {
+      const errs: string[] = [];
+      page.on('pageerror', (e) => errs.push(`${r} pageerror: ${String(e.message ?? e).split('\n')[0]}`));
+      page.on('console', (m) => { if (m.type() === 'error') errs.push(`${r} console: ${m.text().split('\n')[0]}`); });
+      await page.goto(r, { waitUntil: 'load' });
+      const t0 = Date.now();
+      const firstInView = await page.waitForSelector('.reveal.is-inview', { timeout: 3000 }).then(() => Date.now() - t0).catch(() => null);
+      await page.waitForTimeout(1000);
+      const hiddenAboveFold = await page.evaluate(() => [...document.querySelectorAll('.reveal')].filter((el) => getComputedStyle(el).opacity === '0' && el.getBoundingClientRect().top < innerHeight).length);
+      const revealInFirstScreen = await page.evaluate(() => [...document.querySelectorAll('.reveal')].some((el) => el.getBoundingClientRect().top < innerHeight));
+      expect(errs, `${r} @ ${vp.width}`).toEqual([]);
+      expect(hiddenAboveFold, `${r} hidden reveals above the fold`).toBe(0);
+      if (revealInFirstScreen) expect(firstInView, `${r} first .reveal in view`).not.toBeNull(), expect(firstInView!).toBeLessThan(500);
+      page.removeAllListeners('pageerror'); page.removeAllListeners('console');
+    }
+    await page.close();
+  });
+}

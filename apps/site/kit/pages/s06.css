@@ -1,0 +1,164 @@
+/* ============================================================================
+   S06 · Changelog — page.css (tokens only; no colour literal)
+   ----------------------------------------------------------------------------
+   Kit classes reused: .chip (.neutral for the component, .accent for latest),
+   .sr-only, the [data-copy] helper (ui.js: "Copied" 1400 ms, .is-done),
+   .rise-14 (motion.css), the site chrome (site.css) and the faint nebula
+   (space.css via BS.mountSpace).
+   Copied from the siblings: the masthead band (S03 / S05: r12 hairline
+   --panel over the faint field, copy pad 56, eyebrow mono 11, title 40/46,
+   lede 18/30, rise-16 450 out-cubic at 0 / 30 / 180) and the sticky rail
+   (S02: notch + 32, mono 11 head, 2 px track + 100 ms linear damped fill,
+   links 5 0 5 18, muted → ink, Back to top).
+   Built locally (the kit has no such primitive, logged on the board):
+     · .cl-entry — the release panel (head row + Added / Changed / Fixed)
+     · .cl-anchor — the "#" copy-link button (ghost, 28 high)
+     · .cl-rail__dot — the latest release's accent dot in the version list
+   INVENTED values (logged on the board):
+     masthead 260 (brief); body grid 220 + 56 + 936 = 1212 (S02), 32 under
+     the masthead (S03); entries gap 24, pad 28 (site panel), head row gap 12,
+     hairline under the head, 20 / 24 pad; groups as a 96 px key column + the
+     list, 20 between groups; bullet 4 × 4 r1 --line-strong at 9 px; list
+     measure 680; "#" button 28 × 28 r6 mono 14; rail dot 6 at x 8, links
+     5 0 5 22; reveal rise-14 400 out-cubic at 260 + 60 per entry on first
+     paint, 0 afterwards (once per entry).
+   ========================================================================== */
+
+/* ══ masthead (S03 / S05's band, 260 high) ═══════════════════════════════ */
+.cl-mast {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; align-items: center;
+  width: min(var(--site-max-w), calc(100% - 96px)); height: 260px;
+  margin: calc(var(--notch-top) + var(--notch-h) + 24px) auto 0;
+  border: var(--hairline); border-radius: var(--r-panel); background: var(--panel);
+}
+.cl-mast__space { position: absolute; inset: 0; z-index: 0; }
+.cl-mast__space .space { background: var(--panel); }
+.cl-mast__copy { position: relative; z-index: 1; max-width: calc(720px + 112px); padding: 0 56px; }
+.cl-mast__eyebrow {
+  font: var(--fw-body) var(--fs-11)/17.6px var(--font-mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--muted);
+}
+.cl-mast__title { margin: 20px 0 16px; font: var(--fw-medium) var(--fs-40)/46px var(--font-sans); letter-spacing: -0.03em; color: var(--ink); }
+.cl-mast__lede { max-width: 720px; font: var(--fw-body) var(--fs-18)/30px var(--font-sans); color: var(--muted); }
+
+/* the ladder (S02 / S03 / S05 verbatim); the rail follows at 260 */
+.bs-js .cl-mast.is-rising .cl-mast__eyebrow { animation: rise-16 var(--d-450) var(--ease-out-cubic) 0ms both; }
+.bs-js .cl-mast.is-rising .cl-mast__title   { animation: rise-16 var(--d-450) var(--ease-out-cubic) 30ms both; }
+.bs-js .cl-mast.is-rising .cl-mast__lede    { animation: rise-16 var(--d-450) var(--ease-out-cubic) 180ms both; }
+.bs-js .cl.is-rising .cl-rail               { animation: rise-14 var(--d-400) var(--ease-out-cubic) 260ms both; }
+
+/* ══ body grid (S02: 220 rail + 56 + 936) ═══════════════════════════════ */
+.cl {
+  display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; align-items: start;
+  width: min(var(--site-max-w), calc(100% - 96px)); margin: 32px auto 0;
+}
+.cl-rail-col { position: relative; align-self: stretch; }
+
+/* ══ the version rail (S02's .hiw-toc) ══════════════════════════════════ */
+.cl-rail { position: sticky; top: calc(var(--notch-top) + var(--notch-h) + 32px); }
+.cl-rail__head {
+  margin: 0 0 12px;
+  font: var(--fw-body) var(--fs-11)/17.6px var(--font-mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--muted);
+}
+.cl-rail__body { position: relative; }
+.cl-rail__track { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
+/* S02's damped fill (.hiw-toc__fill, from the kit's whitepaper rail), verbatim: 100 ms linear on
+   transform, never height. No 100 ms token exists; the value is accepted as is. */
+.cl-rail__fill {
+  position: absolute; inset: 0; background: var(--accent);
+  transform: scaleY(0); transform-origin: 50% 0;
+  transition: transform 100ms linear;
+}
+.cl-rail__list { display: flex; flex-direction: column; }
+.cl-rail__link {
+  position: relative; display: flex; align-items: baseline; gap: 10px;
+  padding: 5px 0 5px 22px; border-radius: var(--r-chip);
+  font: var(--fw-body) var(--fs-12)/18px var(--font-mono); color: var(--muted); white-space: nowrap;
+  transition: color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+.cl-rail__v { font-variant-numeric: tabular-nums; }
+.cl-rail__c { margin-left: auto; font: var(--fw-body) var(--fs-11)/18px var(--font-sans); color: var(--muted); }
+.cl-rail__dot { position: absolute; left: 8px; top: 11px; width: 6px; height: 6px; border-radius: var(--r-full); background: var(--accent); }
+@media (hover: hover) and (pointer: fine) { .cl-rail__link:hover { color: var(--ink); } }
+.cl-rail__link:active { transform: scale(.98); }
+.cl-rail__link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cl-rail__link.is-active { color: var(--ink); font-weight: var(--fw-medium); }
+.cl-rail__link.is-active .cl-rail__c { color: var(--ink); }
+
+.cl-rail__top {
+  display: inline-flex; align-items: center; gap: 6px; margin: 20px 0 0 22px; padding: 7px 12px 7px 9px;
+  border: var(--hairline); border-radius: var(--r-control); background: transparent;
+  font: var(--fw-medium) var(--fs-12)/16px var(--font-sans); color: var(--muted); cursor: pointer;
+  transition: color var(--d-150) var(--ease-in-out), border-color var(--d-150) var(--ease-in-out), opacity var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+.cl-rail__top svg { width: 14px; height: 14px; }
+@media (hover: hover) and (pointer: fine) { .cl-rail__top:not(:disabled):hover { color: var(--ink); border-color: var(--line-strong); } }
+.cl-rail__top:not(:disabled):active { transform: scale(.98); }
+.cl-rail__top:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cl-rail__top:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ══ entries ═════════════════════════════════════════════════════════════ */
+.cl-entries { display: grid; gap: 24px; min-width: 0; }
+.cl-entry {
+  border: var(--hairline); border-radius: var(--r-panel); background: var(--panel);
+}
+/* the reveal gate: an entry waits at 0 until it rises (once); reduced motion shows it at once */
+.bs-js .cl-entry:not(.is-in) { opacity: 0; }
+
+.cl-entry__head {
+  display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 20px 20px 20px 28px;
+  border-bottom: var(--hairline);
+}
+.cl-entry__v {
+  font: var(--fw-strong) var(--fs-16)/24px var(--font-mono); letter-spacing: 0; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.cl-entry__v[tabindex="-1"]:focus { outline: none; }        /* a jump target, not a control */
+.cl-entry__date { font: var(--fw-body) var(--fs-14)/20px var(--font-sans); color: var(--muted); white-space: nowrap; }
+.cl-entry__chips { display: inline-flex; align-items: center; gap: 6px; }
+
+/* the "#" copy-link button: ghost, colour-only hover, "Copied" for 1.4 s (ui.js) */
+.cl-anchor {
+  display: inline-flex; align-items: center; justify-content: center; margin-left: auto;
+  min-width: 28px; height: 28px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r-control);
+  background: transparent; cursor: pointer; white-space: nowrap;
+  font: var(--fw-body) var(--fs-14)/1 var(--font-mono); color: var(--muted);
+  transition: color var(--d-150) var(--ease-in-out), background-color var(--d-150) var(--ease-in-out), border-color var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+@media (hover: hover) and (pointer: fine) { .cl-anchor:hover { color: var(--ink); background: var(--surface-hover); } }
+.cl-anchor:active { transform: scale(.98); }
+.cl-anchor:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.cl-anchor:disabled { opacity: .45; cursor: not-allowed; }
+.cl-anchor.is-done { color: var(--ink); border-color: var(--line-strong); background: transparent; font: var(--fw-medium) var(--fs-12)/1 var(--font-sans); }
+
+/* groups: a key column + the list (a ledger, read down the left edge) */
+.cl-entry__groups { display: grid; gap: 20px; padding: 24px 28px 28px; }
+.cl-group { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 24px; align-items: baseline; }
+.cl-group__k {
+  font: var(--fw-body) var(--fs-11)/22px var(--font-mono); letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase; color: var(--muted);
+}
+.cl-group__list { display: grid; gap: 6px; max-width: 680px; }
+.cl-group__list li {
+  position: relative; padding-left: 18px;
+  font: var(--fw-body) var(--fs-14)/22px var(--font-sans); color: var(--muted); text-wrap: pretty;
+}
+.cl-group__list li::before {
+  content: ""; position: absolute; left: 2px; top: 9px; width: 4px; height: 4px; border-radius: 1px; background: var(--line-strong);
+}
+.cl-group__list code {
+  /* no fill, no padding: a pill next to the sentence's own punctuation read as detached ("( expirySlots ,") */
+  font: var(--fw-body) var(--fs-12)/20px var(--font-mono); color: var(--ink);
+}
+
+/* footer: the version is the latest entry's, and a link to it */
+.site-footer__ver a { color: inherit; border-radius: var(--r-chip); transition: color var(--d-150) var(--ease-in-out); }
+@media (hover: hover) and (pointer: fine) { .site-footer__ver a:hover { color: var(--ink); } }
+.site-footer__ver a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ══ reduced motion: end states, no rise, no press scale, no damped fill ═ */
+html[data-motion="reduce"] :is(.cl-mast__eyebrow, .cl-mast__title, .cl-mast__lede, .cl-rail, .cl-entry) { animation: none !important; opacity: 1 !important; transform: none !important; }
+html[data-motion="reduce"] :is(.cl-rail__link, .cl-rail__top, .cl-anchor):active { transform: none; }
+html[data-motion="reduce"] .cl-rail__fill { transition: none; }

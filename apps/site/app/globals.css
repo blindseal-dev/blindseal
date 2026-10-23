@@ -10,3 +10,13 @@
 @import '../kit/site.css';
 
 html, body { margin: 0; background: var(--canvas); color: var(--ink); }
+/* The mockups' per-page stylesheets, verbatim (each mockup loads its own page.css after site.css).
+   Classes are page-scoped (s01-*, hiw-*, s03-*, docs-*, ex-*, s06-*), so all six load together. */
+@import '../kit/pages/s01.css';
+@import '../kit/pages/s02.css';
+@import '../kit/pages/s03.css';
+@import '../kit/pages/s04.css';
+@import '../kit/pages/s05.css';
+@import '../kit/pages/s06.css';
+/* phone-width addition to the kit (see the file) */
+@import './narrow.css';

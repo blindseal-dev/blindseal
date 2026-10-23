@@ -61,6 +61,9 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   document.querySelectorAll<HTMLElement>('[data-draw-in], .draw-in').forEach((el) => once(el, 'Draw', (e) => BS.motion?.mountDrawIn?.(e)));
   document.querySelectorAll<HTMLElement>('[data-pause]').forEach((el) => once(el, 'Pause', (e) => BS.motion?.mountPause?.(e)));
   document.querySelectorAll<HTMLElement>('[data-figure]').forEach((el) => once(el, 'Figure', (e) => BS.diagrams?.render?.(e.dataset.figure!, e, {})));
+  // pages hook here (use-page-kit.ts): their page.js-equivalents run after the chrome and reveals exist
+  document.documentElement.setAttribute('data-kit-mounted', '1');
+  window.dispatchEvent(new CustomEvent('bs:route-mounted', { detail: { active } }));
 }
 
 let mounted = false;

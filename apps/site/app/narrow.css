@@ -1,0 +1,16 @@
+/* Phone-width addition to the verbatim kit (DECISIONS 2026-10-23): the mockups' site.css carries no width
+   queries, so the notch nav (logo | tabs | action) and the three-column footer overflow at 443 px. Below
+   720 px the notch becomes two rows — logo + action, then the tabs full-width and scrollable — and the
+   footer stacks. Nothing here applies at or above 720 px. */
+@media (max-width: 719.98px) {
+  .site-notch__row { grid-template-columns: 1fr auto; grid-template-rows: var(--notch-h) var(--notch-h); height: auto; }
+  .notch--logo { grid-column: 1; grid-row: 1; }
+  .notch--actions { grid-column: 2; grid-row: 1; padding-left: 12px; }
+  .notch--center { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+    border-radius: 0 0 var(--notch-r) var(--notch-r); border-top: 1px solid var(--line); }
+  .notch--center::-webkit-scrollbar { display: none; }
+  .notch__wing { display: none; }
+  .site-main { padding-top: var(--notch-h); }            /* the second notch row would otherwise cover the masthead */
+  .site-footer { grid-template-columns: minmax(0, 1fr); }
+  .site-footer__routes { grid-template-columns: repeat(2, max-content); }
+}

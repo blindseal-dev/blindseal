@@ -1,0 +1,296 @@
+// The docs data model — the site-side BS.data.docs (+ apiReference) of the S04 mockup. page.js rendered the
+// tree from { group, items [{ slug, title }] } and each page from { slug, group, title, summary, sections
+// [{ heading, body, code }], prev, next }; here a section holds typed blocks (prose, code, lists, callouts,
+// links, the API table) and the page's path is a real Next route. The written content is the reviewed text
+// of the previous docs pages — only the presentation changed. Prose uses a tiny inline markup (inline.tsx):
+// `code`, **strong**, *em*, [label](href).
+
+export type CodeLang = 'shell' | 'json' | 'ts' | 'rust' | 'text';
+export type LinkIcon = 'arrow-right' | 'arrow-up-right';
+export type Endpoint = { method: 'GET' | 'POST' | 'PUT' | 'WS'; path: string; comment: string };
+
+export type Block =
+  | { kind: 'p'; text: string }
+  | { kind: 'code'; text: string; lang: CodeLang }
+  | { kind: 'list'; ordered?: boolean; items: string[] }
+  | { kind: 'callout'; title: string; body: string; muted?: boolean }
+  | { kind: 'links'; links: { href: string; label: string; icon?: LinkIcon }[] }
+  | { kind: 'api'; endpoints: Endpoint[] };
+
+export type DocSection = { id: string; heading: string; count?: string; blocks: Block[] };
+export type DocPage = {
+  slug: string; path: string; group: string; title: string; nav?: string; summary: string; sections: DocSection[];
+  prev?: string; next?: string;
+};
+export type TreeGroup = { group: string; items: { slug: string; title: string; path: string; keywords: string }[] };
+export type Target = { id: string; label: string; level: 1 | 2 };
+
+const p = (text: string): Block => ({ kind: 'p', text });
+const code = (text: string, lang: CodeLang): Block => ({ kind: 'code', text, lang });
+const list = (items: string[], ordered = false): Block => ({ kind: 'list', ordered, items });
+
+// ── the Local API (the dashboard's) ──────────────────────────────────────────
+export const API_ENDPOINTS: Endpoint[] = [
+  { method: 'GET', path: '/api/status', comment: 'Proxy status: connection, policy root, detector version, audit head, L3 mode.' },
+  { method: 'GET', path: '/api/decisions', comment: 'List decisions; filters verdict/server/tool/from/to, cursor pagination.' },
+  { method: 'GET', path: '/api/decisions/:id', comment: 'One decision with all layer results and commitments.' },
+  { method: 'POST', path: '/api/decisions/:id/reveal', comment: 'Reveal the raw payload (requires X-Confirm: reveal). Never stored.' },
+  { method: 'GET', path: '/api/audit/head', comment: 'The current hash-chain head.' },
+  { method: 'GET', path: '/api/audit/entries', comment: 'Content-free entries in a range (from/to).' },
+  { method: 'POST', path: '/api/audit/verify', comment: 'Recompute the chain from genesis → { ok, brokenAt? }.' },
+  { method: 'POST', path: '/api/audit/disclose', comment: 'Signed disclosure for a range { from, to }.' },
+  { method: 'GET', path: '/api/policy', comment: 'The committed policy: root, version, leaf count, rules.' },
+  { method: 'PUT', path: '/api/policy', comment: 'Replace rules; the proxy recomputes the Merkle root.' },
+  { method: 'POST', path: '/api/policy/dry-run', comment: 'Screen a payload without logging or chaining it.' },
+  { method: 'GET', path: '/api/attestations', comment: 'List attestations; filter by status.' },
+  { method: 'POST', path: '/api/attestations', comment: 'Request an attestation for a decision with an action.' },
+  { method: 'POST', path: '/api/attestations/:id/submit', comment: 'Submit to Solana mainnet → tx signature.' },
+  { method: 'GET', path: '/api/nullifiers/:nullifier', comment: 'On-chain status of a nullifier (mainnet, read server-side).' },
+  { method: 'GET', path: '/api/tee/quote', comment: 'The L3 TEE quote (when L3 runs in a TEE).' },
+  { method: 'WS', path: '/events', comment: 'Live stream: decision, status, policy, attestation frames.' },
+];
+
+// BLINDSEAL.md §3.3, verbatim. Edit the spec, then this file — never the other way round.
+const HASHING_SPEC = `payloadHash     = sha256(payload_bytes)            -- payload_bytes = canonical_json({tool, args}); no domain prefix in v1 (the shipped guest; see DECISIONS 2026-10-23)
+policyRoot      = merkle_sha256(leaves), leaf_i = sha256("blindseal.rule.v1" || rule_id || layer || kind || compiled_bytes)
+                  (compiled_bytes = DFA bytes for regex rules, raw value otherwise; tree sorted by rule_id; empty tree = sha256("blindseal.policy.empty.v1"))
+detectorVersion = sp1 vkey hash of the guest program (bytes32)
+actionHash      = sha256("blindseal.action.v1"
+                  || chainId(u16 LE)           -- 1 = solana mainnet, 2 = reserved (no devnet), 3+ reserved for EVM
+                  || targetProgram(32)
+                  || sourceAuthority(32)       -- signer/authority the action executes under; zero if n/a
+                  || instruction(8)            -- anchor discriminator or sha256(name)[..8]
+                  || recipient(32)             -- zero if n/a
+                  || mint(32)                  -- zero for native
+                  || amount(u64 LE)            -- zero if n/a
+                  || payloadHash(32)
+                  || policyRoot(32)
+                  || detectorVersion(32)
+                  || expirySlot(u64 LE)
+                  || nonce(32))                -- random per attestation
+nullifier       = sha256("blindseal.nullifier.v1" || actionHash)`;
+
+// ── the pages, in reading order (prev / next follow it) ──────────────────────
+const PAGE_LIST: Omit<DocPage, 'prev' | 'next'>[] = [
+  {
+    slug: 'quickstart', path: '/docs', group: 'Getting started', title: 'Quickstart',
+    summary: 'Ten minutes on a fresh machine: install, run the proxy in front of an MCP server, see every tool call screened, and verify an attestation without trusting this site. Node 20+ and pnpm are the only requirements — the verifier ships as WebAssembly, so no Rust or Solana toolchain is needed to use Blindseal.',
+    sections: [
+      { id: 'install', heading: 'Install and run', blocks: [
+        code(`$ git clone <repo> blindseal && cd blindseal
+$ ./scripts/quickstart.sh          # installs, builds the dashboard, verifies the sample attestation
+$ BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
+blindseal (MOCK): local API on http://127.0.0.1:7777
+  dashboard: http://127.0.0.1:7777/#token=…`, 'shell'),
+        p('The proxy serves the dashboard from its own origin with a Content-Security-Policy that allows the WebAssembly verifier and nothing else. Open the printed URL — the token is in the fragment and never leaves memory.'),
+      ] },
+      { id: 'agent', heading: 'Point an agent', blocks: [
+        p('In the agent’s MCP config, launch the upstream server through `blindseal`. Every tool call and result passes the four detection layers locally before it reaches the agent or the server.'),
+        code(`"mcpServers": {
+  "github": { "command": "blindseal", "args": ["--", "github-mcp"] }
+}`, 'json'),
+      ] },
+      { id: 'attest', heading: 'Attest a screened action', blocks: [
+        p('An attestation is a Groth16 proof that a specific tool call was screened under a committed policy by a specific detector version and that the deterministic layers passed. Proving runs locally on CPU and takes a while; it is asynchronous by design.'),
+        code(`$ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
+decision d_…: clean (audit #12 0x…)
+proving (this takes a while on CPU)…
+attestation written: attestation.json`, 'shell'),
+        p('The decision is appended to the hash-chained audit log before proving starts, content-free: only ids, the verdict and the payload hash.'),
+      ] },
+      { id: 'verify', heading: 'Verify it — anywhere', blocks: [
+        code(`$ blindseal verify attestation.json        # off-chain, the wasm verifier
+$ blindseal submit attestation.json        # Solana mainnet: verifies on chain, consumes the nullifier
+$ blindseal submit attestation.json --check   # has this nullifier been consumed?`, 'shell'),
+        p('Or drop the file on the [verify page](/verify): it runs the same verifier in your browser and uploads nothing. `submit` compares the RPC’s genesis hash with mainnet-beta’s before sending; there is no other cluster.'),
+      ] },
+      { id: 'api', heading: 'API reference', count: `${API_ENDPOINTS.length} endpoints`, blocks: [
+        p('The local API the dashboard speaks. Auth: `Authorization: Bearer <token>`. Same-origin only; the browser never contacts an RPC — on-chain reads go through the proxy.'),
+        { kind: 'api', endpoints: API_ENDPOINTS },
+      ] },
+    ],
+  },
+  {
+    slug: 'concepts', path: '/docs/concepts', group: 'Concepts', title: 'Concepts',
+    summary: 'Blindseal sits between an agent and its tools. Every call and result is screened locally, the decision is written to a hash-chained log, and — when the action touches a chain — a zero-knowledge proof binds the screening to that exact action. The five objects below are the whole model.',
+    sections: [
+      { id: 'decision', heading: 'Decision', blocks: [
+        p('One screened tool call or result. Four layers run in order: L0 decodes (base64, hex, URL, HTML entities, nested) and re-screens; L1 is a fixed set of regex rules compiled to DFAs; L2 compares embeddings against a corpus; L3 is a model judge. A decision carries a verdict (pass / flag / block), which layer decided, and the commitments below. The raw payload is encrypted at rest and can be revealed on the operator’s explicit confirmation; it is never written to the chain or the log.'),
+      ] },
+      { id: 'policy', heading: 'Policy and the policy root', blocks: [
+        p('The policy is the set of deterministic rules in force. Its root is a Merkle root over one leaf per rule, where a regex rule’s leaf hashes its compiled DFA bytes — so the root commits to exactly what the detector executes, not to a pattern string that could be compiled differently. Changing a rule, or the regex engine version, changes the root. Operators can register roots on chain and run the verifier in allowlist mode.'),
+      ] },
+      { id: 'audit', heading: 'Audit chain and disclosure', blocks: [
+        p('Each decision appends a content-free entry — decision id, verdict, payload hash, timestamp — whose hash includes the previous entry’s hash. `audit verify` recomputes the chain from genesis; any edit shows as a break. A *disclosure* is a signed slice of the chain over a time window that a third party can verify offline against the proxy’s identity key, without seeing any content.'),
+      ] },
+      { id: 'attestation', heading: 'Attestation', blocks: [
+        p('A Groth16 proof from an SP1 zkVM guest that: recomputed the payload hash, recomputed the policy root from the DFAs it ran, ran L1 and found the payload clean, and bound the on-chain action through an *action hash*. Its public inputs are six values — payload hash, policy root, detector version (the guest’s verifying key), action hash, nullifier, expiry slot. Nothing about the content, the agent, or the operator is public. Proving is local, CPU-only and slow (hours on a laptop today); it is asynchronous by design and the numbers are published in `docs/performance.md`.'),
+      ] },
+      { id: 'verifier', heading: 'On-chain verifier and nullifier', blocks: [
+        p('A Solana program verifies the proof (one instruction, alt_bn128 syscalls) and consumes a *nullifier* — a PDA derived from the action hash — so an attestation can be used exactly once. A gated program calls it by CPI in the same transaction as the action it guards, passing the action fields **it** is about to execute; if they differ from the screened action the hash does not match and the transaction fails. If the action itself fails, the whole transaction reverts and the nullifier stays unconsumed. The verifier has a paused flag, a vkey allowlist and an optional policy-root allowlist, all authority-controlled.'),
+      ] },
+      { id: 'mainnet', heading: 'One chain', blocks: [
+        p('Solana mainnet is the only deploy target; `chainId 1` is the only chain id and the SDK refuses to send to any RPC whose genesis hash is not mainnet-beta’s. Localnet exists for the test suite only.'),
+      ] },
+    ],
+  },
+  {
+    slug: 'hashing', path: '/docs/hashing', group: 'Canonical hashing', title: 'Canonical hashing', nav: 'Hashing spec',
+    summary: 'All hashes are SHA-256 (a Solana syscall and an SP1 precompile), domain-separated.',
+    sections: [
+      { id: 'spec', heading: 'The spec', blocks: [
+        p('This is BLINDSEAL.md §3.3 verbatim; three implementations reproduce it byte for byte and are tested against each other: the Rust detector core (host and in-zkVM), the on-chain program, and the TypeScript SDK.'),
+        code(HASHING_SPEC, 'text'),
+        p('Nonce exists so two legitimately identical actions get distinct attestations. Nullifier is a pure function of the action hash so the consumer can’t be tricked into accepting a nullifier for a different action.'),
+      ] },
+      { id: 'public-inputs', heading: 'Public inputs', blocks: [
+        p('The proof commits one 168-byte blob in this order: `payloadHash ‖ policyRoot ‖ detectorVersion ‖ actionHash ‖ nullifier` (five × 32 bytes) then `expirySlot` as a little-endian u64. The verifier (on chain and in the browser) checks the proof against the blob; UIs decode the blob into the six named fields for display.'),
+      ] },
+      { id: 'pdas', heading: 'On-chain addresses', blocks: [
+        code(`Config     = PDA(["config"])
+PolicyRoot = PDA(["policy", policyRoot32])
+Nullifier  = PDA(["nullifier", nullifier32])     -- exists ⇔ consumed
+program    = merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb  (Solana mainnet)`, 'text'),
+      ] },
+    ],
+  },
+  {
+    slug: 'integrate', path: '/docs/integrate', group: 'Gating a program on an attestation', title: 'Gating a program on an attestation', nav: 'Gated programs',
+    summary: 'A gated program executes an action only if a Blindseal attestation for *that exact action* verifies and is consumed in the same transaction.',
+    sections: [
+      { id: 'rule', heading: 'The one rule', blocks: [
+        { kind: 'callout', title: 'What makes this sound', body: 'The action fields you forward to the verifier must come from what **your program** is about to execute — your own id, your instruction discriminator, the signer you debit, the recipient, the mint, the amount — never from anything the agent hands you.' },
+      ] },
+      { id: 'cpi', heading: 'CPI verify_and_consume', blocks: [
+        p('Add `blindseal-verify` with the `cpi` feature and call it before the action. The example below is the shipped `transfer-gate` program, a native-SOL transfer.'),
+        code(`use blindseal_verify::{cpi::accounts::VerifyAndConsume, ActionArgs, program::BlindsealVerify};
+
+let disc: [u8; 8] = <crate::instruction::GatedTransfer as anchor_lang::Discriminator>::DISCRIMINATOR
+    .try_into().unwrap();
+let action = ActionArgs {
+    chain_id: 1,                                   // Solana mainnet (the only chain id)
+    target_program: crate::ID,                     // ourselves
+    source_authority: ctx.accounts.source.key(),   // the signer we debit
+    instruction: disc,                             // our discriminator
+    recipient: ctx.accounts.recipient.key(),
+    mint: Pubkey::default(),                       // native SOL
+    amount,
+    nonce,                                         // from the attestation
+};
+blindseal_verify::cpi::verify_and_consume(
+    CpiContext::new(ctx.accounts.verify_program.to_account_info(), VerifyAndConsume {
+        config: ctx.accounts.config.to_account_info(),
+        policy_root: ctx.accounts.policy_root.as_ref().map(|a| a.to_account_info()),
+        nullifier: ctx.accounts.nullifier.to_account_info(),
+        payer: ctx.accounts.source.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
+    }),
+    proof, public_inputs, action,
+)?;
+// …then the action. If it fails, the whole tx reverts and the nullifier stays unconsumed.
+system_program::transfer(/* source → recipient, amount */)?;`, 'rust'),
+        p('Type the verifier account as `Program<\'info, BlindsealVerify>` so a caller cannot substitute another program for the CPI.'),
+      ] },
+      { id: 'checks', heading: 'What the verifier checks, in order', blocks: [
+        list([
+          'not paused',
+          '`detectorVersion` is an allowed vkey',
+          'if allowlist mode: the policy root is registered',
+          '`expirySlot ≥` the current slot',
+          'the action hash recomputed from *your* fields (+ the committed values + the nonce) equals the public one — `ActionHashMismatch` otherwise',
+          'the nullifier matches and has not been consumed — `NullifierAlreadyConsumed` on replay',
+          'the Groth16 proof verifies (sp1-solana)',
+          'the Nullifier PDA is created (payer = your signer) and `Consumed` is emitted',
+        ], true),
+        p('Each step fails with its own error code. The five wrong-field cases all surface as `ActionHashMismatch`: the proof binds one hash over all of them, so the program cannot name which field diverged.'),
+      ] },
+      { id: 'client', heading: 'Client side', blocks: [
+        code(`import { buildVerifyIx, actionArgsFrom, submit } from '@blindseal/sdk';
+
+// compose into your own transaction (gated program)…
+const ix = buildVerifyIx(attestation, actionArgsFrom(attestation), { payer: wallet.publicKey });
+
+// …or submit directly (no gated program): verifies on chain and consumes the nullifier
+const sig = await submit(attestation, { wallet });   // refuses any RPC that is not mainnet-beta`, 'ts'),
+        p('Budget about 230k compute units for the verify step plus your own logic; set the limit explicitly with a ComputeBudget instruction (the default 200k is not enough). Measured figures live in `docs/performance.md`.'),
+      ] },
+      { id: 'accounts', heading: 'Accounts', blocks: [
+        code(`config      PDA(["config"])                      read
+policy_root PDA(["policy", policyRoot])          read, optional (pass the program id for None)
+nullifier   PDA(["nullifier", nullifier])        writable, must not exist
+payer       signer, writable                     pays the Nullifier PDA rent
+program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
+      ] },
+    ],
+  },
+  {
+    slug: 'scope', path: '/docs/scope', group: 'What is proven — and what is not', title: 'What is proven — and what is not', nav: 'What is proven',
+    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the deterministic layers passed. The model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy.',
+    sections: [
+      { id: 'proven', heading: 'Proven (zero-knowledge, verifiable by anyone)', blocks: [
+        list([
+          'The payload with this hash was screened by the detector with this verifying key, under the policy with this root.',
+          'The deterministic layer (L1 regex rules, as committed DFAs) found it clean. A proof cannot exist for a payload L1 flags.',
+          'The screening is bound to one on-chain action — program, instruction, signer, recipient, mint, amount — and to an expiry slot and a fresh nonce.',
+          'On chain: the attestation was consumed once. A second use fails.',
+        ]),
+      ] },
+      { id: 'attested', heading: 'Attested, not proven', blocks: [
+        list([
+          'L2 (embeddings) and L3 (model judge) verdicts. They are recorded in the audit log and can be run in a TEE (planned); their output is not inside the proof.',
+          'The content of the audit log itself. The chain proves integrity and order of entries, not that an operator ran every call through the proxy.',
+        ]),
+      ] },
+      { id: 'not', heading: 'Not covered', blocks: [
+        list([
+          'Traffic that does not pass through the proxy.',
+          'Novel attacks the deterministic rules miss. On the published red-team corpus the proven layers alone catch roughly a third of attacks and little of the novel holdout set; detection in practice leans on L2/L3, which are attested rather than proven. The numbers are in `packages/LIMITATIONS.md` and are updated with every corpus change.',
+          'The correctness of the gated program beyond the fields it forwards. Blindseal checks that the forwarded action equals the screened one; it does not audit the program.',
+          'L0 decode-then-L1 is run by the proxy but is not yet inside the guest; the proof covers L1 on the payload as received. In-guest L0 is the next increment and will change the detector version.',
+        ]),
+      ] },
+      { id: 'privacy', heading: 'What is public', blocks: [
+        p('Six hashes and a slot number. No prompt, no tool arguments, no policy contents or thresholds, no model scores, and nothing that names the agent or the operator. The explorer shows counts and policy roots only.'),
+      ] },
+    ],
+  },
+];
+
+export const PAGES: DocPage[] = PAGE_LIST.map((pg, i) => ({
+  ...pg, prev: i > 0 ? PAGE_LIST[i - 1].slug : undefined, next: i < PAGE_LIST.length - 1 ? PAGE_LIST[i + 1].slug : undefined,
+}));
+export const BY_SLUG: Record<string, DocPage> = Object.fromEntries(PAGES.map((pg) => [pg.slug, pg]));
+
+// ── the tree (page.js: a group whose only page shares its name is a loose row under Guides / Reference;
+//    the fixture convention: such a page's group IS its title) ──
+const REFERENCE = new Set(['hashing', 'scope']);
+const rawTree: { group: string; items: DocPage[] }[] = [];
+PAGES.forEach((pg) => {
+  let g = rawTree.find((x) => x.group === pg.group);
+  if (!g) { g = { group: pg.group, items: [] }; rawTree.push(g); }
+  g.items.push(pg);
+});
+// what the sidebar search matches: the title, the headings and the prose (not the code)
+function searchText(pg: DocPage): string {
+  const prose = pg.sections.flatMap((s) => s.blocks.flatMap((b) => b.kind === 'p' ? [b.text] : b.kind === 'list' ? b.items : b.kind === 'callout' ? [b.title, b.body] : []));
+  return [pg.title, pg.nav ?? '', pg.summary, ...pg.sections.map((s) => s.heading), ...prose].join(' ').replace(/[`*]/g, '').toLowerCase();
+}
+export const TREE: TreeGroup[] = [];
+export const BUCKET_OF: Record<string, string> = {};
+rawTree.forEach((g) => {
+  const loose = g.items.length === 1 && g.items[0].title === g.group;
+  const name = loose ? (REFERENCE.has(g.items[0].slug) ? 'Reference' : 'Guides') : g.group;
+  let b = TREE.find((x) => x.group === name);
+  if (!b) { b = { group: name, items: [] }; TREE.push(b); }
+  g.items.forEach((pg) => {
+    b!.items.push({ slug: pg.slug, title: pg.nav ?? pg.title, path: pg.path, keywords: searchText(pg) });
+    BUCKET_OF[pg.slug] = name;
+  });
+});
+
+export function targetsOf(pg: DocPage): Target[] {
+  return pg.sections.map((s) => ({ id: s.id, label: s.heading, level: 1 }));
+}
+
+// the sidebar footer: the docs track the latest proxy release (the top entry of /changelog)
+export const LATEST = { version: '0.5.0', dateLabel: 'Oct 23, 2026', href: '/changelog' };

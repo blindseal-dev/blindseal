@@ -1,0 +1,9 @@
+/* S06 · Changelog — narrow screens only. The mockup's page.css (kit/pages/s06.css, loaded verbatim)
+   has no breakpoint: below ~720 px its 220 + 56 rail column and the nowrap entry head overflow the
+   viewport (the mockup itself scrolls sideways at 443). Nothing here applies at desktop widths. */
+@media (max-width: 719px) {
+  .cl { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .cl-rail { position: static; }
+  .cl-entry__head { flex-wrap: wrap; }
+  .cl-group { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
