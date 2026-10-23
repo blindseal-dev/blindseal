@@ -27,6 +27,11 @@
     "@types/node": "22.9.0",
     "@types/bn.js": "5.1.6",
     "@blindseal/sdk": "workspace:*",
-    "tsx": "4.19.2"
+    "tsx": "4.19.2",
+    "pixelmatch": "6.0.0",
+    "pngjs": "7.0.0",
+    "@types/pngjs": "6.0.5",
+    "@types/pixelmatch": "5.2.6",
+    "playwright": "1.48.2"
   }
 }

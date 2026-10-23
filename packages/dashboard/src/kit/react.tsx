@@ -6,13 +6,39 @@ import type { CSSProperties, ReactNode } from 'react';
 const BS = () => (typeof window !== 'undefined' ? window.BS : undefined);
 
 /** After each render, swap lucide placeholders, decorate glass, and run reveals once. */
+/**
+ * The mockups' DOMContentLoaded mount sequence, run after React commits and on every route change,
+ * idempotently (data-kit* markers + the kit's own seen-sets): syncMotionAttr → icons →
+ * glass.decorate(document) → spaces for unmounted hosts → mountReveals(main) → mountDrawIn →
+ * mountPause → diagrams. The frame itself is BS.mountShell (Shell.tsx).
+ */
 export function useKitBoot(deps: unknown[] = []) {
   useEffect(() => {
     const bs = BS();
     if (!bs) return;
-    try { bs.icons?.(); } catch { /* noop */ }
-    try { bs.glass?.decorate?.(); } catch { /* noop */ }
-    try { bs.reveal?.(); } catch { /* noop */ }
+    const once = (el: HTMLElement, key: string, fn: (el: HTMLElement) => void) => {
+      const k = `kit${key}`;
+      if (el.dataset[k]) return;
+      el.dataset[k] = '1';
+      try { fn(el); } catch { /* a kit module missing is not fatal */ }
+    };
+    const raf = requestAnimationFrame(() => {
+      try { bs.motion?.syncMotionAttr?.(); } catch { /* noop */ }
+      try { bs.icons?.(); } catch { /* noop */ }
+      try { bs.glass?.decorate?.(document); } catch { /* noop */ }
+      document.querySelectorAll<HTMLElement>('[data-space], [data-bg]').forEach((host) => {
+        if (host.hasAttribute('data-space-mounted')) return;
+        host.setAttribute('data-space-mounted', '');
+        const i = host.getAttribute('data-intensity') || host.getAttribute('data-space') || 'hero';
+        try { bs.mountSpace?.(host, { intensity: i === 'faint' ? 'faint' : 'hero' }); } catch { /* noop */ }
+      });
+      const main = document.getElementById('main-content') ?? document;
+      try { bs.motion?.mountReveals?.(main); } catch { /* noop */ }
+      document.querySelectorAll<HTMLElement>('[data-draw-in], .draw-in').forEach((el) => once(el, 'Draw', (e) => bs.motion?.mountDrawIn?.(e)));
+      document.querySelectorAll<HTMLElement>('[data-pause]').forEach((el) => once(el, 'Pause', (e) => bs.motion?.mountPause?.(e)));
+      document.querySelectorAll<HTMLElement>('[data-figure]').forEach((el) => once(el, 'Figure', (e) => bs.diagrams?.render?.(e.dataset.figure!, e, {})));
+    });
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

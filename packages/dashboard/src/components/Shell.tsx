@@ -1,92 +1,89 @@
-import { useEffect, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useStatus, useEventStream } from '../api/hooks';
-import { Hash, Icon } from '../kit/react';
 
-// The dashboard sidebar items (constants.js BS.NAV), with the kit's Lucide names.
-const NAV = [
-  { to: '/decisions', label: 'Decisions', icon: 'list' },
-  { to: '/audit', label: 'Audit', icon: 'link' },
-  { to: '/policy', label: 'Policy', icon: 'scroll-text' },
-  { to: '/attestations', label: 'Attestations', icon: 'stamp' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
-];
+// The dashboard frame is the kit's shell.js (BS.mountShell): sidebar with the sliding pill, glass
+// top bar with the title/actions/connection pill, status bar, route cover. React owns only
+// <main id="main-content"> (the shell adopts it) and the actions slot (a portal into the shell's
+// [data-actions]). Navigation: navigate:false → the shell plays pill + cover in place and calls
+// onNavigate(id) at the swap moment, where react-router takes over. Status comes from the §5 API —
+// never BS.data — so the shell mounts once the status query has settled, with explicit blanks so
+// the kit's built-in sample values never show.
 const TITLES: Record<string, string> = {
-  decisions: 'Decisions', audit: 'Audit', policy: 'Policy', attestations: 'Attestations', settings: 'Settings',
+  decisions: 'Decisions', audit: 'Audit', policy: 'Policy', attestations: 'Attestations', settings: 'Settings', verify: 'Verify',
 };
+const ROUTES = { decisions: '#/decisions', audit: '#/audit', policy: '#/policy', attestations: '#/attestations', settings: '#/settings' };
+
+type ShellApi = {
+  refs: { actions: HTMLElement; main: HTMLElement };
+  setActive: (id: string, o?: { animate?: boolean }) => void;
+  setTitle: (t: string) => void;
+  setConnection: (s: 'connected' | 'reconnecting' | 'offline') => void;
+  setAuditHead: (h: { index: number; hash: string; ts: string }) => void;
+  setPolicyRoot: (r: string) => void;
+};
+const kit = () => (window as unknown as { BS?: { mountShell?: (o: unknown) => ShellApi; shell?: ShellApi } }).BS;
 
 export function Shell({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
   const { conn } = useEventStream(false);
-  const { data: status } = useStatus();
+  const statusQ = useStatus();
+  const status = statusQ.data;
   const loc = useLocation();
+  const navigate = useNavigate();
   const section = loc.pathname.split('/')[1] || 'decisions';
   const title = TITLES[section] ?? 'Blindseal';
+  const [shell, setShell] = useState<ShellApi | null>(null);
 
-  // the kit shell owns html/body sizing + overflow
+  const connState: 'connected' | 'reconnecting' | 'offline' =
+    status?.connection === 'offline' || conn === 'closed' ? 'offline'
+      : status?.connection === 'reconnecting' || conn === 'connecting' ? 'reconnecting' : 'connected';
+
+  // mount once, after the status query settled (success or 401/offline → blanks, not samples)
   useEffect(() => {
-    document.documentElement.classList.add('bs-shell');
-    return () => document.documentElement.classList.remove('bs-shell');
-  }, []);
+    if (shell || statusQ.isPending) return;
+    const BS = kit();
+    if (!BS?.mountShell) return;
+    const s = status;
+    const api = BS.mountShell({
+      active: section,
+      title,
+      routes: ROUTES,
+      navigate: false,
+      cover: true,
+      onNavigate: (id: string) => navigate(`/${id}`),
+      connection: connState,
+      status: {
+        mock: s?.mock ?? false,
+        version: s?.version ?? '',
+        uptimeSec: s?.uptimeSec ?? 0,
+        detectorVersion: s?.detectorVersion ?? '—',
+        policyRoot: s?.policyRoot ?? '',
+        l3: s?.l3 ?? { mode: '—' },
+        audit: s?.audit ?? { index: -1, hash: '', ts: '' },
+        signerPubkey: '',
+      },
+    });
+    setShell(api);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusQ.isPending]);
 
-  const connState = status?.connection === 'offline' || conn === 'closed' ? 'offline'
-    : status?.connection === 'reconnecting' || conn === 'connecting' ? 'reconnecting' : 'live';
-  const connLabel = connState === 'live' ? 'Connected' : connState === 'reconnecting' ? 'Reconnecting' : 'Offline';
+  // route → active item + title (no-op when the shell itself drove the change)
+  useEffect(() => { if (shell) { shell.setActive(section, { animate: true }); shell.setTitle(title); } }, [shell, section, title]);
+  // live status → connection pill + status bar
+  useEffect(() => { if (shell) shell.setConnection(connState); }, [shell, connState]);
+  useEffect(() => {
+    if (!shell || !status) return;
+    if (status.audit) shell.setAuditHead(status.audit);
+    if (status.policyRoot) shell.setPolicyRoot(status.policyRoot);
+  }, [shell, status]);
 
+  // <main id="main-content"> is React's root container itself (index.html / main.tsx); the shell
+  // adopts it into .bs-work. The actions slot is the shell's [data-actions] (a portal).
   return (
-    <div className="bs-app" data-shell="sidebar">
-      <aside className="bs-side">
-        <div className="bs-side__brand">
-          <NavLink to="/decisions" className="bs-wordmark">
-            <Icon name="shield-check" size={18} />
-            <span className="bs-wordmark__word">Blindseal</span>
-          </NavLink>
-          <span className="chip mock">{status?.mock === false ? 'LIVE' : 'MOCK'}</span>
-        </div>
-        <div className="bs-side__nav">
-          <nav className="bs-nav">
-            {NAV.map((n) => (
-              <NavLink key={n.to} to={n.to} className="bs-navitem">
-                <span className="bs-navitem__g"><Icon name={n.icon} /></span>
-                <span className="bs-navitem__t">{n.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-        <div className="bs-side__foot">
-          <div className="bs-proxy">
-            <p className="bs-proxy__k"><span className="live-dot" aria-hidden />Proxy</p>
-            <Hash value={`127.0.0.1:${7777}`} label="Proxy address" />
-          </div>
-          <div className="bs-side__footrow">
-            <span className="bs-side__ver">v{status?.version ?? '0.4.0'}</span>
-          </div>
-        </div>
-      </aside>
-
-      <div className="bs-work">
-        <header className="bs-top">
-          <div className="bs-top__lead">
-            <h1 className="bs-top__title">{title}</h1>
-            <div className="bs-top__actions">{actions}</div>
-          </div>
-          <div className="bs-top__right">
-            <span className="bs-sb" data-state={connState}>
-              <span className="live-dot" aria-hidden />
-              <span className="bs-sb__v">{connLabel}</span>
-            </span>
-          </div>
-        </header>
-        <main className="bs-main" id="main-content">{children}</main>
-      </div>
-
-      <footer className="bs-status">
-        <span className="bs-sb"><span className="bs-sb__k">audit</span><span className="bs-sb__v">#{status?.audit?.index ?? '—'}</span></span>
-        <span className="bs-sb"><span className="bs-sb__k">policy</span><Hash value={status?.policyRoot} /></span>
-        <span className="bs-sb"><span className="bs-sb__k">detector</span><Hash value={status?.detectorVersion} /></span>
-        <span className="bs-sb"><span className="bs-sb__k">L3</span><span className="bs-sb__v">{status?.l3?.mode ?? '—'}</span></span>
-        <span className="bs-status__spacer" />
-        <span className="bs-sb" data-state={connState}><span className="live-dot" aria-hidden /><span className="bs-sb__v">{connLabel}</span></span>
-      </footer>
-    </div>
+    <>
+      {children}
+      {shell && actions ? createPortal(actions, shell.refs.actions) : null}
+    </>
   );
 }

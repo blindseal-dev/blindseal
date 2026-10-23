@@ -102,7 +102,6 @@ export function resolveToken(explicit?: string): string {
 }
 
 // ---- helpers ----
-const DOMAIN = 'blindseal.audit.v1';
 const sha = (s: string) => '0x' + createHash('sha256').update(s).digest('hex');
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {

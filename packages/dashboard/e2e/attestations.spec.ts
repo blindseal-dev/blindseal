@@ -4,7 +4,7 @@ test('attestations: list + detail sheet with 6 public inputs', async ({ page }) 
   const off: string[] = [];
   page.on('request', (r) => { try { const h = new URL(r.url()).hostname; if (!['localhost','127.0.0.1',''].includes(h) && r.url().startsWith('http')) off.push(r.url()); } catch {} });
   await page.goto(`/#token=${TOKEN}`);
-  await page.locator('.bs-navitem', { hasText: 'Attestations' }).click();
+  await page.locator('a.bs-navitem', { hasText: 'Attestations' }).click();
   await page.locator('.d05-table tbody tr').first().click(); // row 0 carries a real length-1 blob
   await expect(page.locator('.d05-sheet')).toBeVisible();
   // The single committed blob is decoded into the six labelled fields for display.

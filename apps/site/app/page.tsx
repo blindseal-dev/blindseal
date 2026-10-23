@@ -7,7 +7,8 @@ export default function Home() {
   return (
     <>
       <section className="hero" aria-label="Introduction">
-        <div className="hero__space" data-bg="nebula" data-intensity="hero" aria-hidden />
+        {/* CRT field (crt.js, WebGL2) with the reduced-motion still frame; BS.mountSite falls back to the nebula without WebGL2 */}
+        <div className="hero__space" data-bg="crt" data-intensity="hero" aria-hidden />
         <div className="hero__shade" aria-hidden />
         <div className="hero__content"><div className="hero__col">
           <p className="hero__eyebrow"><i className="hero__dot" aria-hidden /><span>Local proxy</span><span className="hero__sep" aria-hidden>·</span><span>Zero-knowledge attestation</span><span className="hero__sep" aria-hidden>·</span><span>Verified on Solana</span></p>

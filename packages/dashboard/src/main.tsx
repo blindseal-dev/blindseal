@@ -24,10 +24,14 @@ import './kit/diagrams.js';
 import './kit/sheet.js';
 import './kit/space.js';
 import './kit/ui.js';
+import './kit/shell.js'; // BS.mountShell — the sidebar/top bar/status bar/route cover (Shell.tsx)
 
 captureToken();
 
-createRoot(document.getElementById('root')!).render(
+// React's root container IS <main id="main-content">: BS.mountShell adopts that element into the
+// shell frame, and React 18 delegates events at its root container — so the container must be the
+// element the shell moves, or clicks inside the pages would no longer reach React.
+createRoot(document.getElementById('main-content')!).render(
   <StrictMode>
     <App />
   </StrictMode>,

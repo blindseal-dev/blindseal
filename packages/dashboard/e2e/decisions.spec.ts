@@ -52,11 +52,21 @@ test('key text meets 4.5:1 contrast against its background', async ({ page }) =>
     }
     const el = document.querySelector('.bs-top__title') as HTMLElement;
     const fg = getComputedStyle(el).color;
-    let bg = 'rgb(0,0,0)';
+    // Effective background: alpha-composite every translucent ancestor (the kit's glass bars are
+    // rgba) over the first opaque one, top-down, instead of taking the first non-transparent colour.
+    const parse = (c: string) => { const m = c.match(/[\d.]+/g)!.map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+    const layers: { r: number; g: number; b: number; a: number }[] = [];
     for (let n: HTMLElement | null = el; n; n = n.parentElement) {
       const c = getComputedStyle(n).backgroundColor;
-      if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') { bg = c; break; }
+      if (!c || c === 'transparent') continue;
+      const p = parse(c);
+      if (p.a === 0) continue;
+      layers.unshift(p);
+      if (p.a >= 1) break;
     }
+    let base = { r: 0, g: 0, b: 0 };
+    for (const p of layers) base = { r: p.r * p.a + base.r * (1 - p.a), g: p.g * p.a + base.g * (1 - p.a), b: p.b * p.a + base.b * (1 - p.a) };
+    const bg = `rgb(${base.r}, ${base.g}, ${base.b})`;
     const l1 = lum(fg), l2 = lum(bg);
     return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   });
