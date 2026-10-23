@@ -98,3 +98,25 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) {
     await page.close();
   });
 }
+
+// 6) the hydration race under load: CPU ×6 and a regular-3G network (CDP), listeners before goto. On a
+//    slow machine the kit download can finish while React is still hydrating — the kit must never
+//    mutate React-owned DOM in that window (no load-time boots; the script is injected post-hydration).
+test('live: hydration clean under CPU×6 + 3G throttling', async ({ browser }) => {
+  for (const r of ['/', '/how-it-works', '/docs', '/explorer']) {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    const errs: string[] = [];
+    page.on('pageerror', (e) => errs.push(`${r} pageerror: ${String(e.message ?? e).split('\n')[0]}`));
+    page.on('console', (m) => { if (m.type() === 'error') errs.push(`${r} console: ${m.text().split('\n')[0]}`); });
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+    await cdp.send('Network.enable');
+    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 400, downloadThroughput: (780 * 1024) / 8, uploadThroughput: (330 * 1024) / 8 });
+    await page.goto(r, { waitUntil: 'load' });
+    await page.waitForTimeout(4000);
+    expect(errs, `${r} throttled`).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.hasAttribute('data-kit-mounted')), `${r} kit mounted`).toBe(true);
+    await ctx.close();
+  }
+});

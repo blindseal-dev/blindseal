@@ -104,19 +104,28 @@
     document.addEventListener("mouseleave", function () { glows.forEach(function (o) { o.style.opacity = "0"; }); });
   }
 
-  function boot() {
-    ensureDefs();
-    decorate(document);
-    new MutationObserver(function (records) {
+  /* Nothing runs at load (the site hydrates React first, then boots the kit explicitly). The
+     observer never watches document: kit-owned layers (toasts, menus, tooltips, dialogs, sheets)
+     are adopted when the kit creates them — decorated, iconed and watched for their own additions. */
+  var observer = null;
+  function watch(el) {
+    if (!el || el.nodeType !== 1 || el.hasAttribute("data-glass-watched")) return;
+    el.setAttribute("data-glass-watched", "");
+    if (!observer) observer = new MutationObserver(function (records) {
       for (var i = 0; i < records.length; i++) {
         var added = records[i].addedNodes;
-        for (var j = 0; j < added.length; j++) if (added[j].nodeType === 1) decorate(added[j]);
+        for (var j = 0; j < added.length; j++) if (added[j].nodeType === 1) { decorate(added[j]); if (BS.icons) BS.icons(added[j]); }
       }
-    }).observe(document.documentElement, { childList: true, subtree: true });
-    wireGlow();
+    });
+    observer.observe(el, { childList: true, subtree: true });
+  }
+  function adopt(el) { decorate(el); if (BS.icons) BS.icons(el); watch(el); }
+  var glowWired = false;
+  function boot(root) {
+    ensureDefs();                       /* a no-op when the layout rendered #bs-glass-defs */
+    decorate(root || document);
+    if (!glowWired) { glowWired = true; wireGlow(); }
   }
 
-  BS.glass = { decorate: decorate, SELECTOR: SELECTOR, ITEM_SELECTOR: ITEM_SELECTOR, ensureDefs: ensureDefs, paint: paint };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  BS.glass = { decorate: decorate, SELECTOR: SELECTOR, ITEM_SELECTOR: ITEM_SELECTOR, ensureDefs: ensureDefs, paint: paint, boot: boot, watch: watch, adopt: adopt };
 })();

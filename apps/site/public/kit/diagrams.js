@@ -17,7 +17,7 @@
      replay(host)                 draws the figure again from nothing.
      mount(scope)                 renders every [data-diagram="name"] in scope,
                                   options from data-opts='{"active":"prove"}'.
-                                  Runs once on DOMContentLoaded by itself.
+                                  Mounted by the site after hydration.
      check(scope)                 → { paths, missing }  every path[data-draw] has
                                   pathLength="1" (the demo logs it).
 
@@ -604,6 +604,7 @@
   function resolve(host) { return typeof host === "string" ? document.querySelector(host) : host; }
 
   function render(name, host, opts) {
+    ensureStyle();
     host = resolve(host);
     var fn = FIGS[name];
     if (!host) { console.warn("[BS.diagrams] render(" + name + "): no host"); return null; }
@@ -663,6 +664,7 @@
   }
 
   function mount(scope) {
+    ensureStyle();
     [].forEach.call((scope || document).querySelectorAll("[data-diagram]:not([data-dg-ready])"), function (el) {
       var o = {};
       try { o = el.getAttribute("data-opts") ? JSON.parse(el.getAttribute("data-opts")) : {}; }
@@ -717,7 +719,9 @@
   });
   /* rules for the hash buttons, injected here because diagrams.css is shared with J00;
      colours are tokens via diagrams.css's --dg-* roles; hover and focus are colour/ring only */
-  (function injectStyle() {
+  var styled = false;
+  function ensureStyle() {   /* the figure styles go into <head> on first render, never at load */
+    if (styled || !document.head) return; styled = true;
     if (document.getElementById("bs-diagrams-runtime")) return;
     var st = document.createElement("style");
     st.id = "bs-diagrams-runtime";
@@ -729,10 +733,9 @@
       ".fig .dg-hashbtn.is-copied .dg-hash { fill: var(--dg-ink); }" +
       "html[data-motion=\"reduce\"] .fig .dg-hashbtn .dg-hashhit { transition: none; }";
     (document.head || document.documentElement).appendChild(st);
-  })();
+  }
 
   BS.diagrams = { list: Object.keys(FIGS), render: render, replay: replay, mount: mount, check: check };
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { mount(document); });
-  else mount(document);
+  /* nothing runs at load; the site renders figures from its mount sequence */
 })();

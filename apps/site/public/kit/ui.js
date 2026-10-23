@@ -137,7 +137,7 @@
   var TONE_ICON = { info: "info", ok: "circle-check", warn: "triangle-alert", danger: "circle-alert" };
   function toastRoot() {
     var r = document.getElementById("bs-toasts");
-    if (!r) { r = document.createElement("div"); r.id = "bs-toasts"; r.className = "toasts"; r.setAttribute("aria-live", "polite"); document.body.appendChild(r); }
+    if (!r) { r = document.createElement("div"); r.id = "bs-toasts"; r.className = "toasts"; r.setAttribute("aria-live", "polite"); document.body.appendChild(r); if (BS.glass && BS.glass.adopt) BS.glass.adopt(r); }
     return r;
   }
   function dismiss(t) {
@@ -197,7 +197,7 @@
         (it.icon ? ico(it.icon) : "") + "<span>" + esc(it.label) + "</span>" + (it.meta ? '<span class="menu__meta">' + esc(it.meta) + "</span>" : "") + "</button>";
     });
     el.innerHTML = html;
-    document.body.appendChild(el);   /* a sibling layer: never inside a glass element (backdrop root) */
+    document.body.appendChild(el); if (BS.glass && BS.glass.adopt) BS.glass.adopt(el);   /* a sibling layer: never inside a glass element (backdrop root) */
     trigger.setAttribute("aria-haspopup", "menu");
     trigger.setAttribute("aria-expanded", "false");
     var api;
@@ -397,7 +397,7 @@
   function tip() {
     if (!tipEl) {
       tipEl = document.createElement("div"); tipEl.className = "tooltip"; tipEl.setAttribute("role", "tooltip"); tipEl.id = "bs-tooltip";
-      document.body.appendChild(tipEl);
+      document.body.appendChild(tipEl); if (BS.glass && BS.glass.adopt) BS.glass.adopt(tipEl);
     }
     return tipEl;
   }
@@ -597,7 +597,7 @@
       foot.appendChild(b);
     });
     if (!foot.children.length) foot.remove();
-    document.body.appendChild(el);
+    document.body.appendChild(el); if (BS.glass && BS.glass.adopt) BS.glass.adopt(el);
     var closed = false;
     var rec = { node: panel, kind: "dialog", close: function (r) { close(r); } };
     ui.layers.push(rec);
@@ -632,9 +632,7 @@
     return '<div class="skeleton-rows" aria-hidden="true">' + out + "</div>";
   };
 
-  function boot() { ui.copy(); }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  /* nothing runs at load; the site calls ui.copy() in its mount sequence */
   /* copy buttons added later (rendered blocks, sheets) get wired on click */
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("[data-copy]:not([data-copy-wired])");

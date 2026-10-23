@@ -100,8 +100,12 @@
     syncMotionAttr();
     document.dispatchEvent(new CustomEvent("bs:motion", { detail: { mode: m, reduced: reduced() } }));
   }
-  syncMotionAttr();
-  if (mq.addEventListener) mq.addEventListener("change", function () { syncMotionAttr(); document.dispatchEvent(new CustomEvent("bs:motion", { detail: { mode: mode, reduced: reduced() } })); });
+  var booted = false;
+  function boot() {   /* nothing runs at load; the site calls BS.motion.boot() first in its mount sequence */
+    if (booted) return; booted = true;
+    syncMotionAttr();
+    if (mq.addEventListener) mq.addEventListener("change", function () { syncMotionAttr(); document.dispatchEvent(new CustomEvent("bs:motion", { detail: { mode: mode, reduced: reduced() } })); });
+  }
 
   /* ── scroll root + route-cover gate ──────────────────────────────────── */
   function scrollRoot(explicit) {
@@ -342,7 +346,7 @@
     };
   }
 
-  BS.motion = {
+  BS.motion = { boot: boot, 
     reduced: reduced, mode: function () { return mode; }, setMode: setMode,
     scale: scale, wait: wait, raf2: raf2, syncMotionAttr: syncMotionAttr,
     staggerFade: staggerFade, mountReveals: mountReveals, mountDrawIn: mountDrawIn, redraw: redraw,

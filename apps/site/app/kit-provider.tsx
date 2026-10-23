@@ -1,19 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Script from 'next/script';
 
-// The ONE place the kit is mounted. The kit JS (window.BS) loads via <Script> in the layout; the
-// mockups run their mount sequence on DOMContentLoaded — here it runs after hydration and again on
-// every route change, idempotently, in the same order:
+// The ONE place the kit is mounted. The kit JS (window.BS) is injected from a useEffect — i.e. only
+// after React has hydrated — and no kit module does anything at load (DECISIONS 2026-10-23: every
+// boot()/mount()/observer was stripped from the modules), so the kit can never touch React-owned DOM
+// mid-hydration. The mockups ran their mount sequence on DOMContentLoaded — here it runs once the
+// script has loaded and again on every route change, idempotently, in the same order:
 //   syncMotionAttr → mountSite (frame, notch nav with wings/row/pill, footer, hero rise, spaces
 //   incl. the CRT hero with the nebula fallback) → icons → glass.decorate → spaces for new hosts →
 //   mountReveals → mountDrawIn → mountPause → diagrams.
 // Elements already handled carry a data-kit marker, so route changes never re-animate.
 type BSKit = {
-  motion?: { syncMotionAttr?: () => void; mountReveals?: (scope: Node) => void; mountDrawIn?: (el: Element) => void; mountPause?: (el: Element) => void; reduced?: () => boolean };
-  glass?: { decorate?: (root: Node) => void };
-  icons?: () => void;
+  motion?: { boot?: () => void; syncMotionAttr?: () => void; mountReveals?: (scope: Node) => void; mountDrawIn?: (el: Element) => void; mountPause?: (el: Element) => void; reduced?: () => boolean };
+  glass?: { decorate?: (root: Node) => void; boot?: (root?: Node) => void };
+  icons?: ((root?: Node) => void) & { boot?: (root?: Node) => void };
+  ui?: { copy?: () => void };
   mountSite?: (o: unknown) => unknown;
   site?: { setActive?: (id: string, o?: { animate?: boolean }) => void; refs?: { notch?: HTMLElement } };
   mountSpace?: (host: Element, o: { intensity: string; fade?: boolean }) => unknown;
@@ -37,7 +39,7 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
     el.dataset[k] = '1';
     try { fn(el); } catch { /* a kit module missing is not fatal */ }
   };
-  try { BS.motion?.syncMotionAttr?.(); } catch {}
+  try { (BS.motion?.boot ?? BS.motion?.syncMotionAttr)?.(); } catch {}
   if (firstMount) {
     try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'Open dashboard', href: DASHBOARD_URL } }); } catch {}
     // the dashboard is local-first: open it in a new tab, never navigate the site away
@@ -45,8 +47,9 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   } else {
     try { BS.site?.setActive?.(active, { animate: true }); } catch {}
   }
-  try { BS.icons?.(); } catch {}
-  try { BS.glass?.decorate?.(document); } catch {}
+  try { (BS.icons?.boot ?? BS.icons)?.(document); } catch {}
+  try { (BS.glass?.boot ?? BS.glass?.decorate)?.(document); } catch {}
+  try { BS.ui?.copy?.(); } catch {}          // [data-copy] buttons (the mockups wired these on DOMContentLoaded)
   // spaces/CRT for hosts mountSite did not see (pages rendered after the first mount)
   document.querySelectorAll<HTMLElement>('.hero__space, [data-space]').forEach((host) => {
     if (host.hasAttribute('data-space-mounted')) return;
@@ -73,7 +76,14 @@ export function KitProvider() {
   const path = usePathname();
   // the bundle loads after hydration; on client-side navigations it is already there
   const [ready, setReady] = useState(false);
-  useEffect(() => { if (kitReady()) setReady(true); }, []);
+  useEffect(() => {
+    if (kitReady()) { setReady(true); return; }
+    let s = document.querySelector<HTMLScriptElement>('script[data-bs-kit]');
+    if (!s) { s = document.createElement('script'); s.src = '/kit/kit.js'; s.async = true; s.dataset.bsKit = '1'; document.head.appendChild(s); }
+    const onLoad = () => setReady(true);
+    s.addEventListener('load', onLoad);
+    return () => s!.removeEventListener('load', onLoad);
+  }, []);
   useEffect(() => {
     if (!ready) return;
     const BS = (window as unknown as { BS?: BSKit }).BS;
@@ -83,5 +93,5 @@ export function KitProvider() {
     const raf = requestAnimationFrame(() => mountSequence(BS, first, activeFor(path)));
     return () => cancelAnimationFrame(raf);
   }, [ready, path]);
-  return <Script src="/kit/kit.js" strategy="afterInteractive" onLoad={() => setReady(true)} />;
+  return null;
 }

@@ -173,21 +173,7 @@
   BS.icons = icons;
   BS.mark = mark;
 
-  function boot() {
-    favicon();
-    icons(document);
-    new MutationObserver(function (records) {
-      for (var i = 0; i < records.length; i++) {
-        var added = records[i].addedNodes;
-        for (var j = 0; j < added.length; j++) {
-          var nd = added[j];
-          if (nd.nodeType !== 1) continue;
-          if (nd.tagName === "I" && nd.hasAttribute("data-lucide")) swap(nd);
-          else if (nd.querySelector && nd.querySelector("i[data-lucide]")) icons(nd);
-        }
-      }
-    }).observe(document.documentElement, { childList: true, subtree: true });
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  /* Nothing runs at load. boot(root) swaps the icons present now; markup added later is iconed by
+     whoever adds it (pages via decorate(scope); kit layers via BS.glass.adopt). */
+  icons.boot = function (root) { favicon(); icons(root || document); };
 })();

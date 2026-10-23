@@ -138,7 +138,7 @@
     panel.setAttribute("aria-label", (o.eyebrow ? o.eyebrow + ": " : "") + (o.title || "Details"));
     setLead(lead, o); setExtra(extra, o.extra);
     fill(body, content);
-    document.body.appendChild(root);
+    document.body.appendChild(root); if (BS.glass && BS.glass.adopt) BS.glass.adopt(root);
 
     var closed = false;
     var state = { panel: panel, lead: lead, extra: extra, body: body, param: o.param || null, onClose: o.onClose || null };

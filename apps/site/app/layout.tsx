@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { KitProvider } from './kit-provider';
+import { GlassDefs } from './glass-defs';
 
 export const metadata: Metadata = {
   title: 'Blindseal — prove an agent was screened',
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="bs-js">
       <body>
+        <GlassDefs />
         <main id="main-content" className="site-main">{children}</main>
         <KitProvider />
       </body>

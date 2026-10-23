@@ -17,7 +17,21 @@ type Odo = { el: HTMLElement; set: (v: unknown) => void; value: () => unknown };
 type LoadError = { code?: string; message?: string };
 const PAD_L = 40, PAD_T = 12, PAD_B = 28, H = 248, GAP = 2, BAR_MAX = 24, R = 4;
 
+const fmtInt = (n: number) => n.toLocaleString('en-US');   /* fixed locale: the server string must equal the client's */
+const ERR_TITLE: Record<string, string> = { RPC_RATE_LIMITED: 'Mainnet RPC rate-limited', RPC_OFF: 'Mainnet reads are off', RPC_UNAVAILABLE: 'Mainnet RPC unavailable' };
+
 export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
+  /* the server renders the state it already knows — ready numbers, the empty block or the offline panel
+     with the RPC error code — so the page never shows "reading" / 0 when the read succeeded or the
+     RPC refused; the effect below then animates the same values (odometers, chart, rows). Nothing here
+     depends on the clock. */
+  const live = !!snapshot.live;
+  const total = live ? snapshot.consumed.total : 0;
+  const view: 'ready' | 'empty' | 'offline' = !live ? 'offline' : total === 0 ? 'empty' : 'ready';
+  const perDay = live ? snapshot.consumed.perDay : [];
+  const sum30 = perDay.slice(-30).reduce((a, d) => a + d.count, 0);
+  const day24 = perDay.length ? perDay[perDay.length - 1].count : 0;   /* today so far (the effect adds yesterday's share) */
+  const code = (!live && (snapshot.error?.code as string)) || 'RPC_UNAVAILABLE';
   const router = useRouter();
 
   usePageKit((BS: BSAny) => {
@@ -427,39 +441,39 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
           <p className="ex-mast__lede">What the verifier program has consumed. No content, no agents, no operators.</p>
         </div>
         <div className="ex-mast__end">
-          <p className="ex-cluster" id="ex-cluster" data-state="loading" aria-live="polite">
+          <p className="ex-cluster" id="ex-cluster" data-state={live ? 'live' : 'offline'} aria-live="polite">
             <span className="live-dot" aria-hidden="true"></span>
             <span className="ex-cluster__net">mainnet</span>
             <span className="ex-cluster__sep" aria-hidden="true"></span>
             <span className="ex-cluster__k">slot</span>
-            <span className="ex-cluster__slot" id="ex-slot"><span className="skeleton ex-sk-slot" aria-hidden="true"></span><span className="sr-only">reading</span></span>
+            <span className="ex-cluster__slot" id="ex-slot">{live ? fmtInt(snapshot.slot) : 'unavailable'}</span>
           </p>
-          <p className="ex-cluster__sub" id="ex-updated">Reading the verifier program…</p>
+          <p className="ex-cluster__sub" id="ex-updated">{live ? 'Read from the verifier program · read-only' : 'Last read failed · nothing cached'}</p>
         </div>
       </header>
 
-      <div className="ex" id="ex" data-view="loading" aria-busy="true">
+      <div className="ex" id="ex" data-view={view} aria-busy="false">
 
         {/* ══ the four totals ═══════════════════════════════════════════════ */}
         <section className="ex-stats ex-enter" aria-label="Totals on mainnet">
           <div className="stat ex-stat ex-stat--lead">
             <p className="stat__k">Attestations consumed</p>
-            <p className="stat__v ex-stat__v ex-stat__v--lg" data-odo="total">0</p>
+            <p className="stat__v ex-stat__v ex-stat__v--lg" data-odo="total">{live ? fmtInt(total) : '—'}</p>
             <p className="stat__d" data-sub="total"><span>All time on mainnet</span></p>
           </div>
           <div className="stat ex-stat">
             <p className="stat__k">Last 24 h</p>
-            <p className="stat__v ex-stat__v" data-odo="day">0</p>
+            <p className="stat__v ex-stat__v" data-odo="day">{live ? fmtInt(day24) : '—'}</p>
             <p className="stat__d" data-sub="day"><span>Rolling window, UTC</span></p>
           </div>
           <div className="stat ex-stat">
             <p className="stat__k">Distinct policy roots</p>
-            <p className="stat__v ex-stat__v" data-odo="roots">0</p>
+            <p className="stat__v ex-stat__v" data-odo="roots">{live ? fmtInt(snapshot.policyRoots.length) : '—'}</p>
             <p className="stat__d" data-sub="roots"><span>Hashes only; the rules stay local</span></p>
           </div>
           <div className="stat ex-stat">
             <p className="stat__k">Consumer programs</p>
-            <p className="stat__v ex-stat__v" data-odo="programs">0</p>
+            <p className="stat__v ex-stat__v" data-odo="programs">{live ? fmtInt(snapshot.consumerPrograms.length) : '—'}</p>
             <p className="stat__d" data-sub="programs"><span>Programs that called the verifier</span></p>
           </div>
         </section>
@@ -470,7 +484,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
             <div className="ex-chart__lead">
               <p className="site-panel__n">Per day · UTC</p>
               <h2 className="site-panel__title" id="ex-chart-title">Consumed per day</h2>
-              <p className="ex-chart__sum"><span className="ex-chart__sum-v" id="ex-sum">0</span> <span id="ex-sum-label">in the last 30 days</span></p>
+              <p className="ex-chart__sum"><span className="ex-chart__sum-v" id="ex-sum">{fmtInt(sum30)}</span> <span id="ex-sum-label">in the last 30 days</span></p>
             </div>
             <div className="seg ex-range" id="ex-range" aria-label="Range">
               <button type="button" className="seg__item" data-value="7">7 d</button>
@@ -490,7 +504,15 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
         </section>
 
         {/* ══ offline / empty: one block in place of the chart and the lists ══ */}
-        <section className="ex-alt" id="ex-alt" hidden aria-live="polite"></section>
+        <section className="ex-alt" id="ex-alt" hidden={view === 'ready'} aria-live="polite">
+          {view === 'offline' && (
+            <div className="ex-alt--error">
+              <p className="ex-alt__title">{ERR_TITLE[code] ?? ERR_TITLE.RPC_UNAVAILABLE}</p>
+              <p className="ex-alt__body"><span data-msg>{snapshot.error?.message || 'Solana RPC unreachable. Retry in a moment.'}</span> The explorer reads the chain directly; this page caches nothing.</p>
+              <p className="ex-alt__meta" data-meta>Attempt 1 · cluster mainnet · {code}</p>
+            </div>
+          )}
+        </section>
 
         {/* ══ the two lists ═════════════════════════════════════════════════ */}
         <div className="ex-lists site-grid-2 reveal cascade" id="ex-lists">
