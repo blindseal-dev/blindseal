@@ -46,7 +46,7 @@ if [ -n "$OLD" ] && [ "$OLD" != "None" ]; then
 fi
 
 SRC=$(cat <<JSON
-{"ImageRepository":{"ImageIdentifier":"$IMAGE","ImageRepositoryType":"ECR","ImageConfiguration":{"Port":"3000","RuntimeEnvironmentVariables":{"BLINDSEAL_RPC_URL":"$RPC","NODE_ENV":"production"}}},
+{"ImageRepository":{"ImageIdentifier":"$IMAGE","ImageRepositoryType":"ECR","ImageConfiguration":{"Port":"3000","RuntimeEnvironmentVariables":{"BLINDSEAL_RPC_URL":"$RPC","NODE_ENV":"production","HOSTNAME":"0.0.0.0"}}},
  "AutoDeploymentsEnabled":false,"AuthenticationConfiguration":{"AccessRoleArn":"$ROLE_ARN"}}
 JSON
 )
@@ -61,8 +61,8 @@ else
   echo "→ update service $SERVICE"
   aws apprunner update-service --service-arn "$ARN" --source-configuration "$SRC" >/dev/null
 fi
-echo "→ waiting for RUNNING"
-for i in $(seq 1 60); do
+echo "→ waiting for RUNNING (a create takes ~8–10 min)"
+for i in $(seq 1 90); do
   ST=$(aws apprunner describe-service --service-arn "$ARN" --query Service.Status --output text)
   [ "$ST" = "RUNNING" ] && break
   [ "$ST" = "CREATE_FAILED" ] || [ "$ST" = "UPDATE_FAILED" ] && { echo "service $ST"; aws apprunner list-operations --service-arn "$ARN" --max-results 3; exit 1; }

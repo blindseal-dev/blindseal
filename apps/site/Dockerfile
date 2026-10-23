@@ -30,4 +30,6 @@ COPY --from=build --chown=web:web /app/apps/site/public ./apps/site/public
 USER web
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1
-CMD ["node", "apps/site/server.js"]
+# Force the bind address at exec time: App Runner (and other platforms) inject their own HOSTNAME,
+# which Next's standalone server would otherwise bind to — then the loopback health check fails.
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 exec node apps/site/server.js"]
