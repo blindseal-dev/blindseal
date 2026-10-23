@@ -20,7 +20,7 @@ rm -rf "$PKG" && mkdir -p "$PKG"
 wasm-bindgen --target web --out-dir "$PKG" --out-name blindseal_verifier "$WASM"
 
 echo "→ identity sweep (PART A) on the shipped binary"
-if strings "$PKG"/blindseal_verifier_bg.wasm | grep -iqE 'blindseal|blindseal|/Users/|/home/'; then
+if strings "$PKG"/blindseal_verifier_bg.wasm | grep -iqE "/Users/|/home/$([ -f "$HERE/../../.identity-sweep" ] && printf '|%s' $(grep -v '^#' "$HERE/../../.identity-sweep"))"; then
   echo "‼ identity string found in wasm — aborting"; exit 1
 fi
 echo "✓ clean. pkg/ bytes:"; ls -la "$PKG"
