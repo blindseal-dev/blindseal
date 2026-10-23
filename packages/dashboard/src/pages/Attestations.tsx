@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useAttestations, useAttestation, useSubmitAttestation, useBusEvent } from '../api/hooks';
 import type { Attestation, AttestationStatus } from '../api/types';
 import { Hash, Icon, StatusChip } from '../kit/react';
+import { splitPublicInputs } from '../api/publicInputs';
 
 const STATUSES: (AttestationStatus | '')[] = ['', 'generating', 'generated', 'submitted', 'consumed', 'expired', 'rejected'];
 const LIFECYCLE: AttestationStatus[] = ['generating', 'generated', 'submitted', 'consumed'];
-const PI_LABELS = ['payloadHash', 'policyRoot', 'detectorVersion', 'actionHash', 'nullifier', 'expirySlot'];
 
 function download(a: Attestation) {
   const blob = new Blob([JSON.stringify(a, null, 2)], { type: 'application/json' });
@@ -79,7 +79,7 @@ function Sheet({ id, onClose }: { id: string; onClose: () => void }) {
               </ol>
               <h3 className="d05-h">Public inputs <span className="is-faint">(verified, guest order)</span></h3>
               <dl className="kv d05-pi">
-                {(a.publicInputs ?? []).map((pi, i) => <div key={i}><dt className="mono">{PI_LABELS[i] ?? `#${i}`}</dt><dd><Hash value={pi} /></dd></div>)}
+                {splitPublicInputs(a.publicInputs).map((f) => <div key={f.label}><dt className="mono">{f.label}</dt><dd>{f.hash ? <Hash value={f.value} /> : <span className="mono">{f.value}</span>}</dd></div>)}
               </dl>
               <dl className="kv">
                 <div><dt>Proof</dt><dd><Hash value={a.proof?.bytes} label="Groth16 proof" /> <span className="is-faint">{a.proof?.protocol}/{a.proof?.curve}</span></dd></div>

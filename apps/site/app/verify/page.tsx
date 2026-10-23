@@ -10,7 +10,7 @@ export default function VerifyPage() {
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const run = async (json: string) => { setBusy(true); setResult(await verifyAttestation(json)); setBusy(false); };
+  const run = async (json: string) => { setBusy(true); try { setResult(await verifyAttestation(json)); } finally { setBusy(false); } };
   const load = (t: boolean) => { const j = t ? tamper(CANON) : JSON.stringify(sample, null, 2); setText(j); run(j); };
   const onDrop = (e: React.DragEvent) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) f.text().then((t) => { setText(t); run(t); }); };
 

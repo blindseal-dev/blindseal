@@ -27,11 +27,17 @@ test('home reduced-motion reaches end state', async ({ page }) => {
 });
 
 
-test('verify: sample valid, tampered invalid, nothing stored', async ({ page }) => {
+test('verify: sample valid, tampered invalid, nothing stored, wasm fetched same-origin', async ({ page }) => {
+  const off: string[] = [];
+  // This is the only test that triggers the lazy wasm fetch — assert it stays same-origin.
+  page.on('request', (r) => { try { const h = new URL(r.url()).hostname; if (!['localhost','127.0.0.1',''].includes(h) && r.url().startsWith('http')) off.push(r.url()); } catch {} });
   await page.goto('/verify');
   await page.getByRole('button', { name: 'Load sample' }).click();
   await expect(page.locator('.s03-result .panel__title')).toHaveText('Valid');
   await page.getByRole('button', { name: 'Load tampered' }).click();
   await expect(page.locator('.s03-result .panel__title')).toHaveText('Invalid');
+  // The real Groth16 verifier ran: a flipped proof fails the on-curve check.
+  await expect(page.locator('.s03-result')).toContainText('NotOnCurve');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
+  expect(off, `off-host: ${off.join(', ')}`).toEqual([]);
 });

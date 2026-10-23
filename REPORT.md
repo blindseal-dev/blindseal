@@ -48,7 +48,12 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 ## First thing tomorrow
 1. ~~Wire the real verifier~~ **DONE 2026-10-23**: `@blindseal/verifier-wasm` (wasm-bindgen) runs the
    real Groth16 check in both verify pages; mock verifier removed. (The earlier "compile-to-wasm proven"
-   was wrong — the 295 B module was empty; the real module is 406 KB and both links and runs.)
+   was wrong — the 295 B module was empty; the real module is 406 KB and both links and runs.) Also:
+   `splitPublicInputs` decodes the real len-1 commitment into the six display fields (unit-tested);
+   verifier fails closed + retryable on a wasm load error. **Open follow-up:** no proxy route serves
+   the React `dist/` yet (the current proxy dashboard is the legacy scan-history page). When one is added,
+   it must serve `.wasm` as `application/wasm` and allow `wasm-unsafe-eval` if it sets a CSP — the e2e
+   here runs against Vite dev, not that path. (See DECISIONS 2026-10-23.)
 2. **M2 on-chain**: Anchor verify program + transfer-gate + devnet deploy (budget ~230k CU + logic, per M0.5).
 3. Raise dashboard motion fidelity (sliding pill, row flash) and the site CRT hero; add a §5 counts endpoint
    to unblock `/decisions` counts + `/policy` root preview.

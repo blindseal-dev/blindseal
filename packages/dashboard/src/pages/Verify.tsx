@@ -13,8 +13,8 @@ export function Verify() {
 
   const run = async (json: string) => {
     setBusy(true);
-    setResult(await verifyAttestation(json));
-    setBusy(false);
+    try { setResult(await verifyAttestation(json)); }
+    finally { setBusy(false); } // never leave the button stuck on "Verifying…"
   };
   const loadSample = async (t: boolean) => {
     const a = await api.get<Attestation>('/attestations/sample');

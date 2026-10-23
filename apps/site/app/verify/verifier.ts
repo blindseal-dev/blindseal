@@ -27,7 +27,12 @@ export async function verifyAttestation(json: string): Promise<VerifyResult> {
   let proofOk = false;
   let proofDetail = 'proof did not verify';
   if (schemaOk) {
-    await ensure();
+    try {
+      await ensure();
+    } catch (e) {
+      ready = null; // a failed load (CSP/404/MIME) must not be cached — allow a retry
+      return { valid: false, error: `Verifier failed to load: ${e instanceof Error ? e.message : String(e)}`, steps: [] };
+    }
     const r = JSON.parse(verify_attestation_json(json)) as { ok: boolean; reason: string | null };
     proofOk = r.ok;
     proofDetail = r.ok

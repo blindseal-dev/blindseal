@@ -50,9 +50,11 @@ The SP1 guest commits exactly **six** public values, in this order (`crates/gues
   `sp1-solana` verify the proof against. The six named fields above are the **decoded** view of that
   same blob, in the order in §1. The verify page (S03) and attestation detail (D05) decode
   `publicInputs[0]` into those six fields for display; they verify against the blob, not the fields.
-- `fixtures/*.json` (mock API) currently stores `publicInputs` as the **decoded** 6-element array for
-  convenience. The real prover emits the 1-element raw blob. The production UI must handle the raw
-  blob form (decode it); treat the 6-element fixture form as a already-decoded shortcut.
+- `fixtures/*.json` (mock API) are mixed: `attestation-sample.json` and `attestations.json[0]` now
+  carry the **real 1-element raw blob** (what the prover emits); the remaining list entries keep the
+  **decoded** 6-element array for convenience. The dashboard handles both via
+  `packages/dashboard/src/api/publicInputs.ts::splitPublicInputs` (decodes the len-1 blob into the six
+  named fields; passes a 6-element array through). The production UI must handle the raw blob form.
 
 ## 2. `detectorVersion` is the vkey, not a version string
 
