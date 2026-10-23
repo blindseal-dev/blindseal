@@ -96,8 +96,10 @@ describe('mock API — audit', () => {
   it('disclose returns a signed, content-free window', async () => {
     const d = await (await fetch(`${base}/audit/disclose`, { method: 'POST', headers: { ...auth.headers, 'content-type': 'application/json' }, body: JSON.stringify({ from: 0, to: 5 }) })).json();
     expect(d.entries).toHaveLength(6);
-    expect(d.signature).toMatch(/^0x/);
+    expect(d.signature).toMatch(/^[0-9a-f]{128}$/); // a real ed25519 signature (64 bytes, hex)
     expect(d.entries[0]).not.toHaveProperty('payload');
+    const { verifyDisclosure } = await import('@blindseal/audit');
+    expect(verifyDisclosure(d)).toEqual({ ok: true }); // signed by the mock identity, chain reproduces
   });
 });
 

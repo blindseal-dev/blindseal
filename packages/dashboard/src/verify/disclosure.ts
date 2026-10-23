@@ -34,13 +34,22 @@ async function sha256Domain(domain: string, text: string): Promise<string> {
 
 export async function verifyDisclosure(d: Disclosure): Promise<DisclosureVerdict> {
   // 1) signature over canonicalJson({from,to,head,entries,signerPubkey}); signer = SPKI DER hex
-  let key: CryptoKey;
-  try {
-    key = await crypto.subtle.importKey('spki', fromHex(d.signerPubkey), { name: 'Ed25519' }, false, ['verify']);
-  } catch { return { ok: false, reason: 'bad signer pubkey (or no Ed25519 WebCrypto in this browser)' }; }
+  //    (12-byte Ed25519 SPKI prefix + 32-byte key). WebCrypto Ed25519 where the browser has it
+  //    (Chromium ≥ 137), else the pure-JS @noble/ed25519 fallback (DECISIONS 2026-10-23).
+  const spki = fromHex(d.signerPubkey);
+  if (spki.length !== 44) return { ok: false, reason: 'bad signer pubkey' };
   const preimage = enc.encode(canonicalJson({ from: d.from, to: d.to, head: d.head, entries: d.entries, signerPubkey: d.signerPubkey }));
+  const sig = fromHex(d.signature);
   let sigOk = false;
-  try { sigOk = await crypto.subtle.verify({ name: 'Ed25519' }, key, fromHex(d.signature), preimage); } catch { sigOk = false; }
+  try {
+    const key = await crypto.subtle.importKey('spki', spki, { name: 'Ed25519' }, false, ['verify']);
+    sigOk = await crypto.subtle.verify({ name: 'Ed25519' }, key, sig, preimage);
+  } catch {
+    try {
+      const ed = await import('@noble/ed25519');
+      sigOk = await ed.verifyAsync(sig, preimage, spki.slice(12));
+    } catch { sigOk = false; }
+  }
   if (!sigOk) return { ok: false, reason: 'signature mismatch' };
   // 2) each entry hash reproduces from its 6-field core; prevHash links within the window
   for (let i = 0; i < d.entries.length; i++) {
