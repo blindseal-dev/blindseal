@@ -2,12 +2,12 @@
    _shared/tokens.css — Blindseal mockups · the ONE token layer (J00)
    ----------------------------------------------------------------------------
    Dark only (DECISIONS D01), on :root. Three layers, in order:
-     1. the [removed].family palette, VERBATIM from (the previous kit)/tokens.css
+     1. the Blindseal palette, VERBATIM from the Blindseal kit/tokens.css
         (medals and avatar colours dropped: no leaderboard, no avatars).
      2. the kit names (--canvas, --panel, --line, --ink, --muted, --accent,
-        --ring, --num-up …) re-pointed at layer 1 exactly as the previous project did.
+        --ring, --num-up …) re-pointed at layer 1 exactly as the Blindseal kit did.
      3. Blindseal: verdict + status colours (D03), hash sizes (D09), the site
-        geometry ([removed] notch + hero, refs/[removed]/NAV-HERO.spec.md), the
+        geometry (the notch nav + hero, the nav/hero spec), the
         shell geometry (D06), radii, type, spacing and the house motion
         tokens (reference tokens.css §14, verbatim).
 
@@ -25,7 +25,7 @@
 :root {
   color-scheme: dark;
 
-  /* ══ 1 · [removed].family palette (verbatim) ═══════════════════════════════ */
+  /* ══ 1 · Blindseal palette (verbatim) ═══════════════════════════════ */
   --color-bg-primary: #060510;             /* page, gaps between panels, status bar */
   --color-bg-secondary: #12111a;           /* every panel, card, row, input, secondary button */
   --color-bg-tertiary: #cbd0eb1a;          /* rgba(203,208,235,.10): THE hairline, hover wash, chip bg */
@@ -51,10 +51,10 @@
   --color-critical: #ff622e;
   --color-critical-transparent: #ff622e1f;
 
-  /* ══ 2 · kit names, re-pointed (as the previous project) ══════════════════════════ */
+  /* ══ 2 · kit names, re-pointed (as the Blindseal kit) ══════════════════════════ */
   --canvas:         var(--color-bg-primary);         /* #060510 page ground */
   --panel:          var(--color-bg-secondary);       /* #12111a flat cards, rows, inputs */
-  --surface:        var(--color-bg-secondary);       /* alias of --panel (the earlier shell name) */
+  --surface:        var(--color-bg-secondary);       /* alias of --panel (the shell name) */
   --surface-raised: var(--color-bg-tertiary-solid);  /* #161522 a surface on a surface, kbd, code */
   --surface-hover:  var(--color-bg-tertiary);        /* the 10% wash: row hover, active segment */
   --muted-surface:  var(--color-bg-secondary);
@@ -69,7 +69,7 @@
   --line:        var(--color-bg-tertiary);
   --line-soft:   var(--color-bg-tertiary);
   --line-faint:  var(--color-bg-tertiary-solid);
-  --line-strong: color-mix(in srgb, var(--color-text-secondary) 34%, transparent); /* hover hairline (the previous project INVENTED: 34% of text-secondary) */
+  --line-strong: color-mix(in srgb, var(--color-text-secondary) 34%, transparent); /* hover hairline (the Blindseal kit INVENTED: 34% of text-secondary) */
   --hairline:    1px solid var(--color-bg-tertiary);
   --gap-ring:    2px solid var(--color-bg-primary);
 
@@ -142,10 +142,10 @@
   --hash-size: 12px;
   --hash-size-lg: 13px;
 
-  /* site geometry — [removed] notch + hero (refs/[removed]/NAV-HERO.spec.md) */
+  /* site geometry — the notch nav + hero (the nav/hero spec) */
   --notch-top: 8px;          /* the frame gutter: tabs hang from it */
   --notch-h: 54px;           /* tab height */
-  --notch-max-w: 1424px;     /* the row: 1440 − 2 × 8 (INVENTED cap; [removed] spreads edge to edge) */
+  --notch-max-w: 1424px;     /* the row: 1440 − 2 × 8 (INVENTED cap; the notch nav spreads edge to edge) */
   --notch-r: 24px;           /* tab bottom radius */
   --notch-wing: 16px;        /* the concave corner pieces */
   --notch-item-h: 38px;      /* link / button height inside a tab */
@@ -178,7 +178,7 @@
   /* type — the stacks and the strong weight live in fonts.css (gate-keyed) */
   --fs-10: 10px; --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px; --fs-16: 16px;
   --fs-18: 18px; --fs-20: 20px; --fs-24: 24px; --fs-28: 28px; --fs-30: 30px; --fs-38: 38px; --fs-40: 40px; --fs-56: 56px;
-  --ls-display: -0.03em; --ls-tight: -0.02em; --ls-eyebrow: 0.12em;   /* 11px × .12 = 1.32px (the reference app) */
+  --ls-display: -0.03em; --ls-tight: -0.02em; --ls-eyebrow: 0.12em;   /* 11px × .12 = 1.32px (the kit) */
   --t-headline: 30px/34px;
   --t-money:    18px/28px;
   --t-bio:      16px/24px;
@@ -192,7 +192,7 @@
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px;
   --s-7: 28px; --s-8: 32px; --s-10: 40px; --s-12: 48px; --s-16: 64px;
 
-  /* ══ motion — the reference app tokens.css §14, VERBATIM ═══════════════════════ */
+  /* ══ motion — the kit tokens.css §14, VERBATIM ═══════════════════════ */
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);           /* state changes */
   --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1); /* entrances */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);        /* snappy arrivals, odometer in, row entry */
@@ -226,7 +226,7 @@
   --d-1100: 1.1s;   /* loading sweep */
   --d-1800: 1.8s;   /* now-dot ring */
   --d-2400: 2.4s;   /* LIVE breathe */
-  --stagger: 0.06s;        /* the reference app +0.06s per child */
+  --stagger: 0.06s;        /* the kit +0.06s per child */
   --stagger-fine: 30ms;    /* dropdown children */
   --stagger-series: 80ms;  /* per chart series / per path */
   --d-tick: 1s;
@@ -234,7 +234,7 @@
   --stagger-card: 45ms;
   --d-shimmer: 6s;
   --d-marquee: 40s;
-  --d-drift: 12s;          /* the nebula's wp-field-drift (the reference app's long-form page.css:275) */
+  --d-drift: 12s;          /* the nebula's wp-field-drift (the kit's long-form page.css:275) */
   --menu-in: var(--d-150); --menu-out: var(--d-140); --menu-rise: 6px; --menu-gap: 6px;
 
   /* ══ z ladder ═════════════════════════════════════════════════════════ */

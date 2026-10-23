@@ -1,0 +1,47 @@
+/* ============================================================================
+   _shared/fonts.css — Geist (sans) + Geist Mono (mono), self-hosted
+   ----------------------------------------------------------------------------
+   NOTHING is fetched from outside localhost: no @import, no CDN, no external
+   URL. Every face below is a local woff2 in ./fonts/ (Geist, SIL OFL 1.1 —
+   see ./fonts/OFL.txt). Weights: Medium 500 is the DEFAULT (labels, names,
+   numbers); Regular 400 for body copy; Semibold 600 for buttons, chips, the
+   status bar and the wordmark. Tabular figures on every number class and .hash.
+   ========================================================================== */
+
+/* ── Geist (sans) ──────────────────────────────────────────────────────── */
+@font-face { font-family: "Geist"; src: url("./fonts/geist-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist"; src: url("./fonts/geist-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist"; src: url("./fonts/geist-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+
+/* ── Geist Mono (hashes, code, keys) ───────────────────────────────────── */
+@font-face { font-family: "Geist Mono"; src: url("./fonts/geist-mono-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("./fonts/geist-mono-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+
+/* ── the stacks ────────────────────────────────────────────────────────── */
+:root {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "JetBrains Mono", Consolas, monospace;
+  --fw-body: 400;
+  --fw-medium: 500;
+  --fw-strong: 600;
+  /* kit aliases, so ported recipes read the same */
+  --fw-regular: var(--fw-body);
+  --fw-bold: var(--fw-strong);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-medium);           /* Medium is the default weight */
+  font-size: 14px; line-height: 20px;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* every number class gets tabular figures (no jitter while digits change) */
+.num, .amount, .stat__v, .odo, .price-ticker, .ticking, .ticker, .row__value, .headline-num,
+.table .num, .table .is-num, .kbd, .badge-count, .hash, .kv__v, .slot, .progress__v {
+  font-variant-numeric: tabular-nums;
+}
+
+/* mono: hashes, code, keys */
+.mono, .hash, code, kbd, samp, pre { font-family: var(--font-mono); font-weight: var(--fw-body); }

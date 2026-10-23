@@ -1,67 +1,53 @@
-// Component smoke test: the Decisions page renders live rows from the API contract and filters by
-// verdict. fetch is mocked to return the §5 shape; no network, no proxy needed.
+// Decisions component: renders rows from the §5 contract, filters by verdict, and shows the
+// onboarding (empty) and token (unauthorized) states. fetch is mocked — no network, no kit JS.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Decisions } from '../src/pages/Decisions';
 import type { Decision } from '../src/api/types';
 
-function mkDecision(id: string, verdict: Decision['verdict']): Decision {
+function dec(id: string, verdict: Decision['verdict']): Decision {
   return {
-    id,
-    ts: '2026-10-20T09:00:04.105Z',
-    server: 'slack',
-    tool: 'list_channels',
-    direction: 'response',
-    verdict,
-    layers: [
-      { layer: 'L0', ran: true, verdict: 'pass', latencyMs: 0.5 },
-      { layer: 'L1', ran: true, verdict, latencyMs: 0.1 },
-      { layer: 'L2', ran: false, verdict: 'skip', latencyMs: 0 },
-      { layer: 'L3', ran: false, verdict: 'skip', latencyMs: 0 },
-    ],
+    id, ts: '2026-10-20T09:00:04.105Z', server: 'slack', tool: 'list_channels', direction: 'response', verdict,
+    layers: [{ layer: 'L0', ran: true, verdict: 'pass', latencyMs: 0.5 }, { layer: 'L1', ran: true, verdict, latencyMs: 0.1 }],
     payloadHash: '0x880dcefa96c5ac45dcb65880cf9f83b244d5e5e034c39675b6741ef16e5d3fe7',
-    redactedHash: '0x880dcefa96c5ac45dcb65880cf9f83b244d5e5e034c39675b6741ef16e5d3fe7',
-    redactions: [],
-    policyRoot: '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397',
-    detectorVersion: '0x726faa56c0857bbace50727feedf504a76f37a98c975f565e44bf341fb29851d',
-    auditIndex: 0,
-    auditHash: '0xaed0',
-    latencyMs: 12,
+    redactedHash: '0x880d', redactions: [], policyRoot: '0x36a9e9', detectorVersion: '0x726faa', auditIndex: 0, auditHash: '0xaed0', latencyMs: 12,
   };
 }
+const STATUS = { version: '0.0.0-mock', connection: 'live', upstreams: [{ name: 'slack', transport: 'stdio', healthy: true }], policyRoot: '0x36a9e9', detectorVersion: '0x726faa', audit: { index: 199, hash: '0x1', ts: '' }, prover: { available: true }, l3: { mode: 'local' }, mock: true };
 
-const ALL = { items: [mkDecision('a1', 'block'), mkDecision('a2', 'pass')] };
-
-beforeEach(() => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string) => {
-      const u = String(url);
-      const body = u.includes('verdict=block') ? { items: [ALL.items[0]] } : ALL;
-      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }),
-  );
-});
+function mockFetch(handler: (url: string) => { status: number; body: unknown }) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    const { status, body } = handler(String(url));
+    return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  }));
+}
 afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => { /* each test sets its own mock */ });
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <Decisions />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={qc}><MemoryRouter><Decisions /></MemoryRouter></QueryClientProvider>);
 }
 
 it('renders decision rows from the contract', async () => {
+  mockFetch((u) => u.includes('/status') ? { status: 200, body: STATUS } : { status: 200, body: { items: [dec('a1', 'block'), dec('a2', 'pass')] } });
   const { container } = renderPage();
-  await waitFor(() => expect(screen.getAllByText('list_channels').length).toBe(2));
-  // Scope to the verdict chips (the filter bar also has Block/Pass buttons).
-  const verdicts = Array.from(container.querySelectorAll('.bs-verdict')).map((c) => c.textContent);
-  expect(verdicts).toContain('Block');
-  expect(verdicts).toContain('Pass');
+  await waitFor(() => expect(within(container).getAllByText('list_channels').length).toBe(2));
+  const verdicts = Array.from(container.querySelectorAll('.verdict')).map((c) => c.textContent);
+  expect(verdicts).toContain('block');
+  expect(verdicts).toContain('pass');
+});
+
+it('shows onboarding when empty + audit head -1', async () => {
+  mockFetch((u) => u.includes('/status') ? { status: 200, body: { ...STATUS, audit: { index: -1, hash: '0x0', ts: '' } } } : { status: 200, body: { items: [] } });
+  renderPage();
+  await waitFor(() => expect(screen.getByText('No decisions yet.')).toBeTruthy());
+});
+
+it('shows the token screen on 401', async () => {
+  mockFetch(() => ({ status: 401, body: { error: { code: 'UNAUTHORIZED', message: 'no token' } } }));
+  renderPage();
+  await waitFor(() => expect(screen.getByText('Dashboard token required')).toBeTruthy());
 });

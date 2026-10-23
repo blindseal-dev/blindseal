@@ -1,49 +1,33 @@
 # @blindseal/dashboard
 
-The local dashboard (FRONTEND.md §3): **Vite + React + TypeScript**, built to a static bundle at
-`dist/` that the proxy serves. No SSR, no external requests. Data comes from the proxy local API
-(mock mode: `mock-server.ts`) over the §5 contract, with a `/events` WebSocket for the live stream.
+**Owned by the frontend dev.** The production dashboard is ported from the mockups in
+[`design/mockups/`](../../design/mockups/) following the brief's stack and sequence:
 
-## Run
+- **Stack:** Vite + React + TypeScript + Tailwind; TanStack Query + a native WebSocket against the
+  proxy's local API. Builds to a static bundle at `packages/dashboard/dist`, served by the proxy.
+  See [`FRONTEND.md §3`](../../FRONTEND.md).
+- **Data contract:** [`FRONTEND.md §5`](../../FRONTEND.md) (types, endpoints, fixtures) and the
+  authoritative [`docs/FRONTEND-CONTRACT.md`](../../docs/FRONTEND-CONTRACT.md).
+- **Port order & carry-overs:** [`FRONTEND.md §6`](../../FRONTEND.md) — carry the token layer, motion
+  grammar, hash component, verdict colours, the five-state rule and the never-write scan from
+  `design/mockups/` verbatim; keep the mockup's drawn figures (no backend SVG).
+
+## Backend is ready for you
+
+The proxy serves the §5 contract in **mock mode** from `fixtures/` — build the whole dashboard
+against it, no real backend required:
 
 ```
-# terminal 1 — the mock API on :4831
 BLINDSEAL_MOCK=1 pnpm -C packages/proxy dev run --mock --port 4831
-# terminal 2 — the dashboard dev server on :5319 (proxies /api + /events to :4831)
-pnpm -C packages/dashboard dev
+# open with the token the proxy prints:  #token=<token>
 ```
 
-Open `http://localhost:5319/#token=<token printed by the proxy>`. In production the proxy serves
-`dist/` and injects the token into the fragment.
+- Endpoints + WebSocket `/events` match `FRONTEND.md §5` and `docs/FRONTEND-CONTRACT.md`.
+- **State switches** for every UI state: `BLINDSEAL_MOCK_STATE=<state>` or `?state=<state>` —
+  `empty, unauthorized, offline, reconnecting, prover-down, chain-broken, tee, upstream-down`
+  (the mockups' `?state=` set; `no-action, not-found, loading` are data/UI-side).
+- Fixtures mirror the real engine: 22 committed L1 rules, real policy root `0x36a9e9…`, attestation
+  public inputs in guest-commit order, `sourceAuthority` on actions.
 
-```
-pnpm -C packages/dashboard build      # tsc + vite build -> dist/ (≈69 kB gz)
-pnpm -C packages/dashboard test       # vitest: acceptance scans + component tests
-```
-
-## Layout
-
-- `src/tokens.css` — the design token layer, ported verbatim from `frontend-reference/` (dark only;
-  shadcn aliases included). `src/index.css` is the component layer; no colour literal lives outside
-  the tokens.
-- `src/api/` — `types.ts` (the contract, see `docs/FRONTEND-CONTRACT.md`), `client.ts` (fetch +
-  in-memory bearer token from the URL fragment), `hooks.ts` (TanStack Query + the `/events` socket
-  folded into the query cache).
-- `src/components/` — `Shell` (sidebar + top bar with the connection pill + MOCK chip + the audit/
-  policy/detector/L3 status bar), `Hash` (click-to-copy truncated hash), `VerdictChip`, `LayerStrip`.
-- `src/pages/` — `Decisions` + `DecisionDetail` are wired to live data. `Audit`, `Policy`,
-  `Attestations`, `Settings` are `Stub`s — the shell, routing, tokens and data layer are in place;
-  each is a mechanical port of its mockup in `frontend-reference/mockups/D0x/` against `api/hooks.ts`.
-
-## Component inventory (status)
-
-| Page | Route | Status |
-|------|-------|--------|
-| Decisions | `/decisions` | **wired** — live table, verdict filter, counts, row → detail |
-| Decision detail | `/decisions/:id` | **wired** — layer breakdown, hashes, action |
-| Audit | `/audit` | stub |
-| Policy | `/policy` | stub (note: the Merkle root must come from `PUT /policy`, not JS) |
-| Attestations | `/attestations` | stub |
-| Settings | `/settings` | stub |
-
-The marketing site (`apps/site`, Next.js) is a separate package, not yet scaffolded.
+The off-chain verifier the verify page needs is `crates/verifier-wasm` (confirmed to compile to
+`wasm32`; wasm-bindgen packaging as `@blindseal/verifier-wasm` is the remaining backend hand-off).

@@ -139,6 +139,7 @@ export interface Disclosure {
 // Matches mock-server.ts `status()` exactly.
 export interface Status {
   version: string;
+  connection?: 'live' | 'reconnecting' | 'offline';
   uptimeSec: number;
   upstreams: { name: string; transport: string; healthy: boolean }[];
   policyRoot: string;

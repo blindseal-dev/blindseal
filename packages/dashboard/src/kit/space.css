@@ -1,0 +1,88 @@
+/* ============================================================================
+   _shared/space.css — the nebula (DECISIONS D04), filled by BS.mountSpace()
+   ----------------------------------------------------------------------------
+   A gradient field, never neon. Layers, back to front, inside .space (absolute,
+   inset 0, overflow hidden, pointer-events none, behind the host's content):
+     .space__nebula  four radial gradients mixed from the tokens, on a layer
+                     160% of the host (so the drift never shows an edge):
+                       accent (cobalt) 14% upper-right (+ a 5% haze; ≤ 18%
+                       together — measured, see the budget below)
+                       accent-deep (#221d4b) ≤ 10% + gradient-start (#6f85ff)
+                       ≤ 8% lower-left
+                       a cool bg-tertiary wisp ≤ 4% (40% of a 10% token)
+                     drifting on the kit's wp-field-drift (whitepaper.css:275-282,
+                     12s ease-in-out infinite; the keyframes are copied verbatim
+                     below — the ONE vocabulary addition of the kit, owned here).
+     .space__grain   a static SVG feTurbulence (baseFrequency .8, 2 octaves),
+                     greyscale, at 3.5% opacity
+     .space__stars   one inline SVG, ~140 seeded points (radii .6 / 1.1, white
+                     alphas .35–.9); twelve breathe on breathe-55 2.4s at
+                     staggered delays
+     .space__fade    the bottom fades to var(--canvas), so a hero ends on flat
+                     ground and every panel below sits on the plain canvas
+   data-intensity="faint" halves every alpha (--k: .5).
+   Paused off screen / in a hidden tab (BS.motion.mountPause → .is-paused);
+   static under reduced motion (end state = the centred field).
+
+   Brightness budget: the brightest field pixel must stay under ≈ #1a1d3c
+   (measured in Playwright, stars / grain / shade hidden). At 18% + 7% the
+   peak read #1c2147, over budget; at 14% + 5% it reads #181b3c (measured).
+
+   Colour literals: the star alphas below (white) are the only ones in this
+   file — every other colour is a token mixed with color-mix().
+   ========================================================================== */
+
+.space {
+  --k: 1;
+  position: absolute; inset: 0; z-index: 0;
+  overflow: hidden; pointer-events: none;
+  background: var(--canvas);
+  contain: strict;
+}
+.space[data-intensity="faint"] { --k: .5; }
+
+/* ── the field ─────────────────────────────────────────────────────────── */
+.space__nebula {
+  position: absolute; top: 50%; left: 50%;
+  width: 160%; height: 160%;
+  transform: translate(-50%, -50%);
+  background:
+    /* accent, upper-right */
+    radial-gradient(ellipse 30% 26% at 69% 31%, color-mix(in srgb, var(--accent) calc(14% * var(--k)), transparent) 0%, transparent 72%),
+    /* a wider accent haze under it, so the blob has no rim */
+    radial-gradient(ellipse 46% 40% at 64% 36%, color-mix(in srgb, var(--accent) calc(5% * var(--k)), transparent) 0%, transparent 70%),
+    /* the deep accent, lower-left */
+    radial-gradient(ellipse 40% 34% at 30% 70%, color-mix(in srgb, var(--accent-deep) calc(10% * var(--k)), transparent) 0%, transparent 70%),
+    /* the gradient-start lift inside it */
+    radial-gradient(ellipse 22% 18% at 33% 67%, color-mix(in srgb, var(--color-accent-gradient-start) calc(8% * var(--k)), transparent) 0%, transparent 70%),
+    /* the cool wisp, centre-left (40% of the 10% tertiary token = 4%) */
+    radial-gradient(ellipse 34% 12% at 44% 52%, color-mix(in srgb, var(--color-bg-tertiary) calc(40% * var(--k)), transparent) 0%, transparent 70%);
+  animation: wp-field-drift var(--d-drift) ease-in-out infinite;
+  will-change: transform;
+}
+/* the kit's long-form page.css:279-282, verbatim */
+@keyframes wp-field-drift {
+  0%, 100% { transform: translate(-54%, -46%) scale(1); }
+  50% { transform: translate(-46%, -54%) scale(1.12); }
+}
+
+.space__grain {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: calc(.035 * var(--k));
+}
+
+.space__stars {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+}
+/* the star alphas: white, the per-star alpha comes from --a (.35–.9) */
+.space__stars circle { fill: rgb(255 255 255 / calc(var(--a, .6) * var(--k))); }
+.space__stars circle.is-twinkle { animation: breathe-55 var(--d-2400) ease-in-out infinite; animation-delay: var(--tw, 0s); }
+
+.space__fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+  background: linear-gradient(to bottom, transparent 0%, var(--canvas) 100%);
+}
+.space[data-fade="false"] .space__fade { display: none; }
+
+/* ── reduced motion: everything static, the field centred ─────────────── */
+html[data-motion="reduce"] :is(.space__nebula, .space__stars circle) { animation: none !important; }

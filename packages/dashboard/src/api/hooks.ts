@@ -2,12 +2,7 @@
 // pushes live decisions/status and we fold them into the query cache so the UI is live without
 // polling.
 import { useEffect, useRef, useState } from 'react';
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, eventsUrl } from './client';
 import type {
   Attestation,
@@ -111,12 +106,24 @@ export function useDryRun() {
 }
 
 /** Fold a live decision into every cached decision list (newest first, capped). */
-function pushDecision(qc: QueryClient, d: Decision) {
-  qc.setQueriesData<DecisionPage>({ queryKey: ['decisions'] }, (prev) => {
-    if (!prev) return prev;
-    if (prev.items.some((x) => x.id === d.id)) return prev;
-    return { ...prev, items: [d, ...prev.items].slice(0, 500) };
-  });
+// A tiny in-process event bus: one WebSocket (opened in the Shell) fans frames out to subscribers,
+// so pages own their own live behaviour (e.g. the Decisions Live/Paused queue) without a second WS.
+type BusCb = (data: any) => void;
+const bus = new Map<string, Set<BusCb>>();
+function emit(type: string, data: any) {
+  bus.get(type)?.forEach((cb) => { try { cb(data); } catch { /* subscriber threw */ } });
+}
+/** Subscribe to a frame type ('decision' | 'status' | 'policy' | 'attestation'). */
+export function useBusEvent(type: string, cb: BusCb) {
+  const ref = useRef(cb);
+  ref.current = cb;
+  useEffect(() => {
+    const wrapped: BusCb = (d) => ref.current(d);
+    let set = bus.get(type);
+    if (!set) { set = new Set(); bus.set(type, set); }
+    set.add(wrapped);
+    return () => { set!.delete(wrapped); };
+  }, [type]);
 }
 
 export type ConnState = 'connecting' | 'open' | 'closed';
@@ -125,12 +132,10 @@ export type ConnState = 'connecting' | 'open' | 'closed';
  * Subscribe to /events. Returns the live connection state and whether the stream is paused.
  * Reconnects with backoff. Decisions/status/policy/attestation frames update the query cache.
  */
-export function useEventStream(paused: boolean) {
+export function useEventStream(_paused?: boolean) {
   const qc = useQueryClient();
   const [conn, setConn] = useState<ConnState>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
-  const pausedRef = useRef(paused);
-  pausedRef.current = paused;
 
   useEffect(() => {
     let closed = false;
@@ -153,27 +158,17 @@ export function useEventStream(paused: boolean) {
         setConn('open');
       };
       ws.onmessage = (ev) => {
-        if (pausedRef.current) return;
         let frame: EventFrame;
         try {
           frame = JSON.parse(ev.data);
         } catch {
           return;
         }
-        switch (frame.type) {
-          case 'decision':
-            pushDecision(qc, frame.data);
-            break;
-          case 'status':
-            qc.setQueryData(['status'], frame.data);
-            break;
-          case 'policy':
-            qc.setQueryData(['policy'], frame.data);
-            break;
-          case 'attestation':
-            qc.invalidateQueries({ queryKey: ['attestations'] });
-            break;
-        }
+        emit(frame.type, (frame as any).data);
+        // Convenience cache updates; decisions are owned by the page (bus) so they are not folded.
+        if (frame.type === 'status') qc.setQueryData(['status'], frame.data);
+        else if (frame.type === 'policy') qc.setQueryData(['policy'], frame.data);
+        else if (frame.type === 'attestation') qc.invalidateQueries({ queryKey: ['attestations'] });
       };
       ws.onclose = () => {
         setConn('closed');

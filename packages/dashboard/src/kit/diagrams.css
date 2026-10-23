@@ -1,0 +1,259 @@
+/* ============================================================================
+   _shared/diagrams.css — BS.diagrams: the kit's draw-in figures (J0D)
+   ----------------------------------------------------------------------------
+   Self-contained: a page that loads only this file and diagrams.js gets the
+   full draw-in, even if motion.css is older or absent. The selectors use the
+   kit's classes and attributes, so motion.css and this file agree:
+
+     host  <figure class="fig">   .is-armed → (in view, 2×rAF) → .is-drawn
+     [data-draw]        stroke draw, pathLength="1", 900ms out-cubic, +80ms × --i
+     [data-draw="fast"] the same at 600ms (ticks, slot bars, the ✕)
+     [data-draw-tip]    arrowhead, opacity 300ms ease at --i × 80 + dur × .5
+     [data-draw-fill]   node fill, opacity 600ms ease at --i × 80 + 200ms
+     [data-draw-fade]   opacity 400ms ease after the paths (--labels-delay)
+     [data-draw-label]  opacity + 4px rise, 400ms out-cubic, --labels-delay + --li × 40ms
+     [data-draw-to]     partial stroke (status progress): offset 1 → 1 − --to
+
+   Sources ((reference study)/):
+     900ms out-cubic, +80ms per path ........ protocol.css:207, ProtocolPage.tsx:116-123
+                                               (motion spec §1.3 rows 46-47, §1.4.9)
+     600ms out-cubic (fast) ................. about.css:235 (row 49)
+     arrowheads 300ms ease .................. about.css:247 (row 50); placement after the
+                                               line is under way = AboutVisuals.tsx Flywheel tip
+     labels 400ms after paths × 80ms ........ protocol.css:211 (row 48); + i × 40ms per label
+                                               = ProtocolPage.tsx:133
+     fills 600ms ease, Δ200ms ............... about.css:527 burn area (row 53)
+     state changes 200ms in-out ............. DECISIONS interaction thesis (150-200ms in-out)
+
+   Slow-mo: html[data-motion="slow"]. When the kit's motion engine is present
+   (BS.motion or PF.motion with syncMotionAttr) it slows every animation and
+   transition with playbackRate .25, so this file leaves --dg-k at 1
+   (data-dg-rate="kit"). Without the kit, diagrams.js marks the host
+   data-dg-rate="css" and every duration and delay below is multiplied by
+   --dg-k: 4. One mechanism at a time, never both (that would be ×16).
+
+   Reduced motion: the OS query and html[data-motion="reduce"] pin every end
+   state with no transition (the kit §1.5 layer 2).
+
+   Colour: tokens only (--ink --muted --faint --line --panel --canvas --accent
+   --accent-soft). The fallbacks below contain no literal colour: before
+   tokens.css exists they derive from currentColor / the Canvas system colour,
+   so a figure renders monochrome rather than blank.
+   ========================================================================== */
+
+/* Diagram faces: self-hosted Geist / Geist Mono (same as fonts.css). Only
+   requested when the kit's --font-sans / --font-mono are not defined. */
+@font-face { font-family: "BS Diagram Sans"; src: url("fonts/geist-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "BS Diagram Sans"; src: url("fonts/geist-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "BS Diagram Sans"; src: url("fonts/geist-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "BS Diagram Mono"; src: url("fonts/geist-mono-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "BS Diagram Mono"; src: url("fonts/geist-mono-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+
+.fig {
+  /* colour roles (tokens first, token-free fallbacks second) */
+  --dg-ink: var(--ink, currentColor);
+  --dg-muted: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+  --dg-faint: var(--faint, color-mix(in srgb, currentColor 34%, transparent));
+  --dg-line: var(--line, color-mix(in srgb, currentColor 14%, transparent));
+  --dg-line-strong: var(--line-strong, var(--dg-muted));   /* outlines that draw in: --line (10%) vanishes mid-draw */
+  --dg-panel: var(--panel, color-mix(in srgb, currentColor 5%, transparent));
+  --dg-accent: var(--accent, currentColor);
+  --dg-accent-soft: var(--accent-soft, var(--accent-tint, color-mix(in srgb, var(--dg-accent) 16%, transparent)));
+  --dg-pass-soft: var(--surface-hover, var(--dg-line));   /* pass stays boring: the neutral wash */
+  --dg-block-soft: var(--verdict-block-bg, var(--dg-accent-soft));
+  --dg-flag: var(--verdict-flag, var(--flag, var(--color-yellow, currentColor)));
+  --dg-skip: var(--verdict-skip-line, var(--dg-muted));
+  --dg-flag-soft: var(--verdict-flag-bg, var(--flag-soft, var(--color-yellow-transparent, color-mix(in srgb, var(--dg-flag) 12%, transparent))));
+  /* type */
+  --dg-sans: var(--font-sans, "BS Diagram Sans", ui-sans-serif, system-ui, sans-serif);
+  --dg-mono: var(--font-mono, "BS Diagram Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  /* motion (kit tokens first; the fallbacks are the kit's values) */
+  --dg-k: 1;
+  --dg-dur: calc(var(--d-900, .9s) * var(--dg-k));
+  --dg-dur-fast: calc(var(--d-600, .6s) * var(--dg-k));
+  --dg-stagger: calc(var(--stagger-series, 80ms) * var(--dg-k));
+  --dg-label-stagger: calc(40ms * var(--dg-k));
+  --dg-label-dur: calc(var(--d-400, .4s) * var(--dg-k));
+  --dg-tip-dur: calc(.3s * var(--dg-k));
+  --dg-fill-dur: calc(var(--d-600, .6s) * var(--dg-k));
+  --dg-fill-at: calc(var(--d-200, .2s) * var(--dg-k));
+  --dg-state: calc(var(--d-200, .2s) * var(--dg-k));
+  --dg-labels: calc(var(--labels-delay, .8s) * var(--dg-k));
+  --dg-ease: var(--ease-out-cubic, cubic-bezier(.215, .61, .355, 1));
+  --dg-ease-state: var(--ease-in-out, cubic-bezier(.4, 0, .2, 1));
+  --dg-ease-exit: var(--ease-in-quick, cubic-bezier(.4, 0, 1, 1));
+
+  display: block;
+  margin: 32px 0;
+  padding: 0;
+  color: var(--dg-ink);
+}
+html[data-motion="slow"] .fig[data-dg-rate="css"] { --dg-k: 4; }
+
+.fig__art { position: relative; }
+.fig__art > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--dg-sans);
+  font-kerning: normal;
+}
+.fig__caption {
+  margin: 12px 0 0;
+  font-family: var(--dg-mono);
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: .02em;
+  color: var(--dg-muted);   /* review R1: --faint failed contrast; the kit .wp-diagram-note = content-secondary */
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── strokes ─────────────────────────────────────────────────────────────── */
+.fig svg [data-draw],
+.fig svg [data-draw-to],
+.fig svg [data-draw-tip] {
+  fill: none;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* no vector-effect: non-scaling-stroke. Chrome resolves a pathLength-normalised
+     dash in screen space under it, so at any scale ≠ 1 the draw stops short of
+     the path's end (seen at 1440: outlines missing their last segment). */
+}
+.fig .dg-node   { stroke: var(--dg-line-strong); }   /* structure */
+.fig .dg-conn   { stroke: var(--dg-muted); }         /* connectors, secondary */
+.fig .dg-tick   { stroke: var(--dg-muted); }
+.fig .dg-rule   { stroke: var(--dg-faint); }         /* the hidden | public rule */
+.fig .dg-accent { stroke: var(--dg-accent); stroke-width: 1.5; }
+.fig .dg-inkline { stroke: var(--dg-ink); }
+.fig .dg-node.is-active { stroke: var(--dg-accent); }
+.fig .dg-node.is-flag   { stroke: var(--dg-flag); }
+.fig .dg-node.is-skip   { stroke: var(--dg-skip); }
+.fig .dg-conn.is-off    { opacity: 0; }
+.fig .dg-conn.is-broken { stroke: var(--dg-muted); }
+
+/* fills (no stroke) */
+.fig .dg-fill { fill: var(--dg-panel); stroke: none; }
+.fig .dg-fill.is-active { fill: var(--dg-accent-soft); }
+.fig .dg-fill.is-pass   { fill: var(--dg-pass-soft); }
+.fig .dg-fill.is-block  { fill: var(--dg-block-soft); }
+.fig .dg-fill.is-flag   { fill: var(--dg-flag-soft); }
+.fig .dg-fill.is-skip   { fill: none; }
+.fig .dg-fill.is-reached { fill: var(--dg-accent); }
+.fig .dg-fill--clear    { fill: none; }
+.fig .dg-fill--clear.is-reached { fill: var(--dg-accent); }
+.fig .dg-hatch-line { stroke: var(--dg-muted); stroke-width: 1; }
+
+/* ── type (the kit: 11px uppercase tracked labels, mono for numbers) ────── */
+.fig svg text { dominant-baseline: middle; fill: var(--dg-ink); }
+.fig .dg-title { font-size: 14px; font-weight: 500; letter-spacing: -.005em; }
+.fig .dg-sub   { font-size: 12px; font-weight: 400; fill: var(--dg-muted); }
+.fig .dg-label { font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; fill: var(--dg-muted); }
+.fig .dg-idx   { font-family: var(--dg-mono); font-size: 11px; letter-spacing: .04em; fill: var(--dg-muted); font-variant-numeric: tabular-nums; }
+.fig .dg-num   { font-family: var(--dg-mono); font-size: 11px; letter-spacing: .04em; fill: var(--dg-faint); font-variant-numeric: tabular-nums; }   /* step ordinals only */
+.fig .dg-mono  { font-family: var(--dg-mono); font-size: 12px; fill: var(--dg-ink); font-variant-numeric: tabular-nums; }
+.fig .dg-hash  { font-family: var(--dg-mono); font-size: 10.5px; letter-spacing: 0; fill: var(--dg-muted); font-variant-numeric: tabular-nums; }
+.fig .dg-title.is-active, .fig .dg-label.is-active { fill: var(--dg-ink); }
+.fig .dg-hash.is-dim, .fig .dg-mono.is-dim { fill: var(--dg-muted); }   /* dim = ink → muted; never below muted */
+.fig .dg-label.is-ink { fill: var(--dg-ink); }
+.fig .dg-label.is-accent { fill: var(--accent-text, var(--dg-accent)); }   /* accent TEXT = --accent-text (D33); strokes and fills keep --dg-accent */
+
+/* ── the draw-in (armed → drawn) ─────────────────────────────────────────── */
+.fig.is-armed [data-draw] {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition:
+    stroke-dashoffset var(--dg-dur) var(--dg-ease) calc(var(--i, 0) * var(--dg-stagger)),
+    stroke var(--dg-state) var(--dg-ease-state) 0s,
+    opacity var(--dg-state) var(--dg-ease-state) 0s;
+}
+.fig.is-armed [data-draw="fast"] {
+  transition:
+    stroke-dashoffset var(--dg-dur-fast) var(--dg-ease) calc(var(--i, 0) * var(--dg-stagger)),
+    stroke var(--dg-state) var(--dg-ease-state) 0s,
+    opacity var(--dg-state) var(--dg-ease-state) 0s;
+}
+.fig.is-armed.is-drawn [data-draw] { stroke-dashoffset: 0; }
+
+.fig.is-armed [data-draw-to] {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset var(--dg-dur) var(--dg-ease) calc(var(--i, 0) * var(--dg-stagger));
+}
+.fig.is-armed.is-drawn [data-draw-to] { stroke-dashoffset: calc(1 - var(--to, 1)); }
+
+.fig.is-armed [data-draw-tip] {
+  opacity: 0;
+  transition:
+    opacity var(--dg-tip-dur) ease calc(var(--i, 0) * var(--dg-stagger) + var(--dg-dur) * .5),
+    stroke var(--dg-state) var(--dg-ease-state) 0s;
+}
+.fig.is-armed.is-drawn [data-draw-tip] { opacity: 1; }
+.fig.is-armed.is-drawn [data-draw-tip].is-off, .fig [data-draw-tip].is-off { opacity: 0; }
+
+.fig.is-armed [data-draw-fill] {
+  opacity: 0;
+  transition:
+    opacity var(--dg-fill-dur) ease calc(var(--i, 0) * var(--dg-stagger) + var(--dg-fill-at)),
+    fill var(--dg-state) var(--dg-ease-state) 0s;
+}
+.fig.is-armed.is-drawn [data-draw-fill] { opacity: 1; }
+
+.fig.is-armed [data-draw-fade] {
+  opacity: 0;
+  transition: opacity var(--dg-label-dur) ease calc(var(--dg-labels) + var(--li, 0) * var(--dg-label-stagger));
+}
+.fig.is-armed.is-drawn [data-draw-fade] { opacity: 1; }
+
+.fig.is-armed [data-draw-label] {
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dg-label-dur) var(--dg-ease) calc(var(--dg-labels) + var(--li, 0) * var(--dg-label-stagger)),
+    transform var(--dg-label-dur) var(--dg-ease) calc(var(--dg-labels) + var(--li, 0) * var(--dg-label-stagger)),
+    fill var(--dg-state) var(--dg-ease-state) 0s;
+}
+.fig.is-armed.is-drawn [data-draw-label] { opacity: 1; transform: none; }
+
+/* state changes on a drawn figure (render() on a drawn host = update):
+   no stagger for what stays, a short stagger (--ei) for what enters */
+.fig.is-settled [data-draw] { transition-delay: calc(var(--ei, 0) * var(--dg-stagger)), 0s, 0s; }
+.fig.is-settled [data-draw-to] { transition-delay: 0s; }
+.fig.is-settled [data-draw-tip] { transition-delay: calc(var(--ei, 0) * var(--dg-stagger) + var(--dg-dur) * .5), 0s; }
+.fig.is-settled [data-draw-fill] { transition-delay: calc(var(--ei, 0) * var(--dg-stagger)), 0s; }
+.fig.is-settled [data-draw-fade] { transition-delay: calc(var(--ei, 0) * var(--dg-stagger) + var(--dg-dur) * .4); }
+.fig.is-settled [data-draw-label] {
+  transition-delay:
+    calc(var(--ei, 0) * var(--dg-stagger) + var(--dg-dur) * .4),
+    calc(var(--ei, 0) * var(--dg-stagger) + var(--dg-dur) * .4),
+    0s;
+}
+/* entering elements hold their undrawn state for two frames */
+.fig.is-armed.is-drawn .dg-enter[data-draw],
+.fig.is-armed.is-drawn .dg-enter [data-draw],
+.fig.is-armed.is-drawn .dg-enter [data-draw-to] { stroke-dashoffset: 1; transition: none; }
+.fig.is-armed.is-drawn .dg-enter:is([data-draw-tip], [data-draw-fill], [data-draw-fade]),
+.fig.is-armed.is-drawn .dg-enter :is([data-draw-tip], [data-draw-fill], [data-draw-fade]) { opacity: 0; transition: none; }
+.fig.is-armed.is-drawn .dg-enter[data-draw-label],
+.fig.is-armed.is-drawn .dg-enter [data-draw-label] { opacity: 0; transform: translateY(4px); transition: none; }
+/* leaving elements: exits are quicker and opacity-only */
+.fig .dg-leave,
+.fig.is-armed.is-drawn .dg-leave { opacity: 0 !important; transition: opacity calc(var(--d-160, .16s) * var(--dg-k)) var(--dg-ease-exit) !important; }
+
+/* replay: kill transitions for the one frame the figure is reset */
+.fig.is-nofx,
+.fig.is-nofx * { transition: none !important; }
+
+/* ── reduced motion: every end state, no transition ──────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="full"]):not([data-motion="slow"]) .fig [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
+  html:not([data-motion="full"]):not([data-motion="slow"]) .fig [data-draw-to] { stroke-dashoffset: calc(1 - var(--to, 1)) !important; transition: none !important; }
+  html:not([data-motion="full"]):not([data-motion="slow"]) .fig :is([data-draw-tip], [data-draw-fill], [data-draw-fade], [data-draw-label]) { opacity: 1 !important; transform: none !important; transition: none !important; }
+  html:not([data-motion="full"]):not([data-motion="slow"]) .fig :is(.dg-conn.is-off, .dg-leave) { opacity: 0 !important; }
+}
+html[data-motion="reduce"] .fig [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
+html[data-motion="reduce"] .fig [data-draw-to] { stroke-dashoffset: calc(1 - var(--to, 1)) !important; transition: none !important; }
+html[data-motion="reduce"] .fig :is([data-draw-tip], [data-draw-fill], [data-draw-fade], [data-draw-label]) { opacity: 1 !important; transform: none !important; transition: none !important; }
+html[data-motion="reduce"] .fig :is(.dg-conn.is-off, .dg-leave) { opacity: 0 !important; }
+html[data-motion="reduce"] .fig * { transition: none !important; }
