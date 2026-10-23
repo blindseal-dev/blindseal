@@ -5,6 +5,7 @@ import { Shell } from './components/Shell';
 import { useKitBoot } from './kit/react';
 import { Decisions } from './pages/Decisions';
 import { DecisionDetail } from './pages/DecisionDetail';
+import { Audit } from './pages/Audit';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -25,7 +26,7 @@ function Layout() {
           <Route path="/" element={<Navigate to="/decisions" replace />} />
           <Route path="/decisions" element={<Decisions />} />
           <Route path="/decisions/:id" element={<DecisionDetail />} />
-          <Route path="/audit" element={<Placeholder name="Audit" />} />
+          <Route path="/audit" element={<Audit />} />
           <Route path="/policy" element={<Placeholder name="Policy" />} />
           <Route path="/attestations" element={<Placeholder name="Attestations" />} />
           <Route path="/settings" element={<Placeholder name="Settings" />} />
