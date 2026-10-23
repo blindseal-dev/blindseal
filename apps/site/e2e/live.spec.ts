@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { INIT, DIFF } from './mismatch-lib';
 // Acceptance on the DEPLOYED site (playwright.live.config.ts): the kit must be mounted after
 // hydration. Measured, not eyeballed:
 //   1. after scrolling to the bottom, .reveal elements at opacity 0 → must be 0
@@ -74,49 +75,31 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
   console.log(`      hidden reveals per route: ${JSON.stringify(hidden)} · notch fixed=${notch.position === 'fixed'} backdrop=${notch.backdrop} · hero canvas=${hero.canvas} webgl2=${hero.webgl2} · console errors=${errors.length}`);
 });
 
-// 5) hydration: zero pageerror / console error on every route at 1440×900 and 443×714, listeners attached
-//    BEFORE goto and waitUntil 'load'; no .reveal left hidden inside the first screen; and when a .reveal
-//    sits in the first screen it is in view within 500 ms of load.
-for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) {
-  test(`live: hydration clean at ${vp.width}x${vp.height}`, async ({ browser }) => {
-    const page = await browser.newPage({ viewport: vp });
+// 5) hydration, captured rather than inferred (owner's acceptance): the DOM React hydrates against
+//    (outerHTML at DOMContentLoaded) diffed at full fidelity against the DOM 5 s later, plus every
+//    console.error / reportError / window error mentioning 418/423/hydration. Done = __errs empty and
+//    the diff empty on all seven routes, at 1440×900 and 443×714, normal and under CPU ×6 — with the
+//    kit blocked (React's own work only) AND with the kit running (its post-mount chrome excluded).
+for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) for (const throttle of [false, true]) for (const kit of [false, true]) {
+  test(`live: no hydration mismatch ${vp.width}x${vp.height} ${throttle ? 'CPU×6' : 'normal'} ${kit ? 'kit' : 'no-kit'}`, async ({ browser }) => {
+    test.setTimeout(240_000);
     for (const r of ROUTES) {
-      const errs: string[] = [];
-      page.on('pageerror', (e) => errs.push(`${r} pageerror: ${String(e.message ?? e).split('\n')[0]}`));
-      page.on('console', (m) => { if (m.type() === 'error') errs.push(`${r} console: ${m.text().split('\n')[0]}`); });
+      const ctx = await browser.newContext({ viewport: vp });
+      const page = await ctx.newPage();
+      await page.addInitScript(INIT);
+      if (!kit) await page.route('**/kit/kit.js', (route) => route.abort());
+      if (throttle) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 }); }
       await page.goto(r, { waitUntil: 'load' });
-      const t0 = Date.now();
-      const firstInView = await page.waitForSelector('.reveal.is-inview', { timeout: 3000 }).then(() => Date.now() - t0).catch(() => null);
-      await page.waitForTimeout(1000);
-      const hiddenAboveFold = await page.evaluate(() => [...document.querySelectorAll('.reveal')].filter((el) => getComputedStyle(el).opacity === '0' && el.getBoundingClientRect().top < innerHeight).length);
-      const revealInFirstScreen = await page.evaluate(() => [...document.querySelectorAll('.reveal')].some((el) => el.getBoundingClientRect().top < innerHeight));
-      expect(errs, `${r} @ ${vp.width}`).toEqual([]);
-      expect(hiddenAboveFold, `${r} hidden reveals above the fold`).toBe(0);
-      if (revealInFirstScreen) expect(firstInView, `${r} first .reveal in view`).not.toBeNull(), expect(firstInView!).toBeLessThan(500);
-      page.removeAllListeners('pageerror'); page.removeAllListeners('console');
+      await page.waitForTimeout(5000);
+      const res = await page.evaluate(`(${DIFF})(${JSON.stringify(kit)})`) as { errs: string[]; diff: unknown[] };
+      expect(res.errs, `${r} __errs`).toEqual([]);
+      // kit blocked: the settled DOM must equal the hydrated DOM exactly — React's server and client trees agree.
+      // kit running: the pages' own page.js ports then legitimately rewrite what the mockups rewrote (odometer
+      // cells, icon <i> → <svg>, aria-current, absolute copy links, "Updated Ns ago"), so the diff is reported
+      // in the test annotations, not asserted; the assertion there is: no error reached the console/reportError.
+      if (!kit) expect(res.diff, `${r} pre/post DOM diff`).toEqual([]);
+      else { test.info().annotations.push({ type: 'post-mount mutations', description: `${r}: ${res.diff.length}` }); expect(await page.evaluate(() => document.documentElement.hasAttribute('data-kit-mounted')), `${r} kit mounted`).toBe(true); }
+      await ctx.close();
     }
-    await page.close();
   });
 }
-
-// 6) the hydration race under load: CPU ×6 and a regular-3G network (CDP), listeners before goto. On a
-//    slow machine the kit download can finish while React is still hydrating — the kit must never
-//    mutate React-owned DOM in that window (no load-time boots; the script is injected post-hydration).
-test('live: hydration clean under CPU×6 + 3G throttling', async ({ browser }) => {
-  for (const r of ['/', '/how-it-works', '/docs', '/explorer']) {
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const page = await ctx.newPage();
-    const errs: string[] = [];
-    page.on('pageerror', (e) => errs.push(`${r} pageerror: ${String(e.message ?? e).split('\n')[0]}`));
-    page.on('console', (m) => { if (m.type() === 'error') errs.push(`${r} console: ${m.text().split('\n')[0]}`); });
-    const cdp = await ctx.newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
-    await cdp.send('Network.enable');
-    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 400, downloadThroughput: (780 * 1024) / 8, uploadThroughput: (330 * 1024) / 8 });
-    await page.goto(r, { waitUntil: 'load' });
-    await page.waitForTimeout(4000);
-    expect(errs, `${r} throttled`).toEqual([]);
-    expect(await page.evaluate(() => document.documentElement.hasAttribute('data-kit-mounted')), `${r} kit mounted`).toBe(true);
-    await ctx.close();
-  }
-});

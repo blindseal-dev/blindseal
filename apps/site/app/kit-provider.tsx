@@ -84,14 +84,24 @@ export function KitProvider() {
     s.addEventListener('load', onLoad);
     return () => s!.removeEventListener('load', onLoad);
   }, []);
+  // the page segment's own hydration signal (page-hydrated.tsx): the root layout hydrates before the
+  // page under selective hydration, so this effect alone is not proof that the page is ready
+  const [hydratedPath, setHydratedPath] = useState<string | null>(null);
   useEffect(() => {
-    if (!ready) return;
+    const cur = (window as unknown as { __bsPageHydrated?: string }).__bsPageHydrated;
+    if (cur) setHydratedPath(cur);
+    const on = (e: Event) => setHydratedPath((e as CustomEvent<{ path: string }>).detail.path);
+    window.addEventListener('bs:page-hydrated', on);
+    return () => window.removeEventListener('bs:page-hydrated', on);
+  }, []);
+  useEffect(() => {
+    if (!ready || hydratedPath !== path) return;
     const BS = (window as unknown as { BS?: BSKit }).BS;
     if (!BS) return;
     const first = !mounted; mounted = true;
     // next frame, so React's DOM for this route is final before the kit decorates it
     const raf = requestAnimationFrame(() => mountSequence(BS, first, activeFor(path)));
     return () => cancelAnimationFrame(raf);
-  }, [ready, path]);
+  }, [ready, path, hydratedPath]);
   return null;
 }

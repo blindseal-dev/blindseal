@@ -1,3 +1,4 @@
+import { PageHydrated } from '../page-hydrated';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { BUCKET_OF, BY_SLUG, targetsOf, type Block, type DocPage, type DocSection, type Endpoint } from './content';
@@ -117,6 +118,7 @@ export function DocRoute({ slug }: { slug: string }) {
         </nav>
       </aside>
       <DocsBehaviour />
+      <PageHydrated />
     </>
   );
 }
