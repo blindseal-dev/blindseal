@@ -9,6 +9,7 @@ import { Audit } from './pages/Audit';
 import { Policy } from './pages/Policy';
 import { Attestations } from './pages/Attestations';
 import { Settings } from './pages/Settings';
+import { Verify } from './pages/Verify';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -33,6 +34,7 @@ function Layout() {
           <Route path="/policy" element={<Policy />} />
           <Route path="/attestations" element={<Attestations />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/verify" element={<Verify />} />
         </Routes>
       </Shell>
     </ActionsContext.Provider>
