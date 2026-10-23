@@ -35,7 +35,14 @@ if [ -z "$ROLE_ARN" ]; then
   ROLE_ARN=$(aws iam create-role --role-name "$ROLE" --query Role.Arn --output text --assume-role-policy-document '{
     "Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"build.apprunner.amazonaws.com"},"Action":"sts:AssumeRole"}]}')
   aws iam attach-role-policy --role-name "$ROLE" --policy-arn arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
-  sleep 10 # IAM propagation
+  echo "   new role — waiting 75s for IAM propagation (App Runner pulls with it at create time)"
+  sleep 75
+fi
+# a service left in CREATE_FAILED must be deleted before the name can be reused
+OLD=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$SERVICE' && Status=='CREATE_FAILED'].ServiceArn" --output text)
+if [ -n "$OLD" ] && [ "$OLD" != "None" ]; then
+  echo "→ deleting failed service $OLD"; aws apprunner delete-service --service-arn "$OLD" >/dev/null
+  for i in $(seq 1 30); do aws apprunner describe-service --service-arn "$OLD" >/dev/null 2>&1 || break; sleep 10; done
 fi
 
 SRC=$(cat <<JSON
