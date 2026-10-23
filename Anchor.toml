@@ -26,10 +26,24 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "pnpm exec ts-mocha -p ./tests/tsconfig.json -t 1000000 tests/**/*.spec.ts"
+# The suite runs on our own Agave 4.3.1 validator with the programs genesis-loaded (see the
+# script header for why anchor's deploy path did not work here). `anchor test --skip-build
+# --skip-deploy --skip-local-validator` or simply `scripts/test-m2.sh`.
+test = "scripts/test-m2.sh"
 
 [test]
 startup_wait = 10000
 
 [test.validator]
 ledger = ".anchor/test-ledger"
+
+# Load the built programs at genesis (executable immediately, as the admin smoke does) instead of
+# Anchor's `solana program deploy`, which left them "Program is not deployed" on this toolchain.
+# Run: anchor test --skip-build --skip-deploy
+[[test.genesis]]
+address = "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
+program = "target/deploy/blindseal_verify.so"
+
+[[test.genesis]]
+address = "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+program = "target/deploy/transfer_gate.so"

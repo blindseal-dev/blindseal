@@ -1,0 +1,12 @@
+{
+  "measuredAt": "2026-10-23T18:22:56.591Z",
+  "cluster": "localnet",
+  "gatedTransferCU": 262507,
+  "txBytes": 893,
+  "proofBytes": 260,
+  "publicInputBytes": 168,
+  "anchor": "0.31.1",
+  "sp1Solana": "0.1.0",
+  "sp1": "5.0.0",
+  "tx": "5cCiq9i42wYiLA16AvGWxL5j9jQSwuChAoCgugE3iYktfEHLtDJDQT41c97KsbMux94E6ND3o9Quad4FNvt935C"
+}

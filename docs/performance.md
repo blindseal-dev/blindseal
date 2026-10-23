@@ -126,3 +126,23 @@ Patched sha2 with the SP1 sha256 precompile (tag patch-sha2-0.10.8-sp1-4.0.0; mi
 compatible with our 5.0.0). Full guest cycle count (execute): **104,155,812** (down from 346M,
 ~3.3x). policyRoot still 0x36a9e9… (correct). Proving is proportionally faster; the remaining
 cost is the policyRoot merkle over the DFA byte-blobs.
+
+## M2 — on-chain verify + consume on localnet (2026-10-23, measured)
+
+Source: `tests/m2-metrics.json`, written by the happy-path test in `tests/m2.spec.ts`
+(`scripts/test-m2.sh`: Agave 4.3.1 `solana-test-validator`, programs genesis-loaded at their
+fixed ids). Numbers are from `simulateTransaction` on the exact transaction that was then sent.
+
+| Metric | Value | Notes |
+|---|---|---|
+| Gated transfer, whole tx | **262,507 CU** | ComputeBudget ix + `transfer_gate::gated_transfer` → CPI `verify_and_consume` → system transfer |
+| `verify_and_consume` alone (inside the CPI) | ~254,300 CU | from the program logs; M0.5's bare Groth16 verify was 227,375 — the delta is the actionHash + nullifier recompute (2 × sha256), the Nullifier PDA creation and the `Consumed` event |
+| Transaction size | **893 bytes** | 260-byte proof + 168-byte public inputs + 178-byte action args + 32-byte nonce + accounts |
+| Proof / public inputs | 260 B / 168 B | SP1 v5 Groth16 (bn254); 5×32 commitments + u64 expiry |
+| Prove time (localnet test proof) | 8,250,797 ms (2 h 17 m) | CPU prover on this machine (`proveMs` in the fixture); unchanged from M1 |
+| Compute budget to request | **400,000 CU** | SDK default (`VERIFY_CU_LIMIT`); the 200k default is exceeded |
+
+Program ids (localnet = mainnet): verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`,
+transfer-gate `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`. Pins: anchor 0.31.1, sp1-solana 0.1.0
+(`GROTH16_VK_5_0_0_BYTES`), SP1 5.0.0. Mainnet figures are recorded in REPORT.md when the
+acceptance transfer runs.

@@ -1,0 +1,30 @@
+{
+  "action": {
+    "amount": "1000000",
+    "instruction": "0x981894646560fc2b",
+    "mint": "",
+    "recipient": "9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf",
+    "sourceAuthority": "5j1SSqkKBoMB4QgzuffgS9H9SDSaGnpKZ3VNpTKUwy3o",
+    "targetProgram": "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+  },
+  "actionHash": "0xcfbc8bd88ac15a0647504d4599333b56954f4ba9a088bb5dce6825f243e4bbd5",
+  "chainId": 1,
+  "decisionId": "test-localnet-0001",
+  "detectorVersion": "0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e",
+  "expirySlot": 2000000000,
+  "nonce": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)",
+  "nullifier": "0x6ae18cf4955d1636f7268d4f81126a8c74178583d255697b841037964583258c",
+  "payloadHash": "0x4c4bd908e89bcbd11226f59ab664ea69f5ba362e39808a7c6779fc84fa164ca4",
+  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "proof": {
+    "bytes": "0xa4594c5914bfeccdbdfc0d43a11d7e19825565c964147ec96505ca1f63ed2840f1a060780b91e3e9a2a37e2ba2c3ae96e53a9ebc4180d1d6b91faf25b8ebf63ce074de3a184145d4e694e582e6536c57bdcc36f60d8cb84caf693ebb1046474176813213125be917f19f6bc105ed930be9fed5202c4f2d37a765c41f359f8419c69b04bc219d1a723fd1e8ec24622ce8cbcabd2267bbd6c915d8a1606da25179e26ad5002e5208f0609e636eaa4f6c4ef11be82f99abe3ec554f622a7bb279c4a1e3023c118472f37ac411d5d1bbe250199a055aeac06e014166a2c3c99715b59e27beb0220b84b23ad084f65ce96d1b2d5674a0d405f21571403b5be013cc8c9f240940",
+    "curve": "bn254",
+    "protocol": "groth16"
+  },
+  "proveMs": 8250797,
+  "publicInputs": [
+    "0x4c4bd908e89bcbd11226f59ab664ea69f5ba362e39808a7c6779fc84fa164ca436a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331ecfbc8bd88ac15a0647504d4599333b56954f4ba9a088bb5dce6825f243e4bbd56ae18cf4955d1636f7268d4f81126a8c74178583d255697b841037964583258c0094357700000000"
+  ],
+  "version": 1
+}
