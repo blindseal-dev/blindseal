@@ -60,3 +60,4 @@ crates/prover/attestation.json
 **/playwright-report/
 **/test-results/
 **/.playwright/
+.history-subs

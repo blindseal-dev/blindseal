@@ -97,3 +97,41 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 | **replay of the same attestation — rejected** (`NullifierAlreadyConsumed`, custom error 6006, in the tx logs) | **`42QVDVFjBN7Sp9dpkgfUcKSeZZq67ji4hGRvtuJMJyA3jbxFT6GuJwQaWKSj3oTZoX9jgQjWhmN3iCU2L5w87y3E`** |
 
 Authority after: 1.4536 SOL. Site live: https://dv8pdxqyec.us-east-1.awsapprunner.com (explorer reads these accounts live).
+
+---
+
+# Kit mounted at the root — measured on the deployed site (2026-10-23)
+
+Diagnosis (yours) confirmed: the kit loaded but nothing mounted it after hydration. Fixed once, at
+the root: `KitProvider` (site) runs the mockups' mount sequence after hydration and on every route
+change; `BS.mountShell` (dashboard) replaces the hand-written frame; `site.js` + `crt.js` + `shell.js`
+are loaded; the notch nav is `BS.mountSite`'s exact markup (wings, row, pill); the hero is the CRT
+field with the reduced-motion still frame and the nebula fallback; "Open dashboard" opens
+`http://127.0.0.1:7777` in a new tab. The kit is one ordered bundle loaded after hydration (the
+modules boot on DOMContentLoaded and were racing React's hydration — #418/#423).
+
+**The four numbers, Playwright on https://dv8pdxqyec.us-east-1.awsapprunner.com (not dev), image `b719620`:**
+
+| Check | Result |
+|---|---|
+| `.reveal` elements still at opacity 0 after scrolling to the bottom | **0** on every route (`/`, `/how-it-works`, `/verify`, `/docs`, `/docs/hashing`, `/explorer`, `/changelog`) |
+| `.site-notch` computed position / glass | **fixed**; backdrop-filter **none** — by design: the mockups mount `nav:"notch"` (opaque tabs on the 8px frame); backdrop-filter exists only in the `nav:"glass"` variant (`.site-notch--glass .notch.glass-bar`). Wings 4, pill present, 5 items. Say the word and it flips to glass. |
+| Hero canvas with a WebGL2 context | **true** (CRT field running; headless Chromium too) |
+| Console errors across the routes | **0** |
+
+Also asserted: the footer is rendered on every route; "Open dashboard" href `http://127.0.0.1:7777`, `target=_blank`.
+Suites: site 12/12, dashboard 11/11 (the shell adopts `<main id="main-content">`, which is React's root
+container so event delegation survives). Visual diffs vs `design/mockups`: `docs/visual-diff/` (table below).
+
+## Visual diff vs `design/mockups` (1440×900 first screen, full motion settled) — `docs/visual-diff/`
+| Pair | Differing pixels | Reading of the diff image |
+|---|---|---|
+| S01 home | 0.16% | identical bar the hero's CRT noise frame |
+| S02 how-it-works | 5.28% | chrome identical; long-form body copy/figures differ in wrap and fixture values |
+| S03 verify | 2.46% | chrome identical; the live page carries the "Load disclosure" control the mockup predates |
+| S04 docs | 3.72% | chrome identical; the live docs open on the quickstart (mockup: the API shell) |
+| S05 explorer | 6.66% | chrome identical; **structural**: the mockup's four-tile + 30-day-chart explorer vs the shipped three-stat layout, and live mainnet counts vs fixtures |
+| S06 changelog | 3.43% | chrome identical; the 0.5.0 entry the mockup predates |
+| D01 decisions | 4.44% | shell (sidebar/pill/top bar/status bar) identical; fixture rows vs the mock API's rows, odometer frame |
+
+Candidates for a faithful port, in order of pixel distance: S05 explorer, S02 how-it-works, S04 docs.
