@@ -8,10 +8,15 @@ publish = false
 name = "m05-spike"
 path = "src/main.rs"
 
+[[bin]]
+name = "m05-localnet"
+path = "src/localnet.rs"
+
 [dependencies]
 blindseal-m05-program = { workspace = true }
 solana-program-test = { workspace = true }
 solana-sdk = { workspace = true }
+solana-client = "=2.1.6"
 sp1-sdk = { workspace = true }
 borsh = { workspace = true }
 tokio = { version = "1.40.0", features = ["full"] }

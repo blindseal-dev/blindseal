@@ -7,7 +7,7 @@ Updated at the end of M0.5, M1, and M2 (BLINDSEAL.md §9.4).
 - Apple Silicon, macOS 27 (arm64), 10 CPU cores, 32 GB RAM.
 - Docker Desktop memory raised to 24 GB for the Groth16 wrap (see M0.5 notes).
 
-## M0.5 — verifier spike (SP1 Groth16 -> Solana via sp1-solana) — green except CU (blocker named)
+## M0.5 — verifier spike (SP1 Groth16 -> Solana via sp1-solana) — GREEN (real CU measured on localnet)
 
 A minimal SP1 guest (sha256 a few bytes, commit the digest) was proven to a local Groth16
 proof and **verified on the Solana runtime** through `sp1-solana` (`GROTH16_VK_5_0_0_BYTES`,
@@ -45,7 +45,29 @@ version, **not** a silent downgrade.
 | Groth16 proof size | **260 bytes** |
 | Public-input size | **36 bytes** |
 | Transaction size (signed, serialized) | **545 bytes** |
-| Verify compute units | **not captured here** — see caveat |
+| Verify compute units (program-test, native) | not metered (native processor) |
+
+### Localnet verification — real compute units (2026-10-22)
+
+Deployed `blindseal-m05-program` (`cargo build-sbf`, BPFLoaderUpgradeab1e) to a real
+`solana-test-validator` and sent the SP1 v5 Groth16 verify instruction with the committed proof
+(`m05-spike/script/m05-localnet.rs`; metrics in `m05-localnet-metrics.json`).
+
+| Field | Value |
+|---|---|
+| Harness | solana-test-validator (localnet, SBF VM) — real metering |
+| On-chain verify | **VERIFIED** on localnet (a proof from our own guest) |
+| Tampered-input case | **rejected** (non-vacuous) |
+| **Verify compute units** | **227,375 CU** (measured via `simulateTransaction`) |
+| Compute-unit limit requested | 1,400,000 (default 200k is exceeded — a `ComputeBudget::set_compute_unit_limit` ix is required) |
+| Transaction size (signed; budget ix + verify ix) | **584 bytes** |
+| Groth16 proof size | 260 bytes |
+| Public-input size | 36 bytes |
+| Groth16 VK | `GROTH16_VK_5_0_0_BYTES` |
+
+**Finding:** on-chain Groth16 verification costs ~227k CU and must raise the compute-unit limit
+above the 200k default; a consumer program that gates on an attestation budgets ~230k CU plus its
+own logic. This closes the M0.5 CU gap that program-test (native processor) could not measure.
 
 ### Caveats / follow-ups
 - **Compute units — not captured; blocker named.** `solana-program-test` with a native

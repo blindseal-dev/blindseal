@@ -823,6 +823,7 @@ dependencies = [
  "blindseal-m05-program",
  "borsh 1.8.1",
  "serde_json",
+ "solana-client",
  "solana-program-test",
  "solana-sdk",
  "sp1-sdk",

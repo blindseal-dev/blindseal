@@ -1,0 +1,17 @@
+{
+  "compute_unit_limit_requested": 1400000,
+  "compute_units": 227375,
+  "groth16_vk": "GROTH16_VK_5_0_0_BYTES",
+  "harness": "solana-test-validator (localnet, SBF VM)",
+  "negative_rejected": true,
+  "program_id": "3d5p1cnARSmq7cbmEvn6BiA611beusae16etiXT1RtK7",
+  "proof_bytes": 260,
+  "public_inputs_bytes": 36,
+  "solana": "2.1.6",
+  "sp1_sdk": "5.0.0",
+  "sp1_solana": "0.1.0",
+  "sp1_zkvm": "5.0.0",
+  "tx_bytes": 584,
+  "verify_ok": true,
+  "vkey_hash": "0x0097cb8781a7e6c5d286471c3df6108fd023e78632fe4e86f93cb99b8b8aaf06"
+}
