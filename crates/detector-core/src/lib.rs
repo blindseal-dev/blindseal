@@ -515,3 +515,66 @@ pub fn run_layer1_serialized(text: &str, pol: &SerializedL1) -> RawResult {
     let matched: Vec<bool> = pol.dfas.iter().map(|b| dfa_is_match_serialized(b, text)).collect();
     combine_l1(text, &matched)
 }
+
+// ---------------- action binding: actionHash + nullifier (BLINDSEAL.md §3.3) ----------------
+// actionHash commits the on-chain action the agent is about to take, bound to the screening.
+// The guest computes it; the Solana consumer program recomputes it from the instruction IT is
+// executing and compares. Layout is fixed and little-endian for scalars. sourceAuthority was
+// added in the M1 spec amendment so an attestation screened for one authority can't move
+// another's funds.
+
+const ACTION_DOMAIN: &str = "blindseal.action.v1";
+const NULLIFIER_DOMAIN: &str = "blindseal.nullifier.v1";
+
+/// Parsed on-chain action (chain adapter output). 32-byte fields are zero when n/a; amount
+/// is zero when n/a; mint is zero for the native asset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActionFields {
+    pub chain_id: u16,            // 1 = solana mainnet, 2 = solana devnet, 3+ reserved for EVM
+    pub target_program: [u8; 32],
+    pub source_authority: [u8; 32],
+    pub instruction: [u8; 8],     // anchor discriminator or sha256(name)[..8]
+    pub recipient: [u8; 32],
+    pub mint: [u8; 32],
+    pub amount: u64,
+}
+
+/// The committed values the screening binds to (carried as public inputs alongside the action).
+#[derive(Debug, Clone, Copy)]
+pub struct Commitments {
+    pub payload_hash: [u8; 32],
+    pub policy_root: [u8; 32],
+    pub detector_version: [u8; 32],
+    pub expiry_slot: u64,
+    pub nonce: [u8; 32],
+}
+
+/// actionHash = sha256(domain || chainId(LE) || targetProgram || sourceAuthority || instruction
+/// || recipient || mint || amount(LE) || payloadHash || policyRoot || detectorVersion ||
+/// expirySlot(LE) || nonce).
+pub fn action_hash(a: &ActionFields, c: &Commitments) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(ACTION_DOMAIN.as_bytes());
+    h.update(a.chain_id.to_le_bytes());
+    h.update(a.target_program);
+    h.update(a.source_authority);
+    h.update(a.instruction);
+    h.update(a.recipient);
+    h.update(a.mint);
+    h.update(a.amount.to_le_bytes());
+    h.update(c.payload_hash);
+    h.update(c.policy_root);
+    h.update(c.detector_version);
+    h.update(c.expiry_slot.to_le_bytes());
+    h.update(c.nonce);
+    h.finalize().into()
+}
+
+/// nullifier = sha256(domain || actionHash). A pure function of the action hash so a consumer
+/// can't be tricked into accepting a nullifier for a different action (§3.3).
+pub fn nullifier(action_hash: &[u8; 32]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(NULLIFIER_DOMAIN.as_bytes());
+    h.update(action_hash);
+    h.finalize().into()
+}

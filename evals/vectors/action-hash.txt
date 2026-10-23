@@ -1,0 +1,3 @@
+# Blindseal actionHash/nullifier vector (§3.3). TS SDK + Solana program must match.
+actionHash 0x125e9b8f13cb41836a242c2018258a44d26d70930f37e83dd2e47a7c4a88dfb0
+nullifier  0xb0b46388498eea3b60f1f7ee66ec198384e6de6e0e31c5910988416edb6b347a
