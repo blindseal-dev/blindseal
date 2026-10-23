@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# BLINDSEAL.md §7: commit messages carry no tool/session attribution. Strips any
+# Co-Authored-By: / Claude-Session: / Session-URL: trailer and claude.ai session URLs.
+# Enabled with: git config core.hooksPath .githooks   (scripts/quickstart.sh does this)
+f="$1"
+tmp="$(mktemp)"
+grep -viE '^(Co-Authored-By|Co-authored-by|Claude-Session|Session-URL|Signed-off-by):|https?://claude\.ai/' "$f" > "$tmp" || true
+# drop trailing blank lines left behind
+printf '%s\n' "$(cat "$tmp")" > "$f"
+rm -f "$tmp"
