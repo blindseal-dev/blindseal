@@ -36,7 +36,7 @@ overnight-sprint.txt
 # Operator-private notes — see ~/blindseal-private-notes/ outside the repo
 # Untracked eval results stay local unless explicitly committed with provenance
 .private/
-.claude/
+.claude/*
 *.private.md
 packages/eval/results/eval-*.json
 packages/eval/results/eval-*.md
@@ -63,3 +63,4 @@ crates/prover/attestation.json
 .history-subs
 .history-msg-subs
 .history-drop-paths
+!.claude/settings.json
