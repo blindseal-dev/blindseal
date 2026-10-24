@@ -166,4 +166,4 @@ launch checklist and not started.
 Both programs embed a neodyme `security.txt` (`solana-security-txt 1.1.1`; contact `blindseal@users.noreply.github.com`
 until the domain is live, policy `SECURITY.md`). M2 suite on the new binaries: 15/15.
 - `transfer_gate` upgraded on mainnet: `57tz1JLdBkHGoNNDhxT2mkjkK4tKGZ3qLVNoeFmDtqYMxuXWonMt29dVjkXb898GktNr5Kn67rtJrV39pV5k5Wxf`
-- `blindseal_verify`: upgrade not sent — buffer rent ≈ 2.29 SOL vs 1.40 SOL on the authority (docs/LAUNCH-CHECKLIST.md).
+- `blindseal_verify` upgraded on mainnet (2026-10-24): `WVtX7vXUP1aY5WFRBuiztChQd9ZjEdDGuTAj4ek9hvKQzbpC3U3gr9cLM7VpGgB3gHQmoz8RyvQo3pnq2hfTuPD`
