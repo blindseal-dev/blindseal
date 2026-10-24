@@ -13,3 +13,4 @@
 @media (max-width: 719.98px) { .dash-launch__grid { grid-template-columns: minmax(0, 1fr); } }
 .dash-launch__grid > * { min-width: 0; }
 .dash-launch .code { overflow-x: auto; }
+.dash-launch__list > li { min-width: 0; }   /* grid items default to min-width:auto and inherit the <pre> min-content width */

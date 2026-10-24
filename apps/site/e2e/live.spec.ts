@@ -10,7 +10,9 @@ const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/exp
 
 test('live: reveals, notch, CRT hero, console', async ({ page }) => {
   const errors: string[] = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  // /dashboard probes the visitor's local proxy (127.0.0.1:7777); a refused fetch always logs a console error
+  // in the browser — that is the launcher working, not a page error.
+  page.on('console', (m) => { if (m.type() === 'error' && !/127\.0\.0\.1:7777|ERR_CONNECTION_REFUSED/.test(m.text() + (m.location()?.url ?? ''))) errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
 
   await page.goto('/');
