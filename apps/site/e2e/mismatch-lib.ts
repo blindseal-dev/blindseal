@@ -45,7 +45,7 @@ export const DIFF = `(kit) => {
   cmp(new DOMParser().parseFromString(window.__pre, 'text/html').documentElement, document.documentElement);
   return { errs: window.__errs, diff: out };
 }`;
-export const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog', '/dashboard'];
+export const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog'];
 
 // Entries that touch <html> (attributes), <head> (children/attributes) or a DIRECT child of <body> (an
 // insertion/removal at body level, or an attribute change on a body child). With the kit running these must

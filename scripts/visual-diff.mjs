@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'docs', 'visual-diff');
+const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null;   // ONLY=S01,S02 limits the pairs
 const LIVE = process.env.LIVE_URL ?? 'https://blindseal.tech';
 const DASH = process.env.DASH_URL ?? 'http://127.0.0.1:4831';
 const TOKEN = process.env.DASH_TOKEN ?? 'e2e0000000000000000000000000000000000000000000e2e';
@@ -46,6 +47,7 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 const rows = [];
 for (const [name, a, b] of PAIRS) {
+  if (ONLY && ![...ONLY].some((p) => name.startsWith(p))) continue;
   const m = await shoot(browser, a), l = await shoot(browser, b);
   const diff = new PNG({ width: W, height: H });
   const n = pixelmatch(m.png.data, l.png.data, diff.data, W, H, { threshold: 0.1, includeAA: false });

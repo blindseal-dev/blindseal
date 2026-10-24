@@ -61,8 +61,7 @@
         '<p class="site-footer__line">' + esc(ctx.oneLiner) + "</p></div>" +
       '<nav class="site-footer__routes" aria-label="Footer">' + FOOT.map(function (f) {
         return '<a href="' + esc(ctx.routes[f.id] || "#") + '" data-site-foot="' + f.id + '">' + esc(f.label) + "</a>";
-      }).join("") + "</nav>" +
-      '<p class="site-footer__ver">v' + esc(ctx.version) + " · built for 127.0.0.1</p>";
+      }).join("") + "</nav>";
   }
   return { NAV: NAV, FOOT: FOOT, WING: WING, navHtml: navHtml, footerHtml: footerHtml, mark: mark };
 });

@@ -4,12 +4,12 @@
 // the rise — it creates nothing in html/head/body (DECISIONS 2026-10-23). The active item and the
 // footer's aria-current are set by the kit on the client (the layout has no pathname on the server).
 import { createRequire } from 'node:module';
-import { DASHBOARD_URL, ROUTES } from './routes';
+import { ROUTES } from './routes';
 const req = createRequire(import.meta.url);
 const tpl = req('../kit/site-templates.cjs') as { navHtml: (c: unknown) => string; footerHtml: (c: unknown) => string };
 
 export const SITE_VERSION = '0.5.0';
-const CTX = { routes: ROUTES, brand: 'Blindseal', action: { label: 'Open dashboard', href: '/dashboard' }   /* the launcher page; the local 127.0.0.1 link lives there */, oneLiner: "Prove an agent's action was screened — without showing what it was.", version: SITE_VERSION };
+const CTX = { routes: ROUTES, brand: 'Blindseal', action: { label: 'Docs', href: '/docs' }   /* becomes GitHub → the repo once it is public */, oneLiner: "Prove an agent's action was screened — without showing what it was.", version: SITE_VERSION };
 
 export function SiteChromeTop() {
   return (

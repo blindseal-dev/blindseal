@@ -11,7 +11,6 @@ export default function Home() {
         <div className="hero__space" data-bg="crt" data-intensity="hero" aria-hidden />
         <div className="hero__shade" aria-hidden />
         <div className="hero__content"><div className="hero__col">
-          <p className="hero__eyebrow"><i className="hero__dot" aria-hidden /><span>Local proxy</span><span className="hero__sep" aria-hidden>·</span><span>Zero-knowledge attestation</span><span className="hero__sep" aria-hidden>·</span><span>Verified on Solana</span></p>
           <h1 className="hero__title">Prove an agent&apos;s action was screened <br /><em>without showing what it was</em>.</h1>
           <p className="hero__sub">Blindseal is a privacy-preserving, verifiable screening layer for AI agents.<br />Nothing sensitive leaves the machine.</p>
           <div className="hero__actions">

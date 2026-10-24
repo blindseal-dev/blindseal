@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { ROUTES, DASHBOARD_URL } from './routes';
-export { ROUTES, DASHBOARD_URL };
+import { ROUTES } from './routes';
+export { ROUTES };
 
 // The ONE place the kit is mounted. The kit JS (window.BS) is injected from a useEffect — i.e. only
 // after React has hydrated — and no kit module does anything at load (DECISIONS 2026-10-23: every
@@ -41,7 +41,7 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   };
   try { (BS.motion?.boot ?? BS.motion?.syncMotionAttr)?.(); } catch {}
   if (firstMount) {
-    try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'Open dashboard', href: '/dashboard' } }); } catch {}
+    try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'Docs', href: '/docs' } }); } catch {}
     // the dashboard is local-first: open it in a new tab, never navigate the site away
     /* the CTA's target/rel are in the server-rendered template */
   } else {
