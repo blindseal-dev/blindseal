@@ -27,7 +27,7 @@ docs "What is proven" page.
 Node ≥ 20 and pnpm; no Rust or Solana toolchain needed (the wasm verifier and the IDLs are committed).
 
 ```sh
-git clone https://github.com/blindseal/blindseal && cd blindseal
+git clone https://github.com/blindseal-dev/blindseal && cd blindseal
 ./scripts/quickstart.sh          # install, build the dashboard, verify the sample attestation (real Groth16) and reject a tampered copy
 BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
 # → local API + dashboard on http://127.0.0.1:7777 (the token is printed; it travels in the URL fragment only)

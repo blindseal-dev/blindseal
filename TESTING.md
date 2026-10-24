@@ -49,9 +49,9 @@ Three specific things — naming them turns "cool" into usable signal:
 
 ## Where to send it
 
-- **Bugs / feedback:** <https://github.com/blindseal/blindseal/issues>
+- **Bugs / feedback:** <https://github.com/blindseal-dev/blindseal/issues>
 - **Security / vulnerabilities:** security@blindseal.io (see [SECURITY.md](SECURITY.md))
-- **Code + eval methodology:** <https://github.com/blindseal/blindseal> — the eval holdout,
+- **Code + eval methodology:** <https://github.com/blindseal-dev/blindseal> — the eval holdout,
   benign set, limitations, and the contamination postmortem are all public.
 
 ## Good to know

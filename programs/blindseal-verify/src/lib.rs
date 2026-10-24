@@ -33,11 +33,11 @@ declare_id!("merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb");
 #[cfg(not(feature = "no-entrypoint"))]
 solana_security_txt::security_txt! {
     name: "Blindseal verifier",
-    project_url: "https://github.com/blindseal/blindseal",
+    project_url: "https://github.com/blindseal-dev/blindseal",
     contacts: "email:blindseal@proton.me",
-    policy: "https://github.com/blindseal/blindseal/blob/main/SECURITY.md",
+    policy: "https://github.com/blindseal-dev/blindseal/blob/main/SECURITY.md",
     preferred_languages: "en",
-    source_code: "https://github.com/blindseal/blindseal"
+    source_code: "https://github.com/blindseal-dev/blindseal"
 }
 
 /// Domain separators — identical to detector-core (§3.3).

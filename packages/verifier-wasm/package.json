@@ -29,11 +29,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/blindseal/blindseal.git"
+    "url": "https://github.com/blindseal-dev/blindseal.git"
   },
-  "homepage": "https://github.com/blindseal/blindseal",
+  "homepage": "https://github.com/blindseal-dev/blindseal",
   "bugs": {
-    "url": "https://github.com/blindseal/blindseal/issues"
+    "url": "https://github.com/blindseal-dev/blindseal/issues"
   },
   "publishConfig": {
     "access": "public"

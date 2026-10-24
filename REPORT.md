@@ -141,7 +141,7 @@ Candidates for a faithful port, in order of pixel distance: S05 explorer, S02 ho
 # Pre-public pass — steps 1–2 done (2026-10-23); stopped for the owner's review
 
 **Step 1 — identities across the full history (before):** one author/committer identity on all 64
-commits, `blindseal <257006814+blindseal@users.noreply.github.com>`; every commit carried a `Co-Authored-By`
+commits, `blindseal <347208916+blindseal-dev@users.noreply.github.com>`; every commit carried a `Co-Authored-By`
 trailer; the first commit's subject and ~25 early blobs named the base project.
 
 **Step 2 — `scripts/history-rewrite.sh` (local; no remote exists; nothing pushed):**
@@ -153,7 +153,7 @@ trailer; the first commit's subject and ~25 early blobs named the base project.
   and in every message; three never-Blindseal directories (the base product's trade/demo/installer
   packages, already absent from the tree) dropped from every revision; the old CLI banner renamed
 - **result, swept over `git log -p main` (every diff, message, identity):** 69 commits · identities:
-  `blindseal <257006814+blindseal@users.noreply.github.com>` only · trailers remaining 0 · PART A hits 0 ·
+  `blindseal <347208916+blindseal-dev@users.noreply.github.com>` only · trailers remaining 0 · PART A hits 0 ·
   PART B occurrences outside the allowed paths 0 · dead directories in any revision 0
 - the grep/substitution lists live only in local gitignored files (`.identity-sweep`, `.history-subs`,
   `.history-msg-subs`, `.history-drop-paths`); the scripts carry no names
@@ -163,12 +163,12 @@ is rerun (idempotent, ~1 s) immediately before the repo goes public. Steps 3–5
 launch checklist and not started.
 
 ## security.txt (pre-public pass, step 3) — 2026-10-23
-Both programs embed a neodyme `security.txt` (`solana-security-txt 1.1.1`; contact `257006814+blindseal@users.noreply.github.com`
+Both programs embed a neodyme `security.txt` (`solana-security-txt 1.1.1`; contact `347208916+blindseal-dev@users.noreply.github.com`
 until the domain is live, policy `SECURITY.md`). M2 suite on the new binaries: 15/15.
 - `transfer_gate` upgraded on mainnet: `57tz1JLdBkHGoNNDhxT2mkjkK4tKGZ3qLVNoeFmDtqYMxuXWonMt29dVjkXb898GktNr5Kn67rtJrV39pV5k5Wxf`
 - `blindseal_verify` upgraded on mainnet (2026-10-24): `WVtX7vXUP1aY5WFRBuiztChQd9ZjEdDGuTAj4ek9hvKQzbpC3U3gr9cLM7VpGgB3gHQmoz8RyvQo3pnq2hfTuPD`
 
 ## security.txt — final (2026-10-24)
-Contact `blindseal@proton.me`, project/source `https://github.com/blindseal/blindseal`, policy `SECURITY.md`.
+Contact `blindseal@proton.me`, project/source `https://github.com/blindseal-dev/blindseal`, policy `SECURITY.md`.
 - `transfer_gate`: `3gssaLXWBQVyhQv8xnWHLjcBqZFfVQn8WK6uMDmJcuFb4Sm1edYbWVwKB7MQT8v2uhdukVACxYKWSBzkYR2S9sPD`
 - `blindseal_verify`: `5p2uwpfhuEC6toRPfVTUokWvrpfznLfJYRkkvBDLb6uYCoev63j8m27xcJdFUQyqXz4tbWrxp6ezpRjJSL8WcMnQ`

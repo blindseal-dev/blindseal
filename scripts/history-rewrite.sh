@@ -16,7 +16,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 export PATH="/opt/homebrew/bin:$PATH"
-NAME="blindseal"; EMAIL="257006814+blindseal@users.noreply.github.com"
+NAME="blindseal"; EMAIL="347208916+blindseal-dev@users.noreply.github.com"
 ALLOWED_PATHS=(LICENSE BLINDSEAL.md DECISIONS.md README.md FRONTEND.md RH-INTEGRATION.md docs scripts/identity-sweep.sh scripts/history-rewrite.sh scripts/npm-pack-audit.sh)
 for f in .identity-sweep .history-subs .history-msg-subs; do [ -f "$f" ] || { echo "$f missing (local list)"; exit 1; }; done
 A_RE="$(grep -v '^#' .identity-sweep | grep . | tr '\n' '|' | sed 's/|$//')"
