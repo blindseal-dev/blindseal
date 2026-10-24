@@ -11,6 +11,7 @@ A_RE="$( [ -f .identity-sweep ] && grep -v '^#' .identity-sweep | grep . | tr '\
 B_RE='blindseal|partner-chain|transfer-gate|@blindseal|\bblindseal\b|BLINDSEAL_|\bveil\b'
 SECRET_RE='npm_[A-Za-z0-9]{30,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY|"privateKey"|_authToken'
 PATH_RE='/Users/[a-z]+|/home/[a-z]+|C:\\Users'
+PATH_OK='/home/user/|/home/you/|/Users/you/|/Users/me/|/home/me/'   # documentation / fixture placeholders, not a real home
 TMP="$(mktemp -d)"; fail=0
 for p in "${PKGS[@]}"; do
   name="$(node -p "require('./$p/package.json').name")"; ver="$(node -p "require('./$p/package.json').version")"
@@ -24,7 +25,7 @@ for p in "${PKGS[@]}"; do
   hits "personal names (PART A)" "$A_RE"
   hits "base / other project names" "$B_RE"
   hits "secrets / tokens / keys" "$SECRET_RE"
-  hits "absolute home paths" "$PATH_RE"
+  ph="$(grep -rnIiE "$PATH_RE" "$d/package" 2>/dev/null | grep -vE "$PATH_OK" | head -6 || true)"; if [ -n "$ph" ]; then echo "   ✗ absolute home paths:"; echo "$ph" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no absolute home paths"; fi
   em="$(grep -rnoIE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' "$d/package" 2>/dev/null | grep -viE 'blindseal@proton\.me|users\.noreply\.github\.com|example\.com|@modelcontextprotocol|@blindseal/|@solana/|@types/|@noble/|@anthropic|@openai|@babel|@eslint|@vitest|npm:' | head -6 || true)"
   if [ -n "$em" ]; then echo "   ✗ other e-mail addresses:"; echo "$em" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no foreign e-mail addresses"; fi
   kp="$(grep -rlE '^\[([0-9]{1,3},){63}[0-9]{1,3}\]' "$d/package" 2>/dev/null | head -3 || true)"; if [ -n "$kp" ]; then echo "   ✗ keypair-shaped JSON: $kp"; fail=1; else echo "   ✓ no keypair files"; fi
