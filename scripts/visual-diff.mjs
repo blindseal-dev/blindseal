@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'docs', 'visual-diff');
-const LIVE = process.env.LIVE_URL ?? 'https://dv8pdxqyec.us-east-1.awsapprunner.com';
+const LIVE = process.env.LIVE_URL ?? 'https://blindseal.tech';
 const DASH = process.env.DASH_URL ?? 'http://127.0.0.1:4831';
 const TOKEN = process.env.DASH_TOKEN ?? 'e2e0000000000000000000000000000000000000000000e2e';
 const mock = (p) => 'file://' + join(ROOT, 'design/mockups/mockups', p);

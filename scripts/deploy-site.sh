@@ -58,11 +58,12 @@ if [ -z "$ARN" ] || [ "$ARN" = "None" ]; then
   echo "→ create service $SERVICE"
   ARN=$(aws apprunner create-service --service-name "$SERVICE" --source-configuration "$SRC" \
     --instance-configuration '{"Cpu":"0.5 vCPU","Memory":"1 GB"}' \
-    --health-check-configuration '{"Protocol":"HTTP","Path":"/","Interval":10,"Timeout":5,"HealthyThreshold":1,"UnhealthyThreshold":5}' \
+    --health-check-configuration '{"Protocol":"HTTP","Path":"/healthz","Interval":10,"Timeout":5,"HealthyThreshold":1,"UnhealthyThreshold":5}' \
     --query Service.ServiceArn --output text)
 else
   echo "→ update service $SERVICE"
-  aws apprunner update-service --service-arn "$ARN" --source-configuration "$SRC" >/dev/null
+  aws apprunner update-service --service-arn "$ARN" --source-configuration "$SRC" \
+    --health-check-configuration '{"Protocol":"HTTP","Path":"/healthz","Interval":10,"Timeout":5,"HealthyThreshold":1,"UnhealthyThreshold":5}' >/dev/null
 fi
 echo "→ waiting for RUNNING (a create takes ~8–10 min)"
 for i in $(seq 1 90); do

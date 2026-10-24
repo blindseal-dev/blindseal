@@ -42,4 +42,4 @@ step "5/5 start the proxy in MOCK mode, serving the dashboard"
 echo "  BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock"
 echo "  then open the printed dashboard URL (it includes #token=…)."
 echo
-echo "Quickstart OK. Next: docs/ (concepts, hashing, integrating a gated program) and the verify page on the site."
+echo "Quickstart OK. Next: docs/ (concepts, hashing, integrating a gated program) and the verify page at https://blindseal.tech/verify."

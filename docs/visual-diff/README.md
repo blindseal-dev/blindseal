@@ -1,7 +1,7 @@
 # Visual diff — shipped pages vs design/mockups (2026-10-23, after the faithful S02–S06 port)
 
 1440×900, first screen, full motion settled (2.5 s), fonts ready, scrolled to top. Differing pixels
-by `pixelmatch` (threshold 0.1). Live = https://dv8pdxqyec.us-east-1.awsapprunner.com (site) and the dashboard served by the proxy.
+by `pixelmatch` (threshold 0.1). Live = https://blindseal.tech (site) and the dashboard served by the proxy.
 
 | Pair | Differing pixels | Files |
 |---|---|---|

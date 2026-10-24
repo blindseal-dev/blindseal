@@ -84,7 +84,7 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 3. ~~Owner gate~~ **DONE 2026-10-23 13:28 PDT**: funded 3.995 SOL → `scripts/mainnet-deploy.sh` deployed both
    programs (upgrade authority = `88sR7X…`), initialized Config, registered the default root →
    `scripts/mainnet-acceptance.mts` consumed the real attestation through the gate and the replay was rejected.
-4. ~~Quickstart on a fresh clone~~ **DONE**; site **live** at https://dv8pdxqyec.us-east-1.awsapprunner.com (App Runner, container image, `scripts/deploy-site.sh`).
+4. ~~Quickstart on a fresh clone~~ **DONE**; site **live** at https://blindseal.tech (App Runner, container image, `scripts/deploy-site.sh`).
 
 ## Mainnet signatures (Solana mainnet-beta, 2026-10-23)
 | Step | Signature / id |
@@ -96,7 +96,7 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 | **gated transfer — verify + consume + 0.001 SOL** (decision `d_ff1be0d3f891beef`, nullifier `0xfea1d3ec…15f1`), 259,324 CU, 893 B | **`7iwA4nxnBG73o8H8j8XUESYsmyGhGrxU5HiqXww8Nzp1YRC9oa7oE2ArWsd2fZN736vyhMatECyd2zw5agedpye`** |
 | **replay of the same attestation — rejected** (`NullifierAlreadyConsumed`, custom error 6006, in the tx logs) | **`42QVDVFjBN7Sp9dpkgfUcKSeZZq67ji4hGRvtuJMJyA3jbxFT6GuJwQaWKSj3oTZoX9jgQjWhmN3iCU2L5w87y3E`** |
 
-Authority after: 1.4536 SOL. Site live: https://dv8pdxqyec.us-east-1.awsapprunner.com (explorer reads these accounts live).
+Authority after: 1.4536 SOL. Site live: https://blindseal.tech (explorer reads these accounts live).
 
 ---
 
@@ -110,7 +110,7 @@ field with the reduced-motion still frame and the nebula fallback; "Open dashboa
 `http://127.0.0.1:7777` in a new tab. The kit is one ordered bundle loaded after hydration (the
 modules boot on DOMContentLoaded and were racing React's hydration — #418/#423).
 
-**The four numbers, Playwright on https://dv8pdxqyec.us-east-1.awsapprunner.com (not dev), image `b719620`:**
+**The four numbers, Playwright on https://blindseal.tech (not dev), image `b719620`:**
 
 | Check | Result |
 |---|---|

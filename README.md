@@ -8,7 +8,7 @@ call executes, and — when something downstream needs proof — produces a zero
 specific call passed a committed policy. The attestation is verified by one Solana instruction. Nothing sensitive
 leaves the machine: not the prompt, not the tool arguments, not the policy, not which agent was screened.
 
-- Site and docs: the `apps/site` deployment (quickstart, concepts, hashing spec, gated-program guide, scope)
+- Site and docs: **https://blindseal.tech** (quickstart, concepts, hashing spec, gated-program guide, scope, verify page)
 - Verifier program (Solana mainnet): `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`
 - Example consumer (transfer-gate): `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`
 - Security contact: **blindseal@proton.me** (see `SECURITY.md`; both programs carry a neodyme security.txt)

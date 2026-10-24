@@ -5,6 +5,10 @@ import { GlassDefs } from './glass-defs';
 import { SiteChromeTop, SiteFooter } from './site-chrome';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://blindseal.tech'),
+  alternates: { canonical: '/' },
+  openGraph: { type: 'website', url: 'https://blindseal.tech', siteName: 'Blindseal', title: 'Blindseal — prove an agent was screened', description: 'A privacy-preserving, verifiable screening layer for AI agents. Nothing sensitive leaves the machine.' },
+  twitter: { card: 'summary', title: 'Blindseal — prove an agent was screened', description: 'A privacy-preserving, verifiable screening layer for AI agents. Nothing sensitive leaves the machine.' },
   title: 'Blindseal — prove an agent was screened',
   description: 'A privacy-preserving, verifiable screening layer for AI agents. Nothing sensitive leaves the machine.',
   // the favicon icons.js used to inject (same SVG, the tokens' --canvas / --ink values)

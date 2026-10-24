@@ -3,6 +3,6 @@ import { defineConfig, devices } from '@playwright/test';
 //   LIVE_URL=https://… pnpm exec playwright test -c playwright.live.config.ts
 export default defineConfig({
   testDir: './e2e', testMatch: /live\.spec\.ts/, timeout: 60_000, reporter: [['list']],
-  use: { baseURL: process.env.LIVE_URL ?? 'https://dv8pdxqyec.us-east-1.awsapprunner.com', viewport: { width: 1440, height: 900 } },
+  use: { baseURL: process.env.LIVE_URL ?? 'https://blindseal.tech', viewport: { width: 1440, height: 900 } },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
 });
