@@ -14,7 +14,7 @@ for (const r of routes) {
   const nav = A.goto(base + r, { waitUntil: 'commit' }); await B.bringToFront(); await nav;
   await B.waitForTimeout(8000);
   const vis = await A.evaluate(() => document.visibilityState);
-  const res = await A.evaluate(() => ({ errs: (window as any).__errs as string[], kit: document.documentElement.hasAttribute('data-kit-mounted') }));
+  const res = await A.evaluate(() => ({ errs: (window as any).__errs as string[], kit: document.body.hasAttribute('data-kit-mounted') }));
   console.log(`${THR ? 'cpu×6' : 'norm '} ${r.padEnd(14)} visibility=${vis} errs=${res.errs.length} kitMounted=${res.kit}`); for (const e of res.errs.slice(0, 3)) console.log('   ERR ' + e);
   if (res.errs.length) bad++; await ctx.close();
 }
