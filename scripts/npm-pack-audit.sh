@@ -26,7 +26,7 @@ for p in "${PKGS[@]}"; do
   hits "base / other project names" "$B_RE"
   hits "secrets / tokens / keys" "$SECRET_RE"
   ph="$(grep -rnIiE "$PATH_RE" "$d/package" 2>/dev/null | grep -vE "$PATH_OK" | head -6 || true)"; if [ -n "$ph" ]; then echo "   ✗ absolute home paths:"; echo "$ph" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no absolute home paths"; fi
-  em="$(grep -rnoIE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' "$d/package" 2>/dev/null | grep -viE 'blindseal@proton\.me|users\.noreply\.github\.com|example\.com|@modelcontextprotocol|@blindseal/|@solana/|@types/|@noble/|@anthropic|@openai|@babel|@eslint|@vitest|npm:' | head -6 || true)"
+  em="$(grep -rnoIE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' "$d/package" 2>/dev/null | grep -viE 'blindseal@proton\.me|users\.noreply\.github\.com|example\.com|@[a-z0-9.-]+\.example\b|@modelcontextprotocol|@blindseal/|@solana/|@types/|@noble/|@anthropic|@openai|@babel|@eslint|@vitest|npm:' | head -6 || true)"
   if [ -n "$em" ]; then echo "   ✗ other e-mail addresses:"; echo "$em" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no foreign e-mail addresses"; fi
   kp="$(grep -rlE '^\[([0-9]{1,3},){63}[0-9]{1,3}\]' "$d/package" 2>/dev/null | head -3 || true)"; if [ -n "$kp" ]; then echo "   ✗ keypair-shaped JSON: $kp"; fail=1; else echo "   ✓ no keypair files"; fi
 done
