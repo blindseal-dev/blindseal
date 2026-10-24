@@ -10,6 +10,8 @@
 #          the named docs, docs/, and the two sweep scripts (which carry the grep lists by design);
 #          the local `.identity-sweep` patterns are replaced in every blob and message
 #      Neither list is ever committed — this script carries no names.
+#      paths: the local `.history-path-renames` pairs (old<TAB>new) rename files in every revision, so old
+#      names never appear in diff headers; `.history-drop-paths` removes directories that were never Blindseal's
 #   3. sweep refs/heads/main only (not the backup ref): every diff, message and identity.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
@@ -88,6 +90,15 @@ if [ ${#DROP[@]} -gt 0 ]; then
   echo "   dropping from every revision: $(grep -v '^#' .history-drop-paths | grep . | tr '\n' ' ')"
   rm -rf .git/filter-repo   # stale state from a previous pass makes filter-repo's metadata step assert
   git filter-repo --force --refs refs/heads/main "${DROP[@]}" --invert-paths
+fi
+RENAME=()
+if [ -f .history-path-renames ]; then
+  while IFS=$'\t' read -r a b; do [ -n "$a" ] && [ "${a#\#}" = "$a" ] && [ -n "$b" ] && RENAME+=(--path-rename "$a:$b"); done < .history-path-renames
+fi
+if [ ${#RENAME[@]} -gt 0 ]; then
+  echo "   renaming in every revision: $(grep -v '^#' .history-path-renames | grep . | cut -f1 | tr '\n' ' ')"
+  rm -rf .git/filter-repo
+  git filter-repo --force --refs refs/heads/main "${RENAME[@]}"
 fi
 rm -rf .git/filter-repo
 git filter-repo --force --refs refs/heads/main --commit-callback "$COMMIT_CB" --blob-callback "$BLOB_CB"
