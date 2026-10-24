@@ -86,7 +86,7 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 | `docs/` | hashing spec, integration guide, performance numbers, launch checklist |
 
 Build the programs with `scripts/build-programs.sh`; run the on-chain suite with `scripts/test-m2.sh`.
-Deployed bytes can be reproduced with `solana-verify` (commands in `docs/LAUNCH-CHECKLIST.md`).
+Deployed bytes reproduce with `solana-verify` from this repository at the tagged commit (commands in `docs/LAUNCH-CHECKLIST.md`); while the repository is private, that check is available to whoever has access.
 
 ## Upgradeability
 
