@@ -109,7 +109,7 @@ footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #1a2a1a; fon
 </header>
 <div id="root"><div class="empty">loading…</div></div>
 <footer>
-  blindseal is a local prompt-injection scanning proxy. Scans here came from your local DB.
+  Blindseal is a local prompt-injection scanning proxy. Scans here came from your local DB.
   Nothing on this page leaves your machine.
 </footer>
 <script>

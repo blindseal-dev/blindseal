@@ -3,7 +3,7 @@
 # and the service on first run, updates the image afterwards. Prints the HTTPS URL at the end.
 #
 #   AWS_PROFILE=<profile> scripts/deploy-site.sh            # region from the profile (default us-east-1)
-#   BLINDSEAL_RPC_URL=https://… AWS_PROFILE=… scripts/deploy-site.sh   # explorer's mainnet RPC
+#   BLINDSEAL_RPC_URL=https://… AWS_PROFILE=… scripts/deploy-site.sh   # explorer's mainnet RPC (default: SSM /blindseal/site/BLINDSEAL_RPC_URL)
 #
 # The repo never names the AWS account; the service URL is App Runner's random subdomain unless a
 # custom domain is attached later. Image is linux/amd64 (App Runner), built with buildx.
@@ -14,7 +14,10 @@ REGION="${AWS_REGION:-$(aws configure get region --profile "$AWS_PROFILE" 2>/dev
 export AWS_REGION="$REGION"
 SERVICE="${BLINDSEAL_SITE_SERVICE:-blindseal-site}"
 REPO="${BLINDSEAL_SITE_REPO:-blindseal-site}"
-RPC="${BLINDSEAL_RPC_URL:-https://api.mainnet-beta.solana.com}"
+# the explorer's mainnet RPC: the env var if given, else the SecureString in SSM Parameter Store
+# (/blindseal/site/BLINDSEAL_RPC_URL — the key never lives in the repo), else the public endpoint
+RPC="${BLINDSEAL_RPC_URL:-$(aws ssm get-parameter --name /blindseal/site/BLINDSEAL_RPC_URL --with-decryption --query Parameter.Value --output text 2>/dev/null || true)}"
+RPC="${RPC:-https://api.mainnet-beta.solana.com}"
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 ECR="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
 TAG="$(git rev-parse --short HEAD)-$(date -u +%Y%m%d%H%M)"

@@ -10,7 +10,6 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'audit-view': 'src/cli/audit-view.ts',
-    check: 'src/cli/check.ts',
     decide: 'src/cli/decide.ts',
     init: 'src/cli/init.ts',
   },
@@ -22,7 +21,7 @@ export default defineConfig({
   dts: false,
   sourcemap: false,
   minify: false,
-  noExternal: ['@blindseal/corpus', '@blindseal/redactor'],
+  noExternal: ['@blindseal/corpus', '@blindseal/redactor', '@blindseal/audit', '@blindseal/sdk', '@blindseal/chain-reads'],   // private workspace packages ship inside dist/; only real externals are dependencies
   async onSuccess() {
     const { chmodSync } = await import('node:fs');
     // Copy corpus binary data into dist/ so the bundled loadCorpus() can find
@@ -31,7 +30,7 @@ export default defineConfig({
       copyFileSync(join(corpusDir, f), join(here, 'dist', f));
     }
     // npm requires bin scripts to be executable
-    for (const f of ['index.js', 'audit-view.js', 'check.js', 'init.js']) {
+    for (const f of ['index.js', 'audit-view.js', 'decide.js', 'init.js']) {
       chmodSync(join(here, 'dist', f), 0o755);
     }
     console.log('✓ corpus data copied to dist/ · bin scripts marked executable');

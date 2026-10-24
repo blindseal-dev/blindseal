@@ -18,8 +18,8 @@ declare_id!("ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG");
 #[cfg(not(feature = "no-entrypoint"))]
 solana_security_txt::security_txt! {
     name: "Blindseal transfer-gate (example consumer)",
-    project_url: "https://github.com/blindseal",
-    contacts: "email:blindseal@users.noreply.github.com",
+    project_url: "https://github.com/blindseal/blindseal",
+    contacts: "email:blindseal@proton.me",
     policy: "https://github.com/blindseal/blindseal/blob/main/SECURITY.md",
     preferred_languages: "en",
     source_code: "https://github.com/blindseal/blindseal"

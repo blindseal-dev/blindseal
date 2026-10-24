@@ -1,10 +1,9 @@
 {
   "name": "@blindseal/verifier-wasm",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.5.0",
   "type": "module",
   "license": "MIT",
-  "description": "Off-chain SP1 v5 Groth16 attestation verifier compiled to wasm (wasm-bindgen build of crates/verifier-wasm). Generated — rebuild with ./build.sh.",
+  "description": "Blindseal attestation verifier compiled to WebAssembly (SP1 v5 Groth16 over BN254): verify an attestation in the browser or Node without a server.",
   "main": "./pkg/blindseal_verifier.js",
   "module": "./pkg/blindseal_verifier.js",
   "types": "./pkg/blindseal_verifier.d.ts",
@@ -16,6 +15,27 @@
     "./bg.wasm": "./pkg/blindseal_verifier_bg.wasm",
     "./package.json": "./package.json"
   },
-  "files": ["pkg", "build.sh"],
-  "sideEffects": ["./pkg/blindseal_verifier.js"]
+  "files": [
+    "pkg",
+    "build.sh"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "solana",
+    "zero-knowledge",
+    "groth16",
+    "wasm",
+    "attestation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blindseal/blindseal.git"
+  },
+  "homepage": "https://github.com/blindseal/blindseal",
+  "bugs": {
+    "url": "https://github.com/blindseal/blindseal/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

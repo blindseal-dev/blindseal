@@ -252,6 +252,10 @@ program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
       { id: 'privacy', heading: 'What is public', blocks: [
         p('Six hashes and a slot number. No prompt, no tool arguments, no policy contents or thresholds, no model scores, and nothing that names the agent or the operator. The explorer shows counts and policy roots only.'),
       ] },
+      { id: 'upgradeable', heading: 'The programs are upgradeable', blocks: [
+        p('Both on-chain programs — the verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb` and the transfer-gate example `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the repository, and `solana-verify` lets you check that the deployed bytes match the public source.'),
+        p('Planned: the authority moves to a Squads multisig with a timelock, and the program ids stay the same. Until then, treat the single key as the trust root it is.'),
+      ] },
     ],
   },
 ];

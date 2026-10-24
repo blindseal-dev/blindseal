@@ -18,8 +18,6 @@ BLINDSEAL_TRADE_GUARD=1 BLINDSEAL_TRADE_ALLOWLIST=0xYourWallet \
   npx @blindseal/proxy@latest -- <your trading MCP server>
 ```
 
-A recording of step 1 is in [`docs/blindseal-demo.cast`](docs/blindseal-demo.cast) (asciinema
-format — `asciinema play docs/blindseal-demo.cast`).
 
 ## What you can test locally (no blockchain, no accounts)
 

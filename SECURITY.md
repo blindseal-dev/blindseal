@@ -1,47 +1,39 @@
-# Security Policy
+# Security policy
 
-## Reporting a Vulnerability
+Blindseal's on-chain programs — `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb` (verifier) and
+`ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG` (transfer-gate example) — carry a
+[neodyme security.txt](https://github.com/neodyme-labs/solana-security-txt) that points here.
 
-**Do not open a public GitHub issue for security vulnerabilities.**
+## Reporting a vulnerability
 
-To report a vulnerability:
-
-1. **Preferred**: Open a [GitHub Security Advisory](../../security/advisories/new) — this creates a private thread with the maintainers.
-2. **Alternate**: Email **security@blindseal.io**.
-
-Include:
-- Description of the vulnerability and its impact
-- Steps to reproduce (proof-of-concept payload, config, environment)
-- Any suggested mitigations
-
-We will acknowledge receipt within **48 hours** and aim to ship a patch within **7 days** for confirmed critical vulnerabilities.
+**Do not open a public issue for a vulnerability.** Email **blindseal@proton.me** (or open a private
+GitHub security advisory on this repository). Include what is affected, how to reproduce it (payload,
+config, environment) and any mitigation you suggest. We acknowledge within 72 hours and publish a fix
+before details, with credit if you want it.
 
 ## Scope
 
-In-scope:
-- Prompt injection bypasses (payloads that defeat L1/L2/L3 detection in block mode)
-- Capability firewall bypasses (tainted content reaching sensitive tools without being gated)
-- Manifest verification bypasses (tool drift not detected or incorrectly reported)
-- Vulnerabilities in the attestation client (private key exposure, replay attacks)
-- Command injection in the stdio transport (proxy spawning unintended processes)
+In scope:
+- The on-chain programs: proof verification, the §3.7 check order, nullifier (replay) protection, the
+  policy-root and vkey allowlists, upgrade/pause authority handling.
+- The SP1 guest and prover (`crates/`): anything that lets an attestation be produced for a call the
+  committed policy would not pass, or that leaks the payload through the public inputs.
+- The proxy and its local API: prompt-injection bypasses of L0/L1 in `block` mode, redaction failures
+  (secrets or PII reaching L2/L3), audit-chain or disclosure forgery, dashboard token handling.
+- The SDK and the wasm verifier: accepting an invalid attestation or disclosure.
 
 Out of scope:
-- Detection evasion in `warn` or `log` mode (those modes intentionally allow through)
-- False positives (clean content blocked) — report as a regular issue
-- Attacks requiring the attacker to already have code execution on the proxy host
-- Social engineering
+- Detection evasion in `warn` or `log` mode (those modes let traffic through by design), and evasion of
+  L2/L3 — the model-based layers are attested, not proven, and are documented as best-effort.
+- False positives (clean content blocked) — report those as ordinary issues.
+- Attacks that require code execution on the proxy host already.
 
-## Supported Versions
+## Supported versions
 
-The most recent release on npm is the only supported version. We do not backport patches to older releases.
+The most recent release on npm and the programs currently deployed at the ids above.
 
-## Known Limitations
+## Known limitations
 
-Blindseal is a defense-in-depth layer, not a complete solution:
-
-- **Adversarial evasion**: A determined attacker with knowledge of the detection pipeline can craft payloads that evade L1 and L2. L3 (LLM judge) raises the bar significantly but is not infallible.
-- **Semantic attacks**: Highly indirect or multi-step injections may not be detected by any layer.
-- **Performance trade-off**: L3 adds ~1s latency per ambiguous response. Operators who disable L3 have weaker detection on borderline cases.
-- **Capability firewall**: Taint tracking uses token overlap, not semantic similarity. A sufficiently paraphrased exfiltration may not be caught.
-
-The goal is to make prompt injection attacks expensive and detectable — not to guarantee zero bypasses.
+The zero-knowledge proof covers the deterministic layers (L0 and L1) only. That is the claim: a specific
+call was screened under a committed policy by a specific detector version and the deterministic layers
+passed. It is not a proof that an agent is safe.
