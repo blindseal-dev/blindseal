@@ -1,4 +1,3 @@
-import { PageHydrated } from '../page-hydrated';
 import type { Metadata } from 'next';
 import { VerifyClient } from './verify-client';
 
@@ -96,7 +95,6 @@ export default function VerifyPage() {
 
       </div>
       <VerifyClient />
-      <PageHydrated />
     </>
   );
 }

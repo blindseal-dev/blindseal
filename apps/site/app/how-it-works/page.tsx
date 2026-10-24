@@ -1,4 +1,3 @@
-import { PageHydrated } from '../page-hydrated';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { HowKit, type HowData } from './how-kit';
@@ -307,7 +306,6 @@ export default function HowItWorks() {
         </article>
       </div>
       <HowKit data={d} />
-      <PageHydrated />
     </>
   );
 }

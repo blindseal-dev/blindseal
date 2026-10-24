@@ -1,0 +1,9 @@
+/* diagrams.js used to inject these into <head> at first render (ensureStyle); the kit writes nothing into
+   <head> any more, so they live here. Verbatim apart from body[data-motion] → body[data-motion] (see
+   DECISIONS 2026-10-23: the motion attribute moved from <html> to <body>). */
+.fig .dg-hashbtn { cursor: pointer; outline: none; }
+.fig .dg-hashbtn .dg-hashhit { fill: transparent; pointer-events: all; stroke: var(--ring, var(--dg-accent)); stroke-width: 1.5; stroke-opacity: 0; transition: stroke-opacity var(--d-150, .15s) var(--dg-ease-state); }
+.fig .dg-hashbtn:focus-visible .dg-hashhit { stroke-opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .fig .dg-hashbtn:hover .dg-hash { fill: var(--dg-ink); } }
+.fig .dg-hashbtn.is-copied .dg-hash { fill: var(--dg-ink); }
+body[data-motion="reduce"] .fig .dg-hashbtn .dg-hashhit { transition: none; }

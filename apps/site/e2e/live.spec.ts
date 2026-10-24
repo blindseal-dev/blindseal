@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { INIT, DIFF } from './mismatch-lib';
+import { INIT, DIFF, chromeViolations } from './mismatch-lib';
 // Acceptance on the DEPLOYED site (playwright.live.config.ts): the kit must be mounted after
 // hydration. Measured, not eyeballed:
 //   1. after scrolling to the bottom, .reveal elements at opacity 0 → must be 0
@@ -77,28 +77,38 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
 
 // 5) hydration, captured rather than inferred (owner's acceptance): the DOM React hydrates against
 //    (outerHTML at DOMContentLoaded) diffed at full fidelity against the DOM 5 s later, plus every
-//    console.error / reportError / window error mentioning 418/423/hydration. Done = __errs empty and
-//    the diff empty on all seven routes, at 1440×900 and 443×714, normal and under CPU ×6 — with the
-//    kit blocked (React's own work only) AND with the kit running (its post-mount chrome excluded).
-for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) for (const throttle of [false, true]) for (const kit of [false, true]) {
-  test(`live: no hydration mismatch ${vp.width}x${vp.height} ${throttle ? 'CPU×6' : 'normal'} ${kit ? 'kit' : 'no-kit'}`, async ({ browser }) => {
-    test.setTimeout(240_000);
+//    console.error / reportError / window error mentioning 418/423/hydration. Asserted on all seven
+//    routes, at 1440×900 and 443×714, normal / CPU ×6 / frozen lifecycle (background-tab emulation):
+//      · __errs empty in every variant
+//      · kit blocked: the diff is EMPTY (React's server and client trees agree)
+//      · kit running: no insertion or attribute change on <html>, <head> or any direct child of <body> —
+//        the chrome is server-rendered and the kit only adopts it. Deeper, post-mount page.js work
+//        (odometer cells, <i> → <svg>, aria-current, absolute copy links, "Updated Ns ago") is allowed.
+for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) for (const load of ['normal', 'CPU×6', 'frozen'] as const) for (const kit of [false, true]) {
+  test(`live: no hydration mismatch ${vp.width}x${vp.height} ${load} ${kit ? 'kit' : 'no-kit'}`, async ({ browser }) => {
+    test.setTimeout(300_000);
     for (const r of ROUTES) {
       const ctx = await browser.newContext({ viewport: vp });
       const page = await ctx.newPage();
       await page.addInitScript(INIT);
       if (!kit) await page.route('**/kit/kit.js', (route) => route.abort());
-      if (throttle) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 }); }
-      await page.goto(r, { waitUntil: 'load' });
+      const cdp = await ctx.newCDPSession(page);
+      if (load === 'CPU×6') await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+      if (load === 'frozen') {
+        await page.goto(r, { waitUntil: 'commit' });
+        await cdp.send('Page.setWebLifecycleState', { state: 'frozen' }).catch(() => {});
+        await new Promise((res) => setTimeout(res, 8000));
+        await cdp.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
+        await page.waitForLoadState('load');
+      } else await page.goto(r, { waitUntil: 'load' });
       await page.waitForTimeout(5000);
-      const res = await page.evaluate(`(${DIFF})(${JSON.stringify(kit)})`) as { errs: string[]; diff: unknown[] };
+      const res = await page.evaluate(`(${DIFF})(${JSON.stringify(kit)})`) as { errs: string[]; diff: { at?: string; kind?: string }[] };
       expect(res.errs, `${r} __errs`).toEqual([]);
-      // kit blocked: the settled DOM must equal the hydrated DOM exactly — React's server and client trees agree.
-      // kit running: the pages' own page.js ports then legitimately rewrite what the mockups rewrote (odometer
-      // cells, icon <i> → <svg>, aria-current, absolute copy links, "Updated Ns ago"), so the diff is reported
-      // in the test annotations, not asserted; the assertion there is: no error reached the console/reportError.
       if (!kit) expect(res.diff, `${r} pre/post DOM diff`).toEqual([]);
-      else { test.info().annotations.push({ type: 'post-mount mutations', description: `${r}: ${res.diff.length}` }); expect(await page.evaluate(() => document.documentElement.hasAttribute('data-kit-mounted')), `${r} kit mounted`).toBe(true); }
+      else {
+        expect(chromeViolations(res.diff), `${r} html/head/body-children changes by the kit`).toEqual([]);
+        expect(await page.evaluate(() => document.body.hasAttribute('data-kit-mounted')), `${r} kit mounted`).toBe(true);
+      }
       await ctx.close();
     }
   });

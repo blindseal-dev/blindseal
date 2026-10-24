@@ -34,7 +34,7 @@
        panel + hairline, r12, padding 28), .site-grid-2 / -3 (gap 24).
    (d) THE FOOTER — .site-footer: the six routes, the one-liner, the version.
 
-   Every element works under html[data-motion=reduce] (end states, no rise).
+   Every element works under body[data-motion=reduce] (end states, no rise).
    ========================================================================== */
 
 html.bs-site { --toast-bottom: var(--frame); scroll-padding-top: calc(var(--notch-top) + var(--notch-h) + 16px); }
@@ -260,6 +260,6 @@ html.bs-site-noframe .site-frame { display: none; }
 /* ══ reduced motion ══════════════════════════════════════════════════════ */
 .site-footer__ver, .install__cmd, .hero__trust { font-variant-numeric: tabular-nums; }
 
-html[data-motion="reduce"] .hero :is(.hero__eyebrow, .hero__title, .hero__sub, .hero__actions, .hero__trust > li) { animation: none !important; opacity: 1 !important; transform: none !important; }
-html[data-motion="reduce"] :is(.notch__pill, .notch__ink, .notch__item, .hero__secondary svg) { transition: none !important; }
-html[data-motion="reduce"] :is(.notch__item, .site-brand, .hero__secondary):active { transform: none; }
+body[data-motion="reduce"] .hero :is(.hero__eyebrow, .hero__title, .hero__sub, .hero__actions, .hero__trust > li) { animation: none !important; opacity: 1 !important; transform: none !important; }
+body[data-motion="reduce"] :is(.notch__pill, .notch__ink, .notch__item, .hero__secondary svg) { transition: none !important; }
+body[data-motion="reduce"] :is(.notch__item, .site-brand, .hero__secondary):active { transform: none; }

@@ -719,21 +719,7 @@
   });
   /* rules for the hash buttons, injected here because diagrams.css is shared with J00;
      colours are tokens via diagrams.css's --dg-* roles; hover and focus are colour/ring only */
-  var styled = false;
-  function ensureStyle() {   /* the figure styles go into <head> on first render, never at load */
-    if (styled || !document.head) return; styled = true;
-    if (document.getElementById("bs-diagrams-runtime")) return;
-    var st = document.createElement("style");
-    st.id = "bs-diagrams-runtime";
-    st.textContent =
-      ".fig .dg-hashbtn { cursor: pointer; outline: none; }" +
-      ".fig .dg-hashbtn .dg-hashhit { fill: transparent; pointer-events: all; stroke: var(--ring, var(--dg-accent)); stroke-width: 1.5; stroke-opacity: 0; transition: stroke-opacity var(--d-150, .15s) var(--dg-ease-state); }" +
-      ".fig .dg-hashbtn:focus-visible .dg-hashhit { stroke-opacity: 1; }" +
-      "@media (hover: hover) and (pointer: fine) { .fig .dg-hashbtn:hover .dg-hash { fill: var(--dg-ink); } }" +
-      ".fig .dg-hashbtn.is-copied .dg-hash { fill: var(--dg-ink); }" +
-      "html[data-motion=\"reduce\"] .fig .dg-hashbtn .dg-hashhit { transition: none; }";
-    (document.head || document.documentElement).appendChild(st);
-  }
+  function ensureStyle() { /* the figure runtime styles are kit/diagrams-runtime.css (imported by globals.css); nothing is written into <head> */ }
 
   BS.diagrams = { list: Object.keys(FIGS), render: render, replay: replay, mount: mount, check: check };
 

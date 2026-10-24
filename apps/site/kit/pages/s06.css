@@ -159,6 +159,6 @@
 .site-footer__ver a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* ══ reduced motion: end states, no rise, no press scale, no damped fill ═ */
-html[data-motion="reduce"] :is(.cl-mast__eyebrow, .cl-mast__title, .cl-mast__lede, .cl-rail, .cl-entry) { animation: none !important; opacity: 1 !important; transform: none !important; }
-html[data-motion="reduce"] :is(.cl-rail__link, .cl-rail__top, .cl-anchor):active { transform: none; }
-html[data-motion="reduce"] .cl-rail__fill { transition: none; }
+body[data-motion="reduce"] :is(.cl-mast__eyebrow, .cl-mast__title, .cl-mast__lede, .cl-rail, .cl-entry) { animation: none !important; opacity: 1 !important; transform: none !important; }
+body[data-motion="reduce"] :is(.cl-rail__link, .cl-rail__top, .cl-anchor):active { transform: none; }
+body[data-motion="reduce"] .cl-rail__fill { transition: none; }

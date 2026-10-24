@@ -1,4 +1,3 @@
-import { PageHydrated } from '../page-hydrated';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { ChangelogKit, type Entry } from './changelog-kit';
@@ -127,7 +126,6 @@ export default function Changelog() {
       </div>
 
       <ChangelogKit entries={entries} />
-      <PageHydrated />
     </>
   );
 }

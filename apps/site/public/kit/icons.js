@@ -155,17 +155,7 @@
   }
 
   /* the favicon: mark A in ink on the canvas, coloured from the tokens */
-  function favicon() {
-    var link = document.querySelector('link[rel~="icon"]');
-    if (link && link.getAttribute("href") !== "data:,") return;
-    var cs = getComputedStyle(document.documentElement);
-    var bg = cs.getPropertyValue("--canvas").trim(), ink = cs.getPropertyValue("--ink").trim();
-    if (!bg || !ink) return;
-    var svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='" + bg + "'/>" +
-      "<circle cx='32' cy='32' r='19' fill='none' stroke='" + ink + "' stroke-width='4'/><rect x='22' y='29' width='20' height='6' rx='3' fill='none' stroke='" + ink + "' stroke-width='3.5'/></svg>";
-    if (!link) { link = document.createElement("link"); link.rel = "icon"; (document.head || document.documentElement).appendChild(link); }
-    link.href = "data:image/svg+xml," + encodeURIComponent(svg);
-  }
+  /* favicon: the layout renders it (metadata.icons) — the kit writes nothing into <head> */
 
   icons.mark = mark;
   BS.ICONS = ICONS;
@@ -175,5 +165,5 @@
 
   /* Nothing runs at load. boot(root) swaps the icons present now; markup added later is iconed by
      whoever adds it (pages via decorate(scope); kit layers via BS.glass.adopt). */
-  icons.boot = function (root) { favicon(); icons(root || document); };
+  icons.boot = function (root) { icons(root || document); };
 })();

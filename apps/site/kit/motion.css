@@ -194,12 +194,12 @@
 
 /* ── §7 · slow-mo (dev panel / kitchen sink) ────────────────────────────
    CSS cannot multiply every duration in place, so slow-mo lives in JS
-   (motion.js syncMotionAttr): while html[data-motion="slow"] is set, every
+   (motion.js syncMotionAttr): while body[data-motion="slow"] is set, every
    running animation and transition gets playbackRate 0.25 and JS timers go
    through BS.motion.scale() (×4). Nothing to declare here. */
 
 /* ── §8 · reduced motion — layer 1 (nuke) + layer 2 (end states) ─────────
-   Keyed on the OS query AND html[data-motion="reduce"] (set live by motion.js
+   Keyed on the OS query AND body[data-motion="reduce"] (set live by motion.js
    from the OS, the dev panel, or ?motion=reduce). Layer 1 still RUNS every
    animation for 0.001ms (fill both applies), so layer 2 pins the finished
    state: reveals visible, rows in place, draw-ins drawn, loops stopped. */
@@ -213,10 +213,10 @@
     scroll-behavior: auto !important;
   }
 }
-html[data-motion="reduce"] { scroll-behavior: auto !important; }
-html[data-motion="reduce"] *,
-html[data-motion="reduce"] *::before,
-html[data-motion="reduce"] *::after {
+body[data-motion="reduce"] { scroll-behavior: auto !important; }
+body[data-motion="reduce"] *,
+body[data-motion="reduce"] *::before,
+body[data-motion="reduce"] *::after {
   animation-duration: 0.001ms !important;
   animation-delay: 0ms !important;
   animation-iteration-count: 1 !important;
@@ -225,13 +225,13 @@ html[data-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 /* layer 2 — the end states (OS query and the override share one block via :root[data-motion]) */
-html[data-motion="reduce"] :is(.reveal, .reveal.cascade > *, .reveal .section-head > *, .rise-8, .rise-10, .rise-14, .rise-16,
+body[data-motion="reduce"] :is(.reveal, .reveal.cascade > *, .reveal .section-head > *, .rise-8, .rise-10, .rise-14, .rise-16,
   .bs-rise, .fade-in, .is-entering-row, .card-in) {
   opacity: 1 !important; transform: none !important; animation: none !important;
 }
-html[data-motion="reduce"] :is(.is-flash, .live-dot, .grid-shimmer, .marquee__track, .price-digit__track) { animation: none !important; }
-html[data-motion="reduce"] .ticking__out { display: none; }
-html[data-motion="reduce"] .ticking__in { animation: none !important; }
-html[data-motion="reduce"] .is-armed [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
-html[data-motion="reduce"] .is-armed :is([data-draw-label], [data-draw-fade]) { opacity: 1 !important; transition: none !important; }
-html[data-motion="reduce"] .grid-shimmer { opacity: 0; }
+body[data-motion="reduce"] :is(.is-flash, .live-dot, .grid-shimmer, .marquee__track, .price-digit__track) { animation: none !important; }
+body[data-motion="reduce"] .ticking__out { display: none; }
+body[data-motion="reduce"] .ticking__in { animation: none !important; }
+body[data-motion="reduce"] .is-armed [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
+body[data-motion="reduce"] .is-armed :is([data-draw-label], [data-draw-fade]) { opacity: 1 !important; transition: none !important; }
+body[data-motion="reduce"] .grid-shimmer { opacity: 0; }

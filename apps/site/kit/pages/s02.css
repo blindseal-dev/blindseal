@@ -232,9 +232,9 @@ html.bs-site[data-motion="reduce"] { scroll-behavior: auto; }
 .hiw-next__card .site-panel__body { margin-top: auto; }
 
 /* ══ reduced motion: end states, no rise, no press scale ════════════════ */
-html[data-motion="reduce"] :is(.hiw-mast__eyebrow, .hiw-mast__title, .hiw-mast__lede, .hiw-toc) { animation: none !important; opacity: 1 !important; transform: none !important; }
-html[data-motion="reduce"] :is(.hiw-toc__link, .hiw-toc__top, .hiw-replay):active { transform: none; }
-html[data-motion="reduce"] .hiw-toc__fill { transition: none; }
+body[data-motion="reduce"] :is(.hiw-mast__eyebrow, .hiw-mast__title, .hiw-mast__lede, .hiw-toc) { animation: none !important; opacity: 1 !important; transform: none !important; }
+body[data-motion="reduce"] :is(.hiw-toc__link, .hiw-toc__top, .hiw-replay):active { transform: none; }
+body[data-motion="reduce"] .hiw-toc__fill { transition: none; }
 
 /* programmatic focus targets (section titles after a TOC jump) carry no ring: they are not controls */
 .hiw-sec h2[tabindex="-1"]:focus, .hiw-mast__title[tabindex="-1"]:focus { outline: none; }

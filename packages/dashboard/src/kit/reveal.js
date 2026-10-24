@@ -13,7 +13,7 @@
    +0.15s; .reveal.cascade cells rise-14 at .12s + i × 60ms; .stagger
    children +60ms per --i.
 
-   The cover gate: while the shell's route cover is up (html[data-covered]),
+   The cover gate: while the shell's route cover is up (.bs-app[data-covered]),
    reveals and rises that fire are queued and released the moment the cover
    starts to lift ("bs:uncover"), so the above-the-fold entrance plays in view
    instead of finishing unseen under the cover. Durations are untouched.

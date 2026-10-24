@@ -104,4 +104,4 @@
 .s01-cta__actions { display: flex; align-items: center; gap: var(--s-3); flex: none; }
 /* held until the panel is in view, then BS.motion.staggerFade (opacity only, on the buttons themselves) */
 .bs-js .s01-cta__actions.is-pending > * { opacity: 0; }
-html[data-motion="reduce"] .s01-cta__actions.is-pending > * { opacity: 1; }
+body[data-motion="reduce"] .s01-cta__actions.is-pending > * { opacity: 1; }

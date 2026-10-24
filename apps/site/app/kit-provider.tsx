@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { ROUTES, DASHBOARD_URL } from './routes';
+export { ROUTES, DASHBOARD_URL };
 
 // The ONE place the kit is mounted. The kit JS (window.BS) is injected from a useEffect — i.e. only
 // after React has hydrated — and no kit module does anything at load (DECISIONS 2026-10-23: every
@@ -23,8 +25,6 @@ type BSKit = {
   diagrams?: { render?: (name: string, host: Element, o: unknown) => void };
 };
 
-const ROUTES = { home: '/', how: '/how-it-works', verify: '/verify', docs: '/docs', explorer: '/explorer', changelog: '/changelog' };
-export const DASHBOARD_URL = 'http://127.0.0.1:7777';
 
 function activeFor(path: string): keyof typeof ROUTES {
   if (path === '/') return 'home';
@@ -43,7 +43,7 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   if (firstMount) {
     try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'Open dashboard', href: DASHBOARD_URL } }); } catch {}
     // the dashboard is local-first: open it in a new tab, never navigate the site away
-    document.querySelectorAll<HTMLAnchorElement>('[data-site-cta]').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
+    /* the CTA's target/rel are in the server-rendered template */
   } else {
     try { BS.site?.setActive?.(active, { animate: true }); } catch {}
   }
@@ -65,7 +65,7 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   document.querySelectorAll<HTMLElement>('[data-pause]').forEach((el) => once(el, 'Pause', (e) => BS.motion?.mountPause?.(e)));
   document.querySelectorAll<HTMLElement>('[data-figure]').forEach((el) => once(el, 'Figure', (e) => BS.diagrams?.render?.(e.dataset.figure!, e, {})));
   // pages hook here (use-page-kit.ts): their page.js-equivalents run after the chrome and reveals exist
-  document.documentElement.setAttribute('data-kit-mounted', '1');
+  document.body.setAttribute('data-kit-mounted', '1');   // body, never html: the kit writes nothing on <html>/<head>/body children
   window.dispatchEvent(new CustomEvent('bs:route-mounted', { detail: { active } }));
 }
 
@@ -84,24 +84,14 @@ export function KitProvider() {
     s.addEventListener('load', onLoad);
     return () => s!.removeEventListener('load', onLoad);
   }, []);
-  // the page segment's own hydration signal (page-hydrated.tsx): the root layout hydrates before the
-  // page under selective hydration, so this effect alone is not proof that the page is ready
-  const [hydratedPath, setHydratedPath] = useState<string | null>(null);
   useEffect(() => {
-    const cur = (window as unknown as { __bsPageHydrated?: string }).__bsPageHydrated;
-    if (cur) setHydratedPath(cur);
-    const on = (e: Event) => setHydratedPath((e as CustomEvent<{ path: string }>).detail.path);
-    window.addEventListener('bs:page-hydrated', on);
-    return () => window.removeEventListener('bs:page-hydrated', on);
-  }, []);
-  useEffect(() => {
-    if (!ready || hydratedPath !== path) return;
+    if (!ready) return;
     const BS = (window as unknown as { BS?: BSKit }).BS;
     if (!BS) return;
     const first = !mounted; mounted = true;
     // next frame, so React's DOM for this route is final before the kit decorates it
     const raf = requestAnimationFrame(() => mountSequence(BS, first, activeFor(path)));
     return () => cancelAnimationFrame(raf);
-  }, [ready, path, hydratedPath]);
+  }, [ready, path]);
   return null;
 }

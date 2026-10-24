@@ -25,14 +25,14 @@
      fills 600ms ease, Δ200ms ............... about.css:527 burn area (row 53)
      state changes 200ms in-out ............. DECISIONS interaction thesis (150-200ms in-out)
 
-   Slow-mo: html[data-motion="slow"]. When the kit's motion engine is present
+   Slow-mo: body[data-motion="slow"]. When the kit's motion engine is present
    (BS.motion or PF.motion with syncMotionAttr) it slows every animation and
    transition with playbackRate .25, so this file leaves --dg-k at 1
    (data-dg-rate="kit"). Without the kit, diagrams.js marks the host
    data-dg-rate="css" and every duration and delay below is multiplied by
    --dg-k: 4. One mechanism at a time, never both (that would be ×16).
 
-   Reduced motion: the OS query and html[data-motion="reduce"] pin every end
+   Reduced motion: the OS query and body[data-motion="reduce"] pin every end
    state with no transition (the kit §1.5 layer 2).
 
    Colour: tokens only (--ink --muted --faint --line --panel --canvas --accent
@@ -88,7 +88,7 @@
   padding: 0;
   color: var(--dg-ink);
 }
-html[data-motion="slow"] .fig[data-dg-rate="css"] { --dg-k: 4; }
+body[data-motion="slow"] .fig[data-dg-rate="css"] { --dg-k: 4; }
 
 .fig__art { position: relative; }
 .fig__art > svg {
@@ -252,8 +252,8 @@ html[data-motion="slow"] .fig[data-dg-rate="css"] { --dg-k: 4; }
   html:not([data-motion="full"]):not([data-motion="slow"]) .fig :is([data-draw-tip], [data-draw-fill], [data-draw-fade], [data-draw-label]) { opacity: 1 !important; transform: none !important; transition: none !important; }
   html:not([data-motion="full"]):not([data-motion="slow"]) .fig :is(.dg-conn.is-off, .dg-leave) { opacity: 0 !important; }
 }
-html[data-motion="reduce"] .fig [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
-html[data-motion="reduce"] .fig [data-draw-to] { stroke-dashoffset: calc(1 - var(--to, 1)) !important; transition: none !important; }
-html[data-motion="reduce"] .fig :is([data-draw-tip], [data-draw-fill], [data-draw-fade], [data-draw-label]) { opacity: 1 !important; transform: none !important; transition: none !important; }
-html[data-motion="reduce"] .fig :is(.dg-conn.is-off, .dg-leave) { opacity: 0 !important; }
-html[data-motion="reduce"] .fig * { transition: none !important; }
+body[data-motion="reduce"] .fig [data-draw] { stroke-dashoffset: 0 !important; transition: none !important; }
+body[data-motion="reduce"] .fig [data-draw-to] { stroke-dashoffset: calc(1 - var(--to, 1)) !important; transition: none !important; }
+body[data-motion="reduce"] .fig :is([data-draw-tip], [data-draw-fill], [data-draw-fade], [data-draw-label]) { opacity: 1 !important; transform: none !important; transition: none !important; }
+body[data-motion="reduce"] .fig :is(.dg-conn.is-off, .dg-leave) { opacity: 0 !important; }
+body[data-motion="reduce"] .fig * { transition: none !important; }

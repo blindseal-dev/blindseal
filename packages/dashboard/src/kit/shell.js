@@ -5,9 +5,17 @@
    + the kit route cover), re-wired for Blindseal. The V2 top-nav branch
    is not ported (Blindseal has one dashboard shell).
 
-   Usage (end of <body>, after the other _shared scripts):
-     <main id="main-content"> …page… </main>
-     <script>BS.mountShell({ active: "decisions", title: "Decisions" });</script>
+   The frame markup is STATIC (packages/dashboard/index.html carries the whole
+   .bs-app: sidebar, top bar, status bar, route cover, and the .bs-work that
+   wraps <main id="main-content">; html.bs-shell[data-shell] and body.bs-mounted
+   are static too). mountShell ADOPTS those nodes and only wires them: it
+   writes nothing to <html>, <head>, <body> or body's direct children — the
+   one exception is the kit's own flyout layer, created on demand and appended
+   to body like the kit's toasts, tooltips, menus and sheets. If the static
+   markup is missing it warns once and mounts nothing (no fallback build).
+
+   Usage (after the other kit scripts, once the status is known):
+     BS.mountShell({ active: "decisions", title: "Decisions", routes, status });
 
    Options:
      active     "decisions" | "audit" | "policy" | "attestations" | "settings"
@@ -40,8 +48,9 @@
      across documents the old page slides the pill (240) under a rising cover
      (180), leaves a token in sessionStorage and navigates; the new page opens
      with the cover INSTANT and takes the quick path (hold 100, out 240).
-     While the cover is up html[data-covered] is set; reveals wait for
-     "bs:uncover" (reveal.js). Reduced motion: no cover, no slide.
+     While the cover is up .bs-app[data-covered] is set (BS.motion.covered()
+     reads it); reveals wait for "bs:uncover" (reveal.js). Reduced motion: no
+     cover, no slide.
 
    API: BS.shell = { refs, NAV, routes, setActive(id, {animate}), setTitle(t),
         cover(instant) → Promise, uncover(quick) → Promise, replayCover(),
@@ -111,96 +120,70 @@
     return out;
   }
 
-  /* ── build ────────────────────────────────────────────────────────────── */
-  function navItem(n, ink) {
-    var inner = '<span class="bs-navitem__g">' + ico(n.icon) + '</span><span class="bs-navitem__t">' + esc(n.label) + "</span>";
-    if (ink) return '<span class="bs-navitem" data-nav="' + n.id + '">' + inner + "</span>";
-    return '<a class="bs-navitem" href="' + esc(opts.routes[n.id] || "#") + '" data-nav="' + n.id + '" aria-label="' + esc(n.label) + '">' + inner + "</a>";
+  /* ── adopt: the static frame (index.html) + the runtime values ───────── */
+  var MOCK_CHIP = '<span class="chip mock" title="Mock mode: fixture data, fake event stream">MOCK</span>';
+
+  /* the MOCK chips (top bar right, status bar before the spacer) exist only while status.mock */
+  function renderMock(on) {
+    var right = refs.top.querySelector(".bs-top__right");
+    var tc = right && right.querySelector(".chip.mock");
+    if (right) { if (on && !tc) right.insertAdjacentHTML("beforeend", MOCK_CHIP); else if (!on && tc) tc.parentNode.removeChild(tc); }
+    var sb = null;
+    [].forEach.call(refs.status.querySelectorAll(".bs-sb"), function (el) { if (el.querySelector(".chip.mock")) sb = el; });
+    var spacer = refs.status.querySelector(".bs-status__spacer");
+    if (on && !sb && spacer) spacer.insertAdjacentHTML("beforebegin", '<span class="bs-sb">' + MOCK_CHIP + "</span>");
+    else if (!on && sb) sb.parentNode.removeChild(sb);
   }
 
-  function footHtml() {
+  /* write the Status-shaped values into the adopted foot / status bar nodes */
+  function renderStatus() {
     var ver = (BS.VERSION && BS.VERSION.proxy) || status.version || "0.4.0";
-    return '<div class="bs-proxy"><span class="bs-proxy__k"><span class="live-dot" aria-hidden="true"></span>Proxy</span>' +
-      hash(status.signerPubkey, { label: "Proxy signer (ed25519)" }) + "</div>" +
-      '<div class="bs-side__footrow"><span class="bs-side__ver" data-ver>v' + esc(ver) + " · up " + esc(uptime(status.uptimeSec)) + "</span>" +
-      '<button type="button" class="icon-btn" data-collapse>' + ico("panel-left") + "</button></div>";
+    var v = refs.foot.querySelector("[data-ver]");
+    if (v) v.textContent = "v" + ver + " · up " + uptime(status.uptimeSec);
+    var sig = refs.foot.querySelector(".bs-proxy .hash");
+    if (sig) sig.outerHTML = hash(status.signerPubkey, { label: "Proxy signer (ed25519)" });
+    var ah = refs.status.querySelector("[data-sb-audit-hash]");
+    if (ah) ah.innerHTML = hash(status.audit.hash, { label: "Audit head hash" });
+    var pr = refs.status.querySelector("[data-sb-policy]");
+    if (pr) pr.innerHTML = hash(status.policyRoot, { label: "Policy root" });
+    var det = refs.status.querySelector("[data-sb-detector]");
+    if (det) det.textContent = status.detectorVersion == null ? "" : String(status.detectorVersion);
+    var l3 = refs.status.querySelector("[data-sb-l3]");
+    if (l3) l3.textContent = (status.l3 && status.l3.mode) || "local";
+    renderMock(!!status.mock);
   }
 
-  function connHtml() {
-    return '<button type="button" class="conn" data-conn data-state="connected" aria-live="polite"><span class="live-dot" aria-hidden="true"></span>' +
-      '<span data-conn-label>Connected</span><span class="conn__addr" data-conn-addr>127.0.0.1:7777</span></button>';
-  }
-
-  function statusHtml() {
-    return '<footer class="glass-bar glass-bar--bottom bs-status" aria-label="Proxy status">' +
-      '<span class="bs-sb" data-sb-conn data-state="connected"><span class="live-dot" aria-hidden="true"></span><span class="bs-sb__v" data-sb-conn-label>Screening</span></span>' +
-      '<span class="bs-sb"><span class="bs-sb__k">audit #</span><span class="bs-sb__v num" data-sb-audit></span><span data-sb-audit-hash>' + hash(status.audit.hash, { label: "Audit head hash" }) + "</span></span>" +
-      '<span class="bs-sb"><span class="bs-sb__k">policy</span><span data-sb-policy>' + hash(status.policyRoot, { label: "Policy root" }) + "</span></span>" +
-      '<span class="bs-sb"><span class="bs-sb__k">detector</span><span class="bs-sb__v">' + esc(status.detectorVersion) + "</span></span>" +
-      '<span class="bs-sb"><span class="bs-sb__k">L3</span><span class="bs-sb__v">' + esc((status.l3 && status.l3.mode) || "local") + "</span></span>" +
-      (status.mock ? '<span class="bs-sb"><span class="chip mock" title="Mock mode: fixture data, fake event stream">MOCK</span></span>' : "") +
-      '<span class="bs-status__spacer"></span>' +
-      '<a class="glass-item" href="#privacy" data-stub="Privacy">Privacy</a>' +
-      '<a class="glass-item" href="' + esc((BS.ROUTES && BS.ROUTES.site && BS.ROUTES.site.docs) || "../S04/index.html") + '">Docs</a>' +
-      '<a class="glass-item" href="#help" data-stub="Help">Help</a>' +
-      "</footer>";
-  }
-
-  function build(main) {
-    var html = document.documentElement;
-    html.classList.add("bs-shell");
-    html.setAttribute("data-shell", "sidebar");
-    var name = brandName();
-    var app = document.createElement("div");
-    app.className = "bs-app";
-    app.setAttribute("data-shell", "sidebar");
-    app.innerHTML =
-      '<a class="skip-link" href="#main-content">Skip to content</a>' +
-      '<aside class="bs-side" aria-label="' + esc(name) + '">' +
-        '<div class="bs-side__brand"><a class="bs-wordmark" href="' + esc(opts.routes.decisions) + '" data-nav-link="decisions" aria-label="' + esc(name) + ', decisions">' +
-          mark(20) + '<span class="bs-wordmark__word">' + esc(name) + '</span></a><span class="chip outline">local</span></div>' +
-        '<nav class="bs-side__nav" aria-label="Sections"><p class="bs-nav__label">Dashboard</p><div class="bs-nav"><span class="bs-nav__pill" aria-hidden="true"></span>' +
-          NAV.map(function (n) { return navItem(n, false); }).join("") +
-          '<div class="bs-nav__ink" aria-hidden="true">' + NAV.map(function (n) { return navItem(n, true); }).join("") + "</div>" +
-        "</div></nav>" +
-        '<div class="bs-side__foot" data-foot>' + footHtml() + "</div>" +
-      "</aside>" +
-      '<div class="bs-work">' +
-        '<header class="glass-bar glass-bar--top bs-top">' +
-          '<div class="bs-top__lead"><p class="bs-top__title" data-title></p><span class="bs-top__actions" data-actions></span></div>' +
-          '<div class="bs-top__right">' + connHtml() +
-            (status.mock ? '<span class="chip mock" title="Mock mode: fixture data, fake event stream">MOCK</span>' : "") +
-          "</div>" +
-        "</header>" +
-      "</div>" +
-      '<div class="bs-cover" aria-hidden="true"><div class="bs-cover__ind">' + mark(28) + '<div class="track"><span></span></div></div></div>';
-    document.body.insertBefore(app, document.body.firstChild);
-    var work = app.querySelector(".bs-work");
-    main.id = "main-content";
-    main.classList.add("bs-main");
-    main.setAttribute("tabindex", "-1");
-    work.appendChild(main);
-    app.insertAdjacentHTML("beforeend", statusHtml());
-    document.body.classList.add("bs-mounted");
-
+  function adopt() {
+    var app = document.querySelector(".bs-app");
+    var main = app && app.querySelector("#main-content");
+    var nav = app && app.querySelector(".bs-nav");
+    if (!app || !main || !nav || !app.querySelector(".bs-cover") || !app.querySelector(".bs-status") || !app.querySelector("[data-title]")) {
+      console.warn("[BS] mountShell: the static shell markup (.bs-app with .bs-nav, .bs-cover, .bs-status, [data-title] and #main-content) is missing from the document; nothing mounted.");
+      return false;
+    }
     refs = {
-      app: app, side: app.querySelector(".bs-side"), nav: app.querySelector(".bs-nav"),
-      pill: app.querySelector(".bs-nav__pill"), ink: app.querySelector(".bs-nav__ink"),
+      app: app, side: app.querySelector(".bs-side"), nav: nav,
+      pill: nav.querySelector(".bs-nav__pill"), ink: nav.querySelector(".bs-nav__ink"),
       items: [].slice.call(app.querySelectorAll(".bs-nav > .bs-navitem")),
       title: app.querySelector("[data-title]"), actions: app.querySelector("[data-actions]"),
       foot: app.querySelector("[data-foot]"), cover: app.querySelector(".bs-cover"),
       top: app.querySelector(".bs-top"), conn: app.querySelector("[data-conn]"),
-      status: app.querySelector(".bs-status"), main: main
+      status: app.querySelector(".bs-status"), work: app.querySelector(".bs-work"), main: main
     };
+    /* routes → the nav hrefs + the wordmark */
+    refs.items.forEach(function (a) { if (a.tagName === "A") a.setAttribute("href", opts.routes[a.getAttribute("data-nav")] || "#"); });
+    [].forEach.call(app.querySelectorAll("[data-nav-link]"), function (a) { a.setAttribute("href", opts.routes[a.getAttribute("data-nav-link")] || "#"); });
+    renderStatus();
     route = M() ? M().createRouteTransition(refs.cover) : null;
     setTitle(opts.title || labelOf(opts.active));
-    if (opts.actions) { if (opts.actions.nodeType) refs.actions.appendChild(opts.actions); else refs.actions.innerHTML = opts.actions; }
+    if (opts.actions && refs.actions) { if (opts.actions.nodeType) refs.actions.appendChild(opts.actions); else refs.actions.innerHTML = opts.actions; }
     wireFoot();
     wireTop();
     wireNav();
     wireStatus();
     wireFlyout();
     applyRail(lstore(RAIL_KEY) === "rail", false);
+    return true;
   }
 
   /* ── the white sliding pill + its ink layer ───────────────────────────── */
@@ -250,13 +233,13 @@
 
   /* ── the route cover ──────────────────────────────────────────────────── */
   function cover(instant) {
-    document.documentElement.setAttribute("data-covered", "");
+    refs.app.setAttribute("data-covered", "");
     if (instant || !route) { if (route) route.cover(); else refs.cover.classList.add("is-visible"); return Promise.resolve(); }
     return route.show();
   }
   function uncover(quick, hold) {
     var lift = function () {
-      document.documentElement.removeAttribute("data-covered");
+      refs.app.removeAttribute("data-covered");
       document.dispatchEvent(new CustomEvent("bs:uncover"));
     };
     if (!route) { refs.cover.classList.remove("is-visible"); lift(); return Promise.resolve(); }
@@ -331,6 +314,7 @@
     measure();
   }
   function wireFlyout() {
+    /* kit layer (like toasts / tooltips / sheets): the one node the shell appends to body */
     var fly = document.createElement("div");
     fly.className = "bs-flyout"; fly.setAttribute("aria-hidden", "true");
     document.body.appendChild(fly);
@@ -420,9 +404,8 @@
     opts = Object.assign({ active: "decisions", title: "", navigate: true, cover: true }, o || {});
     opts.routes = Object.assign({}, DEFAULT_ROUTES, opts.routes || {});
     status = readStatus();
-    var main = document.getElementById("main-content") || document.querySelector("body > main") || document.querySelector("main");
-    if (!main) { main = document.createElement("main"); document.body.appendChild(main); }
-    build(main);
+    if (!adopt()) { opts = null; status = null; return null; }
+    var main = refs.main;
     setActive(opts.active);
     /* fixtures.js says BS.data.connection = live | reconnecting | offline (from ?state=) */
     var dc = BS.data && BS.data.connection;

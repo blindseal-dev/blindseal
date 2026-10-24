@@ -1,4 +1,3 @@
-import { PageHydrated } from '../page-hydrated';
 // S05 · Explorer (/explorer) — the mainnet reader. A server component: the read happens here via
 // @blindseal/chain-reads (BLINDSEAL_RPC_URL, else the public mainnet RPC; cached 60 s in module
 // memory), so the visitor's browser never contacts an RPC. The first snapshot travels as props; the
@@ -19,5 +18,5 @@ export const metadata: Metadata = {
 
 export default async function Explorer() {
   const snapshot = await getExplorerSnapshot();
-  return (<><ExplorerView snapshot={snapshot} /><PageHydrated /></>);
+  return (<ExplorerView snapshot={snapshot} />);
 }

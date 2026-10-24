@@ -85,4 +85,4 @@
 .space[data-fade="false"] .space__fade { display: none; }
 
 /* ── reduced motion: everything static, the field centred ─────────────── */
-html[data-motion="reduce"] :is(.space__nebula, .space__stars circle) { animation: none !important; }
+body[data-motion="reduce"] :is(.space__nebula, .space__stars circle) { animation: none !important; }

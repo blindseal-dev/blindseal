@@ -176,7 +176,7 @@
 }
 
 /* ══ reduced motion: every state switches with no transition ════════════ */
-html[data-motion="reduce"] :is(.vf-mast__eyebrow, .vf-mast__title, .vf-mast__lede, .vf-enter, .vf-checks .is-new, .vf-kv > .kv__item, .vf-hidden, .vf-hidden__row, .vf-banner > *) {
+body[data-motion="reduce"] :is(.vf-mast__eyebrow, .vf-mast__title, .vf-mast__lede, .vf-enter, .vf-checks .is-new, .vf-kv > .kv__item, .vf-hidden, .vf-hidden__row, .vf-banner > *) {
   animation: none !important; opacity: 1 !important; transform: none !important;
 }
-html[data-motion="reduce"] .vf-drop:active { transform: none; }
+body[data-motion="reduce"] .vf-drop:active { transform: none; }

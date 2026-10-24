@@ -211,7 +211,7 @@
 .ex-fade { animation: fade-in var(--d-200) var(--ease-out-cubic) both; }
 
 /* ══ reduced motion: end states only ═════════════════════════════════════ */
-html[data-motion="reduce"] :is(.ex-mast__eyebrow, .ex-mast__title, .ex-mast__lede, .ex-mast__end, .ex-enter, .ex-bar, .ex-row, .ex-alt, .ex-fade) {
+body[data-motion="reduce"] :is(.ex-mast__eyebrow, .ex-mast__title, .ex-mast__lede, .ex-mast__end, .ex-enter, .ex-bar, .ex-row, .ex-alt, .ex-fade) {
   animation: none !important; opacity: 1 !important; transform: none !important;
 }
-html[data-motion="reduce"] .ex-tip { transition: none; }
+body[data-motion="reduce"] .ex-tip { transition: none; }

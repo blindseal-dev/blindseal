@@ -330,7 +330,7 @@ html.bs-site { scroll-padding-top: 104px; }
 .docs-otp__top:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ══ reduced motion: end states, no rise, no press scale ════════════════ */
-html[data-motion="reduce"] :is(.docs-side__in, .docs-otp, .docs-crumb, .docs-title, .docs-summary, .docs-meta, .docs-page, .api-ep__body, .api-type) { animation: none !important; opacity: 1 !important; transform: none !important; }
-html[data-motion="reduce"] :is(.docs-tree__item, .docs-otp__link, .docs-otp__top, .docs-pn__card, .docs-anchor, .docs-link, .api-ep__sum):active { transform: none; }
-html[data-motion="reduce"] :is(.docs-otp__fill, .api-ep__chev) { transition: none; }
-html[data-motion="reduce"] .docs-otp__list { animation: none !important; }
+body[data-motion="reduce"] :is(.docs-side__in, .docs-otp, .docs-crumb, .docs-title, .docs-summary, .docs-meta, .docs-page, .api-ep__body, .api-type) { animation: none !important; opacity: 1 !important; transform: none !important; }
+body[data-motion="reduce"] :is(.docs-tree__item, .docs-otp__link, .docs-otp__top, .docs-pn__card, .docs-anchor, .docs-link, .api-ep__sum):active { transform: none; }
+body[data-motion="reduce"] :is(.docs-otp__fill, .api-ep__chev) { transition: none; }
+body[data-motion="reduce"] .docs-otp__list { animation: none !important; }

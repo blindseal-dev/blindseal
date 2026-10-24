@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 // (icons → glass → reveals), exactly what the mockups' DOMContentLoaded boots did for static markup.
 export type BSAny = Record<string, any>;
 export const bs = (): BSAny | undefined => (typeof window === 'undefined' ? undefined : (window as any).BS);
-export const kitMounted = (): boolean => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-kit-mounted');
+export const kitMounted = (): boolean => typeof document !== 'undefined' && document.body.hasAttribute('data-kit-mounted');
 
 export function decorate(scope: ParentNode = document) {
   const BS = bs(); if (!BS) return;

@@ -172,6 +172,6 @@ html.bs-shell, html.bs-shell body { height: 100%; overflow: hidden; }
 .bs-cover.is-visible .bs-cover__ind { opacity: 1; transform: none; }
 .bs-cover:not(.is-visible) .track > span { animation: none; }
 
-html[data-motion="reduce"] :is(.bs-cover, .bs-cover__ind, .bs-nav__pill, .bs-nav__ink) { transition: none !important; }
-html[data-motion="reduce"] .bs-flyout.is-on { animation: none !important; }
-html[data-motion="reduce"] :is(.bs-navitem, .bs-wordmark):active { transform: none; }
+body[data-motion="reduce"] :is(.bs-cover, .bs-cover__ind, .bs-nav__pill, .bs-nav__ink) { transition: none !important; }
+body[data-motion="reduce"] .bs-flyout.is-on { animation: none !important; }
+body[data-motion="reduce"] :is(.bs-navitem, .bs-wordmark):active { transform: none; }

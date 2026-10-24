@@ -703,13 +703,13 @@ button.conn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px;
 /* LIVE dot — 2.4s breathe lives in motion.css (.live-dot) */
 
 /* ══ §21 · reduced motion: end states for this file's motion ═════════════ */
-html[data-motion="reduce"] :is(.sheet__panel, .sheet__scrim) { transition: none !important; }
-html[data-motion="reduce"] .sheet__block { animation: none !important; opacity: 1 !important; transform: none !important; }
-html[data-motion="reduce"] :is(.toast, .dialog__panel, .dialog__scrim) { animation: none !important; }
-html[data-motion="reduce"] :is(.menu, .menu[data-open="true"], .tooltip) { transition: none !important; }
-html[data-motion="reduce"] .skeleton::after, html[data-motion="reduce"] .btn[aria-busy="true"]::after { animation: none !important; transform: translateX(60%); }
-html[data-motion="reduce"] :is(.track > span, .check__sweep > span, .progress.is-indeterminate > i) { animation: none !important; transform: translateX(60%); }
-html[data-motion="reduce"] :is(.btn, .icon-btn, .seg__item, .tab, .hash, .switch, .copy, .conn, .row--btn, a.row, .card--interactive, .toast__x, .menu__row, .table tbody tr.is-clickable):active { transform: none; }
+body[data-motion="reduce"] :is(.sheet__panel, .sheet__scrim) { transition: none !important; }
+body[data-motion="reduce"] .sheet__block { animation: none !important; opacity: 1 !important; transform: none !important; }
+body[data-motion="reduce"] :is(.toast, .dialog__panel, .dialog__scrim) { animation: none !important; }
+body[data-motion="reduce"] :is(.menu, .menu[data-open="true"], .tooltip) { transition: none !important; }
+body[data-motion="reduce"] .skeleton::after, body[data-motion="reduce"] .btn[aria-busy="true"]::after { animation: none !important; transform: translateX(60%); }
+body[data-motion="reduce"] :is(.track > span, .check__sweep > span, .progress.is-indeterminate > i) { animation: none !important; transform: translateX(60%); }
+body[data-motion="reduce"] :is(.btn, .icon-btn, .seg__item, .tab, .hash, .switch, .copy, .conn, .row--btn, a.row, .card--interactive, .toast__x, .menu__row, .table tbody tr.is-clickable):active { transform: none; }
 
 /* ══ §22 · tabular figures, LAST (B3) ═══════════════════════════════════
    The font: shorthand resets font-variant-numeric, so every class above that

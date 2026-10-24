@@ -1,4 +1,3 @@
-import { PageHydrated } from './page-hydrated';
 import Link from 'next/link';
 import { CopyButton } from './copy';
 
@@ -78,7 +77,6 @@ export default function Home() {
         <h2 className="section-head__title" id="cta-h">Screen the next tool call.</h2>
         <div className="hero__actions"><div className="install"><span className="install__tile" aria-hidden>$</span><code className="install__cmd">{INSTALL}</code><CopyButton text={INSTALL} /></div></div>
       </section>
-      <PageHydrated />
     </>
   );
 }

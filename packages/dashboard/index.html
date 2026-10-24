@@ -1,12 +1,75 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="bs-shell" data-shell="sidebar">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Blindseal</title>
   </head>
-  <body>
-    <main id="main-content" class="bs-main" tabindex="-1"></main>
+  <body class="bs-mounted">
+    <!-- The dashboard frame (src/kit/shell.js, DECISIONS D06) is static: BS.mountShell adopts these
+         nodes and only wires them (nav, pill, rail, cover, status). Runtime values are blank here.
+         React's root container is <main id="main-content"> inside .bs-work (src/main.tsx). -->
+    <div class="bs-app" data-shell="sidebar">
+      <a class="skip-link" href="#main-content">Skip to content</a>
+      <aside class="bs-side" aria-label="Blindseal">
+        <div class="bs-side__brand">
+          <a class="bs-wordmark" href="#/decisions" data-nav-link="decisions" aria-label="Blindseal, decisions"><svg xmlns="http://www.w3.org/2000/svg" class="bs-mark bs-mark--A" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10.25"></circle><rect x="7.25" y="10.6" width="9.5" height="2.8" rx="1.4"></rect></svg><span class="bs-wordmark__word">Blindseal</span></a>
+          <span class="chip outline">local</span>
+        </div>
+        <nav class="bs-side__nav" aria-label="Sections">
+          <p class="bs-nav__label">Dashboard</p>
+          <div class="bs-nav">
+            <span class="bs-nav__pill" aria-hidden="true"></span>
+            <a class="bs-navitem" href="#/decisions" data-nav="decisions" aria-label="Decisions"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list" data-lucide="list" aria-hidden="true" focusable="false"><path d="M3 5h.01"></path><path d="M3 12h.01"></path><path d="M3 19h.01"></path><path d="M8 5h13"></path><path d="M8 12h13"></path><path d="M8 19h13"></path></svg></span><span class="bs-navitem__t">Decisions</span></a>
+            <a class="bs-navitem" href="#/audit" data-nav="audit" aria-label="Audit"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link" data-lucide="link" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span><span class="bs-navitem__t">Audit</span></a>
+            <a class="bs-navitem" href="#/policy" data-nav="policy" aria-label="Policy"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scroll-text" data-lucide="scroll-text" aria-hidden="true" focusable="false"><path d="M15 12h-5"></path><path d="M15 8h-5"></path><path d="M19 17V5a2 2 0 0 0-2-2H4"></path><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"></path></svg></span><span class="bs-navitem__t">Policy</span></a>
+            <a class="bs-navitem" href="#/attestations" data-nav="attestations" aria-label="Attestations"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stamp" data-lucide="stamp" aria-hidden="true" focusable="false"><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"></path><path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z"></path><path d="M5 22h14"></path></svg></span><span class="bs-navitem__t">Attestations</span></a>
+            <a class="bs-navitem" href="#/settings" data-nav="settings" aria-label="Settings"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" data-lucide="settings" aria-hidden="true" focusable="false"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span class="bs-navitem__t">Settings</span></a>
+            <div class="bs-nav__ink" aria-hidden="true">
+              <span class="bs-navitem" data-nav="decisions"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list" data-lucide="list" aria-hidden="true" focusable="false"><path d="M3 5h.01"></path><path d="M3 12h.01"></path><path d="M3 19h.01"></path><path d="M8 5h13"></path><path d="M8 12h13"></path><path d="M8 19h13"></path></svg></span><span class="bs-navitem__t">Decisions</span></span>
+              <span class="bs-navitem" data-nav="audit"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link" data-lucide="link" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span><span class="bs-navitem__t">Audit</span></span>
+              <span class="bs-navitem" data-nav="policy"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scroll-text" data-lucide="scroll-text" aria-hidden="true" focusable="false"><path d="M15 12h-5"></path><path d="M15 8h-5"></path><path d="M19 17V5a2 2 0 0 0-2-2H4"></path><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"></path></svg></span><span class="bs-navitem__t">Policy</span></span>
+              <span class="bs-navitem" data-nav="attestations"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stamp" data-lucide="stamp" aria-hidden="true" focusable="false"><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"></path><path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z"></path><path d="M5 22h14"></path></svg></span><span class="bs-navitem__t">Attestations</span></span>
+              <span class="bs-navitem" data-nav="settings"><span class="bs-navitem__g"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" data-lucide="settings" aria-hidden="true" focusable="false"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span class="bs-navitem__t">Settings</span></span>
+            </div>
+          </div>
+        </nav>
+        <div class="bs-side__foot" data-foot>
+          <div class="bs-proxy">
+            <span class="bs-proxy__k"><span class="live-dot" aria-hidden="true"></span>Proxy</span>
+            <button type="button" class="hash" data-hash data-label="Proxy signer (ed25519)" aria-label="Proxy signer (ed25519) . Copy"><span class="hash__v"></span></button>
+          </div>
+          <div class="bs-side__footrow">
+            <span class="bs-side__ver" data-ver></span>
+            <button type="button" class="icon-btn" data-collapse aria-pressed="false" aria-label="Collapse the sidebar" title="Collapse the sidebar"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left" data-lucide="panel-left" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></svg></button>
+          </div>
+        </div>
+      </aside>
+      <div class="bs-work">
+        <header class="glass-bar glass-bar--top bs-top">
+          <div class="bs-top__lead">
+            <p class="bs-top__title" data-title></p>
+            <span class="bs-top__actions" data-actions></span>
+          </div>
+          <div class="bs-top__right">
+            <button type="button" class="conn" data-conn data-state="connected" aria-live="polite"><span class="live-dot" aria-hidden="true"></span><span data-conn-label>Connected</span><span class="conn__addr" data-conn-addr>127.0.0.1:7777</span></button>
+          </div>
+        </header>
+        <main id="main-content" class="bs-main" tabindex="-1"></main>
+      </div>
+      <div class="bs-cover" aria-hidden="true"><div class="bs-cover__ind"><svg xmlns="http://www.w3.org/2000/svg" class="bs-mark bs-mark--A" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.286" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10.25"></circle><rect x="7.25" y="10.6" width="9.5" height="2.8" rx="1.4"></rect></svg><div class="track"><span></span></div></div></div>
+      <footer class="glass-bar glass-bar--bottom bs-status" aria-label="Proxy status">
+        <span class="bs-sb" data-sb-conn data-state="connected"><span class="live-dot" aria-hidden="true"></span><span class="bs-sb__v" data-sb-conn-label>Screening</span></span>
+        <span class="bs-sb"><span class="bs-sb__k">audit #</span><span class="bs-sb__v num" data-sb-audit></span><span data-sb-audit-hash><button type="button" class="hash" data-hash data-label="Audit head hash" aria-label="Audit head hash . Copy"><span class="hash__v"></span></button></span></span>
+        <span class="bs-sb"><span class="bs-sb__k">policy</span><span data-sb-policy><button type="button" class="hash" data-hash data-label="Policy root" aria-label="Policy root . Copy"><span class="hash__v"></span></button></span></span>
+        <span class="bs-sb"><span class="bs-sb__k">detector</span><span class="bs-sb__v" data-sb-detector></span></span>
+        <span class="bs-sb"><span class="bs-sb__k">L3</span><span class="bs-sb__v" data-sb-l3></span></span>
+        <span class="bs-status__spacer"></span>
+        <a class="glass-item" href="#privacy" data-stub="Privacy">Privacy</a>
+        <a class="glass-item" href="../S04/index.html">Docs</a>
+        <a class="glass-item" href="#help" data-stub="Help">Help</a>
+      </footer>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

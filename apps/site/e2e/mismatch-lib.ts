@@ -15,7 +15,7 @@ export const INIT = `
 `;
 export const DIFF = `(kit) => {
   const SKIP_TAG = new Set(['SCRIPT', 'NOSCRIPT', 'NEXT-ROUTE-ANNOUNCER', 'TEMPLATE']);
-  const KIT_SEL = 'a.skip-link, .site-frame, .site-notch, .site-footer, .glass-sheen, .glass-glow, canvas, #bs-toasts, .toasts, .tooltip, .dialog, .sheet, .menu, style:not([data-href]), link[rel~="icon"]';
+  const KIT_SEL = '.glass-sheen, .glass-glow, canvas, #bs-toasts, .toasts, .tooltip, .dialog, .sheet, .menu, style:not([data-href]), link[rel~="icon"]';
   const SPACE = '.hero__space, .ex-mast__space, .hiw-mast__space, .cl-mast__space, .vf-mast__space, [data-space]';
   const kitNode = (el) => kit && (el.matches(KIT_SEL) || !!el.closest(KIT_SEL) || (el.tagName.toLowerCase() === 'svg' && !!el.parentElement && el.parentElement.matches('i[data-lucide]')) || (!!el.closest(SPACE) && !el.matches(SPACE)));
   const skipAttr = (n) => kit && (/^data-(kit|glass|space-mounted|page-hydrated|motion|reveal|seen|dg|odo|site)/.test(n) || n === 'style' || n === 'data-bg');
@@ -46,3 +46,17 @@ export const DIFF = `(kit) => {
   return { errs: window.__errs, diff: out };
 }`;
 export const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog'];
+
+// Entries that touch <html> (attributes), <head> (children/attributes) or a DIRECT child of <body> (an
+// insertion/removal at body level, or an attribute change on a body child). With the kit running these must
+// be none: the chrome is server-rendered and the kit only adopts it.
+export function chromeViolations(diff: { at?: string; kind?: string }[]) {
+  return diff.filter((d) => {
+    const at = d.at || '';
+    if (/^html(\.[\w-]+)*$/.test(at)) return true;
+    if (/^html(\.[\w-]+)* > head/.test(at)) return true;
+    if (/^html(\.[\w-]+)* > body$/.test(at)) return true;
+    if (/^html(\.[\w-]+)* > body > [^>]+$/.test(at) && d.kind !== 'children') return true;
+    return false;
+  });
+}

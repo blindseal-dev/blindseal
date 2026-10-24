@@ -338,9 +338,9 @@ html[data-transparency="reduce"] :is(.glass, .glass-btn:not(.primary), .glass-pi
   :is(.glass, .glass-btn:not(.primary), .glass-pill, .glass-seg, .glass-bar, .glass-head, .glass-menu, .glass-toast, .glass-dock) { background-color: var(--panel); }
 }
 /* reduced motion: no transitions, no press scale (motion.css layer 1 covers the rest) */
-html[data-motion="reduce"] :is(.glass-btn, .glass-item, .glass-pill, .glass-seg__item, .glass-dock, .glass-glow, .glass-seg__pill) { transition: none !important; }
-html[data-motion="reduce"] :is(.glass-btn, .glass-item, button.glass-pill, .glass-seg__item, .glass-dock):active { transform: none; }
-html[data-motion="reduce"] .glass-btn[aria-busy="true"]::after { animation: none !important; transform: translateX(60%); }
+body[data-motion="reduce"] :is(.glass-btn, .glass-item, .glass-pill, .glass-seg__item, .glass-dock, .glass-glow, .glass-seg__pill) { transition: none !important; }
+body[data-motion="reduce"] :is(.glass-btn, .glass-item, button.glass-pill, .glass-seg__item, .glass-dock):active { transform: none; }
+body[data-motion="reduce"] .glass-btn[aria-busy="true"]::after { animation: none !important; transform: translateX(60%); }
 
 /* the hidden SVG that carries the refraction filters */
 .bs-glass-defs { position: absolute; width: 0; height: 0; overflow: hidden; }

@@ -36,17 +36,8 @@
       '<feDisplacementMap in="SourceGraphic" in2="soft" scale="' + scale + '" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>' +
       "</filter>";
   }
-  function ensureDefs() {
-    if (document.getElementById("bs-glass-defs") || !document.body) return;
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.id = "bs-glass-defs";
-    svg.setAttribute("class", "bs-glass-defs");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("width", "0");
-    svg.setAttribute("height", "0");
-    svg.innerHTML = "<defs>" + filter("bs-lg-refract", 34) + filter("bs-lg-refract-sm", 14) + "</defs>";
-    document.body.insertBefore(svg, document.body.firstChild);
-  }
+  /* #bs-glass-defs is rendered by React in the root layout (app/glass-defs.tsx); the kit never inserts it */
+  function ensureDefs() { return !!document.getElementById("bs-glass-defs"); }
 
   var glows = new Set();
   function decorateOne(el) {

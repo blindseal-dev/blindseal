@@ -111,7 +111,8 @@
     var oy = getComputedStyle(m).overflowY;
     return (oy === "auto" || oy === "scroll") ? m : null;
   }
-  function covered() { return root.hasAttribute("data-covered"); }
+  /* the shell's route cover flags .bs-app[data-covered] (the static frame, shell.js); html[data-covered] still counts */
+  function covered() { return root.hasAttribute("data-covered") || !!document.querySelector(".bs-app[data-covered]"); }
   function whenUncovered() {
     if (!covered()) return Promise.resolve();
     return new Promise(function (r) { document.addEventListener("bs:uncover", function () { r(); }, { once: true }); });

@@ -41,25 +41,9 @@
   "use strict";
   var BS = (window.BS = window.BS || {});
 
-  var NAV = BS.SITE_NAV || [
-    { id: "how", label: "How it works" }, { id: "verify", label: "Verify" }, { id: "docs", label: "Docs" },
-    { id: "explorer", label: "Explorer" }, { id: "changelog", label: "Changelog" }
-  ];
+  var NAV = (BS.siteTemplates && BS.siteTemplates.NAV) || [];
   var DEFAULT_ROUTES = (BS.ROUTES && BS.ROUTES.site) || {
     home: "../S01/index.html", how: "../S02/index.html", verify: "../S03/index.html", docs: "../S04/index.html", explorer: "../S05/index.html", changelog: "../S06/index.html"
-  };
-  var FOOT = [
-    { id: "home", label: "Home" }, { id: "how", label: "How it works" }, { id: "verify", label: "Verify" },
-    { id: "docs", label: "Docs" }, { id: "explorer", label: "Explorer" }, { id: "changelog", label: "Changelog" }
-  ];
-  /* the wings: 16×16 concave corners (fill comes from site.css) */
-  /* each: the canvas fill (extended 1px over the tab's hairline) + the arc alone
-     as a 1px --line stroke, which joins the tab outline to the frame's line */
-  var WING = {
-    tr: '<svg class="notch__wing notch__wing--tr" viewBox="-1 0 17 16" aria-hidden="true"><path d="M-1 0H16A16 16 0 0 0 0 16H-1Z"/><path class="notch__arc" d="M16 0.5A15.5 15.5 0 0 0 -0.5 16"/></svg>',
-    tl: '<svg class="notch__wing notch__wing--tl" viewBox="0 0 17 16" aria-hidden="true"><path d="M17 0H0A16 16 0 0 1 16 16H17Z"/><path class="notch__arc" d="M0 0.5A15.5 15.5 0 0 1 16.5 16"/></svg>',
-    bl: '<svg class="notch__wing notch__wing--bl" viewBox="0 -1 16 17" aria-hidden="true"><path d="M0 -1H16V0A16 16 0 0 0 0 16Z"/><path class="notch__arc" d="M16 -0.5A16.5 16.5 0 0 0 0.5 16"/></svg>',
-    br: '<svg class="notch__wing notch__wing--br" viewBox="0 -1 16 17" aria-hidden="true"><path d="M16 -1H0V0A16 16 0 0 1 16 16Z"/><path class="notch__arc" d="M0 -0.5A16.5 16.5 0 0 1 15.5 16"/></svg>'
   };
 
   function M() { return BS.motion; }
@@ -72,45 +56,7 @@
 
   var refs = null, opts = null, current = null, spaces = [];
 
-  function itemHtml(n, ink) {
-    var inner = "<span>" + esc(n.label) + "</span>";
-    if (ink) return '<span class="notch__item" data-label="' + esc(n.label) + '" data-site-nav="' + n.id + '">' + inner + "</span>";
-    return '<a class="notch__item" href="' + esc(opts.routes[n.id] || "#") + '" data-label="' + esc(n.label) + '" data-site-nav="' + n.id + '">' + inner + "</a>";
-  }
-
-  function navHtml() {
-    var glass = opts.nav === "glass";
-    var a = opts.action || { label: "Open dashboard", href: (BS.ROUTES && BS.ROUTES.dashboard && BS.ROUTES.dashboard.decisions) || "../D01/index.html" };
-    var name = BS.BRAND || "Blindseal";
-    var tab = function (cls) { return '<div class="notch notch--' + cls + (glass ? " glass-bar" : "") + '">'; };
-    return '<div class="site-notch__row">' +
-      tab("logo") + (glass ? "" : WING.tr + WING.bl) +
-        '<a class="site-brand" href="' + esc(opts.routes.home) + '" data-site-home aria-label="' + esc(name) + ', home">' + mark(20) + "<span>" + esc(name) + "</span></a>" +
-      "</div>" +
-      tab("center") + (glass ? "" : WING.tl + WING.tr) +
-        '<nav class="notch__items" aria-label="Site"><span class="notch__pill" aria-hidden="true"></span>' +
-          NAV.map(function (n) { return itemHtml(n, false); }).join("") +
-          '<div class="notch__ink" aria-hidden="true">' + NAV.map(function (n) { return itemHtml(n, true); }).join("") + "</div>" +
-        "</nav>" +
-      "</div>" +
-      tab("actions") + (glass ? "" : WING.tl + WING.br) +
-        '<a class="glass-btn primary notch__cta" href="' + esc(a.href) + '" data-site-cta>' + esc(a.label) + "</a>" +
-      "</div>" +
-    "</div>";
-  }
-
-  function footerHtml() {
-    var one = (BS.COPY && BS.COPY.oneLiner) || "Protecting agentic finance one pwn at a time.";
-    var ver = (BS.VERSION && BS.VERSION.proxy) || "0.4.0";
-    return '<footer class="site-footer" aria-label="Site footer">' +
-      '<div class="site-footer__brand"><a class="site-brand" href="' + esc(opts.routes.home) + '">' + mark(20) + "<span>" + esc(BS.BRAND || "Blindseal") + "</span></a>" +
-        '<p class="site-footer__line">' + esc(one) + "</p></div>" +
-      '<nav class="site-footer__routes" aria-label="Footer">' + FOOT.map(function (f) {
-        return '<a href="' + esc(opts.routes[f.id] || "#") + '" data-site-foot="' + f.id + '"' + (f.id === opts.active ? ' aria-current="page"' : "") + ">" + esc(f.label) + "</a>";
-      }).join("") + "</nav>" +
-      '<p class="site-footer__ver">v' + esc(ver) + " · built for 127.0.0.1</p>" +
-    "</footer>";
-  }
+  /* templates: kit/site-templates.cjs (window.BS.siteTemplates) — rendered server-side, adopted here */
 
   /* ── the sliding white pill (the shell's mechanics: translate + scaleX on a
      fixed base width, the ink layer clipped to the same rect, 240ms
@@ -199,46 +145,25 @@
     [].forEach.call(document.querySelectorAll(".hero"), function (h) { h.classList.add("is-rising"); });
   }
 
-  function setNav(mode) {
-    opts.nav = mode === "glass" ? "glass" : "notch";
-    refs.notch.className = "site-notch" + (opts.nav === "glass" ? " site-notch--glass" : "");
-    document.documentElement.classList.toggle("bs-site-noframe", opts.nav === "glass");
-    refs.notch.innerHTML = navHtml();
-    refs.items = refs.notch.querySelector(".notch__items");
-    refs.pill = refs.notch.querySelector(".notch__pill");
-    refs.ink = refs.notch.querySelector(".notch__ink");
-    pillBase = 0; lastKey = "";
-    if ("ResizeObserver" in window) new ResizeObserver(function () { measure(); }).observe(refs.items);
-    setActive(current || opts.active);
-  }
+  /* notch is the only nav mode on the site (DECISIONS: nav stays notch); the glass variant lived in setNav */
+  function setNav() { if (console && console.warn) console.warn("BS.site.setNav: the site renders the notch chrome server-side; nav mode is fixed"); }
 
+  /* ADOPT-ONLY (DECISIONS 2026-10-23): the chrome — skip-link, frame, notch, footer — is rendered by React
+     on the server from kit/site-templates.cjs (the same strings this file used to build). mountSite finds
+     those nodes and wires them; it creates nothing and writes nothing on html, head or body children. */
   function mountSite(o) {
     if (refs) return BS.site;
     opts = Object.assign({ active: "home", navigate: true, footer: true, space: true, nav: "notch" }, o || {});
     opts.routes = Object.assign({}, DEFAULT_ROUTES, opts.routes || {});
-    var html = document.documentElement;
-    html.classList.add("bs-site");
-    html.classList.toggle("bs-site-noframe", opts.nav === "glass");
-    var main = document.getElementById("main-content") || document.querySelector("main");
-    if (!main) { main = document.createElement("main"); main.id = "main-content"; document.body.appendChild(main); }
-    main.classList.add("site-main");
-
-    var frame = document.createElement("div");
-    frame.className = "site-frame"; frame.setAttribute("aria-hidden", "true");
-    var notch = document.createElement("header");
-    notch.className = "site-notch" + (opts.nav === "glass" ? " site-notch--glass" : "");
-    notch.setAttribute("data-site-nav-root", "");
-    var skip = document.createElement("a");
-    skip.className = "skip-link"; skip.href = "#main-content"; skip.textContent = "Skip to content";
-    document.body.insertBefore(notch, document.body.firstChild);
-    document.body.insertBefore(frame, notch);
-    document.body.insertBefore(skip, frame);
+    var notch = document.querySelector("header.site-notch[data-site-nav-root]");
+    var frame = document.querySelector(".site-frame");
+    var main = document.getElementById("main-content");
+    if (!notch || !frame || !main) { if (console && console.warn) console.warn("BS.mountSite: chrome not found in the document (it must be server-rendered)"); return null; }
     refs = { notch: notch, frame: frame, main: main };
-    notch.innerHTML = navHtml();
     refs.items = notch.querySelector(".notch__items");
     refs.pill = notch.querySelector(".notch__pill");
     refs.ink = notch.querySelector(".notch__ink");
-    if (opts.footer) { main.insertAdjacentHTML("beforeend", footerHtml()); refs.footer = main.querySelector(".site-footer"); }
+    refs.footer = main.querySelector(".site-footer");
     setActive(opts.active);
     wire();
     if (opts.space) mountSpaces();
