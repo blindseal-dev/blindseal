@@ -64,3 +64,4 @@ crates/prover/attestation.json
 .history-msg-subs
 .history-drop-paths
 !.claude/settings.json
+.history-path-renames
