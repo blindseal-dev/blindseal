@@ -1,5 +1,5 @@
 {
-  "name": "@blindseal/verifier-wasm",
+  "name": "blindseal-verifier-wasm",
   "version": "0.5.0",
   "type": "module",
   "license": "MIT",

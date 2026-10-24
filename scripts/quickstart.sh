@@ -17,12 +17,12 @@ step "2/5 build the dashboard (served by the proxy with application/wasm + CSP)"
 pnpm -C packages/dashboard exec vite build
 
 step "3/5 verify the sample attestation off-chain (real Groth16, same wasm the verify page uses)"
-# runs inside packages/sdk, where @blindseal/verifier-wasm resolves; no output masking
+# runs inside packages/sdk, where blindseal-verifier-wasm resolves; no output masking
 cd "$ROOT/packages/sdk" && NODE_NO_WARNINGS=1 node --input-type=module -e '
   import { readFileSync } from "node:fs"; import { createRequire } from "node:module";
   const req = createRequire(import.meta.url);
-  const wasm = await import("@blindseal/verifier-wasm");
-  wasm.initSync({ module: readFileSync(req.resolve("@blindseal/verifier-wasm/bg.wasm")) });
+  const wasm = await import("blindseal-verifier-wasm");
+  wasm.initSync({ module: readFileSync(req.resolve("blindseal-verifier-wasm/bg.wasm")) });
   const att = readFileSync(process.env.BLINDSEAL_ROOT + "/fixtures/attestation-sample.json", "utf8");
   const r = JSON.parse(wasm.verify_attestation_json(att));
   console.log("sample attestation:", r.ok ? "VALID" : "INVALID " + r.reason);

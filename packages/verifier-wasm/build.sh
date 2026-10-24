@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate @blindseal/verifier-wasm from the Rust crate (crates/verifier-wasm).
+# Regenerate blindseal-verifier-wasm from the Rust crate (crates/verifier-wasm).
 # Location-relative (no hardcoded home — see DECISIONS run-localnet.sh lesson).
 # Requires: rustup wasm32-unknown-unknown target + wasm-bindgen-cli =0.2.129 (pinned to the crate).
 set -euo pipefail

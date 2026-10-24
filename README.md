@@ -36,7 +36,7 @@ BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
 Put the proxy in front of an MCP server:
 
 ```sh
-npx @blindseal/proxy init
+npx blindseal init
 blindseal -- <your-mcp-server-command>
 ```
 
@@ -75,9 +75,9 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 
 | Path | What |
 |---|---|
-| `packages/proxy` | the MCP proxy + CLI (`@blindseal/proxy`) |
-| `packages/sdk` | build the verify instruction, submit, verify off-chain (`@blindseal/sdk`) |
-| `packages/verifier-wasm` | the Groth16 verifier compiled to WebAssembly (`@blindseal/verifier-wasm`) |
+| `packages/proxy` | the MCP proxy + CLI (`blindseal`) |
+| `packages/sdk` | build the verify instruction, submit, verify off-chain (`blindseal-sdk`) |
+| `packages/verifier-wasm` | the Groth16 verifier compiled to WebAssembly (`blindseal-verifier-wasm`) |
 | `packages/redactor`, `packages/audit`, `packages/chain-reads` | redaction, audit chain + disclosures, mainnet reads |
 | `packages/dashboard` | the local dashboard the proxy serves |
 | `crates/` | detector core (Rust, DFA rules), SP1 guest, prover, verifier |

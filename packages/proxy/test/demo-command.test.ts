@@ -172,7 +172,7 @@ describe('blindseal demo — runDemo offline (no API key, no Ollama)', () => {
     const { runDemo } = await import('../src/cli/demo.js');
     const buf = makeBuffer();
     await runDemo({ out: buf, pauseMs: 0, noColor: true });
-    expect(buf.content).toContain('npx @blindseal/proxy --');
+    expect(buf.content).toContain('npx blindseal --');
     expect(buf.content).toContain('blindseal.io');
   });
 

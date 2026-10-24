@@ -46,7 +46,7 @@ text through the scan but blocked the action).
 
 ```bash
 python3.13 -m venv .venv && ./.venv/bin/pip install agentdojo
-pnpm --filter @blindseal/proxy build          # builds the `decide` binary
+pnpm --filter blindseal build          # builds the `decide` binary
 
 # cost-free: prove the guard blocks the real banking attack
 ./.venv/bin/python test_action_guard.py

@@ -7,15 +7,15 @@ public on npm, so a tester needs only these commands.
 
 ```bash
 # 1. Watch the detection layers run against canned attacks
-npx @blindseal/proxy@latest demo
+npx blindseal@latest demo
 #    optional: export ANTHROPIC_API_KEY=sk-ant-...   # enables the L3 LLM-judge layer
 
 # 2. Put Blindseal in front of any MCP server your agent uses — zero agent config change
-npx @blindseal/proxy@latest -- npx -y @modelcontextprotocol/server-filesystem /data
+npx blindseal@latest -- npx -y @modelcontextprotocol/server-filesystem /data
 
 # 3. (if you run a trading agent) try the trade guard
 BLINDSEAL_TRADE_GUARD=1 BLINDSEAL_TRADE_ALLOWLIST=0xYourWallet \
-  npx @blindseal/proxy@latest -- <your trading MCP server>
+  npx blindseal@latest -- <your trading MCP server>
 ```
 
 
@@ -45,7 +45,7 @@ Three specific things — naming them turns "cool" into usable signal:
 
 1. **False positives** on your real tool traffic — anything benign that got flagged.
 2. **README confusion** — anything unclear or that made you bounce.
-3. **Demo clarity** — does `npx @blindseal/proxy@latest demo` make sense in under a minute?
+3. **Demo clarity** — does `npx blindseal@latest demo` make sense in under a minute?
 
 ## Where to send it
 

@@ -205,7 +205,7 @@ system_program::transfer(/* source → recipient, amount */)?;`, 'rust'),
         p('Each step fails with its own error code. The five wrong-field cases all surface as `ActionHashMismatch`: the proof binds one hash over all of them, so the program cannot name which field diverged.'),
       ] },
       { id: 'client', heading: 'Client side', blocks: [
-        code(`import { buildVerifyIx, actionArgsFrom, submit } from '@blindseal/sdk';
+        code(`import { buildVerifyIx, actionArgsFrom, submit } from 'blindseal-sdk';
 
 // compose into your own transaction (gated program)…
 const ix = buildVerifyIx(attestation, actionArgsFrom(attestation), { payer: wallet.publicKey });

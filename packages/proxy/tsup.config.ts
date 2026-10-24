@@ -21,7 +21,7 @@ export default defineConfig({
   dts: false,
   sourcemap: false,
   minify: false,
-  noExternal: ['@blindseal/corpus', '@blindseal/redactor', '@blindseal/audit', '@blindseal/sdk', '@blindseal/chain-reads'],   // private workspace packages ship inside dist/; only real externals are dependencies
+  noExternal: ['@blindseal/corpus', '@blindseal/redactor', '@blindseal/audit', 'blindseal-sdk', '@blindseal/chain-reads'],   // private workspace packages ship inside dist/; only real externals are dependencies
   async onSuccess() {
     const { chmodSync } = await import('node:fs');
     // Copy corpus binary data into dist/ so the bundled loadCorpus() can find

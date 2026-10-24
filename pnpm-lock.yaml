@@ -8,9 +8,6 @@ importers:
 
   .:
     devDependencies:
-      '@blindseal/sdk':
-        specifier: workspace:*
-        version: link:packages/sdk
       '@coral-xyz/anchor':
         specifier: 0.31.1
         version: 0.31.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -35,6 +32,9 @@ importers:
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
+      blindseal-sdk:
+        specifier: workspace:*
+        version: link:packages/sdk
       chai:
         specifier: 4.5.0
         version: 4.5.0
@@ -65,15 +65,15 @@ importers:
       '@blindseal/chain-reads':
         specifier: workspace:*
         version: link:../../packages/chain-reads
-      '@blindseal/verifier-wasm':
-        specifier: workspace:*
-        version: link:../../packages/verifier-wasm
       '@noble/ed25519':
         specifier: 2.1.0
         version: 2.1.0
       '@solana/web3.js':
         specifier: 1.98.0
         version: 1.98.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      blindseal-verifier-wasm:
+        specifier: workspace:*
+        version: link:../../packages/verifier-wasm
       next:
         specifier: 14.2.15
         version: 14.2.15(@playwright/test@1.48.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -160,15 +160,15 @@ importers:
 
   packages/dashboard:
     dependencies:
-      '@blindseal/verifier-wasm':
-        specifier: workspace:*
-        version: link:../verifier-wasm
       '@noble/ed25519':
         specifier: 2.1.0
         version: 2.1.0
       '@tanstack/react-query':
         specifier: 5.59.20
         version: 5.59.20(react@18.3.1)
+      blindseal-verifier-wasm:
+        specifier: workspace:*
+        version: link:../verifier-wasm
       react:
         specifier: 18.3.1
         version: 18.3.1
@@ -212,18 +212,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.32.0
         version: 0.32.1
-      '@blindseal/audit':
-        specifier: workspace:*
-        version: link:../audit
-      '@blindseal/chain-reads':
-        specifier: workspace:*
-        version: link:../chain-reads
-      '@blindseal/redactor':
-        specifier: workspace:*
-        version: link:../redactor
-      '@blindseal/sdk':
-        specifier: workspace:*
-        version: link:../sdk
+      '@noble/ciphers':
+        specifier: ^1.2.1
+        version: 1.3.0
       '@solana/web3.js':
         specifier: 1.98.0
         version: 1.98.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -233,16 +224,31 @@ importers:
       better-sqlite3:
         specifier: ^12.10.0
         version: 12.10.0
+      blindseal-verifier-wasm:
+        specifier: workspace:*
+        version: link:../verifier-wasm
     devDependencies:
+      '@blindseal/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@blindseal/chain-reads':
+        specifier: workspace:*
+        version: link:../chain-reads
       '@blindseal/corpus':
         specifier: workspace:*
         version: link:../corpus
+      '@blindseal/redactor':
+        specifier: workspace:*
+        version: link:../redactor
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
       '@types/node':
         specifier: ^22.10.0
         version: 22.19.19
+      blindseal-sdk:
+        specifier: workspace:*
+        version: link:../sdk
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(jiti@1.21.7)(postcss@8.5.15)(tsx@4.22.3)(typescript@5.9.3)(yaml@2.9.1)
@@ -276,12 +282,12 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@blindseal/verifier-wasm':
-        specifier: workspace:*
-        version: link:../verifier-wasm
       '@solana/web3.js':
         specifier: 1.98.0
         version: 1.98.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      blindseal-verifier-wasm:
+        specifier: workspace:*
+        version: link:../verifier-wasm
     devDependencies:
       '@types/node':
         specifier: 22.9.0

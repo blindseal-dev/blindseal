@@ -1,9 +1,9 @@
 // Verifier boundary — the REAL checks behind the S03 checklist. Step 2 runs the SP1 v5 Groth16
-// check in-browser via @blindseal/verifier-wasm (wasm-bindgen build of crates/verifier-wasm) — the
+// check in-browser via blindseal-verifier-wasm (wasm-bindgen build of crates/verifier-wasm) — the
 // same check the on-chain program does via sp1-solana. Steps 1 and 3 are plain TS (schema, and the
 // public-input blob decoded into its six fields and cross-checked against the file). The .wasm is
 // served from the site's own origin (public/blindseal_verifier_bg.wasm) — nothing is uploaded.
-import init, { verify_attestation_json } from '@blindseal/verifier-wasm';
+import init, { verify_attestation_json } from 'blindseal-verifier-wasm';
 import { isDisclosure, verifyDisclosure, isCleanWindow, type Disclosure } from './disclosure';
 
 export type AttestationDoc = {

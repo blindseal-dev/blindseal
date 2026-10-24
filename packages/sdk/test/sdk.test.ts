@@ -35,7 +35,7 @@ const attestation = (over: Partial<Attestation> = {}): Attestation => ({
   ...over,
 });
 
-describe('@blindseal/sdk hashing parity (detector-core / guest / on-chain)', () => {
+describe('blindseal-sdk hashing parity (detector-core / guest / on-chain)', () => {
   it('actionHash matches the zkVM for the localnet test action', () => {
     const a = actionArgsFrom(attestation());
     const h = computeActionHash(a, hex(DRY_RUN.payloadHash), hex(DRY_RUN.policyRoot), hex(DRY_RUN.detectorVersion), DRY_RUN.expirySlot);

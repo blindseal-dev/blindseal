@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
-import { MAINNET_GENESIS_HASH, DEFAULT_RPC_URL, buildGatedTransferIx, isConsumed, actionArgsFrom, hex, type Attestation } from '@blindseal/sdk';
+import { MAINNET_GENESIS_HASH, DEFAULT_RPC_URL, buildGatedTransferIx, isConsumed, actionArgsFrom, hex, type Attestation } from 'blindseal-sdk';
 
 const RPC = process.env.BLINDSEAL_RPC_URL ?? DEFAULT_RPC_URL;
 const AUTH = process.env.BLINDSEAL_MAINNET_AUTHORITY ?? path.join(os.homedir(), '.blindseal', 'mainnet-authority.json');

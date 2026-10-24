@@ -31,16 +31,16 @@ function readVersion(): string {
 const HELP = `blindseal — scans MCP tool responses for prompt injection
 
 Usage
-  npx @blindseal/proxy demo                                         # interactive demo (30s first-run experience)
+  npx blindseal demo                                         # interactive demo (30s first-run experience)
   BLINDSEAL_MOCK=1 blindseal run --mock                                 # local API + WS over fixtures (FRONTEND.md §5)
-  npx @blindseal/proxy -- <command> [args...]                      # stdio (wrap a local MCP server)
-  npx @blindseal/proxy --transport http --upstream <url> [--port]  # http (proxy a remote MCP server)
-  npx @blindseal/proxy history [flags]                              # show local scan history (requires BLINDSEAL_PERSIST=1)
-  npx @blindseal/proxy dashboard [flags]                            # localhost dashboard for scan history
+  npx blindseal -- <command> [args...]                      # stdio (wrap a local MCP server)
+  npx blindseal --transport http --upstream <url> [--port]  # http (proxy a remote MCP server)
+  npx blindseal history [flags]                              # show local scan history (requires BLINDSEAL_PERSIST=1)
+  npx blindseal dashboard [flags]                            # localhost dashboard for scan history
 
 Examples
-  npx @blindseal/proxy -- npx -y @modelcontextprotocol/server-filesystem /tmp
-  npx @blindseal/proxy --transport http --upstream https://mcp.example.com/v1 --port 8800
+  npx blindseal -- npx -y @modelcontextprotocol/server-filesystem /tmp
+  npx blindseal --transport http --upstream https://mcp.example.com/v1 --port 8800
 
 Flags
   --transport <stdio|http|scan-http>  default: stdio
@@ -111,7 +111,7 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   if (argv.length === 0) return { transport: 'stdio', showHelp: true, noArgs: true };
   if (argv.includes('--version') || argv.includes('-v')) {
-    process.stdout.write(`@blindseal/proxy ${readVersion()}\n`);
+    process.stdout.write(`blindseal ${readVersion()}\n`);
     process.exit(0);
   }
   if (argv.includes('--help') || argv.includes('-h')) {

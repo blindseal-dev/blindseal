@@ -2,7 +2,7 @@
 // built programs — initialize → decodeConfig → set_config(paused) → register_policy_root.
 // Exercises Anchor wire encoding, PDA seeds and the authority checks without a Groth16 proof.
 import { Connection, Keypair, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
-import { buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, decodeConfig, configPda, policyRootPda, PROGRAM_ID, TRANSFER_GATE_ID, hex } from '@blindseal/sdk';
+import { buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, decodeConfig, configPda, policyRootPda, PROGRAM_ID, TRANSFER_GATE_ID, hex } from 'blindseal-sdk';
 const conn = new Connection('http://127.0.0.1:8899', 'confirmed');
 const auth = Keypair.generate();
 const vkey = hex('0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e');

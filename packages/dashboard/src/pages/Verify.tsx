@@ -5,7 +5,7 @@ import { Icon } from '../kit/react';
 import { verifyAttestation, tamper, type VerifyResult } from '../verify/verifier';
 
 // The verify page stores nothing: the pasted JSON and the result live in component state only.
-// Verification runs the real Groth16 check in-browser via @blindseal/verifier-wasm.
+// Verification runs the real Groth16 check in-browser via blindseal-verifier-wasm.
 export function Verify() {
   const [text, setText] = useState('');
   const [result, setResult] = useState<VerifyResult | null>(null);

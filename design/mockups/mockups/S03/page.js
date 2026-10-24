@@ -52,7 +52,7 @@
   /* ── the steps ───────────────────────────────────────────────────────── */
   var STEPS = [
     { n: 1, title: "Schema valid",                  idle: "Version 1, groth16 on bn254, every required field present." },
-    { n: 2, title: "Proof verifies",                idle: "In this tab, via @blindseal/verifier-wasm (mock until it ships)." },
+    { n: 2, title: "Proof verifies",                idle: "In this tab, via blindseal-verifier-wasm (mock until it ships)." },
     { n: 3, title: "Public inputs decoded",         idle: "Action hash, policy root, detector version, expiry slot, nullifier." },
     { n: 4, title: "Nullifier status on chain",     idle: "Optional · reads devnet · the only step that touches the network." }
   ];

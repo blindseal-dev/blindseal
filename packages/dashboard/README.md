@@ -30,4 +30,4 @@ BLINDSEAL_MOCK=1 pnpm -C packages/proxy dev run --mock --port 4831
   public inputs in guest-commit order, `sourceAuthority` on actions.
 
 The off-chain verifier the verify page needs is `crates/verifier-wasm` (confirmed to compile to
-`wasm32`; wasm-bindgen packaging as `@blindseal/verifier-wasm` is the remaining backend hand-off).
+`wasm32`; wasm-bindgen packaging as `blindseal-verifier-wasm` is the remaining backend hand-off).

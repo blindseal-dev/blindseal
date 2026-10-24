@@ -1,5 +1,5 @@
 /// blindseal init — detect MCP configs on this machine and wrap every server's command
-/// with `npx @blindseal/proxy --`, so the proxy intercepts tool responses before they
+/// with `npx blindseal --`, so the proxy intercepts tool responses before they
 /// reach the agent. Idempotent. Backs up each config to <config>.blindseal-backup before
 /// writing.
 ///
@@ -129,9 +129,9 @@ export function defaultConfigPaths(): string[] {
 
 // ---- Wrap logic ----------------------------------------------------------
 
-const BLINDSEAL_PACKAGE = '@blindseal/proxy';
+const BLINDSEAL_PACKAGE = 'blindseal';
 
-/// True if the entry is already wrapped by blindseal (either npx @blindseal/proxy or a global mcp-proxy binary).
+/// True if the entry is already wrapped by blindseal (either npx blindseal or a global mcp-proxy binary).
 export function isAlreadyWrapped(entry: McpServerEntry): boolean {
   const cmd = entry.command?.toLowerCase() ?? '';
   const args = entry.args ?? [];

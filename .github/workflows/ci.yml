@@ -40,7 +40,7 @@ jobs:
 
       - name: build — proxy + collector
         run: |
-          pnpm --filter @blindseal/proxy build
+          pnpm --filter blindseal build
           pnpm --filter @blindseal/collector build
 
       - name: bundle size check

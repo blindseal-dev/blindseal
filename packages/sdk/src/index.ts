@@ -58,10 +58,10 @@ export interface VerifyResult { ok: boolean; reason: string | null; }
 
 /** Off-chain Groth16 verify via the same wasm the verify pages use. */
 export async function verifyOffchain(att: Attestation): Promise<VerifyResult> {
-  const wasm = await import('@blindseal/verifier-wasm');
+  const wasm = await import('blindseal-verifier-wasm');
   const { readFileSync } = await import('node:fs');
   const req = createRequire(import.meta.url);
-  const bytes = readFileSync(req.resolve('@blindseal/verifier-wasm/bg.wasm'));
+  const bytes = readFileSync(req.resolve('blindseal-verifier-wasm/bg.wasm'));
   wasm.initSync({ module: bytes });
   return JSON.parse(wasm.verify_attestation_json(JSON.stringify(att))) as VerifyResult;
 }

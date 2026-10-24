@@ -1,5 +1,5 @@
 {
-  "name": "@blindseal/sdk",
+  "name": "blindseal-sdk",
   "version": "0.5.0",
   "type": "module",
   "license": "MIT",
@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@solana/web3.js": "1.98.0",
-    "@blindseal/verifier-wasm": "workspace:*"
+    "blindseal-verifier-wasm": "workspace:*"
   },
   "devDependencies": {
     "typescript": "5.6.3",

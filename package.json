@@ -26,7 +26,7 @@
     "@types/chai": "4.3.20",
     "@types/node": "22.9.0",
     "@types/bn.js": "5.1.6",
-    "@blindseal/sdk": "workspace:*",
+    "blindseal-sdk": "workspace:*",
     "tsx": "4.19.2",
     "pixelmatch": "6.0.0",
     "pngjs": "7.0.0",

@@ -1227,7 +1227,7 @@
   var DOC_PAGES = [
     { slug: "install", group: "Getting started", title: "Install", summary: "Install the proxy and open the local dashboard.", sections: [
       S("Requirements", "Node 20 or later on macOS or Linux. The proxy listens on 127.0.0.1 only."),
-      S("Install", "One command creates ~/.blindseal with a default policy and a dashboard token.", "npx @blindseal/proxy init"),
+      S("Install", "One command creates ~/.blindseal with a default policy and a dashboard token.", "npx blindseal init"),
       S("First run", "Start the proxy. It prints the dashboard address with the token in the URL fragment; the token never leaves your machine.", "blindseal run")] },
     { slug: "point-an-agent", group: "Getting started", title: "Point an agent at the proxy", summary: "Route an agent's tool calls through Blindseal instead of straight to its MCP servers.", sections: [
       S("Where it sits", "The proxy sits between the agent and its tools. Every tool call is screened by four layers before it executes, and every result is screened before the agent reads it."),

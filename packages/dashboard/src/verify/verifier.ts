@@ -1,8 +1,8 @@
-// Verifier boundary. Runs the REAL SP1 v5 Groth16 check in-browser via @blindseal/verifier-wasm
+// Verifier boundary. Runs the REAL SP1 v5 Groth16 check in-browser via blindseal-verifier-wasm
 // (wasm-bindgen build of crates/verifier-wasm) — the same check the on-chain program does via
 // sp1-solana (M2). Nothing else imports the verifier. The TS schema check below stays so malformed
 // input still produces the step list; the wasm does the cryptographic proof step.
-import init, { verify_attestation_json } from '@blindseal/verifier-wasm';
+import init, { verify_attestation_json } from 'blindseal-verifier-wasm';
 import { isDisclosure, verifyDisclosure, isCleanWindow, type Disclosure } from './disclosure';
 
 export interface VerifyStep { id: string; label: string; ok: boolean | null; detail: string; }

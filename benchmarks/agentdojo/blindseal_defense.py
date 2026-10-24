@@ -63,7 +63,7 @@ class BlindsealActionGuard(BasePipelineElement):
         if not self.decide_js.exists():
             raise FileNotFoundError(
                 f"blindseal decide binary not found at {self.decide_js}. Build it: "
-                f"pnpm --filter @blindseal/proxy build"
+                f"pnpm --filter blindseal build"
             )
 
     def _decide(self, prior_outputs: list[dict], tool_calls: list, allowlist: list[str]) -> list[dict]:

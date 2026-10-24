@@ -3,8 +3,8 @@
 /// see all four detection layers firing without connecting a real MCP server.
 ///
 /// Usage:
-///   npx @blindseal/proxy demo
-///   ANTHROPIC_API_KEY=... npx @blindseal/proxy demo   # enables L3
+///   npx blindseal demo
+///   ANTHROPIC_API_KEY=... npx blindseal demo   # enables L3
 
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
@@ -380,7 +380,7 @@ export async function runDemo(opts?: DemoOptions): Promise<void> {
 
   write(
     `\n  ${col.bold('Wrap your MCP server:')}\n` +
-      `  ${col.cyan('npx @blindseal/proxy -- <your server command>')}\n` +
+      `  ${col.cyan('npx blindseal -- <your server command>')}\n` +
       `\n  ${col.dim('blindseal.io')}\n\n`,
   );
 }

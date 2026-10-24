@@ -97,7 +97,7 @@
       <h1 class="hero__title">Prove an agent's action was screened <br><em>without showing what it was</em>.</h1>
       <p class="hero__sub">Blindseal is a privacy-preserving, verifiable screening layer for AI agents.<br>Nothing sensitive leaves the machine.</p>
       <div class="hero__actions">
-        <div class="install"><span class="install__tile" aria-hidden="true">$</span><code class="install__cmd">npx @blindseal/proxy init</code><button type="button" class="copy" data-copy="npx @blindseal/proxy init" aria-label="Copy the install command"><i data-lucide="copy"></i></button></div>
+        <div class="install"><span class="install__tile" aria-hidden="true">$</span><code class="install__cmd">npx blindseal init</code><button type="button" class="copy" data-copy="npx blindseal init" aria-label="Copy the install command"><i data-lucide="copy"></i></button></div>
         <a class="hero__secondary" href="../S02/" data-sink-link>Read how it works<i data-lucide="arrow-right"></i></a>
       </div>
       <ul class="hero__trust">
@@ -244,7 +244,7 @@
   $("#kss-status").innerHTML = ui.status("consumed");
   $("#kss-hash").innerHTML = '<span class="sub">policy root</span> ' + ui.hash(hex(64), { label: "Policy root", lg: true });
   $("#kss-honest").textContent = BS.COPY.honestScope;
-  $("#kss-code").innerHTML = ui.code("$ npx @blindseal/proxy init\n$ blindseal run -- npx @modelcontextprotocol/server-github", { lang: "sh" });
+  $("#kss-code").innerHTML = ui.code("$ npx blindseal init\n$ blindseal run -- npx @modelcontextprotocol/server-github", { lang: "sh" });
 
   /* the marks */
   var m = BS.icons.mark;

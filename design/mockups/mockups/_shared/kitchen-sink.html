@@ -638,7 +638,7 @@
 
   /* ── 10 · code + callout ──────────────────────────────────────────────── */
   $("#ks-code-blocks").innerHTML =
-    ui.code("$ npx @blindseal/proxy init", { lang: "sh" }) +
+    ui.code("$ npx blindseal init", { lang: "sh" }) +
     ui.code('# point an agent at the proxy (claude_desktop_config.json)\n{ "command": "blindseal", "args": ["run", "--", "npx", "@modelcontextprotocol/server-github"] }', { lang: "json" }) +
     ui.code("$ BLINDSEAL_MOCK=1 blindseal run\n# serving fixtures on 127.0.0.1:7777 · one decision every 3s", { lang: "sh" });
   $("#ks-honest").textContent = BS.COPY.honestScope;
@@ -646,7 +646,7 @@
   /* ── 11 · checklist + kv ──────────────────────────────────────────────── */
   var CHECKS = [
     { n: 1, title: "Schema valid", detail: "version 1 · groth16 · bn254 · required fields present" },
-    { n: 2, title: "Proof verifies", detail: "in the browser, @blindseal/verifier-wasm (mock)" },
+    { n: 2, title: "Proof verifies", detail: "in the browser, blindseal-verifier-wasm (mock)" },
     { n: 3, title: "Public inputs decoded", detail: "action hash, policy root, detector version, expiry slot, nullifier" },
     { n: 4, title: "Nullifier status on chain", detail: "optional · devnet" }
   ];

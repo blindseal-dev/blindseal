@@ -11,7 +11,7 @@ import { ComputeBudgetProgram, Connection, Keypair, Transaction } from '@solana/
 import {
   MAINNET_GENESIS_HASH, DEFAULT_RPC_URL, PROGRAM_ID, configPda, policyRootPda, decodeConfig,
   buildInitializeIx, buildRegisterPolicyRootIx, hex,
-} from '@blindseal/sdk';
+} from 'blindseal-sdk';
 
 const RPC = process.env.BLINDSEAL_RPC_URL ?? DEFAULT_RPC_URL;
 const AUTH = process.env.BLINDSEAL_MAINNET_AUTHORITY ?? path.join(os.homedir(), '.blindseal', 'mainnet-authority.json');

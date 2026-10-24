@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Connection, Keypair } from '@solana/web3.js';
-import { DEFAULT_RPC_URL, isConsumed, submit, verifyOffchain, WrongClusterError, type Attestation } from '@blindseal/sdk';
+import { DEFAULT_RPC_URL, isConsumed, submit, verifyOffchain, WrongClusterError, type Attestation } from 'blindseal-sdk';
 
 const HELP = `blindseal submit — verify an attestation on Solana mainnet and consume its nullifier
 

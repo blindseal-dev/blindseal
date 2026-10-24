@@ -27,7 +27,7 @@ export function DashboardLauncher({ url }: { url: string }) {
       <div className="site-panel dash-launch__steps">
         <p className="site-panel__n">Three commands</p>
         <ol className="dash-launch__list">
-          <li><span>Install</span><pre className="code"><code>npx @blindseal/proxy init</code></pre></li>
+          <li><span>Install</span><pre className="code"><code>npx blindseal init</code></pre></li>
           <li><span>Run it in front of an MCP server (or in mock mode to look around)</span><pre className="code"><code>{'blindseal -- <your-mcp-server>\nBLINDSEAL_MOCK=1 blindseal run --mock'}</code></pre></li>
           <li><span>Open the URL it prints — the token travels in the fragment and is never stored</span><pre className="code"><code>{url}/#token=…</code></pre></li>
         </ol>

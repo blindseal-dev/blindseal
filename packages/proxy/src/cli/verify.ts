@@ -3,7 +3,7 @@
 /// disclosure.json (ed25519 signature + in-window hash-chain consistency). Exit 0 iff valid.
 import { readFileSync } from 'node:fs';
 import { verifyDisclosure, isCleanWindow, type Disclosure } from '@blindseal/audit';
-import { verifyOffchain, type Attestation } from '@blindseal/sdk';
+import { verifyOffchain, type Attestation } from 'blindseal-sdk';
 
 const HELP = `blindseal verify — verify an attestation.json or a disclosure.json offline
 

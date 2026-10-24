@@ -9,7 +9,7 @@
  *  - Synthesizes 8 plausible benign tool responses (weather, file listing, HTTP status,
  *    commit notes, etc. — not drawn from any dataset).
  *  - Writes each as a real file in /tmp/blindseal-seed-target/.
- *  - Spawns the published proxy from npm (`@blindseal/proxy@next`) wrapping
+ *  - Spawns the published proxy from npm (`blindseal@next`) wrapping
  *    @modelcontextprotocol/server-filesystem against that directory.
  *  - Drives 20 real tools/call `read_file` requests through the proxy with random
  *    10–30s spacing (total ~5–10 min). The proxy genuinely scans each response,
@@ -59,7 +59,7 @@ const BENIGN_PAYLOADS = [
   { id: 'benign-http-status', text: 'HTTP 200 OK. Content-Type: application/json. Content-Length: 4892. Response body: { "ok": true, "items": [...] }' },
   { id: 'benign-commit-log', text: 'commit 7045d7a — chore: bump version to 0.2.0-rc.1 for release. Author: blindseal. Date: 2026-05-21 23:21 PT.' },
   { id: 'benign-db-result', text: 'Query returned 14 rows in 82 ms. Columns: user_id (int), email (text), created_at (timestamp). First row: 1, alice@example.com, 2026-05-01T10:00:00Z.' },
-  { id: 'benign-pkg-info', text: 'Package @blindseal/proxy@0.2.0-rc.1: MCP prompt-injection scanning proxy. License MIT. 12 files. Unpacked size 511.6 kB.' },
+  { id: 'benign-pkg-info', text: 'Package blindseal@0.2.0-rc.1: MCP prompt-injection scanning proxy. License MIT. 12 files. Unpacked size 511.6 kB.' },
   { id: 'benign-cal-event', text: 'Upcoming events on your calendar: 11:00 — standup (zoom), 14:00 — design review, 17:30 — gym. No conflicts detected.' },
   { id: 'benign-readme', text: 'README updated to reflect 0.2.0-rc.1 release. New sections: Ollama operation, on-chain reputation inspector, local scan history (opt-in). Tests passing 415/415.' },
 ];
@@ -117,10 +117,10 @@ async function main() {
 
   setupSeedDir(all);
 
-  console.log('[seed] spawning proxy (npx @blindseal/proxy@next wrapping server-filesystem)...');
+  console.log('[seed] spawning proxy (npx blindseal@next wrapping server-filesystem)...');
   const proxy = spawn(
     'npx',
-    ['--yes', '@blindseal/proxy@next', '--', 'npx', '-y', '@modelcontextprotocol/server-filesystem', SEED_DIR],
+    ['--yes', 'blindseal@next', '--', 'npx', '-y', '@modelcontextprotocol/server-filesystem', SEED_DIR],
     {
       stdio: ['pipe', 'pipe', 'inherit'],
       env: {

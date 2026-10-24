@@ -259,7 +259,7 @@ sprint. They are no longer bypasses today.
 
 ```sh
 pnpm install
-pnpm --filter @blindseal/proxy build
+pnpm --filter blindseal build
 pnpm --filter @blindseal/eval exec tsx red-team/run-bypasses.ts
 pnpm --filter @blindseal/eval exec tsx src/run.ts --set both --no-l3
 # (set ANTHROPIC_API_KEY in env to include L3)

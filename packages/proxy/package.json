@@ -1,5 +1,5 @@
 {
-  "name": "@blindseal/proxy",
+  "name": "blindseal",
   "version": "0.5.0",
   "description": "Blindseal \u2014 a local MCP proxy that screens every tool call (four detection layers), redacts before the model-based layers, keeps a hash-chained audit log, and produces zero-knowledge attestations verifiable on Solana.",
   "license": "MIT",
@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
-    "@blindseal/verifier-wasm": "workspace:*",
+    "blindseal-verifier-wasm": "workspace:*",
     "@noble/ciphers": "^1.2.1",
     "@solana/web3.js": "1.98.0",
     "@xenova/transformers": "^2.17.2",
@@ -49,7 +49,7 @@
     "vitest": "^2.1.0",
     "@blindseal/redactor": "workspace:*",
     "@blindseal/audit": "workspace:*",
-    "@blindseal/sdk": "workspace:*",
+    "blindseal-sdk": "workspace:*",
     "@blindseal/chain-reads": "workspace:*"
   },
   "keywords": [

@@ -25,7 +25,7 @@ const TAMPERED = tamper(JSON.stringify(sample));
 type Step = { n: number; title: string; idle: string };
 const STEPS: Step[] = [
   { n: 1, title: 'Schema valid', idle: 'Version 1, groth16 on bn254, every required field present.' },
-  { n: 2, title: 'Proof verifies', idle: 'In this tab, via @blindseal/verifier-wasm (the real groth16 check).' },
+  { n: 2, title: 'Proof verifies', idle: 'In this tab, via blindseal-verifier-wasm (the real groth16 check).' },
   { n: 3, title: 'Public inputs decoded', idle: 'Payload hash, policy root, detector version, action hash, nullifier, expiry slot.' },
   { n: 4, title: 'Nullifier status on chain', idle: 'Optional · reads mainnet through this site · the only step that touches the network.' },
 ];

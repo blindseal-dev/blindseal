@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { CopyButton } from './copy';
 
-const INSTALL = 'npx @blindseal/proxy init';
+const INSTALL = 'npx blindseal init';
 
 export default function Home() {
   return (

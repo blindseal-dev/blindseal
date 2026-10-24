@@ -46,7 +46,7 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 - M0.5: on-chain VERIFIED on localnet + tampered rejected; **227,375 CU**, tx 584 B (`m05-localnet-metrics.json`).
 
 ## First thing tomorrow
-1. ~~Wire the real verifier~~ **DONE 2026-10-23**: `@blindseal/verifier-wasm` (wasm-bindgen) runs the
+1. ~~Wire the real verifier~~ **DONE 2026-10-23**: `blindseal-verifier-wasm` (wasm-bindgen) runs the
    real Groth16 check in both verify pages; mock verifier removed. (The earlier "compile-to-wasm proven"
    was wrong — the 295 B module was empty; the real module is 406 KB and both links and runs.) Also:
    `splitPublicInputs` decodes the real len-1 commitment into the six display fields (unit-tested);
@@ -67,7 +67,7 @@ FE port architecture (hand-port TSX, kit CSS verbatim, drop Tailwind); page-1 di
 |---|---|
 | Mainnet-only chain model (chainId 1; 2 reserved; devnet removed everywhere) | `104dda7` |
 | Prover CLI (binds real action fields; writes action/nonce/chainId/decisionId) | `104dda7` |
-| `@blindseal/sdk`: buildVerifyIx / buildGatedTransferIx / submit (genesis guard) / verifyOffchain / admin ix | `104dda7`, later |
+| `blindseal-sdk`: buildVerifyIx / buildGatedTransferIx / submit (genesis guard) / verifyOffchain / admin ix | `104dda7`, later |
 | `blindseal attest` (screen → audit → prove), `submit`, `verify`, `audit verify|disclose` | `104dda7`, M3 commit |
 | `blindseal-verify` + `transfer-gate` Anchor programs, built to SBF (`scripts/build-programs.sh`) | `41a0ab4` |
 | `tests/m2.spec.ts` — every §3.7 case incl. paused + atomicity — **15/15 green on localnet** | `441b3f6` |

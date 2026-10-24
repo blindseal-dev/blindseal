@@ -1,4 +1,4 @@
-# @blindseal/verifier-wasm
+# blindseal-verifier-wasm
 
 The off-chain Groth16 attestation verifier (`crates/verifier-wasm`) compiled to WebAssembly and
 wrapped with `wasm-bindgen` for the two verify pages (dashboard + site). It runs the **real**
@@ -7,7 +7,7 @@ detectorVersion, GROTH16_VK)` — the same check the on-chain program does via `
 
 ## API
 ```js
-import init, { verify_attestation_json } from '@blindseal/verifier-wasm';
+import init, { verify_attestation_json } from 'blindseal-verifier-wasm';
 await init(/* Vite: pass the ?url asset; Next: pass '/…/blindseal_verifier_bg.wasm' */);
 const { ok, reason } = JSON.parse(verify_attestation_json(attestationJsonString));
 ```

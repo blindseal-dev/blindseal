@@ -2,7 +2,7 @@
 // over the corpus, every eval dataset, and hand-crafted adversarial vectors, and writes the
 // raw verdicts + pattern sets to evals/vectors/parity.json. The Rust detector-core parity
 // test asserts byte-for-byte agreement against this file. CI regenerates and diffs it to
-// catch TS drift. Run:  pnpm --filter @blindseal/proxy exec tsx ../../evals/parity/dump-vectors.ts
+// catch TS drift. Run:  pnpm --filter blindseal exec tsx ../../evals/parity/dump-vectors.ts
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
