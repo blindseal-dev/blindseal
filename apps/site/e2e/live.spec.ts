@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { INIT, DIFF, chromeViolations } from './mismatch-lib';
+import { INIT, DIFF, chromeViolations, outsideLauncher } from './mismatch-lib';
 // Acceptance on the DEPLOYED site (playwright.live.config.ts): the kit must be mounted after
 // hydration. Measured, not eyeballed:
 //   1. after scrolling to the bottom, .reveal elements at opacity 0 → must be 0
 //   2. the notch nav: computed position fixed, backdrop-filter set
 //   3. the hero has a canvas with a live WebGL2 context (the CRT), or an explicit nebula fallback
 //   4. zero console errors across the routes
-const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog'];
+const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog', '/dashboard'];
 
 test('live: reveals, notch, CRT hero, console', async ({ page }) => {
   const errors: string[] = [];
@@ -34,10 +34,9 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
   expect(notch.pill, 'notch pill').toBe(true);
   expect(notch.items).toBeGreaterThanOrEqual(5);
 
-  // "Open dashboard" → the local dashboard, new tab
+  // "Open dashboard" → the /dashboard launcher (the local 127.0.0.1 link lives there, opened in a new tab)
   const cta = page.locator('[data-site-cta]').first();
-  await expect(cta).toHaveAttribute('href', 'http://127.0.0.1:7777');
-  await expect(cta).toHaveAttribute('target', '_blank');
+  await expect(cta).toHaveAttribute('href', '/dashboard');
 
   // 3) the hero: CRT canvas with WebGL2 (or the nebula fallback declared on the host)
   const hero = await page.locator('.hero__space').first().evaluate((host) => {
@@ -104,7 +103,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) fo
       await page.waitForTimeout(5000);
       const res = await page.evaluate(`(${DIFF})(${JSON.stringify(kit)})`) as { errs: string[]; diff: { at?: string; kind?: string }[] };
       expect(res.errs, `${r} __errs`).toEqual([]);
-      if (!kit) expect(res.diff, `${r} pre/post DOM diff`).toEqual([]);
+      if (!kit) expect(r === '/dashboard' ? outsideLauncher(res.diff) : res.diff, `${r} pre/post DOM diff`).toEqual([]);
       else {
         expect(chromeViolations(res.diff), `${r} html/head/body-children changes by the kit`).toEqual([]);
         expect(await page.evaluate(() => document.body.hasAttribute('data-kit-mounted')), `${r} kit mounted`).toBe(true);

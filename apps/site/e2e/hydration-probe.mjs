@@ -2,7 +2,7 @@
 // listeners attached BEFORE goto, waitUntil:'load'; prints the first .reveal.is-inview time (must be < 500 ms).
 import { chromium } from 'playwright';
 const [base = 'http://127.0.0.1:3000', ...only] = process.argv.slice(2);
-const ROUTES = only.length ? only : ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog'];
+const ROUTES = only.length ? only : ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog', '/dashboard'];
 const b = await chromium.launch(); let bad = 0;
 for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) for (const r of ROUTES) {
   const page = await b.newPage({ viewport: vp }); const errs = [];

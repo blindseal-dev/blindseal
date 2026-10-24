@@ -52,7 +52,7 @@
         "</nav>" +
       "</div>" +
       tab("actions") + WING.tl + WING.br +
-        '<a class="glass-btn primary notch__cta" href="' + esc(a.href) + '" data-site-cta target="_blank" rel="noopener">' + esc(a.label) + "</a>" +
+        '<a class="glass-btn primary notch__cta" href="' + esc(a.href) + '" data-site-cta' + (a.external ? ' target="_blank" rel="noopener"' : "") + '>' + esc(a.label) + "</a>" +
       "</div>" +
     "</div>";
   }

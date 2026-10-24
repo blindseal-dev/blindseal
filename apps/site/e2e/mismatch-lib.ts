@@ -45,7 +45,7 @@ export const DIFF = `(kit) => {
   cmp(new DOMParser().parseFromString(window.__pre, 'text/html').documentElement, document.documentElement);
   return { errs: window.__errs, diff: out };
 }`;
-export const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog'];
+export const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog', '/dashboard'];
 
 // Entries that touch <html> (attributes), <head> (children/attributes) or a DIRECT child of <body> (an
 // insertion/removal at body level, or an attribute change on a body child). With the kit running these must
@@ -60,3 +60,8 @@ export function chromeViolations(diff: { at?: string; kind?: string }[]) {
     return false;
   });
 }
+
+// /dashboard probes the visitor's local proxy after hydration and swaps its status panel accordingly — a
+// client-only state by design. With the kit blocked that page may differ from its server HTML only inside
+// .dash-launch__status; everything else on it must still match exactly.
+export function outsideLauncher(diff: { at?: string }[]) { return diff.filter((d) => !(d.at || '').includes('dash-launch__status')); }

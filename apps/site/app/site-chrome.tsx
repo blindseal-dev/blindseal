@@ -9,7 +9,7 @@ const req = createRequire(import.meta.url);
 const tpl = req('../kit/site-templates.cjs') as { navHtml: (c: unknown) => string; footerHtml: (c: unknown) => string };
 
 export const SITE_VERSION = '0.5.0';
-const CTX = { routes: ROUTES, brand: 'Blindseal', action: { label: 'Open dashboard', href: DASHBOARD_URL }, oneLiner: "Prove an agent's action was screened — without showing what it was.", version: SITE_VERSION };
+const CTX = { routes: ROUTES, brand: 'Blindseal', action: { label: 'Open dashboard', href: '/dashboard' }   /* the launcher page; the local 127.0.0.1 link lives there */, oneLiner: "Prove an agent's action was screened — without showing what it was.", version: SITE_VERSION };
 
 export function SiteChromeTop() {
   return (
