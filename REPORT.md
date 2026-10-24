@@ -172,3 +172,16 @@ until the domain is live, policy `SECURITY.md`). M2 suite on the new binaries: 1
 Contact `blindseal@proton.me`, project/source `https://github.com/blindseal-dev/blindseal`, policy `SECURITY.md`.
 - `transfer_gate`: `3gssaLXWBQVyhQv8xnWHLjcBqZFfVQn8WK6uMDmJcuFb4Sm1edYbWVwKB7MQT8v2uhdukVACxYKWSBzkYR2S9sPD`
 - `blindseal_verify`: `5p2uwpfhuEC6toRPfVTUokWvrpfznLfJYRkkvBDLb6uYCoev63j8m27xcJdFUQyqXz4tbWrxp6ezpRjJSL8WcMnQ`
+
+## solana-verify — 2026-10-24 (public repo, commit `8171dc981893c160bdc2b3dd0a8683bded2e65a3`)
+Both programs were upgraded from the Docker verifiable build (`solanafoundation/solana-verifiable-build:4.3.0`, the
+image closest to the Agave 4.3.1 toolchain) so that `verify-from-repo` reproduces the deployed bytes:
+- `transfer_gate` upgrade `4QNJUxxDdJtCg5NpsGWeybrG3nUNXU5g7YweBWLtDkEpJbM96Adz3yz3wpjJe5WT6Rsj8QVC3se9R65YRyFfUe34`
+- `blindseal_verify` upgrade `4cjmE9VcGbmXUzyhfk6XR13moPLtCZ3Grmf3vKJSTkW3Mih7LghmbEZJuJ5WqMNVDcYUS9sm8SJcZpKJrxF1DvfQ`
+- M2 suite 15/15 on those binaries before they went up; no buffers left; authority ≈ 2.26 SOL.
+
+`solana-verify verify-from-repo https://github.com/blindseal-dev/blindseal --commit-hash 8171dc981893c160bdc2b3dd0a8683bded2e65a3 --mount-path programs -b …:4.3.0`:
+- `blindseal_verify` `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`: hash `8cd0c942e856a6d8413da3626c1ab6ae24cb7cc3fd0852a49c6d9cd758fb7a32` — **matches**;
+  verification PDA `9Zv5uiK9oXyBKFGA6S5TD7kEkso37sdjT3xjK1hVPTJZ`, upload tx `5dWNF6dRtJx5dK6NimKSpXpRPi3R4RQXQJPLarmxhH2RPQ2vkSygakaKEyUwesaGAz4MAfWeSdtbo4i1k3s3r2NK`
+- `transfer_gate` `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`: hash `243cd37db7c80358e32eb76f3d29d65eebd5a286dc6339284faa866e513c7635` — **matches**;
+  verification PDA `57pTNLdKNw2rzWRY4vfSrw7SMEewHcTjSCrJ9achJVoN`, upload tx `6SDAfmmx7B1fuoDjDrv4pSiaDdS9NwvstUNkhPj8v5WGfgHE1hEVgEwcgFG62TNxLahyC6Ry2GXEBgenqTUdnMP`
