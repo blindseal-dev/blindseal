@@ -94,6 +94,8 @@ blindseal (MOCK): local API on http://127.0.0.1:7777
       ] },
       { id: 'attest', heading: 'Attest a screened action', blocks: [
         p('An attestation is a Groth16 proof that a specific tool call was screened under a committed policy by a specific detector version and that the committed L1 rules passed (L0 decoding runs in the proxy but is not inside the proof yet — see [What is proven](/docs/scope)). Proving runs locally on CPU and takes hours: the sample attestation on the [verify page](/verify) took 2 h 16 min to prove on an Apple M1 Max (32 GB). It is asynchronous by design.'),
+        p('`call.json` is the screened tool call: the tool name and its arguments. For the transfer gate it must carry the source authority, the recipient and the amount in lamports:'),
+        code(`{\n  "toolName": "transfer_sol",\n  "args": { "from": "<source authority pubkey>", "to": "<recipient pubkey>", "lamports": 1000000, "memo": "optional" }\n}`, 'json'),
         code(`$ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
 decision d_…: clean (audit #12 0x…)
 proving (hours on CPU)…

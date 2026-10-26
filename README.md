@@ -42,7 +42,7 @@ configs it finds):
 blindseal -- <your-mcp-server-command>
 ```
 
-Attest a screened action and verify it anywhere:
+Attest a screened action and verify it anywhere. `call.json` is the tool call to screen — for the transfer gate: `{ "toolName": "transfer_sol", "args": { "from": "<source authority>", "to": "<recipient>", "lamports": 1000000 } }` (proving takes hours on CPU; the prover downloads on first use):
 
 ```sh
 blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
