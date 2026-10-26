@@ -24,7 +24,7 @@ for p in "${PKGS[@]}"; do
   hits() { local label="$1" re="$2"; local out; out="$(grep -rnIiE "$re" "$d/package" 2>/dev/null | grep -vE 'node_modules' | head -8 || true)"; if [ -n "$out" ]; then echo "   ✗ $label:"; echo "$out" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no $label"; fi; }
   # PART A: full list on every file; on minified bundles (one-line JS/CSS under dashboard/assets) the 2–4 letter
   # initials pattern would match generated identifiers, so those files are scanned with the ≥5-char patterns only
-  A_LONG="$(grep -v '^#' .identity-sweep | grep . | awk 'length($0) >= 5' | tr '\n' '|' | sed 's/|$//')"
+  A_LONG="$(grep -v '^#' .identity-sweep | grep . | sed 's/\\b//g' | awk 'length($0) >= 5' | tr '\n' '|' | sed 's/|$//')"
   pa="$(grep -rnIiE "$A_RE" "$d/package" 2>/dev/null | grep -vE 'node_modules|dashboard/assets/[^:]+\.(js|css):' | head -8 || true)"
   pm="$(grep -rnIiE "$A_LONG" "$d/package/dashboard/assets" 2>/dev/null | head -8 || true)"
   if [ -n "$pa$pm" ]; then echo "   ✗ personal names (PART A):"; printf '%s\n%s\n' "$pa" "$pm" | grep . | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no personal names (PART A)"; fi
