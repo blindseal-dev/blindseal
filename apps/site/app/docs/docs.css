@@ -22,3 +22,45 @@
   /* a long inline code run (the public-input order) wraps rather than widening the page */
   .docs-ic { white-space: normal; overflow-wrap: anywhere; }
 }
+
+/* Phone pass (2026-10-26). The sidebar (first in the DOM) becomes a compact block above the page: the
+   search, then each group as a row of 44 px chips, then the release card. The "On this page" rail
+   stays hidden (the tree carries navigation) but its back-to-top button floats (app/narrow.css). Tables
+   and code scroll inside their boxes; the key → value lines stack. */
+@media (max-width: 719.98px) {
+  .docs { --docs-top: 84px; width: calc(100% - 2 * var(--frame) - 24px); row-gap: 24px; }
+  .docs-side__in { gap: 14px; }
+  .docs-search .input { min-height: 44px; font-size: var(--fs-15); }
+  .docs-tree { gap: 10px; }
+  .docs-tree__group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .docs-tree__head { flex: 1 0 100%; margin: 0 0 2px; padding-left: 2px; }
+  .docs-tree__item { min-height: 44px; padding: 8px 14px 8px 12px; border: var(--hairline); border-radius: var(--r-full); font-size: var(--fs-14); }
+  .docs-tree__item[aria-current="page"] { border-color: var(--line-strong); background: var(--surface-hover); }
+  .docs-side__foot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 14px; }
+  .docs-side__foot .docs-side__k { grid-column: 1 / -1; }
+  .docs-side__foot .docs-side__sub { grid-column: 1 / -1; }
+  .docs-side__foot .docs-link { min-height: 44px; }
+  /* the outline column keeps its (hidden) list; only the button is laid out, fixed, by app/narrow.css */
+  .docs-otp-col { display: contents; }
+  .docs-otp { display: contents; }
+  .docs-otp__head, .docs-otp__rail { display: none; }
+  .docs-title { font-size: clamp(26px, 7.2vw, 30px); line-height: 1.2; }
+  .docs-summary { max-width: none; }
+  .docs-sec { padding-top: 28px; margin-top: 28px; }
+  .docs-h2 { flex-wrap: wrap; font-size: 22px; line-height: 28px; text-wrap: balance; }
+  .docs-anchor { width: 44px; height: 44px; margin: -10px -12px -10px -6px; }
+  .docs-p { max-width: none; }
+  .docs-link { min-height: 44px; }
+  .docs-links { gap: 0 20px; }
+  .docs-list { padding-left: 16px; }
+  .docs .code { padding-right: 14px; }
+  .docs-sec .install { display: flex; max-width: 100%; }
+  .docs-kv { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .docs-kv__v { font-size: var(--fs-13); line-height: 20px; }
+  .docs-kv__v .docs-url { white-space: normal; overflow-wrap: anywhere; }
+  .docs .table .is-note { min-width: 180px; font-size: var(--fs-14); line-height: 20px; }
+  .docs .table .is-mono { white-space: nowrap; }
+  .api-m { width: 40px; }
+  .docs-pn { gap: 12px; margin-top: 40px; padding-top: 24px; }
+  .docs-pn__card { min-height: 44px; }
+}

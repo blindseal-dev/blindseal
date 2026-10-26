@@ -65,7 +65,7 @@
   /* ── primitives: tap targets, wrapping, scrolling in place ───────────────────────────────────── */
   .btn, .btn.sm, .glass-btn, .glass-btn.sm, .seg__item, .copy { min-height: 44px; }
   .btn.sm { padding: 0 12px; }
-  .btn.link { min-height: 44px; padding: 0; }
+  .btn.link { min-height: 44px; min-width: 44px; padding: 0; }
   .seg__item { height: auto; padding: 0 12px; }
   /* the hash chip is click-to-copy: a 44 px hit box, laid out at its 22 / 24 px visual height */
   .hash { height: 44px; margin-block: -11px; }
@@ -88,7 +88,7 @@
   .hero__content { padding: 0 calc(var(--frame) + 12px); }
   .hero__col { max-width: none; }
   .hero__title { width: auto; max-width: none; margin: 20px 0 18px; font-size: clamp(32px, 9.2vw, 44px); line-height: 1.08; }
-  .hero__title br, .hero__sub br { display: none; }        /* the mockup's hand-set breaks are for 1440 */
+  .hero__title br { display: none; }                      /* the mockup's hand-set break is for 1440 (the sub keeps its own: no space precedes it) */
   .hero__sub { max-width: none; font-size: var(--fs-16); line-height: 26px; }
   .hero__actions { flex-direction: column; align-items: stretch; gap: 12px; margin-top: 28px; }
   .install { display: flex; width: 100%; min-width: 0; height: 56px; }
@@ -171,6 +171,7 @@
   .ex-cols, .ex-row { grid-template-columns: 24px minmax(0, 1fr) 56px 64px; column-gap: 8px; }
   .ex-cols, .ex-row { padding-left: 4px; padding-right: 4px; }
   .ex-row__id .hash { margin-left: 0; }
+  .ex-plot { overflow-x: clip; }                            /* the chart's screen-reader table (a collapsed table ignores its 1 px sr-only width) must not widen the page */
   .ex-alt__body { max-width: none; font-size: var(--fs-15); line-height: 24px; }
   .ex-alt--error { padding: 32px 20px; }
   .ex-alt__actions { flex-wrap: wrap; justify-content: center; }

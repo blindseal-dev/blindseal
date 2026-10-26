@@ -130,7 +130,7 @@ export async function getNullifierStatus(nullifierHex: string): Promise<Nullifie
 /// else is "No public name" in the explorer. Pubkey::default() is the verifier's marker for a direct
 /// submission (SDK submit / CLI) with no gated program.
 export const KNOWN_PROGRAM_NAMES: Record<string, string> = {
-  9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa: 'transfer-gate (example)',
+  '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa': 'transfer-gate (example)',
   '11111111111111111111111111111111': 'Direct submission (no gated program)',
 };
 
