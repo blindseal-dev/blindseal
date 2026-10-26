@@ -8,7 +8,7 @@
     },
     "linux-x64": {
       "name": "blindseal-prover-linux-x64",
-      "sha256": "TBD"
+      "sha256": "b4b95cae2414a06c87c58135a64d9106354c1b3116e57579e14278d33bdb41dc"
     }
   }
 }
