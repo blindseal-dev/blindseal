@@ -17,7 +17,7 @@ const DRY_RUN = {
   nonce: '0x1111111111111111111111111111111111111111111111111111111111111111',
 };
 const ACTION = {
-  targetProgram: 'ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG',
+  targetProgram: '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa',
   sourceAuthority: '5j1SSqkKBoMB4QgzuffgS9H9SDSaGnpKZ3VNpTKUwy3o',
   instruction: '0x981894646560fc2b',
   recipient: '9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf',

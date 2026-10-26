@@ -13,7 +13,7 @@ use anchor_lang::system_program;
 use blindseal_verify::program::BlindsealVerify;
 use blindseal_verify::{cpi::accounts::VerifyAndConsume, ActionArgs};
 
-declare_id!("ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG");
+declare_id!("9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa");
 
 #[cfg(not(feature = "no-entrypoint"))]
 solana_security_txt::security_txt! {

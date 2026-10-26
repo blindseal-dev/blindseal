@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/blindseal_verify.json`.
  */
 export type BlindsealVerify = {
-  "address": "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb",
+  "address": "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx",
   "metadata": {
     "name": "blindsealVerify",
     "version": "0.0.0",

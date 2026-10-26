@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/transfer_gate.json`.
  */
 export type TransferGate = {
-  "address": "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG",
+  "address": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
   "metadata": {
     "name": "transferGate",
     "version": "0.0.0",
@@ -53,7 +53,7 @@ export type TransferGate = {
           "docs": [
             "Typed: a direct call that passes any other program here fails before the transfer."
           ],
-          "address": "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
+          "address": "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx"
         },
         {
           "name": "systemProgram",

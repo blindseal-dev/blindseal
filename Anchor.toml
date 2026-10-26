@@ -11,12 +11,12 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-blindseal_verify = "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
-transfer_gate = "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+blindseal_verify = "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx"
+transfer_gate = "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
 
 [programs.mainnet]
-blindseal_verify = "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
-transfer_gate = "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+blindseal_verify = "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx"
+transfer_gate = "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
 
 [registry]
 url = "https://api.apr.dev"
@@ -41,9 +41,9 @@ ledger = ".anchor/test-ledger"
 # Anchor's `solana program deploy`, which left them "Program is not deployed" on this toolchain.
 # Run: anchor test --skip-build --skip-deploy
 [[test.genesis]]
-address = "merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb"
+address = "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx"
 program = "target/deploy/blindseal_verify.so"
 
 [[test.genesis]]
-address = "ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG"
+address = "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
 program = "target/deploy/transfer_gate.so"

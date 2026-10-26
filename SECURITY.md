@@ -1,7 +1,7 @@
 # Security policy
 
-Blindseal's on-chain programs — `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb` (verifier) and
-`ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG` (transfer-gate example) — carry a
+Blindseal's on-chain programs — `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` (verifier) and
+`9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` (transfer-gate example) — carry a
 [neodyme security.txt](https://github.com/neodyme-labs/solana-security-txt) that points here.
 
 ## Reporting a vulnerability

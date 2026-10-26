@@ -11,7 +11,6 @@ export PATH="$HOME/.cargo/bin:$PATH"
 if [ -d "$HOME/.local/share/solana/install/releases/stable-487f1df22d4c1972c51408c346da9499b11e1366/solana-release/bin" ]; then
   export PATH="$HOME/.local/share/solana/install/releases/stable-487f1df22d4c1972c51408c346da9499b11e1366/solana-release/bin:$PATH"
 fi
-"$ROOT/scripts/anchor-keys.sh"
 rm -rf "$ROOT/programs/target"
 for p in blindseal-verify transfer-gate; do
   echo "→ cargo build-sbf $p"

@@ -63,8 +63,8 @@ export function Settings() {
         <dl className="kv">
           <div><dt>Version</dt><dd className="mono">{status?.version ?? '—'}</dd></div>
           <div><dt>Uptime</dt><dd className="num">{status ? `${status.uptimeSec}s` : '—'}</dd></div>
-          <div><dt>Verifier program</dt><dd><Hash value="merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb" label="blindseal-verify program id (Solana mainnet)" /> <span className="is-faint">mainnet</span></dd></div>
-          <div><dt>Transfer gate</dt><dd><Hash value="ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG" label="transfer-gate program id (Solana mainnet)" /> <span className="is-faint">example gated program</span></dd></div>
+          <div><dt>Verifier program</dt><dd><Hash value="6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx" label="blindseal-verify program id (Solana mainnet)" /> <span className="is-faint">mainnet</span></dd></div>
+          <div><dt>Transfer gate</dt><dd><Hash value="9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa" label="transfer-gate program id (Solana mainnet)" /> <span className="is-faint">example gated program</span></dd></div>
         </dl>
       </section>
     </div>

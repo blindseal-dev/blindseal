@@ -4,7 +4,7 @@
 /// endpoint (rate-limited — logged once). `BLINDSEAL_RPC_URL=off` disables reads (tests).
 import { createHash } from 'node:crypto';
 
-export const VERIFY_PROGRAM_ID = 'merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb';
+export const VERIFY_PROGRAM_ID = '6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx';
 export const PUBLIC_MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
 export const MAINNET_GENESIS_HASH = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
 
@@ -130,7 +130,7 @@ export async function getNullifierStatus(nullifierHex: string): Promise<Nullifie
 /// else is "No public name" in the explorer. Pubkey::default() is the verifier's marker for a direct
 /// submission (SDK submit / CLI) with no gated program.
 export const KNOWN_PROGRAM_NAMES: Record<string, string> = {
-  ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG: 'transfer-gate (example)',
+  9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa: 'transfer-gate (example)',
   '11111111111111111111111111111111': 'Direct submission (no gated program)',
 };
 

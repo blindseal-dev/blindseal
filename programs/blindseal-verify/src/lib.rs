@@ -28,7 +28,7 @@ use anchor_lang::solana_program::{
     system_instruction,
 };
 
-declare_id!("merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb");
+declare_id!("6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx");
 
 #[cfg(not(feature = "no-entrypoint"))]
 solana_security_txt::security_txt! {

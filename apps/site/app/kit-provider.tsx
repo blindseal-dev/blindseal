@@ -41,7 +41,7 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   };
   try { (BS.motion?.boot ?? BS.motion?.syncMotionAttr)?.(); } catch {}
   if (firstMount) {
-    try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'Docs', href: '/docs' } }); } catch {}
+    try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'GitHub', href: 'https://github.com/blindseal-dev/blindseal', external: true } }); } catch {}
     // the dashboard is local-first: open it in a new tab, never navigate the site away
     /* the CTA's target/rel are in the server-rendered template */
   } else {

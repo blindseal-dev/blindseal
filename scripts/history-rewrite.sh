@@ -17,7 +17,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 export PATH="/opt/homebrew/bin:$PATH"
 NAME="blindseal"; EMAIL="347208916+blindseal-dev@users.noreply.github.com"
-ALLOWED_PATHS=(LICENSE BLINDSEAL.md DECISIONS.md README.md FRONTEND.md RH-INTEGRATION.md docs scripts/identity-sweep.sh scripts/history-rewrite.sh scripts/npm-pack-audit.sh)
+ALLOWED_PATHS=(LICENSE BLINDSEAL.md DECISIONS.md README.md FRONTEND.md docs scripts/identity-sweep.sh scripts/history-rewrite.sh scripts/npm-pack-audit.sh)
 for f in .identity-sweep .history-subs .history-msg-subs; do [ -f "$f" ] || { echo "$f missing (local list)"; exit 1; }; done
 A_RE="$(grep -v '^#' .identity-sweep | grep . | tr '\n' '|' | sed 's/|$//')"
 B_RE="$(grep -v '^#' .history-subs | grep . | cut -f1 | tr '\n' '|' | sed 's/|$//')"
@@ -113,7 +113,7 @@ tr=$(git log refs/heads/main --format='%B' | grep -cE "^Co-Authored-By:|claude\.
 echo "   trailers remaining: $tr"; [ "$tr" = "0" ] || fail=1
 ahits=$(git log -p refs/heads/main --format='commit %H%n%an %ae %cn %ce%n%B' | grep -ciE "$A_RE" || true)
 echo "   PART A hits across every diff + message + identity: $ahits"; [ "$ahits" = "0" ] || fail=1
-bhits=$(git log -p refs/heads/main --format='%B' -- . ':!LICENSE' ':!BLINDSEAL.md' ':!DECISIONS.md' ':!README.md' ':!FRONTEND.md' ':!RH-INTEGRATION.md' ':!docs' ':!scripts/identity-sweep.sh' ':!scripts/history-rewrite.sh' ':!scripts/npm-pack-audit.sh' | grep -ciE "$B_RE" || true)
+bhits=$(git log -p refs/heads/main --format='%B' -- . ':!LICENSE' ':!BLINDSEAL.md' ':!DECISIONS.md' ':!README.md' ':!FRONTEND.md' ':!docs' ':!scripts/identity-sweep.sh' ':!scripts/history-rewrite.sh' ':!scripts/npm-pack-audit.sh' | grep -ciE "$B_RE" || true)
 echo "   PART B occurrences across every diff + message outside the allowed paths: $bhits"; [ "$bhits" = "0" ] || fail=1
 [ $fail -eq 0 ] && echo "history sweep: clean" || { echo "history sweep: FAILED"; exit 1; }
 echo "done — review: git log --oneline | head; backup at refs/backup/pre-rewrite (delete after the owner's review)"

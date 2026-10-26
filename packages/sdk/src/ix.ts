@@ -4,8 +4,8 @@
 import { createHash } from 'node:crypto';
 import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 
-export const PROGRAM_ID = new PublicKey('merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb');
-export const TRANSFER_GATE_ID = new PublicKey('ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG');
+export const PROGRAM_ID = new PublicKey('6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx');
+export const TRANSFER_GATE_ID = new PublicKey('9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa');
 export const CHAIN_ID_SOLANA_MAINNET = 1;
 /** Genesis hash of Solana mainnet-beta — the only cluster submit() will talk to. */
 export const MAINNET_GENESIS_HASH = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';

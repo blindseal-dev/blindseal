@@ -46,7 +46,7 @@ packages/eval/results/eval-*.md
 
 # Rust / Anchor / SP1 spike build artifacts
 target/
-m05-spike/target/
+docs/internal/m05-spike/target/
 **/m05-metrics.json
 .anchor/
 test-ledger/
@@ -65,3 +65,8 @@ crates/prover/attestation.json
 .history-drop-paths
 !.claude/settings.json
 .history-path-renames
+
+# never committed: program/authority keypairs and build outputs
+keys/
+target*/
+crates/*/target*/

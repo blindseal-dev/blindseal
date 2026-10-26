@@ -15,8 +15,8 @@ WALLET="${ANCHOR_WALLET:-$HOME/.config/solana/id.json}"
 [ -f "$WALLET" ] || solana-keygen new --no-bip39-passphrase -s -o "$WALLET" >/dev/null
 LEDGER="${TMPDIR:-/tmp}/blindseal-m2-ledger"; rm -rf "$LEDGER"
 solana-test-validator -q -r --ledger "$LEDGER" \
-  --bpf-program merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb target/deploy/blindseal_verify.so \
-  --bpf-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG target/deploy/transfer_gate.so > /dev/null 2>&1 &
+  --bpf-program 6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx target/deploy/blindseal_verify.so \
+  --bpf-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa target/deploy/transfer_gate.so > /dev/null 2>&1 &
 VPID=$!
 trap 'kill $VPID 2>/dev/null; wait $VPID 2>/dev/null || true' EXIT
 for i in $(seq 1 60); do solana cluster-version -u http://127.0.0.1:8899 >/dev/null 2>&1 && break; sleep 1; done

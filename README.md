@@ -9,8 +9,8 @@ specific call passed a committed policy. The attestation is verified by one Sola
 leaves the machine: not the prompt, not the tool arguments, not the policy, not which agent was screened.
 
 - Site and docs: **https://blindseal.tech** (quickstart, concepts, hashing spec, gated-program guide, scope, verify page)
-- Verifier program (Solana mainnet): `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`
-- Example consumer (transfer-gate): `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`
+- Verifier program (Solana mainnet): `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`
+- Example consumer (transfer-gate): `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa`
 - Security contact: **blindseal@proton.me** (see `SECURITY.md`; both programs carry a neodyme security.txt)
 
 ## What is proven — and what is not
@@ -45,7 +45,7 @@ blindseal -- <your-mcp-server-command>
 Attest a screened action and verify it anywhere. `call.json` is the tool call to screen — for the transfer gate: `{ "toolName": "transfer_sol", "args": { "from": "<source authority>", "to": "<recipient>", "lamports": 1000000 } }` (proving takes hours on CPU; the prover downloads on first use):
 
 ```sh
-blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
+blindseal attest call.json --target-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa --out attestation.json
 #   proving takes hours on CPU (2 h 16 min for the sample on an M1 Max); the prover binary is downloaded from the
 #   project's GitHub release on first use, or build it from source (below) and pass --prover <path>
 blindseal verify attestation.json          # off-chain, the wasm verifier
@@ -115,7 +115,7 @@ Deployed bytes reproduce with `solana-verify` from this repository at the tagged
 ## Upgradeability
 
 Both programs keep an upgrade authority, held today by a single key. Every upgrade is logged with its
-signature in `REPORT.md`; moving the authority to a Squads multisig with a timelock is on the roadmap.
+signature in `docs/internal/REPORT.md`; moving the authority to a Squads multisig with a timelock is on the roadmap.
 Treat the authority as the trust root it is.
 
 ## Lineage and license

@@ -35,8 +35,8 @@ export const metadata: Metadata = {
 
 const TX_SIG = '7iwA4nxnBG73o8H8j8XUESYsmyGhGrxU5HiqXww8Nzp1YRC9oa7oE2ArWsd2fZN736vyhMatECyd2zw5agedpye';
 const PROGRAM_NAMES: Record<string, string> = {
-  ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG: 'transfer-gate',
-  merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb: 'blindseal-verify',
+  9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa: 'transfer-gate',
+  6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx: 'blindseal-verify',
   '11111111111111111111111111111111': 'System Program',
 };
 const RULES = { L0: 4, L1: 22 };

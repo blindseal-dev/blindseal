@@ -1,6 +1,6 @@
 // M2 verifier suite (BLINDSEAL.md §3.7 "Done when"), run by `anchor test` on localnet.
 // One real Groth16 attestation (tests/fixtures/attestation-test.json, produced by
-// crates/prover for the fixed keys in keys/localnet) covers every case: the verifier's checks
+// crates/prover for the seed-derived test wallets) covers every case: the verifier's checks
 // are ordered BEFORE the Groth16 step, so each negative case is reached with the real proof
 // and a crafted action / public-inputs blob, and fails with its own error.
 // Namespace imports only: the suite may load as ESM, where named imports from these CJS
@@ -26,9 +26,12 @@ const { expect } = cjs(chaiNs) as typeof chaiNs;
 import { buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, decodeConfig } from '../packages/sdk/src/ix';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const ROOT = process.cwd(); // anchor test runs from the repo root (where Anchor.toml lives)
-const kp = (f: string) => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(join(ROOT, 'keys/localnet', f), 'utf8'))));
+// Test wallets are derived at test time from fixed seeds — nothing is stored in the repo. Their pubkeys are
+// stable, which the localnet proof (tests/fixtures/attestation-test.json) binds as source authority / recipient.
+const seeded = (label: string) => Keypair.fromSeed(createHash('sha256').update(`blindseal-localnet:${label}`).digest());
 const hex = (s: string) => Buffer.from(s.replace(/^0x/, ''), 'hex');
 
 const att = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/attestation-test.json'), 'utf8'));
@@ -41,8 +44,8 @@ const POLICY_ROOT = hex(att.policyRoot);
 const NULLIFIER = hex(att.nullifier);
 const DISC = hex(att.action.instruction); // sha256("global:gated_transfer")[..8]
 
-const source = kp('test-source-authority.json');
-const recipient = kp('test-recipient.json');
+const source = seeded('source-authority');
+const recipient = seeded('recipient');
 
 describe('M2 — blindseal-verify + transfer-gate', () => {
   const provider = anchor.AnchorProvider.env();

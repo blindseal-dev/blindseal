@@ -36,7 +36,7 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
 
   // the notch's primary action: Docs (GitHub once the repo is public); the dashboard is local-only and not linked
   const cta = page.locator('[data-site-cta]').first();
-  await expect(cta).toHaveAttribute('href', '/docs');
+  await expect(cta).toHaveAttribute('href', 'https://github.com/blindseal-dev/blindseal');
 
   // 3) the hero: CRT canvas with WebGL2 (or the nebula fallback declared on the host)
   const hero = await page.locator('.hero__space').first().evaluate((host) => {

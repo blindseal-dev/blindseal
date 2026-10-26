@@ -1,0 +1,42 @@
+name: prover-linux
+# Builds the blindseal prover for linux-x64 on a tag push `prover-v*` (or by hand for an existing tag),
+# publishes the binary + sha256 to that tag's GitHub release, and prints the sha256 to paste into
+# packages/proxy/src/prover/manifest.json (assets.linux-x64.sha256).
+on:
+  push:
+    tags: ['prover-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'release tag to attach to (e.g. prover-v0.5.1)'
+        required: true
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/prover
+      - name: deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq pkg-config libssl-dev clang cmake
+      - name: build
+        working-directory: crates/prover
+        run: cargo build --release --locked 2>&1 | tail -3
+      - name: package
+        run: |
+          cp crates/prover/target/release/blindseal-prover blindseal-prover-linux-x64
+          sha256sum blindseal-prover-linux-x64 | tee SHA256SUMS.linux-x64
+      - name: attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" blindseal-prover-linux-x64 SHA256SUMS.linux-x64 --clobber -R "$GITHUB_REPOSITORY"
+          echo "manifest.assets.linux-x64.sha256 = $(cut -d' ' -f1 SHA256SUMS.linux-x64)" >> "$GITHUB_STEP_SUMMARY"

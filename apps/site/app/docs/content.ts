@@ -96,7 +96,7 @@ blindseal (MOCK): local API on http://127.0.0.1:7777
         p('An attestation is a Groth16 proof that a specific tool call was screened under a committed policy by a specific detector version and that the committed L1 rules passed (L0 decoding runs in the proxy but is not inside the proof yet — see [What is proven](/docs/scope)). Proving runs locally on CPU and takes hours: the sample attestation on the [verify page](/verify) took 2 h 16 min to prove on an Apple M1 Max (32 GB). It is asynchronous by design.'),
         p('`call.json` is the screened tool call: the tool name and its arguments. For the transfer gate it must carry the source authority, the recipient and the amount in lamports:'),
         code(`{\n  "toolName": "transfer_sol",\n  "args": { "from": "<source authority pubkey>", "to": "<recipient pubkey>", "lamports": 1000000, "memo": "optional" }\n}`, 'json'),
-        code(`$ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
+        code(`$ blindseal attest call.json --target-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa --out attestation.json
 decision d_…: clean (audit #12 0x…)
 proving (hours on CPU)…
 attestation written: attestation.json`, 'shell'),
@@ -154,7 +154,7 @@ $ blindseal submit attestation.json --check   # has this nullifier been consumed
         code(`Config     = PDA(["config"])
 PolicyRoot = PDA(["policy", policyRoot32])
 Nullifier  = PDA(["nullifier", nullifier32])     -- exists ⇔ consumed
-program    = merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb  (Solana mainnet)`, 'text'),
+program    = 6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx  (Solana mainnet)`, 'text'),
       ] },
     ],
   },
@@ -223,7 +223,7 @@ const sig = await submit(attestation, { wallet });   // refuses any RPC that is 
 policy_root PDA(["policy", policyRoot])          read, optional (pass the program id for None)
 nullifier   PDA(["nullifier", nullifier])        writable, must not exist
 payer       signer, writable                     pays the Nullifier PDA rent
-program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
+program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
       ] },
     ],
   },
@@ -257,7 +257,7 @@ program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
         p('Six hashes and a slot number. No prompt, no tool arguments, no policy contents or thresholds, no model scores, and nothing that names the agent or the operator. The explorer shows counts and policy roots only.'),
       ] },
       { id: 'upgradeable', heading: 'The programs are upgradeable', blocks: [
-        p('Both on-chain programs — the verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb` and the transfer-gate example `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the repository, and `solana-verify` lets you check that the deployed bytes match the public source.'),
+        p('Both on-chain programs — the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` and the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the repository, and `solana-verify` lets you check that the deployed bytes match the public source.'),
         p('Planned: the authority moves to a Squads multisig with a timelock, and the program ids stay the same. Until then, treat the single key as the trust root it is.'),
       ] },
     ],
@@ -277,11 +277,11 @@ blindseal (MOCK): local API on http://127.0.0.1:7777
       { id: 'programs', heading: 'Build the programs', blocks: [
         code(`$ scripts/build-programs.sh        # cargo build-sbf for blindseal-verify and transfer-gate + anchor idl build
 $ scripts/test-m2.sh               # the on-chain suite against a local validator`, 'shell'),
-        p('Requires Rust, the Solana CLI and Anchor. The script builds to SBF with `cargo build-sbf` (target dir outside `programs/`) and writes the `.so` files to `target/deploy/` and the IDLs to `target/idl/`. Program ids are fixed: the verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, the transfer-gate example `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`.'),
+        p('Requires Rust, the Solana CLI and Anchor. The script builds to SBF with `cargo build-sbf` (target dir outside `programs/`) and writes the `.so` files to `target/deploy/` and the IDLs to `target/idl/`. Program ids are fixed: the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa`.'),
       ] },
       { id: 'prover', heading: 'Build the prover', blocks: [
         code(`$ cargo build --release -p blindseal-prover
-$ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG \\
+$ blindseal attest call.json --target-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa \\
     --out attestation.json --prover target/release/blindseal-prover`, 'shell'),
         p('The prover wraps the committed SP1 guest (`crates/guest`) and produces the Groth16 attestation. It needs the SP1 toolchain and, for the Groth16 wrap, Docker with about 24 GB of memory available. Proving takes hours on CPU — 2 h 16 min for the sample attestation on an Apple M1 Max (32 GB). Without `--prover`, `blindseal attest` uses the release binary it downloads on first use; the built binary is the same program.'),
       ] },
@@ -289,7 +289,7 @@ $ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vz
         code(`$ cd programs
 $ solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name blindseal_verify
 $ solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name transfer_gate
-$ solana-verify get-program-hash merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb     # compare with the executable hash printed above`, 'shell'),
+$ solana-verify get-program-hash 6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx     # compare with the executable hash printed above`, 'shell'),
         p('`solana-verify` builds in a pinned container so the bytes are reproducible, then compares the executable hash with what is deployed on mainnet. Both programs keep an upgrade authority; see [What is proven](/docs/scope) for what that means for trust.'),
       ] },
       { id: 'layout', heading: 'Repository layout', blocks: [
