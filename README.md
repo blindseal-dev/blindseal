@@ -20,7 +20,7 @@ screened by this detector version under the policy with this root, the committed
 screening is bound to one on-chain action, one expiry and one nonce — usable once.* **L0** (decode-then-L1) runs in
 the proxy but is **not inside the proof yet**; it is the next increment and will change the detector version. The
 model-based layers **L2/L3** (embeddings, LLM judge) run locally or in a TEE and are **attested, not proven**.
-Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy.
+Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.
 Proving takes hours on CPU: the sample attestation took 2 h 16 min on an Apple M1 Max (32 GB). The honest numbers
 are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is proven" page.
 

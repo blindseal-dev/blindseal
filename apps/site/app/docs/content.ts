@@ -229,7 +229,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
   },
   {
     slug: 'scope', path: '/docs/scope', group: 'What is proven — and what is not', title: 'What is proven — and what is not', nav: 'What is proven',
-    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy.',
+    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.',
     sections: [
       { id: 'proven', heading: 'Proven (zero-knowledge, verifiable by anyone)', blocks: [
         list([

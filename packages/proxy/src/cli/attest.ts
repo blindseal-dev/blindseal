@@ -12,11 +12,11 @@
 /// Usage:
 ///   blindseal attest <toolcall.json> --out <attestation.json> --target-program <id>
 ///     [--instruction <16 hex>] [--expiry <slot> | --no-expiry] [--prover <path>] [--audit-dir <dir>]
-///   expiry defaults to the current mainnet slot + 1500 (fetched over RPC); the prover binary is
+///   expiry defaults to the current mainnet slot + 40,000 (≈ 4.4 h, fetched over RPC); the prover binary is
 ///   resolved by src/prover/resolve.ts (--prover, $BLINDSEAL_PROVER, ~/.blindseal/bin, download).
 ///   toolcall.json: { "toolName": "transfer_sol", "args": { "to": "...", "lamports": 1000000, "from": "..." } }
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -26,6 +26,7 @@ import { parseSolanaAction } from '../chain/solana.js';
 import { openAudit } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
 import { ProverUnavailableError, resolveProver } from '../prover/resolve.js';
+import { blindsealHome } from '../paths.js';
 
 const HELP = `blindseal attest — screen a tool call, record the decision, prove it
 
@@ -36,7 +37,7 @@ Flags
   --out <file>               where to write attestation.json (default ./attestation.json)
   --target-program <id>      the gated program the action targets (base58)
   --instruction <16 hex>     instruction discriminator (default: transfer-gate gated_transfer)
-  --expiry <slot>            expirySlot (default: current slot + 1500, fetched from the RPC)
+  --expiry <slot>            expirySlot (default: current slot + 40000 ≈ 4.4 h, fetched from the RPC; proving takes hours)
   --no-expiry                write the "no expiry" sentinel (2000000000) instead of fetching a slot
   --prover <path>            prover binary (default: $BLINDSEAL_PROVER, then ~/.blindseal/bin/,
                              downloaded from the GitHub release on first use)
@@ -52,7 +53,27 @@ const GATED_TRANSFER_DISC = '0x981894646560fc2b';
 /// The "no expiry" sentinel the circuit accepts (--no-expiry).
 export const NO_EXPIRY_SLOT = '2000000000';
 /// Default validity window: current slot + this many slots (~10 minutes at 400ms/slot).
-export const EXPIRY_WINDOW_SLOTS = 1500;
+export const EXPIRY_WINDOW_SLOTS = 40_000;   // ≈ 4.4 h at 0.4 s/slot: room for a CPU proof (hours) plus submission
+const SLOT_SECONDS = 0.4;
+
+/// Wall-clock of the last successful proof on this machine (~/.blindseal/prover-times.json), used to
+/// warn before proving when the previous proof took more than half the expiry window.
+export function proverTimesPath(): string { return path.join(blindsealHome(), 'prover-times.json'); }
+export function readLastProofSeconds(file: string = proverTimesPath()): number | undefined {
+  try { const j = JSON.parse(readFileSync(file, 'utf8')) as { lastSeconds?: number }; return typeof j.lastSeconds === 'number' ? j.lastSeconds : undefined; } catch { return undefined; }
+}
+export function recordProofSeconds(seconds: number, file: string = proverTimesPath()): void {
+  try { mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 }); writeFileSync(file, JSON.stringify({ lastSeconds: Math.round(seconds), at: new Date().toISOString() }) + '\n', { mode: 0o600 }); } catch { /* best effort */ }
+}
+/// The warning text when the last proof exceeded half the window (undefined = no warning).
+export function expiryWarning(lastSeconds: number | undefined, windowSlots: number = EXPIRY_WINDOW_SLOTS): string | undefined {
+  if (lastSeconds === undefined) return undefined;
+  const windowSeconds = windowSlots * SLOT_SECONDS;
+  if (lastSeconds <= windowSeconds / 2) return undefined;
+  const h = (x: number) => (x / 3600).toFixed(1) + ' h';
+  return `blindseal attest: your last proof on this machine took ${h(lastSeconds)}; the default expiry window is ${h(windowSeconds)}. ` +
+    `If proving runs long the attestation may expire before you can submit it — pass --expiry <slot> for a later slot, or --no-expiry.`;
+}
 
 interface Opts {
   file?: string;
@@ -139,6 +160,7 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     return 1;
   }
   let expiry: string;
+  if (o.expiry === undefined && !o.noExpiry) { const w = expiryWarning(readLastProofSeconds()); if (w) process.stderr.write(w + '\n'); }
   try {
     expiry = await resolveExpiry(o);
   } catch (e) {
@@ -186,8 +208,10 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     '--instruction', o.instruction, '--expiry', expiry,
   ];
   process.stdout.write(`proving (this takes a while on CPU)…\n`);
+  const t0 = Date.now();
   const r = spawnSync(prover, args, { stdio: 'inherit' });
   if (r.status !== 0) { process.stderr.write(`blindseal attest: prover exited ${r.status}\n`); return 1; }
+  recordProofSeconds((Date.now() - t0) / 1000);
   process.stdout.write(`attestation written: ${o.out} (decision ${decisionId}, payloadHash ${payloadHash}, expirySlot ${expiry}${expiry === NO_EXPIRY_SLOT ? ' = no expiry' : ''})\n`);
   return 0;
 }
