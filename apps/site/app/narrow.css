@@ -205,3 +205,9 @@
 @media (hover: none) and (max-width: 719.98px) {
   .docs-anchor { opacity: 1; }
 }
+/* the mastheads' starfield (space.js) paints wider than its host; clip it at phone width, and clip the page's
+   horizontal overflow as a safety net — nothing on the site scrolls sideways on a phone */
+@media (max-width: 719.98px) {
+  .ex-mast__space, .hiw-mast__space, .cl-mast__space, .vf-mast__space, .hero__space, [data-space], .space { overflow: hidden; }
+  html, body { overflow-x: clip; }
+}
