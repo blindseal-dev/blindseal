@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import {
@@ -5,25 +7,20 @@ import {
   configPda, nullifierPda, PROGRAM_ID, TRANSFER_GATE_ID, WrongClusterError, type Attestation,
 } from '../src/index.js';
 
-// Values printed by `blindseal-prover` in BLINDSEAL_EXECUTE mode for the localnet test action
-// (the zkVM ran detector-core's hashing); the SDK must reproduce them byte-for-byte.
+// The localnet test attestation (tests/fixtures/attestation-test.json) is produced by `blindseal-prover`, whose zkVM
+// runs detector-core's hashing; the SDK must reproduce its values byte-for-byte. Read from the fixture, so the
+// suite follows a re-prove (new gate id / wallets) without hand-edited literals.
+const FIXTURE = JSON.parse(readFileSync(join(__dirname, '../../../tests/fixtures/attestation-test.json'), 'utf8'));
 const DRY_RUN = {
-  payloadHash: '0x4c4bd908e89bcbd11226f59ab664ea69f5ba362e39808a7c6779fc84fa164ca4',
-  policyRoot: '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397',
-  detectorVersion: '0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e',
-  actionHash: '0xcfbc8bd88ac15a0647504d4599333b56954f4ba9a088bb5dce6825f243e4bbd5',
-  nullifier: '0x6ae18cf4955d1636f7268d4f81126a8c74178583d255697b841037964583258c',
-  expirySlot: 2_000_000_000n,
-  nonce: '0x1111111111111111111111111111111111111111111111111111111111111111',
+  payloadHash: FIXTURE.payloadHash as string,
+  policyRoot: FIXTURE.policyRoot as string,
+  detectorVersion: FIXTURE.detectorVersion as string,
+  actionHash: FIXTURE.actionHash as string,
+  nullifier: FIXTURE.nullifier as string,
+  expirySlot: BigInt(FIXTURE.expirySlot),
+  nonce: FIXTURE.nonce as string,
 };
-const ACTION = {
-  targetProgram: '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa',
-  sourceAuthority: '5j1SSqkKBoMB4QgzuffgS9H9SDSaGnpKZ3VNpTKUwy3o',
-  instruction: '0x981894646560fc2b',
-  recipient: '9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf',
-  mint: '',
-  amount: '1000000',
-};
+const ACTION = FIXTURE.action as { targetProgram: string; sourceAuthority: string; recipient: string; mint: string; amount: string; instruction: string };
 
 const attestation = (over: Partial<Attestation> = {}): Attestation => ({
   version: 1, chainId: 1, ...DRY_RUN, expirySlot: 2_000_000_000, action: ACTION,
