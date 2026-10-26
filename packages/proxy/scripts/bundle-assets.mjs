@@ -3,6 +3,7 @@
 //   ../dashboard/dist  → packages/proxy/dashboard/   (served by `blindseal run` at /)
 //   <repo>/fixtures/*.json → packages/proxy/fixtures/ (served by `blindseal run --mock`)
 // Both target dirs are gitignored and listed in package.json "files".
+// *.map files are never shipped (absolute source paths)
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,3 +34,9 @@ for (const f of readdirSync(repoFixtures)) {
   n++;
 }
 console.log(`✓ dashboard copied to dashboard/ · ${n} fixture files copied to fixtures/`);
+
+// belt and braces: strip any sourcemap that slipped into the shipped dashboard
+import { readdirSync as __rd, rmSync as __rm, statSync as __st } from 'node:fs';
+import { join as __j } from 'node:path';
+const __walk = (d) => { for (const n of __rd(d)) { const p = __j(d, n); if (__st(p).isDirectory()) __walk(p); else if (n.endsWith('.map')) __rm(p); } };
+try { __walk(new URL('../dashboard', import.meta.url).pathname); } catch {}

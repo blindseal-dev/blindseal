@@ -22,7 +22,12 @@ for p in "${PKGS[@]}"; do
   n="$(find "$d/package" -type f | wc -l | tr -d ' ')"; echo "   files in tarball: $n"
   for f in author contributors maintainers homepage bugs repository funding; do v="$(node -p "JSON.stringify(require('$d/package/package.json').$f ?? null)")"; [ "$v" = "null" ] || echo "   package.json.$f = $v"; done
   hits() { local label="$1" re="$2"; local out; out="$(grep -rnIiE "$re" "$d/package" 2>/dev/null | grep -vE 'node_modules' | head -8 || true)"; if [ -n "$out" ]; then echo "   ✗ $label:"; echo "$out" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no $label"; fi; }
-  hits "personal names (PART A)" "$A_RE"
+  # PART A: full list on every file; on minified bundles (one-line JS/CSS under dashboard/assets) the 2–4 letter
+  # initials pattern would match generated identifiers, so those files are scanned with the ≥5-char patterns only
+  A_LONG="$(grep -v '^#' .identity-sweep | grep . | awk 'length($0) >= 5' | tr '\n' '|' | sed 's/|$//')"
+  pa="$(grep -rnIiE "$A_RE" "$d/package" 2>/dev/null | grep -vE 'node_modules|dashboard/assets/[^:]+\.(js|css):' | head -8 || true)"
+  pm="$(grep -rnIiE "$A_LONG" "$d/package/dashboard/assets" 2>/dev/null | head -8 || true)"
+  if [ -n "$pa$pm" ]; then echo "   ✗ personal names (PART A):"; printf '%s\n%s\n' "$pa" "$pm" | grep . | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no personal names (PART A)"; fi
   hits "base / other project names" "$B_RE"
   hits "secrets / tokens / keys" "$SECRET_RE"
   ph="$(grep -rnIiE "$PATH_RE" "$d/package" 2>/dev/null | grep -vE "$PATH_OK" | head -6 || true)"; if [ -n "$ph" ]; then echo "   ✗ absolute home paths:"; echo "$ph" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no absolute home paths"; fi

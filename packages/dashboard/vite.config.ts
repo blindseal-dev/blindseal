@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   base: './',
-  build: { outDir: 'dist', sourcemap: true },
+  build: { outDir: 'dist', sourcemap: false },   // the proxy ships this dist in its npm package: no sourcemap (absolute source paths)
   server: {
     port: 5319,
     proxy: {
