@@ -68,7 +68,7 @@ export default function Home() {
 
       <section className="site-section reveal" aria-labelledby="scope-h">
         <div className="callout s01-scope"><p className="callout__eyebrow" id="scope-h">What we claim</p>
-          <p className="callout__body">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the deterministic layers passed. The model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p>
+          <p className="callout__body">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p>
         </div>
       </section>
 

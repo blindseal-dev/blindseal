@@ -281,7 +281,7 @@
 
   /* ── 2 · architecture: agent → proxy (L0–L3) → tools; prover, audit log, verifier ── */
   var LAYERS = [
-    { id: "L0", name: "Rules", sees: "raw payload", kind: "proven" },
+    { id: "L0", name: "Decode", sees: "raw payload", kind: "not in proof yet" },
     { id: "L1", name: "Patterns", sees: "raw payload", kind: "proven" },
     { id: "L2", name: "Similarity", sees: "redacted payload", kind: "attested" },
     { id: "L3", name: "Judge", sees: "redacted payload", kind: "attested" }
@@ -290,7 +290,7 @@
     var focus = o.focus || "";
     var on = function (k) { return focus === k ? " is-active" : ""; };
     var aria = "Architecture. The agent calls its tools through the proxy on the same machine; the proxy screens every call " +
-      "with four layers (L0 rules, L1 patterns, L2 similarity, L3 judge), redacting secrets and PII before L2. " +
+      "with four layers (L0 decode, L1 patterns, L2 similarity, L3 judge), redacting secrets and PII before L2. The proof covers L1 today; L0 runs in the proxy and is not in the proof yet. " +
       "Every decision is written to a hash-chained audit log. The prover makes a zero-knowledge attestation; " +
       "only the proof and its public inputs cross to the public side, where the Solana verifier checks it in one instruction.";
     var b = new Builder(uid, 1066, 500, o.label || aria);
@@ -518,7 +518,7 @@
       var v = VERDICTS[o.verdict] ? o.verdict : "block";
       hl.forEach(function (id) { paint[String(id).toUpperCase()] = v; });
     }
-    var aria = "Four screening layers. L0 rules and L1 patterns see the raw payload and are deterministic, so they are proven. " +
+    var aria = "Four screening layers. L0 decode and L1 patterns see the raw payload and are deterministic; the proof covers L1 today, and L0 runs in the proxy but is not in the proof yet. " +
       "Secrets and PII are redacted before L2 similarity and L3 judge, which see the redacted payload and are model-based, so they are attested." +
       Object.keys(paint).map(function (k) { return " " + k + ": " + paint[k] + "."; }).join("");
     var b = new Builder(uid, 560, 300, o.label || aria);
@@ -542,10 +542,10 @@
     b.draw("M404 28H412V136H404", "dg-conn", 5, { k: "brk0" });
     b.draw("M404 170H412V278H404", "dg-conn", 6, { k: "brk1" });
     b.text(424, 74, "deterministic", "dg-label", 5, "start", { k: "k0a" });
-    b.text(424, 92, "proven", "dg-label is-active", 5, "start", { k: "k0b" });
+    b.text(424, 92, "L1 proven · L0 next", "dg-label is-active", 5, "start", { k: "k0b" });
     b.text(424, 216, "model-based", "dg-label", 6, "start", { k: "k1a" });
     b.text(424, 234, "attested", "dg-label is-active", 6, "start", { k: "k1b" });
-    return { b: b, caption: "L0 and L1 are deterministic and proven. L2 and L3 are model-based, run locally or in a TEE, and are attested." };
+    return { b: b, caption: "L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally or in a TEE, and are attested." };
   }
 
   var FIGS = { flow4: flow4, architecture: architecture, lifecycle: lifecycle, chain: chain, layers: layers };

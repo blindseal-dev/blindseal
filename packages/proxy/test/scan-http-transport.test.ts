@@ -26,12 +26,10 @@ function withEnv(overrides: Record<string, string | undefined>, fn: () => Ctx): 
 }
 
 async function startServer(): Promise<Ctx> {
-  // Make sure attestation/telemetry are off so tests don't try to hit the chain or a collector.
+  // Make sure attestation/persistence are off so tests don't try to hit the chain or a DB.
   return withEnv(
     {
       BLINDSEAL_ATTEST: '0',
-      BLINDSEAL_TELEMETRY: '0',
-      BLINDSEAL_TELEMETRY_URL: undefined,
       BLINDSEAL_PERSIST: '0',
       BLINDSEAL_LAYER2_THRESHOLD: '0.35',
       // Force L3 off for deterministic test verdicts.
@@ -71,12 +69,12 @@ describe('scan-http transport', () => {
     await new Promise<void>((resolve) => ctx.server.close(() => resolve()));
   });
 
-  it('GET /health returns ok with telemetry flag', async () => {
+  it('GET /health returns ok', async () => {
     const resp = await fetch(`${ctx.url}/health`);
     expect(resp.status).toBe(200);
-    const body = (await resp.json()) as { ok: boolean; telemetryEnabled: boolean };
+    const body = (await resp.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
-    expect(body.telemetryEnabled).toBe(false);
+    expect(body).not.toHaveProperty('telemetryEnabled');
   });
 
   it('POST /scan returns clean verdict for benign text', async () => {

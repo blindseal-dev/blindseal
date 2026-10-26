@@ -92,9 +92,59 @@ export function computeActionHash(a: ActionArgs, payloadHash: Uint8Array, policy
 export const computeNullifier = (actionHash: Uint8Array): Buffer =>
   createHash('sha256').update(NULLIFIER_DOMAIN).update(actionHash).digest();
 
-/** Decode the 168-byte committed blob into its six fields. */
-export function decodePublicInputs(blob: Uint8Array) {
-  if (blob.length !== 168) throw new Error(`publicInputs must be 168 bytes, got ${blob.length}`);
+// ---- the committed public-input blob ----
+// `publicInputs[0]` is the guest's public values in commit order (crates/guest/src/main.rs):
+//   [0..32)    payloadHash      [32..64)   policyRoot      [64..96)   detectorVersion
+//   [96..128)  actionHash       [128..160) nullifier       [160..168) expirySlot (u64 LE)
+// 168 bytes = 336 hex chars. This is the ONLY data the proof binds; the six labeled top-level
+// fields of attestation.json are convenience copies and must be checked against it.
+export const PUBLIC_INPUTS_LEN = 168;
+
+/** The six committed fields as 0x-prefixed lower-case hex; `expirySlot` is a decimal u64 string. */
+export interface DecodedPublicInputs {
+  payloadHash: string;
+  policyRoot: string;
+  detectorVersion: string;
+  actionHash: string;
+  nullifier: string;
+  expirySlot: string;
+}
+
+/** Byte-level view of the same six fields (used by the instruction builders). */
+export interface DecodedPublicInputsBytes {
+  payloadHash: Buffer;
+  policyRoot: Buffer;
+  detectorVersion: Buffer;
+  actionHash: Buffer;
+  nullifier: Buffer;
+  expirySlot: bigint;
+}
+
+/**
+ * Decode the 168-byte committed blob into its six fields.
+ * - Given a hex string (`publicInputs[0]`, with or without `0x`), returns 0x-prefixed lower-case
+ *   hex fields and `expirySlot` as a decimal string — the shape `verifyOffchain` reports as `decoded`.
+ * - Given raw bytes, returns Buffers and a bigint expiry (the form the instruction builders use).
+ * Throws if the input is not exactly 168 bytes (or not valid hex).
+ */
+export function decodePublicInputs(blobHex: string): DecodedPublicInputs;
+export function decodePublicInputs(blob: Uint8Array): DecodedPublicInputsBytes;
+export function decodePublicInputs(blob: string | Uint8Array): DecodedPublicInputs | DecodedPublicInputsBytes {
+  if (typeof blob === 'string') {
+    const h = blob.trim().replace(/^0x/i, '').toLowerCase();
+    if (!/^[0-9a-f]*$/.test(h) || h.length % 2 !== 0) throw new Error('publicInputs is not a hex string');
+    const b = decodeBytes(Buffer.from(h, 'hex'));
+    const hx = (x: Buffer) => '0x' + x.toString('hex');
+    return {
+      payloadHash: hx(b.payloadHash), policyRoot: hx(b.policyRoot), detectorVersion: hx(b.detectorVersion),
+      actionHash: hx(b.actionHash), nullifier: hx(b.nullifier), expirySlot: b.expirySlot.toString(),
+    };
+  }
+  return decodeBytes(blob);
+}
+
+function decodeBytes(blob: Uint8Array): DecodedPublicInputsBytes {
+  if (blob.length !== PUBLIC_INPUTS_LEN) throw new Error(`publicInputs must be ${PUBLIC_INPUTS_LEN} bytes, got ${blob.length}`);
   const b = Buffer.from(blob);
   return {
     payloadHash: b.subarray(0, 32), policyRoot: b.subarray(32, 64), detectorVersion: b.subarray(64, 96),

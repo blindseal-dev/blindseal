@@ -1,7 +1,7 @@
 {
   "name": "blindseal",
-  "version": "0.5.0",
-  "description": "Blindseal \u2014 a local MCP proxy that screens every tool call (four detection layers), redacts before the model-based layers, keeps a hash-chained audit log, and produces zero-knowledge attestations verifiable on Solana.",
+  "version": "0.5.1",
+  "description": "Blindseal — a local MCP proxy that screens every tool call (four detection layers), redacts before the model-based layers, keeps a hash-chained audit log, and produces zero-knowledge attestations verifiable on Solana.",
   "license": "MIT",
   "homepage": "https://blindseal.tech",
   "repository": {
@@ -15,17 +15,17 @@
   "bin": {
     "blindseal": "dist/index.js",
     "blindseal-audit": "dist/audit-view.js",
-    "blindseal-init": "dist/init.js",
     "blindseal-decide": "dist/decide.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "dashboard",
+    "fixtures"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/bundle-assets.mjs",
     "dev": "tsx src/index.ts",
     "view-audit": "tsx src/cli/audit-view.ts",
-    "init": "tsx src/cli/init.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "bench:l3": "tsx bench/layer3-floor.ts",

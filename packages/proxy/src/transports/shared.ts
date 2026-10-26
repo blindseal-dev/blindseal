@@ -2,7 +2,7 @@
 
 import { runPipeline } from '../detection/pipeline.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
-import { sha256Hex } from '../telemetry/index.js';
+import { createHash } from 'node:crypto';
 
 export interface JsonRpcMessage {
   jsonrpc?: '2.0';
@@ -33,6 +33,10 @@ export interface InspectionOutcome {
   layer?: number;
   result: DetectionResult | null;
   contentHash: string;
+}
+
+export function sha256Hex(s: string): string {
+  return createHash('sha256').update(s).digest('hex');
 }
 
 export function tryParse(line: string): JsonRpcMessage | null {
@@ -96,7 +100,7 @@ export function buildCapabilityBlockedResponse(
 
 /// Inspects a tool-call response: runs the detection pipeline on every text content item,
 /// mutates the message in-place based on the worst verdict + the configured mode, and returns
-/// a structured outcome the caller can use for telemetry/audit.
+/// a structured outcome the caller can use for audit/persistence.
 export async function inspectToolCallResponse(
   msg: JsonRpcMessage & { result: ToolCallResult },
   toolName: string,

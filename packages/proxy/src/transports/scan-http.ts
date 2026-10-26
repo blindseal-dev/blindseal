@@ -1,16 +1,13 @@
 /// Scan-only HTTP transport.
 /// Exposes a single POST /scan endpoint that runs raw text through the existing
-/// detection pipeline (runPipeline) and the existing scanReporter, returning the
-/// DetectionResult as JSON. This is not an MCP transport — it is a back-end service
-/// used by external callers (e.g. the blindseal.io demo site) so that real visitor
-/// inputs become real attestations under the same sampling/batching policy as the
-/// stdio and http MCP transports.
+/// detection pipeline (runPipeline), returning the DetectionResult as JSON. This is not
+/// an MCP transport — it is a back-end service for external callers (e.g. a demo site)
+/// that want a verdict on free-form text.
 ///
 /// Detection logic is reused verbatim. Capability gating, taint tracking, manifest
 /// checking, audit logging, and local scan persistence are intentionally not wired
 /// here — they all require MCP-protocol context (tool calls, server identifiers,
-/// session boundaries) that a free-form scan endpoint doesn't have. Telemetry and
-/// attestation are wired because both operate on per-scan verdicts only.
+/// session boundaries) that a free-form scan endpoint doesn't have.
 
 import {
   createServer,
@@ -20,11 +17,7 @@ import {
 } from 'node:http';
 import { loadConfig } from '../config.js';
 import { runPipeline } from '../detection/pipeline.js';
-import {
-  createReporter,
-  sha256Hex,
-  type TelemetryReporter,
-} from '../telemetry/index.js';
+import { sha256Hex } from './shared.js';
 
 export interface ScanHttpOptions {
   listenPort: number;
@@ -94,14 +87,7 @@ function parseRequestBody(raw: string): ScanRequestBody | { error: string } {
 }
 
 export function startScanHttp(opts: ScanHttpOptions): Server {
-  const config = loadConfig();
-  const telemetry: TelemetryReporter = createReporter(config.telemetry);
-
-  if (config.telemetry.bannerOnStart) {
-    process.stderr.write(
-      'blindseal: telemetry is enabled (sha256 hashes only, no raw content) — see PRIVACY.md; set BLINDSEAL_TELEMETRY=0 to disable\n',
-    );
-  }
+  loadConfig(); // same env validation as the MCP transports
 
   const defaultServerUrl = opts.defaultServerUrl ?? 'scan-http:blindseal';
 
@@ -112,7 +98,6 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
     if (req.method === 'GET' && (path === '/health' || path === '/')) {
       sendJson(res, 200, {
         ok: true,
-        telemetryEnabled: telemetry.enabled,
       });
       return;
     }
@@ -151,18 +136,6 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       return;
     }
 
-    if (telemetry.enabled) {
-      telemetry.send({
-        type: 'detection',
-        layer: result.layer ?? null,
-        verdict: result.verdict,
-        confidence: result.confidence,
-        toolName,
-        contentHash,
-        patterns: result.detectedPatterns,
-      });
-    }
-
     if (result.verdict !== 'clean') {
       process.stderr.write(
         `blindseal[scan-http]: ${result.verdict} (L${result.layer ?? '?'}) tool=${toolName} confidence=${result.confidence.toFixed(2)}\n`,
@@ -191,7 +164,6 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
 
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
-      void telemetry.shutdown();
       server.close(() => process.exit(0));
     });
   }

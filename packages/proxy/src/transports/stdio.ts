@@ -18,11 +18,6 @@ import {
   type ToolsListResult,
 } from '../manifest/index.js';
 import {
-  createReporter,
-  sha256Hex,
-  type TelemetryReporter,
-} from '../telemetry/index.js';
-import {
   createAuditLogger,
   preview,
   type AuditLogger,
@@ -115,19 +110,12 @@ export function startProxy(cmd: string, args: string[]): void {
   const tradeRate = new TradeRateState();
   const manifest =
     config.manifest.mode !== 'off' ? new ManifestChecker(cmd, args, config.manifest) : null;
-  const telemetry: TelemetryReporter = createReporter(config.telemetry);
   const audit: AuditLogger = createAuditLogger(config.audit);
   const scanStore: ScanStore = createScanStore(config.persistence);
 
   if (scanStore.enabled) {
     process.stderr.write(
       `blindseal: persisting scan history to ${scanStore.dbPath} (set BLINDSEAL_PERSIST=0 to disable)\n`,
-    );
-  }
-
-  if (config.telemetry.bannerOnStart) {
-    process.stderr.write(
-      'blindseal: telemetry is enabled (sha256 hashes only, no raw content) — see PRIVACY.md; set BLINDSEAL_TELEMETRY=0 to disable\n',
     );
   }
 
@@ -169,16 +157,6 @@ export function startProxy(cmd: string, args: string[]): void {
           decideCapability(name, params?.arguments, taint, config.capability),
           decideTradePolicy(name, params?.arguments, taint, config.tradePolicy, tradeRate),
         );
-        if (decision.action !== 'allow' && telemetry.enabled) {
-          telemetry.send({
-            type: 'capability',
-            action: decision.action,
-            toolName: name,
-            argsHash: sha256Hex(JSON.stringify(params?.arguments ?? null)),
-            sourceTools: (decision.taintSources ?? []).map((s) => s.toolName),
-            matchedPattern: decision.matchedPattern,
-          });
-        }
         if (audit.enabled) {
           audit.log({
             type: 'capability',
@@ -242,15 +220,6 @@ export function startProxy(cmd: string, args: string[]): void {
             verdict,
             config.manifest.mode === 'strict' ? 'strict' : 'on',
           );
-          if (telemetry.enabled) {
-            telemetry.send({
-              type: 'manifest',
-              status: verdict.status,
-              serverKey: verdict.serverKey,
-              fingerprint: verdict.fingerprint.fingerprint,
-              changes: verdict.changes,
-            });
-          }
           if (audit.enabled) {
             audit.log({
               type: 'manifest',
@@ -273,17 +242,6 @@ export function startProxy(cmd: string, args: string[]): void {
           process.stderr.write(
             `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
           );
-        }
-        if (telemetry.enabled) {
-          telemetry.send({
-            type: 'detection',
-            layer: outcome.layer ?? null,
-            verdict: outcome.verdict,
-            confidence: outcome.result?.confidence ?? 0,
-            toolName,
-            contentHash: outcome.contentHash,
-            patterns: outcome.result?.detectedPatterns ?? [],
-          });
         }
         if (audit.enabled) {
           const previewText = (msg.result.content
@@ -335,7 +293,6 @@ export function startProxy(cmd: string, args: string[]): void {
 
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
-      void telemetry.shutdown();
       void audit.shutdown();
       try { scanStore.close(); } catch { /* ignore */ }
       if (!child.killed) child.kill(sig);

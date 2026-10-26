@@ -1,47 +1,31 @@
 # What Blindseal collects
 
-Blindseal's defense gets stronger as more deployments contribute attack data to a shared feed. That feed is opt-out: telemetry is on by default when a collector URL is configured, off when `BLINDSEAL_TELEMETRY=0` is set, and a banner prints to stderr on first run so it is never silent.
+Nothing, by default. The proxy has no telemetry: no collector, no install id, no network
+calls other than the ones a command explicitly makes on your behalf.
 
-## What we collect
+## What stays on this machine
 
-For every scan, capability decision, and manifest verdict:
+- Every decision, verdict, and hash the proxy produces. The hash-chained audit log
+  (`~/.blindseal/audit.log`) is content-free and local.
+- Scan history (`BLINDSEAL_PERSIST=1`, `~/.blindseal/scans.db`) is local and opt-in.
+- The dashboard is served by the proxy itself on `127.0.0.1` behind a token in
+  `~/.blindseal/dashboard.token`; it never loads anything from the network.
 
-- **`contentHash`** — SHA-256 of the tool output, never the raw content
-- **`argsHash`** — SHA-256 of the tool-call arguments, never the raw args
-- **MCP server URL** as captured by the proxy (`stdio:filesystem`, `https://mcp.example.com`). Set `BLINDSEAL_TELEMETRY_REDACT_SERVERS=1` to send a SHA-256 of this instead.
-- **Tool name** (`read_file`, `http_get`) — public protocol surface
-- **Verdict** (`clean` / `suspicious` / `malicious`), confidence, layer that fired, matched pattern labels
-- **Latency** of detection
-- A random per-process **install id** (or a hashed stable id if `BLINDSEAL_TELEMETRY_INSTALL_ID` is set)
+## Network calls the proxy does make, and when
 
-## What we never collect
+- **Layer 3 judge** — only if you configure a key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) or
+  `OLLAMA_HOST`. The judged text is the tool output being screened; it goes to the provider you chose.
+- **Solana RPC** (`BLINDSEAL_RPC_URL`, else the public mainnet endpoint) — `blindseal attest` fetches
+  the current slot for the expiry; `blindseal submit` sends the verify transaction; the dashboard's
+  nullifier lookups are proxied server-side. SHA-256 commitments only, never content.
+- **Prover download** — `blindseal attest` fetches the prover binary from the GitHub release named in
+  the package once, verifies its sha256, and caches it under `~/.blindseal/bin/`.
+- **The MCP server you wrap** — `blindseal -- <server>` or `--transport http --upstream <url>`
+  talks to the server exactly as your agent would have.
 
-- **Raw tool output content** — only its SHA-256
-- **Raw tool-call arguments** — only their SHA-256
-- **User prompts or agent reasoning** — Blindseal does not see these
-- **API keys, credentials, environment variables** — proxy never reads them
-- **Filesystem paths beyond what appears as a `toolName`**
-- **Personally identifying information** — by design
+## What is never sent anywhere
 
-## How to disable
-
-Either of these turns telemetry off completely:
-
-```
-export BLINDSEAL_TELEMETRY=0
-# or, unset the collector URL:
-unset BLINDSEAL_TELEMETRY_URL
-```
-
-When telemetry is implicitly enabled, Blindseal prints one line to stderr on first run noting this and pointing here. No further notifications.
-
-## Where it goes
-
-Events are POSTed in batches of up to 100 (or every 5s, whichever first) to `BLINDSEAL_TELEMETRY_URL`. The endpoint is operator-controlled; for the public Blindseal network it points at our collector. Failures are dropped silently (logged once per 60s); proxy operation never blocks on telemetry.
-
-## What the data is used for
-
-- The public threat feed (recent attacks blocked across the network)
-- Per-MCP-server reputation grounding (combined with on-chain attestations)
-- Adding novel attack variants to the Layer 2 corpus so every deployment benefits
-- Nothing else. No third-party sharing, no advertising, no profiling.
+- Raw tool output or tool-call arguments (outside the Layer 3 provider you opted into)
+- User prompts or agent reasoning — Blindseal does not see these
+- API keys, credentials, environment variables
+- Personally identifying information

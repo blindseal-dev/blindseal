@@ -441,8 +441,8 @@ describe('edge cases — 10k small responses', () => {
     const growthMb = (rssEnd - rssStart) / 1024;
 
     // We require growth < 100 MB across 950 requests. Anything monotonically growing
-    // beyond that would imply a leak (manifest checker, taint store, telemetry batch).
-    // Capability + telemetry are off by default here, so growth should be near zero.
+    // beyond that would imply a leak (manifest checker, taint store, audit buffer).
+    // Capability gating is off by default here, so growth should be near zero.
     expect(growthMb).toBeLessThan(100);
     expect(elapsed).toBeLessThan(60000);
 

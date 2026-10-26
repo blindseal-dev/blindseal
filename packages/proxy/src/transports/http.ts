@@ -1,6 +1,6 @@
 /// HTTP / Streamable-HTTP MCP transport.
 /// Listens locally, forwards every POST to a configured upstream MCP URL, scans responses with
-/// the same detection pipeline + capability gate + manifest checker + telemetry as the stdio
+/// the same detection pipeline + capability gate + manifest checker + audit as the stdio
 /// path. Both single-shot JSON responses and Server-Sent Event streams are scanned: SSE events
 /// are parsed at event boundaries, JSON-RPC tool-call responses are inspected, mutated if needed,
 /// then re-serialized into the SSE stream.
@@ -20,11 +20,6 @@ import {
   type InitializeResult,
   type ToolsListResult,
 } from '../manifest/index.js';
-import {
-  createReporter,
-  sha256Hex,
-  type TelemetryReporter,
-} from '../telemetry/index.js';
 import { createAuditLogger, preview, type AuditLogger } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
@@ -98,19 +93,12 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
   const tradeRate = new TradeRateState();
   const manifest =
     config.manifest.mode !== 'off' ? new ManifestChecker('http', [opts.upstream], config.manifest) : null;
-  const telemetry: TelemetryReporter = createReporter(config.telemetry);
   const audit: AuditLogger = createAuditLogger(config.audit);
   const scanStore: ScanStore = createScanStore(config.persistence);
 
   if (scanStore.enabled) {
     process.stderr.write(
       `blindseal: persisting scan history to ${scanStore.dbPath} (set BLINDSEAL_PERSIST=0 to disable)\n`,
-    );
-  }
-
-  if (config.telemetry.bannerOnStart) {
-    process.stderr.write(
-      'blindseal: telemetry is enabled (sha256 hashes only, no raw content) — see PRIVACY.md; set BLINDSEAL_TELEMETRY=0 to disable\n',
     );
   }
 
@@ -150,16 +138,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           decideCapability(toolName, toolArgs, taint, config.capability),
           decideTradePolicy(toolName, toolArgs, taint, config.tradePolicy, tradeRate),
         );
-        if (decision.action !== 'allow' && telemetry.enabled) {
-          telemetry.send({
-            type: 'capability',
-            action: decision.action,
-            toolName,
-            argsHash: sha256Hex(JSON.stringify(toolArgs ?? null)),
-            sourceTools: (decision.taintSources ?? []).map((s) => s.toolName),
-            matchedPattern: decision.matchedPattern,
-          });
-        }
         if (audit.enabled) {
           audit.log({
             type: 'capability',
@@ -229,17 +207,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
                 process.stderr.write(
                   `blindseal[http/sse]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${scannedTool}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
                 );
-              }
-              if (telemetry.enabled) {
-                telemetry.send({
-                  type: 'detection',
-                  layer: outcome.layer ?? null,
-                  verdict: outcome.verdict,
-                  confidence: outcome.result?.confidence ?? 0,
-                  toolName: scannedTool,
-                  contentHash: outcome.contentHash,
-                  patterns: outcome.result?.detectedPatterns ?? [],
-                });
               }
               if (audit.enabled) {
                 const previewText = scannedMsg.result.content
@@ -337,15 +304,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
             for (const c of verdict.changes) process.stderr.write(`blindseal[http]:   - ${c}\n`);
             if (config.manifest.mode === 'strict') process.exit(3);
           }
-          if (telemetry.enabled) {
-            telemetry.send({
-              type: 'manifest',
-              status: verdict.status,
-              serverKey: verdict.serverKey,
-              fingerprint: verdict.fingerprint.fingerprint,
-              changes: verdict.changes,
-            });
-          }
           if (audit.enabled) {
             audit.log({
               type: 'manifest',
@@ -365,17 +323,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         process.stderr.write(
           `blindseal[http]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
         );
-      }
-      if (telemetry.enabled) {
-        telemetry.send({
-          type: 'detection',
-          layer: outcome.layer ?? null,
-          verdict: outcome.verdict,
-          confidence: outcome.result?.confidence ?? 0,
-          toolName,
-          contentHash: outcome.contentHash,
-          patterns: outcome.result?.detectedPatterns ?? [],
-        });
       }
       if (audit.enabled) {
         const previewText = respMsg.result.content
@@ -442,7 +389,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
 
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
-      void telemetry.shutdown();
       void audit.shutdown();
       try { scanStore.close(); } catch { /* ignore */ }
       server.close(() => process.exit(0));

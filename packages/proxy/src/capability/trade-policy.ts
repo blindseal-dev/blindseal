@@ -12,7 +12,7 @@
 ///   - market-hours enforcement (tokenized stocks trade on a schedule)
 ///
 /// It reuses the same GateDecision shape as decideCapability, so both gates flow
-/// through one block/warn/audit/telemetry path in the transports (see mergeDecisions).
+/// through one block/warn/audit path in the transports (see mergeDecisions).
 
 import type { GateDecision } from './gate.js';
 import type { TaintStore } from './taint.js';

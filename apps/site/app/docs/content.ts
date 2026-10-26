@@ -74,35 +74,37 @@ nullifier       = sha256("blindseal.nullifier.v1" || actionHash)`;
 const PAGE_LIST: Omit<DocPage, 'prev' | 'next'>[] = [
   {
     slug: 'quickstart', path: '/docs', group: 'Getting started', title: 'Quickstart',
-    summary: 'Ten minutes on a fresh machine: install, run the proxy in front of an MCP server, see every tool call screened, and verify an attestation without trusting this site. Node 20+ and pnpm are the only requirements — the verifier ships as WebAssembly, so no Rust or Solana toolchain is needed to use Blindseal.',
+    summary: 'Ten minutes on a fresh machine: install from npm, run the proxy in front of an MCP server, see every tool call screened, and verify an attestation without trusting this site. Node 20+ is the only requirement — the verifier ships as WebAssembly, so no Rust or Solana toolchain is needed to use Blindseal. Building from the repository is a separate page: [From source](/docs/source).',
     sections: [
       { id: 'install', heading: 'Install and run', blocks: [
-        code(`$ git clone <repo> blindseal && cd blindseal
-$ ./scripts/quickstart.sh          # installs, builds the dashboard, verifies the sample attestation
-$ BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
+        code(`$ npm i -g blindseal              # or run every command below with npx: npx blindseal …
+$ blindseal init                   # scaffolds ~/.blindseal: identity keys, the default policy, the dashboard token
+$ blindseal run --mock             # the local API + dashboard over sample traffic
 blindseal (MOCK): local API on http://127.0.0.1:7777
   dashboard: http://127.0.0.1:7777/#token=…`, 'shell'),
-        p('The proxy serves the dashboard from its own origin with a Content-Security-Policy that allows the WebAssembly verifier and nothing else. Open the printed URL — the token is in the fragment and never leaves memory.'),
+        p('`blindseal` is the proxy and the CLI in one package. The proxy serves the dashboard from its own origin with a Content-Security-Policy that allows the WebAssembly verifier and nothing else. Open the printed URL — the token is in the fragment and never leaves memory. `run --mock` shows the dashboard over sample decisions; leave `--mock` off once an agent is pointed at the proxy.'),
       ] },
       { id: 'agent', heading: 'Point an agent', blocks: [
-        p('In the agent’s MCP config, launch the upstream server through `blindseal`. Every tool call and result passes the four detection layers locally before it reaches the agent or the server.'),
+        p('Put `blindseal --` in front of the MCP server command. Everything after the `--` is the upstream server; every tool call and result passes the four detection layers locally before it reaches the agent or the server.'),
+        code(`$ blindseal -- github-mcp --stdio    # the proxy launches the server and sits in the middle`, 'shell'),
+        p('Or let `blindseal init --wrap` rewrite the MCP configs it finds so every server is launched through the proxy. By hand, the config entry looks like this:'),
         code(`"mcpServers": {
   "github": { "command": "blindseal", "args": ["--", "github-mcp"] }
 }`, 'json'),
       ] },
       { id: 'attest', heading: 'Attest a screened action', blocks: [
-        p('An attestation is a Groth16 proof that a specific tool call was screened under a committed policy by a specific detector version and that the deterministic layers passed. Proving runs locally on CPU and takes a while; it is asynchronous by design.'),
+        p('An attestation is a Groth16 proof that a specific tool call was screened under a committed policy by a specific detector version and that the committed L1 rules passed (L0 decoding runs in the proxy but is not inside the proof yet — see [What is proven](/docs/scope)). Proving runs locally on CPU and takes hours: the sample attestation on the [verify page](/verify) took 2 h 16 min to prove on an Apple M1 Max (32 GB). It is asynchronous by design.'),
         code(`$ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
 decision d_…: clean (audit #12 0x…)
-proving (this takes a while on CPU)…
+proving (hours on CPU)…
 attestation written: attestation.json`, 'shell'),
-        p('The decision is appended to the hash-chained audit log before proving starts, content-free: only ids, the verdict and the payload hash.'),
+        p('The decision is appended to the hash-chained audit log before proving starts, content-free: only ids, the verdict and the payload hash. The prover is a separate binary: on first use it is downloaded from the project’s GitHub release for your platform, or you can build it yourself and pass `--prover <path>` (see [From source](/docs/source)).'),
       ] },
       { id: 'verify', heading: 'Verify it — anywhere', blocks: [
         code(`$ blindseal verify attestation.json        # off-chain, the wasm verifier
 $ blindseal submit attestation.json        # Solana mainnet: verifies on chain, consumes the nullifier
 $ blindseal submit attestation.json --check   # has this nullifier been consumed?`, 'shell'),
-        p('Or drop the file on the [verify page](/verify): it runs the same verifier in your browser and uploads nothing. `submit` compares the RPC’s genesis hash with mainnet-beta’s before sending; there is no other cluster.'),
+        p('Or drop the file on the [verify page](/verify): it runs the same verifier in your browser and uploads nothing. `submit` compares the RPC’s genesis hash with mainnet-beta’s before sending; there is no other cluster. `blindseal audit verify` recomputes the local audit chain, and `blindseal dashboard` reopens the dashboard for a running proxy.'),
       ] },
       { id: 'api', heading: 'API reference', count: `${API_ENDPOINTS.length} endpoints`, blocks: [
         p('The local API the dashboard speaks. Auth: `Authorization: Bearer <token>`. Same-origin only; the browser never contacts an RPC — on-chain reads go through the proxy.'),
@@ -115,7 +117,7 @@ $ blindseal submit attestation.json --check   # has this nullifier been consumed
     summary: 'Blindseal sits between an agent and its tools. Every call and result is screened locally, the decision is written to a hash-chained log, and — when the action touches a chain — a zero-knowledge proof binds the screening to that exact action. The five objects below are the whole model.',
     sections: [
       { id: 'decision', heading: 'Decision', blocks: [
-        p('One screened tool call or result. Four layers run in order: L0 decodes (base64, hex, URL, HTML entities, nested) and re-screens; L1 is a fixed set of regex rules compiled to DFAs; L2 compares embeddings against a corpus; L3 is a model judge. A decision carries a verdict (pass / flag / block), which layer decided, and the commitments below. The raw payload is encrypted at rest and can be revealed on the operator’s explicit confirmation; it is never written to the chain or the log.'),
+        p('One screened tool call or result. Four layers run in order: L0 decodes (base64, hex, URL, HTML entities, nested) and re-screens; L1 is a fixed set of regex rules compiled to DFAs; L2 compares embeddings against a corpus; L3 is a model judge. Today the proof covers L1; L0 runs in the proxy and is next to go inside the proof; L2 and L3 are attested, not proven. A decision carries a verdict (pass / flag / block), which layer decided, and the commitments below. The raw payload is encrypted at rest and can be revealed on the operator’s explicit confirmation; it is never written to the chain or the log.'),
       ] },
       { id: 'policy', heading: 'Policy and the policy root', blocks: [
         p('The policy is the set of deterministic rules in force. Its root is a Merkle root over one leaf per rule, where a regex rule’s leaf hashes its compiled DFA bytes — so the root commits to exactly what the detector executes, not to a pattern string that could be compiled differently. Changing a rule, or the regex engine version, changes the root. Operators can register roots on chain and run the verifier in allowlist mode.'),
@@ -124,7 +126,7 @@ $ blindseal submit attestation.json --check   # has this nullifier been consumed
         p('Each decision appends a content-free entry — decision id, verdict, payload hash, timestamp — whose hash includes the previous entry’s hash. `audit verify` recomputes the chain from genesis; any edit shows as a break. A *disclosure* is a signed slice of the chain over a time window that a third party can verify offline against the proxy’s identity key, without seeing any content.'),
       ] },
       { id: 'attestation', heading: 'Attestation', blocks: [
-        p('A Groth16 proof from an SP1 zkVM guest that: recomputed the payload hash, recomputed the policy root from the DFAs it ran, ran L1 and found the payload clean, and bound the on-chain action through an *action hash*. Its public inputs are six values — payload hash, policy root, detector version (the guest’s verifying key), action hash, nullifier, expiry slot. Nothing about the content, the agent, or the operator is public. Proving is local, CPU-only and slow (hours on a laptop today); it is asynchronous by design and the numbers are published in `docs/performance.md`.'),
+        p('A Groth16 proof from an SP1 zkVM guest that: recomputed the payload hash, recomputed the policy root from the DFAs it ran, ran L1 and found the payload clean, and bound the on-chain action through an *action hash*. Its public inputs are six values — payload hash, policy root, detector version (the guest’s verifying key), action hash, nullifier, expiry slot. Nothing about the content, the agent, or the operator is public. Proving is local, CPU-only and slow — the sample attestation took 2 h 16 min on an Apple M1 Max (32 GB); it is asynchronous by design and the measured numbers are published in `docs/performance.md`.'),
       ] },
       { id: 'verifier', heading: 'On-chain verifier and nullifier', blocks: [
         p('A Solana program verifies the proof (one instruction, alt_bn128 syscalls) and consumes a *nullifier* — a PDA derived from the action hash — so an attestation can be used exactly once. A gated program calls it by CPI in the same transaction as the action it guards, passing the action fields **it** is about to execute; if they differ from the screened action the hash does not match and the transaction fails. If the action itself fails, the whole transaction reverts and the nullifier stays unconsumed. The verifier has a paused flag, a vkey allowlist and an optional policy-root allowlist, all authority-controlled.'),
@@ -225,12 +227,12 @@ program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
   },
   {
     slug: 'scope', path: '/docs/scope', group: 'What is proven — and what is not', title: 'What is proven — and what is not', nav: 'What is proven',
-    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the deterministic layers passed. The model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy.',
+    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy.',
     sections: [
       { id: 'proven', heading: 'Proven (zero-knowledge, verifiable by anyone)', blocks: [
         list([
           'The payload with this hash was screened by the detector with this verifying key, under the policy with this root.',
-          'The deterministic layer (L1 regex rules, as committed DFAs) found it clean. A proof cannot exist for a payload L1 flags.',
+          'The committed L1 rules (regex rules, as committed DFAs) found it clean. A proof cannot exist for a payload L1 flags.',
           'The screening is bound to one on-chain action — program, instruction, signer, recipient, mint, amount — and to an expiry slot and a fresh nonce.',
           'On chain: the attestation was consumed once. A second use fails.',
         ]),
@@ -244,9 +246,9 @@ program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
       { id: 'not', heading: 'Not covered', blocks: [
         list([
           'Traffic that does not pass through the proxy.',
-          'Novel attacks the deterministic rules miss. On the published red-team corpus the proven layers alone catch roughly a third of attacks and little of the novel holdout set; detection in practice leans on L2/L3, which are attested rather than proven. The numbers are in `packages/LIMITATIONS.md` and are updated with every corpus change.',
+          'Novel attacks the committed rules miss. On the published red-team corpus the proven layer alone catches roughly a third of attacks and little of the novel holdout set; detection in practice leans on L2/L3, which are attested rather than proven. The numbers are in `packages/LIMITATIONS.md` and are updated with every corpus change.',
           'The correctness of the gated program beyond the fields it forwards. Blindseal checks that the forwarded action equals the screened one; it does not audit the program.',
-          'L0 decode-then-L1 is run by the proxy but is not yet inside the guest; the proof covers L1 on the payload as received. In-guest L0 is the next increment and will change the detector version.',
+          'L0 (decode-then-L1) is run by the proxy but is not inside the proof yet; the proof covers L1 on the payload as received. L0 inside the proof is the next increment and will change the detector version.',
         ]),
       ] },
       { id: 'privacy', heading: 'What is public', blocks: [
@@ -255,6 +257,48 @@ program     merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, 'text'),
       { id: 'upgradeable', heading: 'The programs are upgradeable', blocks: [
         p('Both on-chain programs — the verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb` and the transfer-gate example `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the repository, and `solana-verify` lets you check that the deployed bytes match the public source.'),
         p('Planned: the authority moves to a Squads multisig with a timelock, and the program ids stay the same. Until then, treat the single key as the trust root it is.'),
+      ] },
+    ],
+  },
+  {
+    slug: 'source', path: '/docs/source', group: 'From source', title: 'From source',
+    summary: 'Everything on the [Quickstart](/docs) comes from npm. This page is for working from the repository instead: running the proxy and dashboard from a clone, building the Solana programs and the prover, and reproducing the deployed program bytes. Node 20+ and pnpm for the TypeScript side; Rust, Solana and Anchor toolchains only for the parts that say so.',
+    sections: [
+      { id: 'clone', heading: 'Clone and run', blocks: [
+        code(`$ git clone https://github.com/blindseal-dev/blindseal && cd blindseal
+$ ./scripts/quickstart.sh          # pnpm install, build the dashboard, verify the sample attestation (real Groth16) and reject a tampered copy
+$ BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
+blindseal (MOCK): local API on http://127.0.0.1:7777
+  dashboard: http://127.0.0.1:7777/#token=…`, 'shell'),
+        p('`scripts/quickstart.sh` needs only Node and pnpm: the wasm verifier and the program IDLs are committed, so nothing is compiled. The last line runs the CLI from the checkout; every `blindseal …` command on the other pages is `pnpm -C packages/proxy exec tsx src/index.ts …` here.'),
+      ] },
+      { id: 'programs', heading: 'Build the programs', blocks: [
+        code(`$ scripts/build-programs.sh        # cargo build-sbf for blindseal-verify and transfer-gate + anchor idl build
+$ scripts/test-m2.sh               # the on-chain suite against a local validator`, 'shell'),
+        p('Requires Rust, the Solana CLI and Anchor. The script builds to SBF with `cargo build-sbf` (target dir outside `programs/`) and writes the `.so` files to `target/deploy/` and the IDLs to `target/idl/`. Program ids are fixed: the verifier `merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb`, the transfer-gate example `ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG`.'),
+      ] },
+      { id: 'prover', heading: 'Build the prover', blocks: [
+        code(`$ cargo build --release -p blindseal-prover
+$ blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG \\
+    --out attestation.json --prover target/release/blindseal-prover`, 'shell'),
+        p('The prover wraps the committed SP1 guest (`crates/guest`) and produces the Groth16 attestation. It needs the SP1 toolchain and, for the Groth16 wrap, Docker with about 24 GB of memory available. Proving takes hours on CPU — 2 h 16 min for the sample attestation on an Apple M1 Max (32 GB). Without `--prover`, `blindseal attest` uses the release binary it downloads on first use; the built binary is the same program.'),
+      ] },
+      { id: 'reproduce', heading: 'Reproduce the deployed programs', blocks: [
+        code(`$ cd programs
+$ solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name blindseal_verify
+$ solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name transfer_gate
+$ solana-verify get-program-hash merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb     # compare with the executable hash printed above`, 'shell'),
+        p('`solana-verify` builds in a pinned container so the bytes are reproducible, then compares the executable hash with what is deployed on mainnet. Both programs keep an upgrade authority; see [What is proven](/docs/scope) for what that means for trust.'),
+      ] },
+      { id: 'layout', heading: 'Repository layout', blocks: [
+        list([
+          '`packages/proxy` — the MCP proxy and CLI, published as `blindseal`.',
+          '`packages/sdk` — the verify instruction, submit, off-chain verify; published as `blindseal-sdk`.',
+          '`packages/verifier-wasm` — the Groth16 verifier compiled to WebAssembly; published as `blindseal-verifier-wasm`.',
+          '`crates/` — the detector core (DFA rules), the SP1 guest, the prover and the verifier crate.',
+          '`programs/` — the Anchor programs `blindseal-verify` and `transfer-gate`.',
+          '`apps/site` — this site; `packages/dashboard` — the local dashboard the proxy serves.',
+        ]),
       ] },
     ],
   },

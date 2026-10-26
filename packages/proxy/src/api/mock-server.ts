@@ -4,10 +4,10 @@
 /// The real API (backed by the M1 engine) replaces the handlers, not the contract.
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import type { Socket } from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
+import { resolveDashboardToken } from '../paths.js';
 import { getNullifierStatus } from '@blindseal/chain-reads';
 import { discloseBundle, hashEntry } from '@blindseal/audit';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
@@ -86,19 +86,7 @@ function loadFixtures(dir: string): Fixtures {
 }
 
 export function resolveToken(explicit?: string): string {
-  if (explicit) return explicit;
-  const dir = path.join(os.homedir(), '.blindseal');
-  const file = path.join(dir, 'dashboard.token');
-  try {
-    if (existsSync(file)) return readFileSync(file, 'utf8').trim();
-    mkdirSync(dir, { recursive: true });
-    const tok = randomBytes(24).toString('base64url');
-    writeFileSync(file, tok + '\n', { mode: 0o600 });
-    return tok;
-  } catch {
-    // homedir unwritable (CI sandbox): fall back to an ephemeral token
-    return randomBytes(24).toString('base64url');
-  }
+  return resolveDashboardToken(explicit);
 }
 
 // ---- helpers ----

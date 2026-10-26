@@ -11,7 +11,6 @@ export default defineConfig({
     index: 'src/index.ts',
     'audit-view': 'src/cli/audit-view.ts',
     decide: 'src/cli/decide.ts',
-    init: 'src/cli/init.ts',
   },
   format: ['esm'],
   target: 'node20',
@@ -30,7 +29,7 @@ export default defineConfig({
       copyFileSync(join(corpusDir, f), join(here, 'dist', f));
     }
     // npm requires bin scripts to be executable
-    for (const f of ['index.js', 'audit-view.js', 'decide.js', 'init.js']) {
+    for (const f of ['index.js', 'audit-view.js', 'decide.js']) {
       chmodSync(join(here, 'dist', f), 0o755);
     }
     console.log('✓ corpus data copied to dist/ · bin scripts marked executable');

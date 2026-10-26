@@ -1,55 +1,43 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { startProxy } from './transports/stdio.js';
 import { startHttpProxy } from './transports/http.js';
 import { startScanHttp } from './transports/scan-http.js';
 import { runDemo } from './cli/demo.js';
 import { runHistoryCli } from './cli/history.js';
-import { runDashboardCli } from './cli/dashboard.js';
-import { runRun } from './cli/run.js';
+import { packageVersion } from './paths.js';
 
-function readVersion(): string {
-  try {
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    // dist/index.js → ../package.json; src/index.ts → ../../package.json
-    for (const rel of ['../package.json', '../../package.json']) {
-      const p = path.resolve(here, rel);
-      try {
-        const pkg = JSON.parse(readFileSync(p, 'utf8'));
-        if (pkg.name && pkg.version) return String(pkg.version);
-      } catch {
-        /* keep trying */
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return '0.0.0';
-}
-
-const HELP = `blindseal — scans MCP tool responses for prompt injection
+const HELP = `blindseal — a local MCP proxy that screens every tool call, keeps a hash-chained audit
+log, and produces zero-knowledge attestations verifiable on Solana.
 
 Usage
-  npx blindseal demo                                         # interactive demo (30s first-run experience)
-  BLINDSEAL_MOCK=1 blindseal run --mock                                 # local API + WS over fixtures (FRONTEND.md §5)
-  npx blindseal -- <command> [args...]                      # stdio (wrap a local MCP server)
-  npx blindseal --transport http --upstream <url> [--port]  # http (proxy a remote MCP server)
-  npx blindseal history [flags]                              # show local scan history (requires BLINDSEAL_PERSIST=1)
-  npx blindseal dashboard [flags]                            # localhost dashboard for scan history
+  blindseal init                                    set up ~/.blindseal (identity key, default policy, dashboard token)
+  blindseal init --wrap [--yes --dry-run --config <path>]
+                                                    route the MCP servers in your Claude configs through blindseal
+  blindseal init --unwrap                           restore those configs from their backups
+  blindseal run --mock                              local API + dashboard over bundled sample data
+  blindseal dashboard                               open the dashboard (starts run --mock if nothing is listening)
+  blindseal -- <command> [args...]                  wrap a stdio MCP server
+  blindseal --transport http --upstream <url>       proxy a remote MCP server over HTTP
+  blindseal --transport scan-http [--port <n>]      stand-alone POST /scan endpoint
+  blindseal attest <toolcall.json> --target-program <id> [--out <file>] [--expiry <slot> | --no-expiry]
+  blindseal submit <attestation.json>               verify on Solana mainnet and consume the nullifier
+  blindseal verify <attestation.json | disclosure.json>
+  blindseal audit verify | disclose --from <i> --to <j>
+  blindseal history [flags]                         local scan history (needs BLINDSEAL_PERSIST=1)
+  blindseal demo                                    interactive detection demo
+  blindseal <command> --help                        help for any command
 
 Examples
-  npx blindseal -- npx -y @modelcontextprotocol/server-filesystem /tmp
-  npx blindseal --transport http --upstream https://mcp.example.com/v1 --port 8800
+  blindseal -- npx -y @modelcontextprotocol/server-filesystem /tmp
+  blindseal --transport http --upstream https://mcp.example.com/v1 --port 8800
 
-Flags
-  --transport <stdio|http|scan-http>  default: stdio
+Proxy flags
+  --transport <stdio|http|scan-http>  default: stdio (requires \`-- <command>\`)
   --upstream <url>                    required when --transport http
   --port, --listen-port <n>           default: 8800 (http) / 9787 (scan-http)
   --host <addr>                       default: 127.0.0.1
   --server-url <url>                  logical server identifier for scan-http (default: scan-http:blindseal)
-  --version, -v              print version
-  --help, -h                 this help
+  --version, -v                       print version
+  --help, -h                          this help
 
 Detection (env)
   BLINDSEAL_MODE                 block (default) | warn | log
@@ -58,10 +46,10 @@ Detection (env)
   BLINDSEAL_LAYER3_MODEL         model id override
   BLINDSEAL_LAYER3_BASE_URL      base URL override (ollama or custom endpoint)
   BLINDSEAL_LAYER3_TIMEOUT_MS    judge call hard timeout (default 15000)
-  BLINDSEAL_L3_FP_SAFE           1 = demote suspicious→clean when L3 unavailable (old behaviour)
-  ANTHROPIC_API_KEY          BYO key for Layer 3 (Anthropic)  ← strongly recommended
-  OPENAI_API_KEY             BYO key for Layer 3 (OpenAI / compat)
-  OLLAMA_HOST                Ollama base URL (default: http://localhost:11434); set to enable offline L3
+  BLINDSEAL_L3_FP_SAFE           1 = demote suspicious→clean when L3 unavailable
+  ANTHROPIC_API_KEY              BYO key for Layer 3 (Anthropic)  ← strongly recommended
+  OPENAI_API_KEY                 BYO key for Layer 3 (OpenAI / compat)
+  OLLAMA_HOST                    Ollama base URL (default: http://localhost:11434); set to enable offline L3
 
 Capability firewall (env, default off)
   BLINDSEAL_CAPABILITY                 1 to enable taint-tracking + gate
@@ -74,28 +62,25 @@ Manifest verification (env)
   BLINDSEAL_MANIFEST_CHECK             on (default) | off | strict
   BLINDSEAL_MANIFEST_CACHE_DIR         override \$XDG_CACHE_HOME/blindseal/manifests
 
-Telemetry (env, default on when URL configured)
-  BLINDSEAL_TELEMETRY                  0 to disable
-  BLINDSEAL_TELEMETRY_URL              collector ingest URL
-  BLINDSEAL_TELEMETRY_SECRET           optional Bearer token
-  BLINDSEAL_TELEMETRY_BATCH            batch size (default 100)
-  BLINDSEAL_TELEMETRY_FLUSH_MS         flush interval (default 5000)
-  BLINDSEAL_TELEMETRY_INSTALL_ID       stable install id (hashed before send)
-
 Audit log (env, default off)
   BLINDSEAL_AUDIT_LOG                  path to append-only JSONL of every decision
 
-Local scan history (env, default off — opt in for visibility)
+Local scan history (env, default off)
   BLINDSEAL_PERSIST                    1 to record every scan to ~/.blindseal/scans.db
   BLINDSEAL_PERSIST_PATH               override DB path (default ~/.blindseal/scans.db)
   BLINDSEAL_RETENTION_DAYS             rolling retention (default 30, purged on open)
 
-On-chain attestation (env, default off)
-  BLINDSEAL_ATTEST                     1 to enable EAS attestations on Base
-  BLINDSEAL_BASE_RPC_URL               default: https://mainnet.base.org
-  BLINDSEAL_ATTESTER_PRIVATE_KEY       hot wallet (fund with ~0.05 ETH on Base)
-Privacy: see PRIVACY.md. SHA-256 hashes only — raw content never leaves the proxy.
+Chain + prover (env)
+  BLINDSEAL_RPC_URL                    Solana RPC (default: the public mainnet endpoint)
+  BLINDSEAL_PROVER                     path to a prover binary (otherwise ~/.blindseal/bin or a release download)
+  BLINDSEAL_DASHBOARD_DIST             override the dashboard directory served by \`blindseal run\`
+  BLINDSEAL_FIXTURES                   override the sample data directory for \`run --mock\`
+
+Nothing leaves this machine except the RPC calls you ask for (attest/submit/verify on chain).
 `;
+
+const SUBCOMMANDS = new Set(['init', 'run', 'dashboard', 'demo', 'attest', 'submit', 'verify', 'audit', 'history']);
+const PROXY_FLAGS = new Set(['--', '--transport', '--upstream', '--port', '--listen-port', '--host', '--server-url']);
 
 interface ParsedArgs {
   transport: 'stdio' | 'http' | 'scan-http';
@@ -104,20 +89,9 @@ interface ParsedArgs {
   host?: string;
   serverUrl?: string;
   stdioTarget?: { cmd: string; args: string[] };
-  showHelp: boolean;
-  noArgs: boolean;
 }
 
-function parseArgs(argv: string[]): ParsedArgs {
-  if (argv.length === 0) return { transport: 'stdio', showHelp: true, noArgs: true };
-  if (argv.includes('--version') || argv.includes('-v')) {
-    process.stdout.write(`blindseal ${readVersion()}\n`);
-    process.exit(0);
-  }
-  if (argv.includes('--help') || argv.includes('-h')) {
-    return { transport: 'stdio', showHelp: true, noArgs: false };
-  }
-
+export function parseArgs(argv: string[]): ParsedArgs {
   const sepIdx = argv.indexOf('--');
   const flagArgs = sepIdx >= 0 ? argv.slice(0, sepIdx) : argv;
   const afterSep = sepIdx >= 0 ? argv.slice(sepIdx + 1) : [];
@@ -147,94 +121,91 @@ function parseArgs(argv: string[]): ParsedArgs {
       serverUrl = flagArgs[++i];
     } else if (a && a.startsWith('--')) {
       throw new Error(`unknown flag: ${a}`);
+    } else if (a) {
+      throw new Error(`unexpected argument "${a}" — to wrap an MCP server use: blindseal -- ${a} ...`);
     }
   }
 
   if (transport === 'http') {
     if (!upstream) throw new Error('--transport http requires --upstream <url>');
-    return { transport, upstream, port: port ?? 8800, host: host ?? '127.0.0.1', showHelp: false, noArgs: false };
+    return { transport, upstream, port: port ?? 8800, host: host ?? '127.0.0.1' };
   }
 
   if (transport === 'scan-http') {
-    return {
-      transport,
-      port: port ?? 9787,
-      host: host ?? '127.0.0.1',
-      serverUrl,
-      showHelp: false,
-      noArgs: false,
-    };
+    return { transport, port: port ?? 9787, host: host ?? '127.0.0.1', serverUrl };
   }
 
-  // stdio
-  const target = sepIdx >= 0 ? afterSep : flagArgs;
-  const cmd = target[0];
-  const args = target.slice(1);
-  if (!cmd) throw new Error('no target command (use `--` to separate args)');
-  return { transport: 'stdio', stdioTarget: { cmd, args }, showHelp: false, noArgs: false };
+  // stdio: the target command must come after `--`
+  if (sepIdx < 0) throw new Error('wrapping an MCP server requires "--": blindseal -- <command> [args...]');
+  const cmd = afterSep[0];
+  if (!cmd) throw new Error('no command after "--": blindseal -- <command> [args...]');
+  return { transport: 'stdio', stdioTarget: { cmd, args: afterSep.slice(1) } };
+}
+
+function fail(prefix: string, err: unknown): never {
+  process.stderr.write(`${prefix}: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.exit(1);
 }
 
 function main(): void {
   const argv = process.argv.slice(2);
+  const first = argv[0];
 
-  // demo subcommand — handle before generic flag parsing
-  if (argv[0] === 'demo') {
-    runDemo().then(() => process.exit(0)).catch((err) => {
-      process.stderr.write(`blindseal demo: ${err instanceof Error ? err.message : String(err)}\n`);
-      process.exit(1);
-    });
-    return;
+  if (first === undefined) {
+    process.stdout.write(HELP);
+    process.exit(2);
+  }
+  if (first === '--help' || first === '-h') {
+    process.stdout.write(HELP);
+    process.exit(0);
+  }
+  if (first === '--version' || first === '-v') {
+    process.stdout.write(`blindseal ${packageVersion()}\n`);
+    process.exit(0);
   }
 
-  if (argv[0] === 'run') {
-    runRun(argv.slice(1)).then((code) => { if (code !== 0) process.exit(code); }).catch((err) => {
-      process.stderr.write(`blindseal run: ${err instanceof Error ? err.message : String(err)}\n`);
-      process.exit(1);
-    });
-    return; // mock server keeps the process alive
+  if (SUBCOMMANDS.has(first)) {
+    const rest = argv.slice(1);
+    switch (first) {
+      case 'init':
+        import('./cli/init.js').then((m) => m.runInit(rest)).then((code) => process.exit(code)).catch((e) => fail('blindseal init', e));
+        return;
+      case 'run':
+        import('./cli/run.js').then((m) => m.runRun(rest)).then((code) => { if (code !== 0) process.exit(code); }).catch((e) => fail('blindseal run', e));
+        return; // the server keeps the process alive
+      case 'dashboard':
+        import('./cli/dashboard.js').then((m) => m.runDashboardCli(rest)).then((code) => { if (code !== 0) process.exit(code); }).catch((e) => fail('blindseal dashboard', e));
+        return; // may keep a `run --mock` alive
+      case 'demo':
+        runDemo().then(() => process.exit(0)).catch((e) => fail('blindseal demo', e));
+        return;
+      case 'attest':
+        import('./cli/attest.js').then((m) => m.runAttestCli(rest)).then((code) => process.exit(code)).catch((e) => fail('blindseal attest', e));
+        return;
+      case 'submit':
+        import('./cli/submit.js').then((m) => m.runSubmitCli(rest)).then((code) => process.exit(code)).catch((e) => fail('blindseal submit', e));
+        return;
+      case 'verify':
+        import('./cli/verify.js').then((m) => m.runVerifyCli(rest)).then((code) => process.exit(code)).catch((e) => fail('blindseal verify', e));
+        return;
+      case 'audit':
+        import('./cli/audit.js').then((m) => m.runAuditCli(rest)).then((code) => process.exit(code)).catch((e) => fail('blindseal audit', e));
+        return;
+      case 'history':
+        process.exit(runHistoryCli(rest));
+    }
   }
 
-  if (argv[0] === 'attest') {
-    import('./cli/attest.js')
-      .then(({ runAttestCli }) => runAttestCli(argv.slice(1)))
-      .then((code) => process.exit(code))
-      .catch((err) => {
-        process.stderr.write(`blindseal attest: ${err instanceof Error ? err.message : String(err)}\n`);
-        process.exit(1);
-      });
-    return;
-  }
-
-  if (argv[0] === 'submit') {
-    import('./cli/submit.js')
-      .then(({ runSubmitCli }) => runSubmitCli(argv.slice(1)))
-      .then((code) => process.exit(code))
-      .catch((err) => {
-        process.stderr.write(`blindseal submit: ${err instanceof Error ? err.message : String(err)}\n`);
-        process.exit(1);
-      });
-    return;
-  }
-
-  if (argv[0] === 'audit' || argv[0] === 'verify') {
-    const which = argv[0];
-    (which === 'audit' ? import('./cli/audit.js').then((m) => m.runAuditCli(argv.slice(1))) : import('./cli/verify.js').then((m) => m.runVerifyCli(argv.slice(1))))
-      .then((code) => process.exit(code))
-      .catch((err) => {
-        process.stderr.write(`blindseal ${which}: ${err instanceof Error ? err.message : String(err)}\n`);
-        process.exit(1);
-      });
-    return;
-  }
-
-  if (argv[0] === 'history') {
-    process.exit(runHistoryCli(argv.slice(1)));
-  }
-
-  if (argv[0] === 'dashboard') {
-    const code = runDashboardCli(argv.slice(1));
-    if (code !== 0) process.exit(code);
-    return; // dashboard keeps server alive
+  // Proxy mode: `blindseal -- <cmd>` or `blindseal --transport http|scan-http ...`. Any other
+  // first token is a typo, not a server to spawn.
+  if (!PROXY_FLAGS.has(first) && !(first.startsWith('-') && argv.includes('--'))) {
+    process.stderr.write(
+      first.startsWith('-')
+        ? `blindseal: unknown flag "${first}"\n`
+        : `blindseal: unknown command "${first}"\n`,
+    );
+    process.stderr.write(HELP);
+    process.exit(2);
   }
 
   let parsed: ParsedArgs;
@@ -246,25 +217,14 @@ function main(): void {
     process.exit(2);
   }
 
-  if (parsed.showHelp) {
-    process.stdout.write(HELP);
-    process.exit(parsed.noArgs ? 2 : 0);
-  }
-
   if (parsed.transport === 'http') {
     startHttpProxy({ upstream: parsed.upstream!, listenPort: parsed.port!, listenHost: parsed.host });
     return;
   }
-
   if (parsed.transport === 'scan-http') {
-    startScanHttp({
-      listenPort: parsed.port!,
-      listenHost: parsed.host,
-      defaultServerUrl: parsed.serverUrl,
-    });
+    startScanHttp({ listenPort: parsed.port!, listenHost: parsed.host, defaultServerUrl: parsed.serverUrl });
     return;
   }
-
   const { cmd, args } = parsed.stdioTarget!;
   startProxy(cmd, args);
 }

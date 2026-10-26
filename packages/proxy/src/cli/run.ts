@@ -1,10 +1,10 @@
-/// `blindseal run [--mock]` — start the local API + WS (FRONTEND.md §5).
-/// M0 ships the MOCK path only: `BLINDSEAL_MOCK=1 blindseal run` (or `run --mock`)
-/// serves fixtures/ so the dashboard/site can be built before the engine exists.
-/// The real (engine-backed) API lands in M1.
+/// `blindseal run [--mock]` — start the local API + WS and serve the dashboard at /.
+/// `--mock` serves the sample fixtures shipped with the package behind the real API contract,
+/// with a fake decision stream, so the dashboard can be explored without wrapping a server.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { startMockApi } from '../api/mock-server.js';
+import { nearestFixturesDir, packageRoot, shippedDashboardDir, shippedFixturesDir } from '../paths.js';
 
 export interface RunOptions {
   mock: boolean;
@@ -15,21 +15,22 @@ export interface RunOptions {
   help?: boolean;
 }
 
-const HELP = `blindseal run — start the local API + WS (FRONTEND.md §5)
+const HELP = `blindseal run — start the local API + WS and serve the dashboard
 
 Usage:
-  BLINDSEAL_MOCK=1 blindseal run [--mock] [flags]
+  blindseal run --mock [flags]
 
 Flags
-  --mock              serve fixtures/ with a fake event stream (M0)
+  --mock              serve the bundled sample data with a fake decision stream
   --port <n>          listen port (default 7777)
   --host <addr>       listen host (default 127.0.0.1)
-  --fixtures <dir>    fixtures directory (default: nearest fixtures/)
-  --dashboard <dir>   serve the built dashboard at / (default: $BLINDSEAL_DASHBOARD_DIST or
-                      packages/dashboard/dist next to fixtures/, if built)
+  --fixtures <dir>    sample data directory (default: the fixtures/ shipped in the package,
+                      else the nearest fixtures/ above the current directory; $BLINDSEAL_FIXTURES)
+  --dashboard <dir>   built dashboard to serve at / (default: the dashboard/ shipped in the
+                      package; $BLINDSEAL_DASHBOARD_DIST)
   --help, -h          this help
 
-M0 supports --mock only. The engine-backed API lands in M1.
+Then open the dashboard: blindseal dashboard (or the http://127.0.0.1:7777/#token=… URL printed).
 `;
 
 export function parseRunArgs(argv: string[]): RunOptions {
@@ -47,18 +48,27 @@ export function parseRunArgs(argv: string[]): RunOptions {
   return out;
 }
 
-function resolveFixturesDir(explicit?: string): string {
+/// --fixtures → $BLINDSEAL_FIXTURES → <package>/fixtures → nearest fixtures/ above cwd.
+export function resolveFixturesDir(explicit?: string): string {
   if (explicit) return explicit;
   if (process.env.BLINDSEAL_FIXTURES) return process.env.BLINDSEAL_FIXTURES;
-  let dir = process.cwd();
-  for (let i = 0; i < 7; i++) {
-    const candidate = path.join(dir, 'fixtures');
-    if (existsSync(path.join(candidate, 'decisions.json'))) return candidate;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  throw new Error('fixtures/ not found; pass --fixtures <dir> or set BLINDSEAL_FIXTURES');
+  const found = shippedFixturesDir() ?? nearestFixturesDir();
+  if (found) return found;
+  throw new Error(
+    `sample data not found: this install has no ${path.join(packageRoot(), 'fixtures')} and no fixtures/ above ${process.cwd()}; ` +
+    'pass --fixtures <dir> or set BLINDSEAL_FIXTURES',
+  );
+}
+
+/// --dashboard → $BLINDSEAL_DASHBOARD_DIST → <package>/dashboard → (source checkout only)
+/// ../dashboard/dist next to this package. Undefined when none is built.
+export function resolveDashboardDir(explicit?: string): string | undefined {
+  const picked = explicit ?? process.env.BLINDSEAL_DASHBOARD_DIST;
+  if (picked) return picked;
+  const shipped = shippedDashboardDir();
+  if (shipped) return shipped;
+  const sibling = path.join(packageRoot(), '..', 'dashboard', 'dist');
+  return existsSync(path.join(sibling, 'index.html')) ? sibling : undefined;
 }
 
 /// Returns a process exit code. In mock mode it resolves only on shutdown (SIGINT).
@@ -76,25 +86,34 @@ export async function runRun(argv: string[]): Promise<number> {
   }
   if (!opts.mock) {
     process.stderr.write(
-      'blindseal run: the engine-backed API is not built yet (M1).\n' +
-      'For now: BLINDSEAL_MOCK=1 blindseal run --mock\n',
+      'blindseal run: the engine-backed local API is not available in this release.\n' +
+      'Use `blindseal run --mock` for the dashboard over sample data, or `blindseal -- <server>` to wrap an MCP server.\n',
     );
     return 1;
   }
 
-  const fixturesDir = resolveFixturesDir(opts.fixturesDir);
-  // Built dashboard: explicit flag → env → packages/dashboard/dist beside fixtures/ (if built).
-  const autoDist = path.join(path.dirname(fixturesDir), 'packages', 'dashboard', 'dist');
-  const dashboardDist = opts.dashboard ?? process.env.BLINDSEAL_DASHBOARD_DIST ?? (existsSync(path.join(autoDist, 'index.html')) ? autoDist : undefined);
+  let fixturesDir: string;
+  try {
+    fixturesDir = resolveFixturesDir(opts.fixturesDir);
+  } catch (e) {
+    process.stderr.write(`blindseal run: ${(e as Error).message}\n`);
+    return 1;
+  }
+  const dashboardDist = resolveDashboardDir(opts.dashboard);
+  if (dashboardDist && !existsSync(path.join(dashboardDist, 'index.html'))) {
+    process.stderr.write(`blindseal run: dashboard directory ${dashboardDist} has no index.html\n`);
+    return 1;
+  }
   const handle = await startMockApi({ port: opts.port, host: opts.host, fixturesDir, dashboardDist });
+  const base = handle.url.replace(/\/api$/, '');
   process.stdout.write(
     `blindseal (MOCK): local API on ${handle.url}\n` +
     `  token: ${handle.token}\n` +
     (dashboardDist
-      ? `  dashboard: ${handle.url}/#token=${handle.token}  (served from ${dashboardDist}; application/wasm + CSP)\n`
-      : `  dashboard: not served (build packages/dashboard or pass --dashboard <dist>); open the dev app with #token=${handle.token}\n`) +
-    `  fixtures: ${fixturesDir}\n` +
-    `  WS: ${handle.url.replace(/^http/, 'ws')}/events?token=${handle.token}\n` +
+      ? `  dashboard: ${base}/#token=${handle.token}  (served from ${dashboardDist})\n`
+      : `  dashboard: NOT SERVED — this install has no ${path.join(packageRoot(), 'dashboard')}; pass --dashboard <dir> or set BLINDSEAL_DASHBOARD_DIST\n`) +
+    `  sample data: ${fixturesDir}\n` +
+    `  WS: ${base.replace(/^http/, 'ws')}/api/events?token=${handle.token}\n` +
     'Ctrl-C to stop.\n',
   );
   return new Promise<number>((resolve) => {

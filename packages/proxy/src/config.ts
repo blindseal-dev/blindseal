@@ -1,6 +1,5 @@
 import type { CapabilityConfig, CapabilityMode, TradePolicyConfig } from './capability/index.js';
 import type { ManifestConfig, ManifestMode } from './manifest/index.js';
-import type { TelemetryConfig } from './telemetry/index.js';
 import type { AuditConfig } from './audit/index.js';
 import { loadScanStoreConfig, type ScanStoreConfig } from './persistence/index.js';
 
@@ -11,7 +10,6 @@ export interface BlindsealConfig {
   capability: CapabilityConfig;
   tradePolicy: TradePolicyConfig;
   manifest: ManifestConfig;
-  telemetry: TelemetryConfig;
   audit: AuditConfig;
   persistence: ScanStoreConfig;
 }
@@ -24,7 +22,6 @@ export function loadConfig(): BlindsealConfig {
     capability: loadCapabilityConfig(),
     tradePolicy: loadTradePolicyConfig(),
     manifest: loadManifestConfig(),
-    telemetry: loadTelemetryConfig(),
     audit: loadAuditConfig(),
     persistence: loadScanStoreConfig(),
   };
@@ -33,28 +30,6 @@ export function loadConfig(): BlindsealConfig {
 function loadAuditConfig(): AuditConfig {
   const filepath = process.env.BLINDSEAL_AUDIT_LOG;
   return { enabled: !!filepath, filepath };
-}
-
-function loadTelemetryConfig(): TelemetryConfig {
-  // Default-on once a collector URL is configured. Opt out with BLINDSEAL_TELEMETRY in
-  // {0, false, off, no}. See packages/proxy/PRIVACY.md.
-  const flag = process.env.BLINDSEAL_TELEMETRY?.toLowerCase();
-  const explicitlyOff =
-    flag === '0' || flag === 'false' || flag === 'off' || flag === 'no';
-  const explicitlyOn = flag === '1' || flag === 'true' || flag === 'on';
-  const url = process.env.BLINDSEAL_TELEMETRY_URL;
-  const enabled = !explicitlyOff && !!url;
-  const secret = process.env.BLINDSEAL_TELEMETRY_SECRET;
-  const batchSize = positiveInt(process.env.BLINDSEAL_TELEMETRY_BATCH, 100);
-  const flushIntervalMs = positiveInt(process.env.BLINDSEAL_TELEMETRY_FLUSH_MS, 5000);
-  return {
-    enabled,
-    url,
-    secret,
-    batchSize,
-    flushIntervalMs,
-    bannerOnStart: enabled && !explicitlyOn, // implicit-on path
-  };
 }
 
 function loadManifestConfig(): ManifestConfig {

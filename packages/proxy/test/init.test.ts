@@ -9,12 +9,12 @@ import {
   applyPlan,
   applyUnwrap,
   renderPlan,
-} from '../src/cli/init.js';
+} from '../src/cli/wrap.js';
 import { writeFileSync, readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-describe('blindseal init — parseArgs', () => {
+describe('blindseal init --wrap — parseArgs', () => {
   it('default is "init"', () => {
     const a = parseArgs([]);
     expect(a.command).toBe('init');
@@ -24,6 +24,11 @@ describe('blindseal init — parseArgs', () => {
   it('detects unwrap subcommand', () => {
     const a = parseArgs(['unwrap']);
     expect(a.command).toBe('unwrap');
+  });
+  it('accepts the --wrap / --unwrap flags', () => {
+    expect(parseArgs(['--wrap', '--dry-run']).command).toBe('init');
+    expect(parseArgs(['--wrap', '--dry-run']).dryRun).toBe(true);
+    expect(parseArgs(['--unwrap']).command).toBe('unwrap');
   });
   it('flags', () => {
     const a = parseArgs(['--yes', '--dry-run', '--config', '/x.json']);

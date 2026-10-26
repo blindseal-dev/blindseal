@@ -3,7 +3,7 @@
 The off-chain Groth16 attestation verifier (`crates/verifier-wasm`) compiled to WebAssembly and
 wrapped with `wasm-bindgen` for the two verify pages (dashboard + site). It runs the **real**
 SP1 v5 Groth16 check in the browser — `Groth16Verifier::verify(proof, publicInputs[0],
-detectorVersion, GROTH16_VK)` — the same check the on-chain program does via `sp1-solana` (M2).
+detectorVersion, GROTH16_VK)` — the same check the on-chain program does via `sp1-solana`.
 
 ## API
 ```js

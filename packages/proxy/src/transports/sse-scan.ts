@@ -19,7 +19,7 @@ export interface SseScanHooks {
   toolName: string | null;
   mode: BlindsealMode;
   /// Invoked AFTER inspectToolCallResponse mutates (or doesn't). Lets the transport hook
-  /// telemetry, audit, taint, attestation.
+  /// audit, persistence, taint, attestation.
   onScanned?: (
     msg: JsonRpcMessage & { result: { content: Array<{ type: string; text?: string }> } },
     toolName: string,

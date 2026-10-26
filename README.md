@@ -15,28 +15,30 @@ leaves the machine: not the prompt, not the tool arguments, not the policy, not 
 
 ## What is proven — and what is not
 
-The proof covers the deterministic layers only. It states: *this payload (by hash) was screened by this detector
-version under the policy with this root, the deterministic rules found it clean, and the screening is bound to
-one on-chain action, one expiry and one nonce — usable once.* The model-based layers (embeddings, LLM judge) run
-locally or in a TEE and are **attested, not proven**. Blindseal does not prove an agent is safe, and it does not
-cover traffic that does not pass through the proxy. The honest numbers are in `packages/LIMITATIONS.md` and on the
-docs "What is proven" page.
+The proof covers **L1 today** — the committed deterministic rule automata. It states: *this payload (by hash) was
+screened by this detector version under the policy with this root, the committed L1 rules found it clean, and the
+screening is bound to one on-chain action, one expiry and one nonce — usable once.* **L0** (decode-then-L1) runs in
+the proxy but is **not inside the proof yet**; it is the next increment and will change the detector version. The
+model-based layers **L2/L3** (embeddings, LLM judge) run locally or in a TEE and are **attested, not proven**.
+Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy.
+Proving takes hours on CPU: the sample attestation took 2 h 16 min on an Apple M1 Max (32 GB). The honest numbers
+are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is proven" page.
 
 ## Quickstart
 
-Node ≥ 20 and pnpm; no Rust or Solana toolchain needed (the wasm verifier and the IDLs are committed).
+Node ≥ 20; no Rust or Solana toolchain needed (the verifier ships as WebAssembly). Three unscoped packages on npm:
+`blindseal` (proxy + CLI), `blindseal-sdk`, `blindseal-verifier-wasm`.
 
 ```sh
-git clone https://github.com/blindseal-dev/blindseal && cd blindseal
-./scripts/quickstart.sh          # install, build the dashboard, verify the sample attestation (real Groth16) and reject a tampered copy
-BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
-# → local API + dashboard on http://127.0.0.1:7777 (the token is printed; it travels in the URL fragment only)
+npm i -g blindseal                 # or prefix every command with npx: npx blindseal …
+blindseal init                     # scaffolds ~/.blindseal: identity keys, the default policy, the dashboard token
+blindseal run --mock               # local API + dashboard on http://127.0.0.1:7777 over sample traffic (the token is printed)
 ```
 
-Put the proxy in front of an MCP server:
+Put the proxy in front of a real MCP server (wrapping needs the `--`; `blindseal init --wrap` rewrites the MCP
+configs it finds):
 
 ```sh
-npx blindseal init
 blindseal -- <your-mcp-server-command>
 ```
 
@@ -44,19 +46,41 @@ Attest a screened action and verify it anywhere:
 
 ```sh
 blindseal attest call.json --target-program ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG --out attestation.json
+#   proving takes hours on CPU (2 h 16 min for the sample on an M1 Max); the prover binary is downloaded from the
+#   project's GitHub release on first use, or build it from source (below) and pass --prover <path>
 blindseal verify attestation.json          # off-chain, the wasm verifier
 blindseal submit attestation.json          # Solana mainnet: verifies on chain, consumes the nullifier
 blindseal submit attestation.json --check  # has this nullifier been consumed?
 ```
 
 Or drop `attestation.json` on the site's verify page — the same verifier runs in your browser and uploads nothing.
+`blindseal audit verify` checks the local audit chain; `blindseal dashboard` reopens the dashboard.
+
+### From source
+
+```sh
+git clone https://github.com/blindseal-dev/blindseal && cd blindseal
+./scripts/quickstart.sh          # pnpm install, build the dashboard, verify the sample attestation (real Groth16) and reject a tampered copy
+BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
+```
+
+Rust / Solana / Anchor toolchains are needed only for these:
+
+```sh
+scripts/build-programs.sh                      # the Anchor programs (cargo build-sbf + anchor idl build)
+cargo build --release -p blindseal-prover      # the prover; pass it to `blindseal attest --prover`
+cd programs && solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name blindseal_verify   # reproduce the deployed bytes (also transfer_gate)
+```
+
+The docs page "From source" (`/docs/source`) walks through each step.
 
 ## How it works
 
 ```
 agent ──► proxy (127.0.0.1) ──► upstream MCP server
              │
-             ├─ L0 decode + L1 rules (deterministic, PROVEN)
+             ├─ L1 rules (committed DFAs — PROVEN)
+             ├─ L0 decode-then-L1 (deterministic; in the proxy, not in the proof yet)
              ├─ redaction of secrets / PII
              ├─ L2 embeddings + L3 judge (ATTESTED; local or TEE)
              ├─ hash-chained audit log (content-free; signed disclosures)
@@ -86,7 +110,7 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 | `docs/` | hashing spec, integration guide, performance numbers, launch checklist |
 
 Build the programs with `scripts/build-programs.sh`; run the on-chain suite with `scripts/test-m2.sh`.
-Deployed bytes reproduce with `solana-verify` from this repository at the tagged commit (commands in `docs/LAUNCH-CHECKLIST.md`); while the repository is private, that check is available to whoever has access.
+Deployed bytes reproduce with `solana-verify` from this repository at the tagged commit (see "From source" above and `docs/LAUNCH-CHECKLIST.md`).
 
 ## Upgradeability
 
