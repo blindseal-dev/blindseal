@@ -1,6 +1,6 @@
 {
   "name": "blindseal-verifier-wasm",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "type": "module",
   "license": "MIT",
   "description": "Blindseal attestation verifier compiled to WebAssembly (SP1 v5 Groth16 over BN254): verify an attestation in the browser or Node without a server.",
