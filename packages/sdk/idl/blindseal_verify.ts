@@ -272,6 +272,10 @@ export type BlindsealVerify = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
       "args": [
@@ -392,6 +396,21 @@ export type BlindsealVerify = {
       "code": 6010,
       "name": "unauthorized",
       "msg": "unauthorized"
+    },
+    {
+      "code": 6011,
+      "name": "directCallNotAllowed",
+      "msg": "verify_and_consume must be called by CPI from the target program, not as a top-level instruction"
+    },
+    {
+      "code": 6012,
+      "name": "nestedCallNotAllowed",
+      "msg": "verify_and_consume must be called by exactly one CPI level (the top-level target program)"
+    },
+    {
+      "code": 6013,
+      "name": "callerNotTargetProgram",
+      "msg": "calling program is not the action's target program"
     }
   ],
   "types": [

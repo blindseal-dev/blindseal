@@ -1,9 +1,13 @@
-/// `blindseal submit <attestation.json>` — submit an attestation to Solana MAINNET (the only
-/// cluster). Verifies the Groth16 proof on chain and consumes the nullifier. The SDK refuses
-/// any RPC whose genesis hash is not mainnet-beta's, so a misconfigured endpoint sends nothing.
+/// `blindseal submit <attestation.json> --wallet <source-authority keypair>` — perform the GATED
+/// transaction on Solana MAINNET (the only cluster). For a transfer-gate attestation this sends
+/// `gated_transfer`: transfer-gate CPIs the verifier (Groth16 verify + nullifier consumed) and
+/// executes the screened SOL transfer in the same transaction. The verifier accepts only a CPI
+/// from the attestation's target program, so attestations for any other program are refused here
+/// (submit them through that program). The SDK refuses any RPC whose genesis hash is not
+/// mainnet-beta's, so a misconfigured endpoint sends nothing.
 ///
 /// Usage:
-///   blindseal submit <attestation.json> [--wallet <keypair.json>] [--rpc <url>] [--no-policy]
+///   blindseal submit <attestation.json> --wallet <keypair.json> [--rpc <url>] [--no-policy]
 ///     [--check]   only report whether the nullifier is already consumed
 /// Env: BLINDSEAL_RPC_URL (default: the public mainnet endpoint — rate-limited; logged),
 ///      BLINDSEAL_WALLET  (default ~/.config/solana/id.json)
@@ -11,15 +15,22 @@ import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Connection, Keypair } from '@solana/web3.js';
-import { DEFAULT_RPC_URL, isConsumed, submit, verifyOffchain, WrongClusterError, type Attestation } from 'blindseal-sdk';
+import { DEFAULT_RPC_URL, isConsumed, submit, TRANSFER_GATE_ID, UnsupportedTargetError, verifyOffchain, WrongClusterError, type Attestation } from 'blindseal-sdk';
 
-const HELP = `blindseal submit — verify an attestation on Solana mainnet and consume its nullifier
+const HELP = `blindseal submit — perform the gated transfer for an attestation on Solana mainnet
 
 Usage:
-  blindseal submit <attestation.json> [flags]
+  blindseal submit <attestation.json> --wallet <source-authority keypair.json> [flags]
+
+For a transfer-gate attestation this sends transfer-gate's gated_transfer, signed by the
+attestation's source authority: the proof is verified on chain, the nullifier is consumed and the
+screened SOL transfer executes, all in one transaction. The verifier only accepts a CPI from the
+attestation's target program, so attestations for any other program cannot be sent from here —
+submit them through that program.
 
 Flags
-  --wallet <keypair.json>   fee payer / signer (default $BLINDSEAL_WALLET or ~/.config/solana/id.json)
+  --wallet <keypair.json>   the attestation's source authority: signs, pays and is debited
+                            (default $BLINDSEAL_WALLET or ~/.config/solana/id.json)
   --rpc <url>               RPC endpoint (default $BLINDSEAL_RPC_URL or the public mainnet endpoint)
   --no-policy               program is not in allowlist mode (omit the PolicyRoot account)
   --check                   only report whether the nullifier is already consumed; send nothing
@@ -63,6 +74,11 @@ export async function runSubmitCli(argv: string[]): Promise<number> {
     return 0;
   }
 
+  if (att.action?.targetProgram !== TRANSFER_GATE_ID.toBase58()) {
+    process.stderr.write(`blindseal submit: ${new UnsupportedTargetError(att.action?.targetProgram ?? '').message}\n`);
+    return 1;
+  }
+
   if (!o.skipOffchain) {
     const off = await verifyOffchain(att);
     if (!off.ok) { process.stderr.write(`blindseal submit: off-chain verify failed (${off.reason}); not sending\n`); return 1; }
@@ -73,7 +89,7 @@ export async function runSubmitCli(argv: string[]): Promise<number> {
   const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(walletPath, 'utf8'))));
   try {
     const sig = await submit(att, { wallet, connection: conn, policyRoot: o.noPolicy ? null : undefined });
-    process.stdout.write(`submitted: ${sig}\nnullifier ${att.nullifier} consumed on mainnet\n`);
+    process.stdout.write(`gated transfer: ${sig}\nnullifier ${att.nullifier} consumed on mainnet by transfer-gate (${att.action.amount} lamports → ${att.action.recipient})\n`);
     return 0;
   } catch (e) {
     if (e instanceof WrongClusterError) { process.stderr.write(`blindseal submit: ${e.message}\n`); return 3; }

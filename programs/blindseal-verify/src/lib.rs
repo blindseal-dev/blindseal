@@ -2,15 +2,26 @@
 //!
 //! `verify_and_consume(proof, public_inputs, action)` checks, in this exact order (each failure
 //! is a distinct error so a consumer can tell them apart):
-//!   1. not paused
-//!   2. detectorVersion ∈ allowed_vkeys
-//!   3. if allowlist_policies: PolicyRoot[policyRoot] exists
-//!   4. expirySlot ≥ Clock::slot
-//!   5. recompute actionHash from the action fields the CALLER supplies (+ payloadHash,
+//!   1. called by CPI from exactly one level: `get_stack_height() == 2` — a top-level call fails
+//!      `DirectCallNotAllowed`, a deeper nesting fails `NestedCallNotAllowed`
+//!   2. the caller is the target program: the top-level instruction's program id (instructions
+//!      sysvar; at stack height 2 that is the program issuing this CPI) == `action.target_program`,
+//!      else `CallerNotTargetProgram`
+//!   3. not paused
+//!   4. detectorVersion ∈ allowed_vkeys
+//!   5. if allowlist_policies: PolicyRoot[policyRoot] exists
+//!   6. expirySlot ≥ Clock::slot
+//!   7. recompute actionHash from the action fields the CALLER supplies (+ payloadHash,
 //!      policyRoot, detectorVersion, expirySlot from the public inputs + nonce) == public actionHash
-//!   6. nullifier == sha256(domain || actionHash) and the Nullifier PDA does not exist
-//!   7. Groth16 verify via sp1-solana (alt_bn128 syscalls)
-//!   8. create the Nullifier PDA (payer = caller), emit `Consumed`
+//!   8. nullifier == sha256(domain || actionHash) and the Nullifier PDA does not exist
+//!   9. Groth16 verify via sp1-solana (alt_bn128 syscalls)
+//!  10. create the Nullifier PDA (payer = caller), record the calling program as
+//!      `consumer_program`, emit `Consumed`
+//!
+//! Steps 1–2 close a griefing path: before them, anyone who copied a submitted proof could call
+//! `verify_and_consume` directly with the same action fields and burn the nullifier before the
+//! real gated transaction landed. Now only the program the attestation was screened for can
+//! consume it, and `consumer_program` is the true caller (DECISIONS.md, 2026-10-27).
 //!
 //! The five wrong-field cases (recipient / amount / mint / target program / source authority)
 //! all surface as `ActionHashMismatch` by construction: the proof binds a single hash over all of
@@ -18,14 +29,15 @@
 //! the screened one. The hashing layout is byte-for-byte `blindseal_detector_core::action_hash`
 //! / `nullifier` (host parity test in tests/).
 //!
-//! CPI-able. The gated program must pass the action fields IT is about to execute (see
-//! transfer-gate), never fields supplied by the agent.
+//! CPI-only. The gated program must pass the action fields IT is about to execute (see
+//! transfer-gate), never fields supplied by the agent, and must forward the instructions sysvar.
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
     hash::hashv,
     instruction::{get_stack_height, TRANSACTION_LEVEL_STACK_HEIGHT},
     program::invoke_signed,
     system_instruction,
+    sysvar::instructions::{load_current_index_checked, load_instruction_at_checked},
 };
 
 declare_id!("6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx");
@@ -33,9 +45,9 @@ declare_id!("6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx");
 #[cfg(not(feature = "no-entrypoint"))]
 solana_security_txt::security_txt! {
     name: "Blindseal verifier",
-    project_url: "https://github.com/blindseal-dev/blindseal",
+    project_url: "https://blindseal.tech",
     contacts: "email:blindseal@proton.me",
-    policy: "https://github.com/blindseal-dev/blindseal/blob/main/SECURITY.md",
+    policy: "https://blindseal.tech/.well-known/security.txt",
     preferred_languages: "en",
     source_code: "https://github.com/blindseal-dev/blindseal"
 }
@@ -103,6 +115,20 @@ pub mod blindseal_verify {
         public_inputs: Vec<u8>,
         action: ActionArgs,
     ) -> Result<()> {
+        // 1. CPI from exactly one level. The gated program is the top-level instruction and this
+        //    is its direct CPI; a top-level call (anyone replaying a copied proof) or a deeper
+        //    nesting is refused before anything else is read.
+        let height = get_stack_height();
+        require!(height > TRANSACTION_LEVEL_STACK_HEIGHT, VerifyError::DirectCallNotAllowed);
+        require!(height == TRANSACTION_LEVEL_STACK_HEIGHT + 1, VerifyError::NestedCallNotAllowed);
+
+        // 2. the caller is the program the attestation was screened for. At stack height 2 the
+        //    program issuing this CPI is the current top-level instruction's program.
+        let ix_sysvar = ctx.accounts.instructions.to_account_info();
+        let current = load_current_index_checked(&ix_sysvar)?;
+        let caller = load_instruction_at_checked(current as usize, &ix_sysvar)?.program_id;
+        require_keys_eq!(caller, action.target_program, VerifyError::CallerNotTargetProgram);
+
         let config = &ctx.accounts.config;
         require!(public_inputs.len() == PUBLIC_INPUTS_LEN, VerifyError::BadPublicInputs);
         let payload_hash: [u8; 32] = public_inputs[0..32].try_into().unwrap();
@@ -112,13 +138,13 @@ pub mod blindseal_verify {
         let nullifier: [u8; 32] = public_inputs[128..160].try_into().unwrap();
         let expiry_slot = u64::from_le_bytes(public_inputs[160..168].try_into().unwrap());
 
-        // 1. paused
+        // 3. paused
         require!(!config.paused, VerifyError::Paused);
 
-        // 2. vkey allowlist
+        // 4. vkey allowlist
         require!(config.allowed_vkeys.iter().any(|k| *k == detector_version), VerifyError::DisallowedVkey);
 
-        // 3. policy allowlist
+        // 5. policy allowlist
         if config.allowlist_policies {
             let acc = ctx.accounts.policy_root.as_ref().ok_or(VerifyError::UnregisteredPolicyRoot)?;
             let (expected, _) = Pubkey::find_program_address(&[POLICY_SEED, &policy_root], &crate::ID);
@@ -129,15 +155,15 @@ pub mod blindseal_verify {
             require!(reg.root == policy_root, VerifyError::UnregisteredPolicyRoot);
         }
 
-        // 4. expiry
+        // 6. expiry
         let now = Clock::get()?.slot;
         require!(expiry_slot >= now, VerifyError::Expired);
 
-        // 5. actionHash recompute from the caller's action + the committed values
+        // 7. actionHash recompute from the caller's action + the committed values
         let recomputed = compute_action_hash(&action, &payload_hash, &policy_root, &detector_version, expiry_slot);
         require!(recomputed == action_hash, VerifyError::ActionHashMismatch);
 
-        // 6. nullifier recompute + not yet consumed
+        // 8. nullifier recompute + not yet consumed
         let nf = compute_nullifier(&action_hash);
         require!(nf == nullifier, VerifyError::NullifierMismatch);
         let (nf_key, nf_bump) = Pubkey::find_program_address(&[NULLIFIER_SEED, &nullifier], &crate::ID);
@@ -145,19 +171,14 @@ pub mod blindseal_verify {
         require_keys_eq!(nf_acc.key(), nf_key, VerifyError::NullifierMismatch);
         require!(nf_acc.lamports() == 0 && nf_acc.data_is_empty(), VerifyError::NullifierAlreadyConsumed);
 
-        // 7. Groth16 verify (SP1 v5 VK, alt_bn128 syscalls)
+        // 9. Groth16 verify (SP1 v5 VK, alt_bn128 syscalls)
         let vkey_hex = hex32(&detector_version);
         sp1_solana::verify_proof(&proof, &public_inputs, &vkey_hex, &sp1_solana::GROTH16_VK_5_0_0_BYTES)
             .map_err(|_| VerifyError::InvalidProof)?;
 
-        // 8. create the Nullifier PDA (payer = caller) and record the consumption
-        let consumer = if get_stack_height() > TRANSACTION_LEVEL_STACK_HEIGHT {
-            // invoked by CPI: the consumer is the gated program the attestation was screened for
-            // (bound through actionHash, so a mismatch would already have failed at step 5)
-            action.target_program
-        } else {
-            Pubkey::default() // direct submission (SDK submit / CLI), no gated program
-        };
+        // 10. create the Nullifier PDA (payer = caller) and record the calling program (step 2
+        //     proved it is the top-level program and equals action.target_program)
+        let consumer = caller;
         let space = 8 + Nullifier::INIT_SPACE;
         let rent = Rent::get()?.minimum_balance(space);
         let seeds: &[&[u8]] = &[NULLIFIER_SEED, &nullifier, &[nf_bump]];
@@ -312,6 +333,9 @@ pub struct VerifyAndConsume<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
+    /// CHECK: the instructions sysvar (address-constrained); read to identify the calling program.
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions: UncheckedAccount<'info>,
 }
 
 #[error_code]
@@ -338,4 +362,11 @@ pub enum VerifyError {
     TooManyVkeys,
     #[msg("unauthorized")]
     Unauthorized,
+    // Appended (2026-10-27) so the codes above keep their numbers.
+    #[msg("verify_and_consume must be called by CPI from the target program, not as a top-level instruction")]
+    DirectCallNotAllowed,
+    #[msg("verify_and_consume must be called by exactly one CPI level (the top-level target program)")]
+    NestedCallNotAllowed,
+    #[msg("calling program is not the action's target program")]
+    CallerNotTargetProgram,
 }

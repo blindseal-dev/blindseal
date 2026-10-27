@@ -16,7 +16,7 @@ calls other than the ones a command explicitly makes on your behalf.
 - **Layer 3 judge** — only if you configure a key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) or
   `OLLAMA_HOST`. The judged text is the tool output being screened; it goes to the provider you chose.
 - **Solana RPC** (`BLINDSEAL_RPC_URL`, else the public mainnet endpoint) — `blindseal attest` fetches
-  the current slot for the expiry; `blindseal submit` sends the verify transaction; the dashboard's
+  the current slot for the expiry; `blindseal submit` sends the gated transaction; the dashboard's
   nullifier lookups are proxied server-side. SHA-256 commitments only, never content.
 - **Prover download** — `blindseal attest` fetches the prover binary from the GitHub release named in
   the package once, verifies its sha256, and caches it under `~/.blindseal/bin/`.

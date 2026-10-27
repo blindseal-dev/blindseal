@@ -19,7 +19,7 @@ Usage
   blindseal --transport http --upstream <url>       proxy a remote MCP server over HTTP
   blindseal --transport scan-http [--port <n>]      stand-alone POST /scan endpoint
   blindseal attest <toolcall.json> --target-program <id> [--out <file>] [--expiry <slot> | --no-expiry]
-  blindseal submit <attestation.json>               verify on Solana mainnet and consume the nullifier
+  blindseal submit <attestation.json> --wallet <kp> perform the gated transfer on Solana mainnet (verify + consume + transfer)
   blindseal verify <attestation.json | disclosure.json>
   blindseal audit verify | disclose --from <i> --to <j>
   blindseal history [flags]                         local scan history (needs BLINDSEAL_PERSIST=1)

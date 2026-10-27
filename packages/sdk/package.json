@@ -1,9 +1,9 @@
 {
   "name": "blindseal-sdk",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "type": "module",
   "license": "MIT",
-  "description": "Blindseal SDK — build the on-chain verify instruction, submit attestations to Solana mainnet, verify attestations and disclosures off-chain.",
+  "description": "Blindseal SDK — build the on-chain verify and gated-transfer instructions, submit attestations through the gated program on Solana mainnet, verify attestations and disclosures off-chain.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

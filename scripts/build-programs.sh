@@ -12,7 +12,7 @@ if [ -d "$HOME/.local/share/solana/install/releases/stable-487f1df22d4c1972c5140
   export PATH="$HOME/.local/share/solana/install/releases/stable-487f1df22d4c1972c51408c346da9499b11e1366/solana-release/bin:$PATH"
 fi
 rm -rf "$ROOT/programs/target"
-for p in blindseal-verify transfer-gate; do
+for p in blindseal-verify transfer-gate rogue-caller; do  # rogue-caller: test-only (no IDL, never deployed)
   echo "→ cargo build-sbf $p"
   CARGO_TARGET_DIR="$ROOT/target/sbf" cargo build-sbf --tools-version v1.57 \
     --manifest-path "$ROOT/programs/$p/Cargo.toml" --sbf-out-dir "$ROOT/target/deploy"

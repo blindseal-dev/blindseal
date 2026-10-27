@@ -18,9 +18,9 @@ declare_id!("9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa");
 #[cfg(not(feature = "no-entrypoint"))]
 solana_security_txt::security_txt! {
     name: "Blindseal transfer-gate (example consumer)",
-    project_url: "https://github.com/blindseal-dev/blindseal",
+    project_url: "https://blindseal.tech",
     contacts: "email:blindseal@proton.me",
-    policy: "https://github.com/blindseal-dev/blindseal/blob/main/SECURITY.md",
+    policy: "https://blindseal.tech/.well-known/security.txt",
     preferred_languages: "en",
     source_code: "https://github.com/blindseal-dev/blindseal"
 }
@@ -53,13 +53,16 @@ pub mod transfer_gate {
             nonce,
         };
 
-        // 1) verify + consume the nullifier (reverts the whole tx on any failure)
+        // 1) verify + consume the nullifier (reverts the whole tx on any failure). The verifier only
+        //    accepts this CPI when gated_transfer is the top-level instruction (it reads the
+        //    instructions sysvar to check that its caller is the attestation's target program).
         let cpi_accounts = VerifyAndConsume {
             config: ctx.accounts.config.to_account_info(),
             policy_root: ctx.accounts.policy_root.as_ref().map(|a| a.to_account_info()),
             nullifier: ctx.accounts.nullifier.to_account_info(),
             payer: ctx.accounts.source.to_account_info(),
             system_program: ctx.accounts.system_program.to_account_info(),
+            instructions: ctx.accounts.instructions.to_account_info(),
         };
         blindseal_verify::cpi::verify_and_consume(
             CpiContext::new(ctx.accounts.verify_program.to_account_info(), cpi_accounts),
@@ -102,4 +105,8 @@ pub struct GatedTransfer<'info> {
     /// Typed: a direct call that passes any other program here fails before the transfer.
     pub verify_program: Program<'info, BlindsealVerify>,
     pub system_program: Program<'info, System>,
+    /// CHECK: the instructions sysvar (address-constrained), forwarded to the verifier, which
+    /// reads it to check that the calling program is the attestation's target program.
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions: UncheckedAccount<'info>,
 }

@@ -1,11 +1,13 @@
 // Blindseal SDK (BLINDSEAL.md §3.8). Mainnet is the only deploy target: chainId 1 = Solana
 // mainnet, 2 is reserved. `submit()` refuses any RPC whose genesis hash is not mainnet-beta's.
+// The verifier accepts verify_and_consume only as a CPI from the attestation's target program, so
+// `submit()` sends the GATED transaction (transfer-gate's gated_transfer) and nothing else.
 // Everything encoding-related lives in ix.ts; this file adds the Node-dependent pieces.
 import { createRequire } from 'node:module';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, type Signer } from '@solana/web3.js';
 import {
-  CHAIN_ID_SOLANA_MAINNET, DEFAULT_RPC_URL, MAINNET_GENESIS_HASH, PROGRAM_ID, VERIFY_CU_LIMIT,
-  actionArgsFrom, buildVerifyIx, decodePublicInputs, hex, nullifierPda, type Attestation, type DecodedPublicInputs,
+  CHAIN_ID_SOLANA_MAINNET, DEFAULT_RPC_URL, MAINNET_GENESIS_HASH, PROGRAM_ID, TRANSFER_GATE_ID, VERIFY_CU_LIMIT,
+  actionArgsFrom, buildGatedTransferIx, decodePublicInputs, hex, nullifierPda, type Attestation, type DecodedPublicInputs,
 } from './ix.js';
 export * from './ix.js';
 
@@ -15,7 +17,15 @@ export class WrongClusterError extends Error {
   }
 }
 
+/** Thrown by `submit()` for an attestation whose target program is not transfer-gate. */
+export class UnsupportedTargetError extends Error {
+  constructor(public readonly targetProgram: string) {
+    super(`attestation targets ${targetProgram || '(none)'}, not transfer-gate (${TRANSFER_GATE_ID.toBase58()}): submit through the target program; the verifier only accepts CPI from it`);
+  }
+}
+
 export interface SubmitOptions {
+  /** Signs and pays: must be the attestation's `action.sourceAuthority` (the gated transfer debits it). */
   wallet: Signer | Keypair;
   rpcUrl?: string;        // default BLINDSEAL_RPC_URL or the public mainnet endpoint
   connection?: Connection;
@@ -26,18 +36,28 @@ export interface SubmitOptions {
 }
 
 /**
- * Submit an attestation directly (no gated program): verifies on-chain and consumes the nullifier.
- * Refuses any cluster whose genesis hash is not mainnet-beta's — chainId 1 is the only chain.
+ * Submit an attestation through its gated program: for a transfer-gate attestation, sends
+ * `gated_transfer` (verify + consume + the screened transfer, atomically), signed by the source
+ * authority wallet. The verifier accepts verify_and_consume only as a CPI from the attestation's
+ * target program, so any other target throws `UnsupportedTargetError` — submit through that
+ * program instead. Refuses any cluster whose genesis hash is not mainnet-beta's (chainId 1 is
+ * the only chain). Every local check runs before the RPC is contacted.
  */
 export async function submit(att: Attestation, opts: SubmitOptions): Promise<string> {
   if (att.chainId !== CHAIN_ID_SOLANA_MAINNET) throw new Error(`attestation chainId ${att.chainId} is not Solana mainnet (1)`);
+  const action = actionArgsFrom(att);
+  if (!action.targetProgram.equals(TRANSFER_GATE_ID)) throw new UnsupportedTargetError(att.action?.targetProgram ?? '');
+  if (!action.sourceAuthority.equals(opts.wallet.publicKey)) {
+    throw new Error(`wallet ${opts.wallet.publicKey.toBase58()} is not the attestation's source authority (${action.sourceAuthority.toBase58()}); the gated transfer must be signed by it`);
+  }
+  if (!action.mint.equals(PublicKey.default)) throw new Error('transfer-gate moves native SOL; this attestation names a mint');
+  if (action.recipient.equals(PublicKey.default)) throw new Error('attestation has no recipient');
   const conn = opts.connection ?? new Connection(opts.rpcUrl ?? process.env.BLINDSEAL_RPC_URL ?? DEFAULT_RPC_URL, 'confirmed');
   if (!opts.allowNonMainnet) {
     const genesis = await conn.getGenesisHash();
     if (genesis !== MAINNET_GENESIS_HASH) throw new WrongClusterError(genesis);
   }
-  const action = actionArgsFrom(att);
-  const ix = buildVerifyIx(att, action, { payer: opts.wallet.publicKey, policyRoot: opts.policyRoot });
+  const ix = buildGatedTransferIx(att, { source: opts.wallet.publicKey, recipient: action.recipient, policyRoot: opts.policyRoot });
   const tx = new Transaction().add(ComputeBudgetProgram.setComputeUnitLimit({ units: opts.computeUnits ?? VERIFY_CU_LIMIT }), ix);
   tx.feePayer = opts.wallet.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash('confirmed')).blockhash;

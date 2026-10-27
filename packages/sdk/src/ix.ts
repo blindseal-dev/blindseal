@@ -2,7 +2,7 @@
 // detector-core / on-chain), Anchor wire encoding and every instruction builder. Imported by the
 // localnet suite (CommonJS) and by index.ts (adds submit / verifyOffchain, which need Node APIs).
 import { createHash } from 'node:crypto';
-import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
+import { PublicKey, SystemProgram, SYSVAR_INSTRUCTIONS_PUBKEY, TransactionInstruction } from '@solana/web3.js';
 
 export const PROGRAM_ID = new PublicKey('6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx');
 export const TRANSFER_GATE_ID = new PublicKey('9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa');
@@ -10,7 +10,8 @@ export const CHAIN_ID_SOLANA_MAINNET = 1;
 /** Genesis hash of Solana mainnet-beta — the only cluster submit() will talk to. */
 export const MAINNET_GENESIS_HASH = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
 export const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
-/** Groth16 verify + nullifier creation; measured on localnet (docs/performance.md). */
+/** Compute-unit limit for a gated transaction: Groth16 verify + nullifier creation + the gated
+ *  action (the transfer-gate transaction measures ~269k on localnet, docs/performance.md). */
 export const VERIFY_CU_LIMIT = 400_000;
 
 export const ACTION_DOMAIN = 'blindseal.action.v1';
@@ -172,7 +173,12 @@ export interface VerifyAccounts {
   programId?: PublicKey;
 }
 
-/** `verify_and_consume(proof, public_inputs, action)` for composing into a gated transaction. */
+/**
+ * `verify_and_consume(proof, public_inputs, action)`: the account list and data a gated program
+ * forwards in its CPI. The verifier accepts it ONLY as a CPI from `action.targetProgram` issued by
+ * the top-level instruction — sent as a top-level instruction it fails `DirectCallNotAllowed`.
+ * Accounts: config, policy_root (optional), nullifier, payer, system_program, instructions sysvar.
+ */
 export function buildVerifyIx(att: Attestation, action: ActionArgs, accounts: VerifyAccounts): TransactionInstruction {
   const programId = accounts.programId ?? PROGRAM_ID;
   const proof = hex(att.proof.bytes);
@@ -189,6 +195,7 @@ export function buildVerifyIx(att: Attestation, action: ActionArgs, accounts: Ve
       { pubkey: nullifierPda(nullifier, programId), isSigner: false, isWritable: true },
       { pubkey: accounts.payer, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
     ],
     data,
   });
@@ -255,7 +262,9 @@ export function decodeConfig(data: Uint8Array) {
 
 // ---- transfer-gate (example gated program) ----
 /** `gated_transfer(proof, public_inputs, nonce, amount)`: the gate CPIs verify_and_consume with the
- *  action IT executes, then transfers `amount` lamports source → recipient in the same tx. */
+ *  action IT executes, then transfers `amount` lamports source → recipient in the same tx. Must be a
+ *  top-level instruction (the verifier refuses a deeper nesting). Accounts: source, recipient,
+ *  config, policy_root (optional), nullifier, verify_program, system_program, instructions sysvar. */
 export function buildGatedTransferIx(att: Attestation, accounts: { source: PublicKey; recipient: PublicKey; policyRoot?: PublicKey | null; gateId?: PublicKey; verifyId?: PublicKey }): TransactionInstruction {
   const gateId = accounts.gateId ?? TRANSFER_GATE_ID;
   const verifyId = accounts.verifyId ?? PROGRAM_ID;
@@ -275,7 +284,24 @@ export function buildGatedTransferIx(att: Attestation, accounts: { source: Publi
       { pubkey: nullifierPda(nullifier, verifyId), isSigner: false, isWritable: true },
       { pubkey: verifyId, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      // forwarded to the verifier, which reads it to check that its caller is the target program
+      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
     ],
     data,
   });
+}
+
+// ---- Nullifier record ----
+/** Decode a Nullifier PDA (8 disc ‖ u64 consumed_at_slot ‖ 32 consumer_program ‖ 32 action_hash ‖ u8 bump).
+ *  `consumerProgram` is the program that consumed it by CPI (records written before the caller check
+ *  carry the all-zero key for a direct submission). */
+export function decodeNullifier(data: Uint8Array) {
+  const b = Buffer.from(data);
+  if (b.length < 81) throw new Error(`Nullifier account must be 81 bytes, got ${b.length}`);
+  return {
+    consumedAtSlot: b.readBigUInt64LE(8),
+    consumerProgram: new PublicKey(b.subarray(16, 48)),
+    actionHash: '0x' + b.subarray(48, 80).toString('hex'),
+    bump: b[80],
+  };
 }

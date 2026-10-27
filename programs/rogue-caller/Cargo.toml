@@ -1,0 +1,21 @@
+# TEST-ONLY program (M2 suite): a native forwarder that CPIs whatever program its first account
+# names, with the remaining accounts and the instruction data passed through unchanged. The suite
+# loads it at an id generated at test time (scripts/test-m2.sh) to show that the verifier refuses a
+# CPI from any program other than the attestation's target. Never deployed to mainnet.
+[package]
+name = "rogue-caller"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "rogue_caller"
+
+[features]
+default = []
+no-entrypoint = []
+
+[dependencies]
+anchor-lang = "=0.31.1"   # only for its solana_program re-export (no new crates in the lock)

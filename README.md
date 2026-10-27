@@ -48,9 +48,9 @@ Attest a screened action and verify it anywhere. `call.json` is the tool call to
 blindseal attest call.json --target-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa --out attestation.json
 #   proving takes hours on CPU (2 h 16 min for the sample on an M1 Max); the prover binary is downloaded from the
 #   project's GitHub release on first use, or build it from source (below) and pass --prover <path>
-blindseal verify attestation.json          # off-chain, the wasm verifier
-blindseal submit attestation.json          # Solana mainnet: verifies on chain, consumes the nullifier
-blindseal submit attestation.json --check  # has this nullifier been consumed?
+blindseal verify attestation.json                        # off-chain, the wasm verifier
+blindseal submit attestation.json --wallet source.json   # Solana mainnet: the gated transfer (verify + consume + transfer)
+blindseal submit attestation.json --check                # has this nullifier been consumed?
 ```
 
 Or drop `attestation.json` on the site's verify page — the same verifier runs in your browser and uploads nothing.

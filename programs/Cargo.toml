@@ -3,7 +3,7 @@
 # crates/getrandom into cargo build-sbf). Built with `anchor build` from the repo root.
 [workspace]
 resolver = "2"
-members = ["blindseal-verify", "transfer-gate"]
+members = ["blindseal-verify", "transfer-gate", "rogue-caller"]
 
 [profile.release]
 overflow-checks = true
