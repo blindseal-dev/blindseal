@@ -54,6 +54,7 @@ transaction as the action. Its check order is documented in the header of
 `programs/blindseal-verify/src/lib.rs`; in short:
 
 - **Caller binding** — only the program the attestation was produced for can consume it, by direct CPI.
+- **Not paused** — the verifier's config authority can pause it.
 - **Allowlists** — the verifying key must be accepted, and (if enabled) the policy root registered.
 - **Expiry** — `expirySlot` must not have passed.
 - **Action binding** — the verifier recomputes `actionHash` from the fields the calling program is about to
@@ -87,8 +88,14 @@ Proven (zero-knowledge, verifiable by anyone):
 
 Attested, not proven:
 
-- L0, L2 and L3 verdicts. They run locally and are recorded, but their output is not inside the proof.
+- L2 and L3 verdicts. They run locally (L3 at the provider you configure) and are recorded, but their output
+  is not inside the proof.
 - The audit log's content.
+
+Run but not proven yet:
+
+- L0 (decode-then-L1). The proxy runs it; the proof covers L1 on the payload as received. L0 inside the proof
+  is the next increment and will change the detector version.
 
 Not covered:
 
@@ -120,8 +127,9 @@ Each item references the section of `LIMITATIONS.md` with details and red-team e
    proxy, swap the embedding model, read the L3 key, or rewrite local files.
 2. **The L3 provider is trusted** for its verdicts when L3 is enabled. A local Ollama model keeps L3 on the
    machine.
-3. **The embedding model and corpus come from the installed package**; the same trust boundary as the rest
-   of the npm install.
+3. **The L2 inputs are trusted.** The attack corpus and its embeddings ship in the npm package; the embedding
+   model (`Xenova/bge-small-en-v1.5`) is downloaded from Hugging Face on first use and cached locally. The trust
+   boundary is the npm install plus that one download.
 4. **The program upgrade authority is trusted.** Both programs keep an upgrade authority, held today by a
    single key; whoever holds it can change what the verifier accepts. `solana-verify` checks that the
    deployed bytes match this repository.

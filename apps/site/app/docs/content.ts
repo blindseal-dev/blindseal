@@ -266,7 +266,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
       ] },
       { id: 'upgradeable', heading: 'Who can update the programs?', blocks: [
         p('The verifier and example payment gate can currently be updated by a single project key. Requiring multiple approvals and a waiting period for updates is planned.'),
-        p('Both on-chain programs — the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` and the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the [changelog](/changelog), and `solana-verify` lets you check that the deployed bytes match the public source.'),
+        p('Both on-chain programs — the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` and the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Upgrades are announced in the [changelog](/changelog), and `solana-verify` lets you check that the deployed bytes match the public source.'),
       ] },
     ],
   },

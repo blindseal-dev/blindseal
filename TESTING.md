@@ -26,7 +26,7 @@ npx blindseal@latest -- npx -y @modelcontextprotocol/server-filesystem /data
 
 | Capability | Works locally? | Needs |
 |---|---|---|
-| Four-layer detection (`demo`, wrapping any MCP server) | yes | nothing for L0–L2; an LLM key or local Ollama enables L3 |
+| Four-layer detection (`demo`, wrapping any MCP server) | yes | L0–L1: nothing; L2: a one-time download of the embedding model; L3: an LLM key or local Ollama |
 | Redaction of secrets / PII before the model-based layers | yes | nothing |
 | Capability firewall, manifest-drift check, local scan history | yes | nothing |
 | Hash-chained audit log, `blindseal audit verify` / `disclose` | yes | nothing |

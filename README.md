@@ -119,8 +119,8 @@ Deployed bytes reproduce with `solana-verify` from this repository at the tagged
 
 ## Upgradeability
 
-Both programs keep an upgrade authority, held today by a single key. Every upgrade is logged with its
-signature in the release notes (https://blindseal.tech/changelog); moving the authority to a Squads multisig with a timelock is on the roadmap.
+Both programs keep an upgrade authority, held today by a single key. Upgrades are announced in the release
+notes (https://blindseal.tech/changelog) and `solana-verify` checks the deployed bytes against this repository; moving the authority to a Squads multisig with a timelock is on the roadmap.
 Treat the authority as the trust root it is.
 
 ## License

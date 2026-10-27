@@ -39,9 +39,11 @@ git rev-list refs/heads/main | while read -r c; do git ls-tree -r "$c" -- "${ALL
 echo "   $(wc -l < /tmp/bs_allowed_blobs.txt | tr -d ' ') blob ids exempt from the PART B substitutions"
 
 echo "→ rewrite"
-python3 - "$A_RE" <<'PY' > /tmp/bs_subs.py
+identity_patterns_lines "$PF" personal > /tmp/bs_personal_patterns.txt
+python3 - /tmp/bs_personal_patterns.txt <<'PY' > /tmp/bs_subs.py
 import sys, re
-pats = [p for p in sys.argv[1].split("|") if p]
+# one ERE per line, compiled as a regex (never split on "|": a pattern may contain an alternation)
+pats = [l.rstrip("\n") for l in open(sys.argv[1], encoding="utf-8") if l.strip()]
 def pairs(path):
     out = []
     for line in open(path, encoding="utf-8"):
@@ -52,7 +54,7 @@ def pairs(path):
 print("import re")
 print("B_PAIRS = " + repr(pairs(".history-subs")))
 print("M_PAIRS = " + repr(pairs(".history-msg-subs")))
-print("A_PATS = " + repr([re.escape(p).encode() for p in pats]))
+print("A_PATS = " + repr([p.encode() for p in pats]))
 print("ALLOWED = set(l.strip().encode() for l in open('/tmp/bs_allowed_blobs.txt') if l.strip())")
 print("def scrub_a(d):")
 print("    for p in A_PATS: d = re.sub(b'(?i)' + p, b'blindseal', d)")
@@ -106,7 +108,7 @@ if [ ${#RENAME[@]} -gt 0 ]; then
 fi
 rm -rf .git/filter-repo
 git filter-repo --force --refs refs/heads/main --commit-callback "$COMMIT_CB" --blob-callback "$BLOB_CB"
-rm -f /tmp/bs_subs.py /tmp/bs_allowed_blobs.txt
+rm -f /tmp/bs_subs.py /tmp/bs_allowed_blobs.txt /tmp/bs_personal_patterns.txt
 
 echo "→ history sweep (refs/heads/main only)"
 fail=0

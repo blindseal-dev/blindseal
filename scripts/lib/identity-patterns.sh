@@ -8,6 +8,7 @@
 #   # comment                  lines starting with '#' are comments (except section headers)
 #   #[section]                 starts a section; the header is a comment to older readers
 #   <ERE pattern>              one grep -E pattern per line, matched case-insensitively
+#                              (keep each line free of `|`: older copies of these scripts split on it)
 #
 # Sections:
 #   personal      personal names / handles. Hard fail anywhere: tracked and untracked files, shipped
@@ -26,8 +27,8 @@ identity_file() {
   if [ -n "${IDENTITY_SWEEP_FILE:-}" ]; then printf '%s\n' "$IDENTITY_SWEEP_FILE"; else printf '%s\n' "$root/.identity-sweep"; fi
 }
 
-# identity_patterns <file> <section> — the section's patterns joined with '|' (empty if none).
-identity_patterns() {
+# identity_patterns_lines <file> <section> — the section's patterns, one per line.
+identity_patterns_lines() {
   local file="$1" want="$2"
   [ -f "$file" ] || return 0
   awk -v want="$want" '
@@ -35,5 +36,11 @@ identity_patterns() {
     /^[[:space:]]*#/ { next }
     /^[[:space:]]*$/ { next }
     { s = (sec == "" ? "personal" : sec); if (s == want) { sub(/[[:space:]]+$/, ""); print } }
-  ' "$file" | paste -sd'|' -
+  ' "$file"
+}
+
+# identity_patterns <file> <section> — the section's patterns joined with '|' into one ERE (empty if none).
+# For grep -E only; never split the result on '|' (a pattern may itself contain an alternation).
+identity_patterns() {
+  identity_patterns_lines "$1" "$2" | paste -sd'|' -
 }
