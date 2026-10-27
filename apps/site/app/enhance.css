@@ -1,0 +1,14 @@
+/* App-side additions layered over the verbatim kit CSS (kept out of kit/*.css on purpose). */
+
+/* ── progressive enhancement: reveals are visible until the kit has mounted ──────────────────────────
+   motion.css hides every not-yet-revealed .reveal under html.bs-js — and .bs-js is server-rendered, so
+   without JS (or with the kit blocked / failed) the content would stay at opacity 0 forever. The hiding
+   now applies only once the kit has mounted (body[data-kit-mounted], set by KitProvider right after
+   mountReveals), so the entrance still runs when the kit is present. */
+.bs-js body:not([data-kit-mounted]) .reveal:not(.is-inview) { opacity: 1; }
+/* the same gate for the changelog's entries (s06.css: .bs-js .cl-entry:not(.is-in) — changelog-kit.tsx adds .is-in) */
+.bs-js body:not([data-kit-mounted]) .cl-entry:not(.is-in) { opacity: 1; }
+
+/* ── explorer: direct submissions (no gated program), one small line under the programs list ──────── */
+.ex-list__direct { padding-top: 6px; font: var(--fw-body) var(--fs-11)/16px var(--font-mono); letter-spacing: .04em; color: var(--muted); }
+.ex-list__direct[hidden] { display: none; }

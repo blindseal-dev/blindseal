@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../meta';
 import type { ReactNode } from 'react';
 import { ChangelogKit, type Entry } from './changelog-kit';
+import { RELEASES } from './releases';
 import './changelog.css';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
+  path: '/changelog',
   title: 'Changelog · Blindseal',
   description: 'Dated release notes for the proxy, the dashboard and the site.',
-};
+});
 
 // S06 — Changelog (/changelog), dated release notes: the mockup's masthead band over the faint
 // field, a sticky version rail (scroll-spy, the latest with the accent dot) and one flat panel per
@@ -14,16 +17,6 @@ export const metadata: Metadata = {
 // page.js; the site never loads the fixtures, so the releases live here and are server-rendered —
 // the rail and every entry are static HTML, and changelog-kit.tsx (the page.js port) adds the spy,
 // the reveals, the "#" copy links and the deep links after the kit mounts.
-const RELEASES = [
-  { v: '0.5.4', date: '2026-10-27', added: ['The dashboard ships inside the blindseal npm package and `blindseal run` serves it; `blindseal dashboard` opens it'], changed: ['Wording across the CLI, dashboard and site: model-based checks run locally and are attested, not proven; a TEE mode is planned'], fixed: [] },
-  { v: '0.5.3', date: '2026-10-26', added: ['`attest` warns when the last proof on this machine took more than half the expiry window'], changed: ['`attest --expiry` defaults to the current slot + 40,000 (about 4.4 hours); `--expiry` overrides, `--no-expiry` is opt-in'], fixed: [] },
-  { v: '0.5.2', date: '2026-10-26', added: ['The linux-x64 prover binary on the GitHub release, sha256-pinned in the CLI'], changed: ['New program ids: verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, transfer-gate `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa`; the previous verifier is paused'], fixed: [] },
-  { v: '0.5.1', date: '2026-10-26', added: ['`blindseal init` sets up ~/.blindseal (identity key, default policy, dashboard token); `init --wrap` routes your MCP configs through blindseal', 'The prover binary downloads on first `attest` from the GitHub release, sha256-pinned'], changed: ['Unknown commands exit with an error; wrapping a server needs `--`', 'Telemetry removed'], fixed: ['`verify` decodes the public data and fails when any labelled field differs from it'] },
-  { v: '0.5.0', date: '2026-10-23', added: ['On-chain verifier program (blindseal-verify) and the transfer-gate example: Groth16 verify via sp1-solana, nullifier set, vkey and policy-root allowlists, paused flag', 'SDK: buildVerifyIx, submit (mainnet-only, genesis-hash guarded), verifyOffchain', 'CLI: blindseal attest (screen → audit → prove) and blindseal submit', 'The proxy serves the built dashboard with application/wasm and a CSP that allows the in-browser verifier', 'Mainnet explorer and on-chain nullifier status, read server-side'], changed: ['Solana mainnet is the only deploy target; chainId 2 is reserved (devnet removed everywhere)', 'The verify pages run the real Groth16 verifier compiled to WebAssembly; the mock verifier is gone', 'Attestations carry the action fields and nonce the on-chain recompute needs'], fixed: ['Attestation detail decodes the single committed public-input blob into its six fields'] },
-  { v: '0.4.0', date: '2026-10-22', added: ['Local dashboard (decisions, audit, policy, attestations, settings)', 'Verify page with the in-browser verifier'], changed: ['Policy root is now a Merkle over the committed rule DFAs'], fixed: ['HTML-entity decoder no longer fails open on oversized entities'] },
-  { v: '0.3.0', date: '2026-10-10', added: ['Off-chain Groth16 verifier (sp1-verifier)', 'Hash-chained audit log with selective disclosure'], changed: ['Detector version is the SP1 vkey'], fixed: [] },
-  { v: '0.2.0', date: '2026-09-20', added: ['SP1 guest: payloadHash + policyRoot commitment', 'Redaction before L2/L3'], changed: [], fixed: [] },
-];
 
 type Release = { version: string; component: string; date: string; id: string; added: string[]; changed: string[]; fixed: string[] };
 const GROUPS = [['added', 'Added'], ['changed', 'Changed'], ['fixed', 'Fixed']] as const;
@@ -48,17 +41,41 @@ function dayLong(ymd: string) { const [y, m, d] = ymd.split('-').map(Number); re
 function dayShort(ymd: string) { return dayLong(ymd).replace(/,\s*\d{4}$/, ''); }
 
 // identifiers in the notes read as code: env assignments, routes, method + path, camelCase names,
-// detector versions (page.js's CODE_RE, applied to the text itself — JSX escapes the rest)
-const CODE_RE = /\b(?:GET|POST|PUT|DELETE) \/[\w/.:-]+|\b[A-Z][A-Z0-9_]{2,}=\w+|(?:^|(?<=\s))\/[a-z][\w/-]*|\bdet-\d{4}\.\d+\.\d+\b|\b[a-z]+[A-Z][A-Za-z0-9]*\b/g;
-function note(text: string): ReactNode[] {
+// detector versions (page.js's CODE_RE, applied to the text itself — JSX escapes the rest), and `backticks`
+const CODE_RE = /`[^`]+`|\b(?:GET|POST|PUT|DELETE) \/[\w/.:-]+|\b[A-Z][A-Z0-9_]{2,}=\w+|(?:^|(?<=\s))\/[a-z][\w/-]*|\bdet-\d{4}\.\d+\.\d+\b|\b[a-z]+[A-Z][A-Za-z0-9]*\b/g;
+function codeSpans(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = []; let last = 0;
   for (const m of text.matchAll(CODE_RE)) {
     const at = m.index ?? 0;
     if (at > last) out.push(text.slice(last, at));
-    out.push(<code key={at}>{m[0]}</code>);
-    last = at + m[0].length;
+    const t = m[0];
+    out.push(<code key={key + at}>{t.startsWith('`') ? t.slice(1, -1) : t}</code>);
+    last = at + t.length;
   }
   if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+// {{id:…}} / {{sig:…}}: BS.ui.hash's markup (4 + 4 shown, the full value in data-hash, the title and the
+// accessible name), so a 88-character signature never breaks the layout; the kit's .hash delegation
+// adds copy-on-click and the full-value tooltip once it mounts.
+const REF_RE = /\{\{(id|sig):([1-9A-HJ-NP-Za-km-z]+)\}\}/g;
+function Ref({ kind, value }: { kind: 'id' | 'sig'; value: string }) {
+  const label = kind === 'id' ? 'Program id' : 'Transaction signature';
+  return (
+    <button type="button" className="hash cl-ref" data-hash={value} data-label={label} title={value} aria-label={`${label} ${value}. Copy`}>
+      <span className="hash__v">{value.slice(0, 4) + '…' + value.slice(-4)}</span>
+    </button>
+  );
+}
+function note(text: string): ReactNode[] {
+  const out: ReactNode[] = []; let last = 0;
+  for (const m of text.matchAll(REF_RE)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push(...codeSpans(text.slice(last, at), 't' + last));
+    out.push(<Ref key={'r' + at} kind={m[1] as 'id' | 'sig'} value={m[2]!} />);
+    last = at + m[0].length;
+  }
+  if (last < text.length) out.push(...codeSpans(text.slice(last), 't' + last));
   return out;
 }
 
@@ -73,7 +90,7 @@ export default function Changelog() {
         <div className="cl-mast__copy">
           <p className="cl-mast__eyebrow">Changelog</p>
           <h1 className="cl-mast__title" id="cl-title">Releases.</h1>
-          <p className="cl-mast__lede">Proxy, dashboard and site, dated. Nothing here changes a claim.</p>
+          <p className="cl-mast__lede">Proxy, dashboard and site, dated. A release that changes a claim’s wording or a program id says so.</p>
         </div>
       </header>
 

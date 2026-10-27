@@ -20,6 +20,8 @@ test('random 32-byte values are not all on-curve (Node 24 createPublicKey accept
 
 test('the mainnet nullifier PDA resolves to the account the consuming tx created (7iwA4nxn…)', () => {
   // Consumed event nullifier (tx 7iwA4nxnBG73…, slot 460579127) → PDA [b"nullifier", nullifier] of the verifier
+  // that consumed it: the 0.5.0 verifier (merZNYK…, paused since 0.5.2), not today's VERIFY_PROGRAM_ID
   const nullifier = Buffer.from('fea1d3eca4c3ee68eadf478f8096599b1725acdbcf2975fbb5b7de96b96a15f1', 'hex');
-  assert.equal(findProgramAddress([Buffer.from('nullifier'), nullifier], VERIFY_PROGRAM_ID), '4Ejfezkv4SzjQAa5KpvsMaHHMKY2JUJi6xEiBwEnaB3c');
+  assert.equal(findProgramAddress([Buffer.from('nullifier'), nullifier], 'merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb'), '4Ejfezkv4SzjQAa5KpvsMaHHMKY2JUJi6xEiBwEnaB3c');
+  assert.notEqual(VERIFY_PROGRAM_ID, 'merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb');
 });

@@ -3,6 +3,8 @@
 /// Read-only JSON-RPC over fetch; no SDK dependency. RPC = BLINDSEAL_RPC_URL, else the public
 /// endpoint (rate-limited — logged once). `BLINDSEAL_RPC_URL=off` disables reads (tests).
 import { createHash } from 'node:crypto';
+import { isDirectConsumer, aggregateConsumers, type ConsumerEntry } from './consumers.ts';
+export * from './consumers.ts';
 
 export const VERIFY_PROGRAM_ID = '6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx';
 export const PUBLIC_MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
@@ -102,13 +104,25 @@ export interface NullifierStatus {
   consumed: boolean;
   pda: string;
   consumedAtSlot?: number;
+  /// raw consumer_program field, base58 (Pubkey::default() = `DIRECT_CONSUMER` on a direct submission)
   consumerProgram?: string;
+  /// true when consumer_program is Pubkey::default(): a DIRECT submission (SDK submit / CLI), no gated program
+  direct?: boolean;
   actionHash?: string;
   cluster: 'mainnet-beta';
   rpc: 'configured' | 'public';
 }
 
-/// Nullifier PDA = [b"nullifier", nullifier32]. Layout: 8 disc ‖ u64 LE slot ‖ 32 consumer ‖ 32 actionHash ‖ u8 bump.
+
+/// Decodes a Nullifier account. Layout: 8 disc ‖ u64 LE slot ‖ 32 consumer ‖ 32 actionHash ‖ u8 bump.
+/// null when the bytes are not a Nullifier. The raw consumer is kept; `direct` flags the default key.
+export function parseNullifierAccount(data: Buffer): { consumedAtSlot: number; consumerProgram: string; direct: boolean; actionHash: string } | null {
+  if (data.length < 81 || !data.subarray(0, 8).equals(disc('Nullifier'))) return null;
+  const consumerProgram = b58(data.subarray(16, 48));
+  return { consumedAtSlot: Number(data.readBigUInt64LE(8)), consumerProgram, direct: isDirectConsumer(consumerProgram), actionHash: '0x' + data.subarray(48, 80).toString('hex') };
+}
+
+/// Nullifier PDA = [b"nullifier", nullifier32].
 export async function getNullifierStatus(nullifierHex: string): Promise<NullifierStatus> {
   const nf = Buffer.from(nullifierHex.replace(/^0x/, ''), 'hex');
   if (nf.length !== 32) throw new Error('nullifier must be 32 bytes');
@@ -116,23 +130,11 @@ export async function getNullifierStatus(nullifierHex: string): Promise<Nullifie
   const r = await rpc<{ value: { data: [string, string] } | null }>('getAccountInfo', [pda, { encoding: 'base64', commitment: 'confirmed' }]);
   const base: NullifierStatus = { nullifier: nullifierHex, consumed: false, pda, cluster: 'mainnet-beta', rpc: process.env.BLINDSEAL_RPC_URL ? 'configured' : 'public' };
   if (!r.value) return base;
-  const data = Buffer.from(r.value.data[0], 'base64');
-  if (data.length < 81 || !data.subarray(0, 8).equals(disc('Nullifier'))) return base;
-  return {
-    ...base, consumed: true,
-    consumedAtSlot: Number(data.readBigUInt64LE(8)),
-    consumerProgram: b58(data.subarray(16, 48)),
-    actionHash: '0x' + data.subarray(48, 80).toString('hex'),
-  };
+  const n = parseNullifierAccount(Buffer.from(r.value.data[0], 'base64'));
+  if (!n) return base;
+  return { ...base, consumed: true, consumedAtSlot: n.consumedAtSlot, consumerProgram: n.consumerProgram, ...(n.direct ? { direct: true } : {}), actionHash: n.actionHash };
 }
 
-/// Public program names. A consumer program shows a name only where one is published; everything
-/// else is "No public name" in the explorer. Pubkey::default() is the verifier's marker for a direct
-/// submission (SDK submit / CLI) with no gated program.
-export const KNOWN_PROGRAM_NAMES: Record<string, string> = {
-  '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa': 'transfer-gate (example)',
-  '11111111111111111111111111111111': 'Direct submission (no gated program)',
-};
 
 /// Anchor event discriminator: sha256("event:<Name>")[..8] — Consumed = [30,74,68,130,40,188,227,125]
 const eventDisc = (name: string) => createHash('sha256').update(`event:${name}`).digest().subarray(0, 8);
@@ -152,8 +154,9 @@ export interface ExplorerSnapshot {
   consumed: { total: number; perDay: { day: string; count: number }[] };
   /// from the `Consumed` events (policy_root field) in the program's confirmed transactions
   policyRoots: { root: string; count: number }[];
-  /// from the Nullifier PDAs' consumer_program field (Pubkey::default() = direct submission)
-  consumerPrograms: { programId: string; count: number; name?: string }[];
+  /// from the Nullifier PDAs' consumer_program field, raw; the default key (a direct submission, no
+  /// gated program) is kept and flagged `direct: true` — use splitConsumers() to count real programs
+  consumerPrograms: ConsumerEntry[];
   /// provenance: how many PDAs / signatures / events were read, whether the signature scan hit
   /// its cap, and how many consumptions had to be day-bucketed from their slot (no event found)
   source: { nullifierAccounts: number; signaturesScanned: number; consumedEvents: number; truncated: boolean; slotBucketed: number };
@@ -240,14 +243,12 @@ async function readSnapshot(): Promise<ExplorerSnapshot> {
   const today = Math.floor(now / DAY_MS) * DAY_MS;
   const perDay = Array.from({ length: 90 }, (_, i) => { const day = utcDay(today - (89 - i) * DAY_MS); return { day, count: perDayMap.get(day) ?? 0 }; });
 
-  const consumers = new Map<string, number>();
-  for (const n of nullifiers.values()) consumers.set(n.consumer, (consumers.get(n.consumer) ?? 0) + 1);
 
   return {
     live: true, programId: VERIFY_PROGRAM_ID, cluster: 'mainnet-beta', rpc: rpcMode(), slot, updatedAt: now,
     consumed: { total: nullifiers.size, perDay },
     policyRoots: [...roots].map(([root, count]) => ({ root, count })).sort((a, b) => b.count - a.count),
-    consumerPrograms: [...consumers].map(([programId, count]) => ({ programId, count, ...(KNOWN_PROGRAM_NAMES[programId] ? { name: KNOWN_PROGRAM_NAMES[programId] } : {}) })).sort((a, b) => b.count - a.count),
+    consumerPrograms: aggregateConsumers([...nullifiers.values()].map((n) => n.consumer)),
     source: { nullifierAccounts: nullifiers.size, signaturesScanned: sigs.length, consumedEvents: events.length, truncated: sigs.length >= SIGNATURE_CAP, slotBucketed },
   };
 }

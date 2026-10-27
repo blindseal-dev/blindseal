@@ -37,7 +37,7 @@
     if (ink) return '<span class="notch__item" data-label="' + esc(n.label) + '" data-site-nav="' + n.id + '">' + inner + "</span>";
     return '<a class="notch__item" href="' + esc(ctx.routes[n.id] || "#") + '" data-label="' + esc(n.label) + '" data-site-nav="' + n.id + '">' + inner + "</a>";
   }
-  /* ctx: { routes: {home,how,verify,docs,explorer,changelog}, brand, action: {label, href}, oneLiner, version } */
+  /* ctx: { routes: {home,how,verify,docs,explorer,changelog}, brand, action: {label, href}, oneLiner, npm (the npm package URL, footer) } */
   function navHtml(ctx) {
     var a = ctx.action, name = ctx.brand || "Blindseal";
     var tab = function (cls) { return '<div class="notch notch--' + cls + '">'; };
@@ -79,7 +79,10 @@
         '<p class="site-footer__line">' + esc(ctx.oneLiner) + "</p></div>" +
       '<nav class="site-footer__routes" aria-label="Footer">' + FOOT.map(function (f) {
         return '<a href="' + esc(ctx.routes[f.id] || "#") + '" data-site-foot="' + f.id + '">' + esc(f.label) + "</a>";
-      }).join("") + "</nav>";
+      }).join("") +
+      /* the npm package (external, new tab; no data-site-foot, so setActive never marks it) */
+      (ctx.npm ? '<a href="' + esc(ctx.npm) + '" target="_blank" rel="noopener">npm<span class="sr-only"> (opens in a new tab)</span></a>' : "") +
+      "</nav>";
   }
   return { NAV: NAV, FOOT: FOOT, WING: WING, navHtml: navHtml, menuHtml: menuHtml, footerHtml: footerHtml, mark: mark };
 });

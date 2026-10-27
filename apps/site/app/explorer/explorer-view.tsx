@@ -1,13 +1,14 @@
 'use client';
 // S05 · Explorer — the mockup's <main> children one-to-one (design/mockups/mockups/S05/index.html,
-// "devnet" → "mainnet") plus its page.js, run through usePageKit once the kit has mounted. The JSX
-// is the mockup's LOADING state and nothing in it depends on the clock, the viewport or the
-// snapshot, so server HTML and hydration always agree; the kit then paints the props (odometers roll
-// from 0, the chart is drawn into #ex-plot-svg, the lists are filled) exactly as the mockup paints
-// its fixture after its fake load. Offline: the error panel; Retry re-reads /explorer/snapshot.
+// "devnet" → "mainnet") plus its page.js, run through usePageKit once the kit has mounted. The server
+// renders the state it knows (numbers, the two ranked lists, the per-day table — rows.ts) so the page
+// reads without JS, and nothing in it depends on the clock or the viewport, so hydration always agrees;
+// the kit then animates the same values (odometers roll, the chart is drawn into #ex-plot-svg, the lists
+// are repainted from the same strings). Offline: the error panel; Retry re-reads /explorer/snapshot.
 import { useRouter } from 'next/navigation';
 import type { ExplorerSnapshot } from '@blindseal/chain-reads';
 import { usePageKit, decorate, type BSAny } from '../use-page-kit';
+import { listsHtml, tableCaption, tableRowsHtml } from './rows';
 
 const DAY = 86_400_000;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -32,6 +33,9 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
   const sum30 = perDay.slice(-30).reduce((a, d) => a + d.count, 0);
   const day24 = perDay.length ? perDay[perDay.length - 1].count : 0;   /* today so far (the effect adds yesterday's share) */
   const code = (!live && (snapshot.error?.code as string)) || 'RPC_UNAVAILABLE';
+  /* the lists and the per-day table, server-rendered from the same string builder the effect repaints
+     with (rows.ts): readable without JS; React never owns their children, so the repaint cannot fight it */
+  const lists = live ? listsHtml(snapshot) : null;
   const router = useRouter();
 
   usePageKit((BS: BSAny) => {
@@ -50,7 +54,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
     const plot = $('#ex-plot')!, plotSvg = $('#ex-plot-svg')!, plotSk = $('.ex-plot__sk')!, tip = $('#ex-tip')!, live = $('#ex-plot-live')!, table = $('#ex-table')!;
     const rangeEl = $('#ex-range')!, sumEl = $('#ex-sum')!, sumLabel = $('#ex-sum-label')!;
     const alt = $('#ex-alt')!;
-    const rootsRows = $('#ex-roots-rows')!, rootsFoot = $('#ex-roots-foot')!, progRows = $('#ex-programs-rows')!, progFoot = $('#ex-programs-foot')!;
+    const rootsRows = $('#ex-roots-rows')!, rootsFoot = $('#ex-roots-foot')!, progRows = $('#ex-programs-rows')!, progFoot = $('#ex-programs-foot')!, progDirect = $('#ex-programs-direct')!;
 
     /* ── masthead field + the entrance (S02 / S03 ladder) ────────────────── */
     const space = BS.mountSpace ? BS.mountSpace($('.ex-mast__space'), { intensity: 'faint', fade: false }) : null;
@@ -111,7 +115,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
       plotSk.innerHTML = '<span class="skeleton"></span>';
       let sk = '';
       for (let i = 0; i < 5; i++) sk += '<li class="ex-row ex-row--sk" aria-hidden="true"><span class="skeleton ex-sk-n"></span><span class="skeleton ex-sk-id"></span><span class="skeleton ex-sk-v"></span><span class="skeleton ex-sk-p"></span></li>';
-      rootsRows.innerHTML = sk; progRows.innerHTML = sk;
+      rootsRows.innerHTML = sk; progRows.innerHTML = sk; progDirect.hidden = true;
       rootsFoot.innerHTML = '<span class="skeleton ex-sk-id" aria-hidden="true" style="display:inline-block"></span>';
       progFoot.innerHTML = rootsFoot.innerHTML;
     };
@@ -156,7 +160,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
       rollTo(odo.total!, total);
       rollTo(odo.day!, last24(x.consumed.perDay));
       rollTo(odo.roots!, x.policyRoots.length);
-      rollTo(odo.programs!, x.consumerPrograms.length);
+      rollTo(odo.programs!, listsHtml(x).programCount);   /* real gated programs only: direct submissions are not one */
       paintRange(true);
       paintLists(x);
     };
@@ -300,8 +304,8 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
       plotSvg.setAttribute('aria-label', 'Attestations consumed per day, last ' + range + ' days (UTC). Arrow keys read each day.');
       draw(animate);
       /* the table view: every value reachable without hovering */
-      $('caption', table)!.textContent = 'Attestations consumed per day, last ' + range + ' days (UTC)';
-      $('tbody', table)!.innerHTML = list.map((d) => '<tr><td>' + esc(d.day) + '</td><td>' + esc(fmt.int(d.count)) + '</td></tr>').join('');
+      $('caption', table)!.innerHTML = tableCaption(range);
+      $('tbody', table)!.innerHTML = tableRowsHtml(list);
     };
 
     /* ── the tooltip ─────────────────────────────────────────────────────── */
@@ -370,16 +374,6 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
     window.addEventListener('resize', onResize);
 
     /* ══ the lists ══════════════════════════════════════════════════════════ */
-    const pct = (c: number, t: number) => { if (!t) return '0%'; const p = (c / t) * 100; return (p < 1 ? '<1' : String(Math.round(p))) + '%'; };
-    const rowHtml = (i: number, idHtml: string, count: number, total: number) => {
-      const share = total ? count / total : 0;
-      return '<li class="ex-row" style="--i:' + i + '">' +
-        '<span class="ex-row__n">' + String(i + 1).padStart(2, '0') + '</span>' +
-        '<span class="ex-row__id">' + idHtml + '</span>' +
-        '<span class="ex-row__v">' + esc(fmt.int(count)) + '</span>' +
-        '<span class="ex-row__share"><span class="ex-row__meter" aria-hidden="true"><i style="transform:scaleX(' + share.toFixed(4) + ')"></i></span>' +
-        '<span class="ex-row__pct">' + esc(pct(count, total)) + '</span></span></li>';
-    };
     const enterRows = (list: HTMLElement) => {
       list.classList.remove('is-entering'); void list.offsetWidth;
       if (!reduced()) {
@@ -389,22 +383,10 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
     };
     let listsPainted = false;
     const paintLists = (x: ExplorerSnapshot) => {
-      const total = x.consumed.total;
-      const roots = x.policyRoots.slice().sort((a, b) => b.count - a.count);
-      rootsRows.innerHTML = roots.map((r, i) => rowHtml(i, ui.hash(r.root, { label: 'Policy root', lg: true }), r.count, total)).join('');
-      const rs = roots.reduce((a, r) => a + r.count, 0);
-      rootsFoot.textContent = roots.length + ' roots · sums to ' + fmt.int(rs) + (rs === total ? ', the total consumed' : '');
-
-      const progs = x.consumerPrograms.slice().sort((a, b) => b.count - a.count);
-      let unnamed = 0;
-      progRows.innerHTML = progs.map((p, i) => {
-        const name = p.name;
-        if (!name) unnamed++;
-        const nameHtml = name ? '<span class="ex-row__name">' + esc(name) + '</span>' : '<span class="ex-row__name is-none">No public name</span>';
-        return rowHtml(i, ui.hash(p.programId, { label: 'Program id' }) + nameHtml, p.count, total);
-      }).join('');
-      const ps = progs.reduce((a, p) => a + p.count, 0);
-      progFoot.textContent = progs.length + ' programs · ' + unnamed + ' without a public name · sums to ' + fmt.int(ps);
+      const h = listsHtml(x);
+      rootsRows.innerHTML = h.roots; rootsFoot.innerHTML = h.rootsFoot;
+      progRows.innerHTML = h.programs; progFoot.innerHTML = h.programsFoot;
+      progDirect.innerHTML = h.direct; progDirect.hidden = !h.directCount;
       decorate($('#ex-lists')!);
       /* first paint: the container's .reveal.cascade is the entrance (below the fold); later repaints rise in place */
       if (listsPainted) { enterRows(rootsRows); enterRows(progRows); }
@@ -473,7 +455,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
           </div>
           <div className="stat ex-stat">
             <p className="stat__k">Consumer programs</p>
-            <p className="stat__v ex-stat__v" data-odo="programs">{live ? fmtInt(snapshot.consumerPrograms.length) : '—'}</p>
+            <p className="stat__v ex-stat__v" data-odo="programs">{lists ? fmtInt(lists.programCount) : '—'}</p>
             <p className="stat__d" data-sub="programs"><span>Programs that called the verifier</span></p>
           </div>
         </section>
@@ -499,7 +481,9 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
             <div className="ex-tip" id="ex-tip" aria-hidden="true"><span className="ex-tip__d"></span><span className="ex-tip__sep">·</span><span className="ex-tip__v"></span><span className="ex-tip__note"></span></div>
             <p className="sr-only" id="ex-plot-help">Left and right arrows move one day; Home and End jump to the first and last day.</p>
             <p className="sr-only" id="ex-plot-live" aria-live="polite"></p>
-            <table className="sr-only" id="ex-table"><caption></caption><thead><tr><th scope="col">Day (UTC)</th><th scope="col">Consumed</th></tr></thead><tbody></tbody></table>
+            <table className="sr-only" id="ex-table"><caption dangerouslySetInnerHTML={{ __html: live ? tableCaption(30) : '' }} /><thead><tr><th scope="col">Day (UTC)</th><th scope="col">Consumed</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: live ? tableRowsHtml(perDay.slice(-30)) : '' }} /></table>
+            {/* without JS the bars are never drawn: the per-day table above is the chart, shown */}
+            <noscript><style>{'.ex-plot{height:auto}.ex-plot__svg,.ex-plot__sk,.ex-range{display:none}#ex-table{position:static!important;width:100%;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal;border-collapse:collapse;font:var(--fw-body) 13px/20px var(--font-mono);color:var(--muted)}#ex-table caption{text-align:left;padding-bottom:8px}#ex-table th,#ex-table td{text-align:left;padding:2px 12px 2px 0;font-weight:inherit}'}</style></noscript>
           </div>
         </section>
 
@@ -523,8 +507,8 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
               <p className="ex-list__lede">A root is a Merkle hash of a policy. The rules behind it never leave the operator&apos;s machine.</p>
             </div>
             <div className="ex-cols" aria-hidden="true"><span>#</span><span>Root</span><span className="ex-cols__num">Consumed</span><span className="ex-cols__num">Share</span></div>
-            <ol className="ex-rows" id="ex-roots-rows" aria-label="Policy roots by attestations consumed"></ol>
-            <p className="ex-list__foot" id="ex-roots-foot"></p>
+            <ol className="ex-rows" id="ex-roots-rows" aria-label="Policy roots by attestations consumed" dangerouslySetInnerHTML={{ __html: lists?.roots ?? '' }} />
+            <p className="ex-list__foot" id="ex-roots-foot" dangerouslySetInnerHTML={{ __html: lists?.rootsFoot ?? '' }} />
           </section>
           <section className="site-panel ex-list" id="ex-programs" aria-labelledby="ex-programs-title">
             <div className="ex-list__head">
@@ -533,8 +517,10 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
               <p className="ex-list__lede">Program ids are public on chain. A name shows only where the program publishes one.</p>
             </div>
             <div className="ex-cols" aria-hidden="true"><span>#</span><span>Program id</span><span className="ex-cols__num">Consumed</span><span className="ex-cols__num">Share</span></div>
-            <ol className="ex-rows" id="ex-programs-rows" aria-label="Consumer programs by attestations consumed"></ol>
-            <p className="ex-list__foot" id="ex-programs-foot"></p>
+            <ol className="ex-rows" id="ex-programs-rows" aria-label="Consumer programs by attestations consumed" dangerouslySetInnerHTML={{ __html: lists?.programs ?? '' }} />
+            <p className="ex-list__foot" id="ex-programs-foot" dangerouslySetInnerHTML={{ __html: lists?.programsFoot ?? '' }} />
+            {/* direct submissions (consumer_program = Pubkey::default()): consumed without a gated program — not a consumer program */}
+            <p className="ex-list__direct" id="ex-programs-direct" hidden={!lists?.directCount} dangerouslySetInnerHTML={{ __html: lists?.direct ?? '' }} />
           </section>
         </div>
 

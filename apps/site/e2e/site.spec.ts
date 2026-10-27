@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { INVISIBLE_TEXT } from './nojs-lib';
 
 const PAGES = ['/', '/how-it-works', '/verify', '/docs', '/docs/concepts', '/docs/hashing', '/docs/integrate', '/docs/scope', '/docs/source', '/explorer', '/changelog'];
 
@@ -62,4 +63,48 @@ test('verify: sample valid, tampered invalid, disclosure accepted, nothing store
   await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Valid disclosure');
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
   expect(off, `off-host: ${off.join(', ')}`).toEqual([]);
+});
+
+// ── progressive enhancement: with JavaScript off every route shows its content (no reveal stuck at 0) ──
+test.describe('javascript disabled', () => {
+  test.use({ javaScriptEnabled: false });
+  for (const path of PAGES) {
+    test(`${path}: content visible without JS`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator('h1').first()).toBeVisible();
+      const hidden: string[] = await page.evaluate(INVISIBLE_TEXT);
+      expect(hidden, `invisible text without JS:\n${hidden.slice(0, 10).join('\n')}`).toEqual([]);
+      // and the reveals specifically: rendered at full opacity
+      const reveals: number[] = await page.$$eval('.reveal', (els) => els.map((e) => Number(getComputedStyle(e).opacity)));
+      expect(reveals.every((o) => o === 1), `reveal opacities ${reveals.join(',')}`).toBe(true);
+    });
+  }
+});
+
+// ── a Nullifier consumed DIRECTLY (consumer_program = Pubkey::default()) is not "by 1111…" ──
+test('verify step 4: a direct consumption reads "consumed directly (no gated program)"', async ({ page }) => {
+  await page.route('**/verify/nullifier*', (r) => r.fulfill({ json: { nullifier: '0x' + '00'.repeat(32), consumed: true, pda: 'x', consumedAtSlot: 460579127, consumerProgram: '11111111111111111111111111111111', direct: true, cluster: 'mainnet-beta', rpc: 'configured' } }));
+  await page.goto('/verify');
+  await expect(page.locator('#vf-checks .check')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
+  await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
+  await page.locator('#vf-checks [data-n4]').click();
+  const step4 = page.locator('#vf-checks .check').nth(3);
+  await expect(step4).toHaveAttribute('data-state', 'pass', { timeout: 10_000 });
+  await expect(step4).toContainText('consumed directly (no gated program)');
+  await expect(step4).not.toContainText('by');
+  await expect(step4.locator('.hash')).toHaveCount(0);
+});
+test('verify step 4: a gated consumption still names its program', async ({ page }) => {
+  await page.route('**/verify/nullifier*', (r) => r.fulfill({ json: { nullifier: '0x' + '00'.repeat(32), consumed: true, pda: 'x', consumedAtSlot: 460579127, consumerProgram: '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa', cluster: 'mainnet-beta', rpc: 'configured' } }));
+  await page.goto('/verify');
+  await expect(page.locator('#vf-checks .check')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
+  await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
+  await page.locator('#vf-checks [data-n4]').click();
+  const step4 = page.locator('#vf-checks .check').nth(3);
+  await expect(step4).toHaveAttribute('data-state', 'pass', { timeout: 10_000 });
+  await expect(step4).toContainText('by');
+  await expect(step4.locator('.hash')).toHaveAttribute('data-hash', '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa');
+  await expect(step4).not.toContainText('consumed directly');
 });
