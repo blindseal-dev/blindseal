@@ -56,6 +56,18 @@
       return noop;
     }
     var sr = M.scrollRoot(o.scrollRoot);
+    /* the site server-renders reveals visible (no-JS readable) and only hides them once the kit has mounted;
+       anything already on screen at that moment is marked revealed WITHOUT the entrance animation, so it
+       never blinks out and back in. Only content below the fold hides and rises on scroll. */
+    if (!o.animateInView && document.body && !document.body.hasAttribute("data-kit-mounted")) {
+      var vh = window.innerHeight || 0;
+      nodes = nodes.filter(function (n) {
+        var r = n.getBoundingClientRect();
+        if (r.top < vh && r.bottom > 0) { n.style.animation = "none"; n.style.transition = "none"; n.classList.add("is-inview"); return false; }
+        return true;
+      });
+      if (!nodes.length) return noop;
+    }
     var queue = [], waiting = false;
     var show = function (n) {
       if (n.classList.contains("is-inview")) return;

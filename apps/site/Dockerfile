@@ -17,6 +17,8 @@ COPY apps/site apps/site
 COPY packages/verifier-wasm packages/verifier-wasm
 COPY packages/chain-reads packages/chain-reads
 COPY packages/sdk packages/sdk
+# the docs sidebar's "Latest release" reads the proxy's version from its manifest at build time
+COPY packages/proxy/package.json packages/proxy/
 # prebuild copies the verifier wasm into public/; standalone output lands in .next/standalone
 RUN cd apps/site && pnpm run build
 

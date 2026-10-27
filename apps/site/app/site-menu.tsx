@@ -4,10 +4,14 @@ import { usePathname } from 'next/navigation';
 
 // The phone menu (< 720 px). Its markup — the button in the header row and the full-screen sheet — is
 // server-rendered with the chrome (kit/site-templates.cjs → site-chrome.tsx); this component renders
-// nothing and only wires it, so it works with or without the kit and writes nothing on html/head/body
-// or the body's children (DECISIONS 2026-10-23). Open: aria-expanded, the sheet unhidden, focus to its
-// first link, Tab / Shift+Tab kept inside (button + sheet links), Escape closes and returns focus to
-// the button. Leaving phone width or changing route closes it.
+// nothing and only wires it, so it works with or without the kit and creates nothing in html/head/body
+// (DECISIONS 2026-10-23). Open: aria-expanded, the sheet unhidden, focus to its first link, Tab /
+// Shift+Tab kept inside (button + sheet links), Escape closes and returns focus to the button. Leaving
+// phone width or changing route closes it.
+// Scroll lock while open: the page behind must not scroll (iOS Safari ignores overflow:hidden on body
+// for touch scrolling), so <body> is pinned with position:fixed at -scrollY — inline styles on body
+// only, never on <html> — and on every close path the styles are removed and the exact scroll position
+// is restored with behavior 'instant' (html.bs-site has scroll-behavior: smooth).
 const MQ = '(max-width: 719.98px)';
 
 export function SiteMenu() {
@@ -35,19 +39,33 @@ export function SiteMenu() {
       list[next]!.focus();
     };
     let open = false;
+    let savedY = 0;
+    const LOCK = ['position', 'top', 'left', 'right', 'width', 'overflow'] as const;
+    const lock = () => {
+      savedY = window.scrollY;
+      const b = document.body.style;
+      b.position = 'fixed'; b.top = `-${savedY}px`; b.left = '0'; b.right = '0'; b.width = '100%'; b.overflow = 'hidden';
+    };
+    const unlock = () => {
+      const b = document.body.style;
+      LOCK.forEach((k) => b.removeProperty(k));
+      window.scrollTo({ top: savedY, left: 0, behavior: 'instant' as ScrollBehavior });
+    };
     function set(v: boolean, restore: boolean) {
       if (v === open) return;
       open = v;
       sheet!.hidden = !v;
       btn!.setAttribute('aria-expanded', String(v));
       if (v) {
+        lock();
         markCurrent();
         document.addEventListener('keydown', onKey, true);
         sheet!.scrollTop = 0;
         sheet!.querySelector<HTMLElement>('a[href]')?.focus();
       } else {
         document.removeEventListener('keydown', onKey, true);
-        if (restore) btn!.focus();
+        unlock();
+        if (restore) btn!.focus({ preventScroll: true });
       }
     }
     const onBtn = () => set(!open, true);

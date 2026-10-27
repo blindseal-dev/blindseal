@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
+import { pageMeta } from '../meta';
 import Link from 'next/link';
 import { HowKit, type HowData } from './how-kit';
 import { actionHash, nullifierOf, sha256Hex } from './action-hash';
@@ -29,10 +30,11 @@ import { TocToggle } from './toc-toggle';
 //                             4 L0 decoders — the same lists crates/detector-core compiles.
 //   the audit chain           apps/site/app/verify/disclosure-sample.json (a real signed
 //                             disclosure, #190–#199), recomputed client-side in how-kit.tsx.
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
+  path: '/how-it-works',
   title: 'How it works · Blindseal',
   description: 'Four detection layers, redaction before the judge, a hash-chained audit log, and a Groth16 attestation bound to one on-chain action — and a plain line where the claim stops.',
-};
+});
 
 const TX_SIG = '7iwA4nxnBG73o8H8j8XUESYsmyGhGrxU5HiqXww8Nzp1YRC9oa7oE2ArWsd2fZN736vyhMatECyd2zw5agedpye';
 const PROGRAM_NAMES: Record<string, string> = {

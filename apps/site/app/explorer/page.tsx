@@ -5,16 +5,18 @@
 // clock, so hydration is deterministic. The page.js port (explorer-view.tsx) paints the data once
 // the kit has mounted; Retry (offline) re-reads through /explorer/snapshot.
 import type { Metadata } from 'next';
+import { pageMeta } from '../meta';
 import { getExplorerSnapshot } from '@blindseal/chain-reads';
 import { ExplorerView } from './explorer-view';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
+  path: '/explorer',
   title: 'Explorer · Blindseal',
   description: 'Attestations consumed on mainnet. Counts and hashes only: no content, no agents, no operators.',
-};
+});
 
 export default async function Explorer() {
   const snapshot = await getExplorerSnapshot();

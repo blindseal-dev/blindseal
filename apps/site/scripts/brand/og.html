@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- The og:image template (1200×630), rendered once by scripts/render-brand.mjs with the kit's own fonts,
+     tokens and nebula (BS.mountSpace, held still). Edit here, re-run the script, commit the PNGs. -->
+<html lang="en" class="bs-js">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../kit/tokens.css">
+<link rel="stylesheet" href="../../kit/fonts.css">
+<link rel="stylesheet" href="../../kit/space.css">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #060510; }
+  body { font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .og { position: relative; width: 1200px; height: 630px; overflow: hidden; background: #060510; }
+  .og__space { position: absolute; inset: 0; }
+  /* the accent/indigo glow behind the line */
+  .og__glow { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(620px 360px at 30% 62%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+                radial-gradient(520px 320px at 88% 18%, color-mix(in srgb, var(--accent-deep) 80%, transparent), transparent 70%); }
+  .og__in { position: absolute; inset: 0; padding: 72px 88px; display: grid; grid-template-rows: auto 1fr auto; }
+  .og__brand { display: flex; align-items: center; gap: 14px; font-weight: 600; font-size: 30px; letter-spacing: -0.02em; }
+  .og__brand svg { width: 40px; height: 40px; }
+  .og__line { align-self: center; margin: 0; max-width: 980px; font-weight: 500; font-size: 68px; line-height: 1.08; letter-spacing: -0.035em; text-wrap: balance; }
+  .og__line em { font-style: normal; color: var(--accent-text); }
+  .og__foot { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 22px; color: var(--muted); letter-spacing: .02em; }
+</style>
+</head>
+<body data-motion="reduce">
+  <div class="og">
+    <div class="og__space"></div>
+    <div class="og__glow"></div>
+    <div class="og__in">
+      <div class="og__brand" id="brand"></div>
+      <p class="og__line">Prove an agent’s action was screened — <em>without showing what it was.</em></p>
+      <div class="og__foot"><span>blindseal.tech</span></div>
+    </div>
+  </div>
+  <script src="../../public/kit/kit.js"></script>
+  <script>
+    document.getElementById('brand').innerHTML = BS.siteTemplates.mark(40) + '<span>Blindseal</span>';
+    BS.mountSpace(document.querySelector('.og__space'), { intensity: 'hero', fade: false, seed: 7 });
+  </script>
+</body>
+</html>

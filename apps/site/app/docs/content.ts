@@ -14,7 +14,7 @@ export type Block =
   | { kind: 'code'; text: string; lang: CodeLang }
   | { kind: 'list'; ordered?: boolean; items: string[] }
   | { kind: 'callout'; title: string; body: string; muted?: boolean }
-  | { kind: 'links'; links: { href: string; label: string; icon?: LinkIcon }[] }
+  | { kind: 'links'; links: { href: string; label: string; icon?: LinkIcon; external?: boolean }[] }
   | { kind: 'api'; endpoints: Endpoint[] };
 
 export type DocSection = { id: string; heading: string; count?: string; blocks: Block[] };
@@ -83,6 +83,7 @@ $ blindseal run --mock             # the local API + dashboard over sample traff
 blindseal (MOCK): local API on http://127.0.0.1:7777
   dashboard: http://127.0.0.1:7777/#token=…`, 'shell'),
         p('`blindseal` is the proxy and the CLI in one package. The proxy serves the dashboard from its own origin with a Content-Security-Policy that allows the WebAssembly verifier and nothing else. Open the printed URL — the token is in the fragment and never leaves memory. `run --mock` shows the dashboard over sample decisions; leave `--mock` off once an agent is pointed at the proxy.'),
+        { kind: 'links', links: [{ href: 'https://www.npmjs.com/package/blindseal', label: 'blindseal on npm', icon: 'arrow-up-right', external: true }] },
       ] },
       { id: 'agent', heading: 'Point an agent', blocks: [
         p('Put `blindseal --` in front of the MCP server command. Everything after the `--` is the upstream server; every tool call and result passes the four detection layers locally before it reaches the agent or the server.'),
@@ -100,6 +101,7 @@ blindseal (MOCK): local API on http://127.0.0.1:7777
 decision d_…: clean (audit #12 0x…)
 proving (hours on CPU)…
 attestation written: attestation.json`, 'shell'),
+        p('The attestation expires at the current slot + 40,000 by default (about 4.4 hours), because proving takes hours; pass `--expiry <slot>` for a longer window, or `--no-expiry` to opt out. `attest` warns when your last proof took more than half the window.'),
         p('The decision is appended to the hash-chained audit log before proving starts, content-free: only ids, the verdict and the payload hash. The prover is a separate binary: on first use it is downloaded from the project’s GitHub release for your platform, or you can build it yourself and pass `--prover <path>` (see [From source](/docs/source)).'),
       ] },
       { id: 'verify', heading: 'Verify it — anywhere', blocks: [
@@ -347,5 +349,3 @@ export function targetsOf(pg: DocPage): Target[] {
   return pg.sections.map((s) => ({ id: s.id, label: s.heading, level: 1 }));
 }
 
-// the sidebar footer: the docs track the latest proxy release (the top entry of /changelog)
-export const LATEST = { version: '0.5.4', dateLabel: 'Oct 27, 2026', href: '/changelog' };

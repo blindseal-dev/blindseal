@@ -207,3 +207,31 @@ test('verify: the two tries come first, the textarea is 3 rows until focused, re
   await expect.poll(() => page.evaluate(() => { const r = document.getElementById('vf-banner')!.getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; })).toBe(true);
   expect(errs).toEqual([]);
 });
+
+test('menu sheet: the page behind does not scroll while it is open; closing restores the exact position', async ({ page }) => {
+  const errs = watchErrors(page);
+  await open(page, '/docs/scope');
+  const Y = 900;
+  await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'instant' }), Y);
+  await page.waitForFunction((y) => Math.abs(window.scrollY - y) < 1, Y);
+  const btn = page.locator('[data-site-menu-btn]');
+  const sheet = page.locator('#' + (await btn.getAttribute('aria-controls')));
+  for (const close of ['escape', 'button'] as const) {
+    await btn.click();
+    await expect(sheet).toBeVisible();
+    // the page is pinned where it was (body at -Y) and has nothing left to scroll
+    const locked = await page.evaluate(() => ({ top: document.body.getBoundingClientRect().top, pos: getComputedStyle(document.body).position, room: document.documentElement.scrollHeight - innerHeight }));
+    expect(locked.pos).toBe('fixed');
+    expect(Math.round(locked.top)).toBe(-Y);
+    expect(locked.room).toBeLessThanOrEqual(1);
+    // try to scroll the page behind
+    await page.evaluate(() => window.scrollTo({ top: 4000, behavior: 'instant' }));
+    expect(Math.round(await page.evaluate(() => document.body.getBoundingClientRect().top))).toBe(-Y);
+    if (close === 'escape') await page.keyboard.press('Escape'); else await btn.click();
+    await expect(sheet).toBeHidden();
+    // restored exactly, and the body is back in flow
+    await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(Y);
+    expect(await page.evaluate(() => document.body.getAttribute('style') || '')).toBe('');
+  }
+  expect(errs).toEqual([]);
+});

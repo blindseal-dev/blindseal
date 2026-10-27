@@ -2,6 +2,7 @@
 import { usePageKit, type BSAny } from '../use-page-kit';
 import { schemaCheck, verifyProof, decodePublicInputs, verifyDisclosureSteps, tamper, type AttestationDoc, type Decoded } from './verifier';
 import type { Disclosure } from './disclosure';
+import { isDirectConsumer } from '@blindseal/chain-reads/consumers';
 import sample from './sample.json';
 
 /* ============================================================================
@@ -351,7 +352,7 @@ export function VerifyClient() {
       setCheck(3, 'running', { detail: 'Checking Solana for this proof’s reuse marker…' });
       const t0 = now();
       const read = fetch('/verify/nullifier?n=' + encodeURIComponent(decoded.nullifier), { cache: 'no-store' })
-        .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j as { consumed: boolean; consumedAtSlot?: number; consumerProgram?: string }; })
+        .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j as { consumed: boolean; consumedAtSlot?: number; consumerProgram?: string; direct?: boolean }; })
         .then((r) => ({ ok: true as const, r }), (e: unknown) => ({ ok: false as const, e }));
       Promise.all([read, M.wait(900)]).then(([r]) => {
         if (stale(tok)) return;
@@ -364,7 +365,9 @@ export function VerifyClient() {
         }
         let html: string;
         if (r.r.consumed) html = '<span class="vf-res">' + ui.status('consumed') + '<span>at slot</span><span class="vf-mono num">' + esc(fmt.slot(r.r.consumedAtSlot)) + '</span>' +
-          (r.r.consumerProgram ? '<span>by</span>' + ui.hash(r.r.consumerProgram, { label: 'Consumer program', lg: true }) : '') + '</span>';
+          /* consumer_program = Pubkey::default() is a direct submission, not a program: never "by 1111…" */
+          (r.r.direct || isDirectConsumer(r.r.consumerProgram) ? '<span>consumed directly (no gated program)</span>'
+            : r.r.consumerProgram ? '<span>by</span>' + ui.hash(r.r.consumerProgram, { label: 'Consumer program', lg: true }) : '') + '</span>';
         else html = '<span class="vf-res"><span class="chip outline">unused</span><span>This proof has not been used on Solana yet.</span></span>';
         setCheck(3, 'pass', { detail: html, html: true, end: 'mainnet · ' + ms });
         $('span', b).textContent = 'Check again';

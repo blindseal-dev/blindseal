@@ -23,3 +23,4 @@ html, body { margin: 0; background: var(--canvas); color: var(--ink); }
 @import './home.css';
 @import './verify/verify.css';
 @import './narrow.css';
+@import './enhance.css';

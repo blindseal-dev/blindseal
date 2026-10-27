@@ -4,6 +4,7 @@ import { BUCKET_OF, BY_SLUG, targetsOf, type Block, type DocPage, type DocSectio
 import { CodeBlock } from './code';
 import { inline } from './inline';
 import { DocsBehaviour } from './behaviour';
+import { pageMeta, ONE_LINER } from '../meta';
 
 // page.js's render(slug): the masthead, the numbered sections (.docs-sec[data-target] with the anchor
 // button), prev / next, and the "On this page" rail — the same markup, server-rendered from content.ts so
@@ -49,7 +50,9 @@ function BlockView({ b }: { b: Block }) {
     case 'callout': return <div className={`callout${b.muted ? ' muted' : ''}`}><p className="callout__title">{b.title}</p><p className="callout__body">{inline(b.body)}</p></div>;
     case 'links': return (
       <div className="docs-links">
-        {b.links.map((l) => <Link key={l.href} className="docs-link" href={l.href}>{l.label}<i data-lucide={l.icon ?? 'arrow-right'} /></Link>)}
+        {b.links.map((l) => l.external
+          ? <a key={l.href} className="docs-link" href={l.href} target="_blank" rel="noopener">{l.label}<i data-lucide={l.icon ?? 'arrow-up-right'} /></a>
+          : <Link key={l.href} className="docs-link" href={l.href}>{l.label}<i data-lucide={l.icon ?? 'arrow-right'} /></Link>)}
       </div>
     );
     case 'api': return <ApiTable endpoints={b.endpoints} />;
@@ -80,10 +83,15 @@ function PrevNext({ pg }: { pg: DocPage }) {
   );
 }
 
+/** Prose markup → plain text for meta tags: `[text](url)` → text, then backticks and asterisks dropped. */
+export function plainText(s: string): string {
+  return s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[`*]/g, '');
+}
+
 export function docMetadata(slug: string): Metadata {
   const pg = BY_SLUG[slug];
-  // per-page meta description = the page summary; the shared OG text for every docs page = the tagline
-  return { title: `${pg.title} · Docs · Blindseal`, description: pg.summary.replace(/[`*]/g, ''), openGraph: { title: `${pg.title} · Blindseal docs`, description: "Prove an agent's action was screened — without showing what it was." } };
+  // per-page meta description = the page summary as plain text; the shared OG text for every docs page = the tagline
+  return pageMeta({ path: pg.path, title: `${pg.title} · Docs · Blindseal`, description: plainText(pg.summary), ogDescription: ONE_LINER });
 }
 
 export function DocRoute({ slug }: { slug: string }) {

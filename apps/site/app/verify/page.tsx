@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../meta';
 import { VerifyClient } from './verify-client';
 
 // S03 · Verify (/verify) — the mockup's static markup, server-rendered one-to-one
 // (design/mockups/mockups/S03/index.html). Everything page.js painted (the idle checklist, the
 // banner's demo links, panel 5's rows, the result states) is filled by VerifyClient after the kit
 // mounts, so nothing here depends on time, randomness or the viewport.
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
+  path: '/verify',
   title: 'Verify · Blindseal',
   description: 'Check a Blindseal proof in your browser. Nothing is uploaded, nothing is stored.',
-};
+});
 
 export default function VerifyPage() {
   return (

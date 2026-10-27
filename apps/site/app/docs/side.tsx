@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LATEST, TREE } from './content';
+import { TREE } from './content';
 
 // The sidebar: the search (page.js's slot, here a real filter over the tree with the `/` shortcut and
-// Escape to clear), the tree (aria-current from the pathname) and the latest-release footer. It lives in
+// Escape to clear), the tree (aria-current from the pathname) and the latest-release footer (its version
+// comes from the server layout, read from packages/proxy/package.json at build time). It lives in
 // the docs layout, so it persists across page navigations. Items are hidden, never unmounted, so the
 // kit-swapped icons above them are never touched by React.
-export function DocsSide() {
+export function DocsSide({ latest }: { latest: { version: string; dateLabel: string | null } }) {
   const path = usePathname();
   const [q, setQ] = useState('');
   const input = useRef<HTMLInputElement>(null);
@@ -59,9 +60,9 @@ export function DocsSide() {
         </nav>
         <div className="docs-side__foot" data-side-foot>
           <p className="docs-side__k">Latest release</p>
-          <p className="docs-side__v">proxy {LATEST.version}<span className="chip outline">{LATEST.dateLabel}</span></p>
+          <p className="docs-side__v">proxy {latest.version}{latest.dateLabel && <span className="chip outline">{latest.dateLabel}</span>}</p>
           <p className="docs-side__sub">The docs track the latest proxy release.</p>
-          <Link className="docs-link" href={LATEST.href}>Changelog<i data-lucide="arrow-up-right" /></Link>
+          <Link className="docs-link" href="/changelog">Changelog<i data-lucide="arrow-up-right" /></Link>
         </div>
       </div>
     </aside>

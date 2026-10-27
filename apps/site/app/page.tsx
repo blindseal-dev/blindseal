@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
+import { pageMeta, ONE_LINER } from './meta';
 import { CopyButton } from './copy';
 
 // Copy: docs/internal/copy/02-final-copy.md (verbatim; owner's edits: "digital certificate" → "proof", the hero
@@ -14,6 +16,8 @@ const FAQ: [string, React.ReactNode][] = [
   ['Can an attacker create proof using weaker rules?', <p key="a">An app can choose which rule sets and checking-software versions it accepts. It can reject a proof made with rules it has not approved. The app still needs to choose its rules carefully and enforce those limits.</p>],
   ['How long does it take?', <p key="a">Creating a proof took about 2 hours and 16 minutes in the product&apos;s Apple M1 Max test. Checking it in a browser took about 0.6 seconds. Today&apos;s version is for actions prepared ahead of time, rather than actions that need a new proof right away.</p>],
 ];
+
+export const metadata: Metadata = pageMeta({ path: '/', title: 'Blindseal — prove an agent was screened', description: ONE_LINER });
 
 export default function Home() {
   return (
