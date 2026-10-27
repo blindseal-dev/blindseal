@@ -136,7 +136,7 @@ fixed ids). Numbers are from `simulateTransaction` on the exact transaction that
 | Metric | Value | Notes |
 |---|---|---|
 | Gated transfer, whole tx | **268,973 CU** | ComputeBudget ix + `transfer_gate::gated_transfer` → CPI `verify_and_consume` → system transfer. With the caller check (2026-10-27: stack height + instructions-sysvar read of the top-level program); 262,507 before it (267,055 in the last committed metrics) |
-| `verify_and_consume` alone (inside the CPI) | ~254,300 CU | from the program logs; M0.5's bare Groth16 verify was 227,375 — the delta is the actionHash + nullifier recompute (2 × sha256), the Nullifier PDA creation and the `Consumed` event |
+| `verify_and_consume` alone (inside the CPI) | ~254,300 CU | pre-caller-check figure, not re-measured; from the program logs; M0.5's bare Groth16 verify was 227,375 — the delta is the actionHash + nullifier recompute (2 × sha256), the Nullifier PDA creation and the `Consumed` event |
 | Transaction size | **926 bytes** (893 before the instructions-sysvar account) | 260-byte proof + 168-byte public inputs + 178-byte action args + 32-byte nonce + accounts |
 | Proof / public inputs | 260 B / 168 B | SP1 v5 Groth16 (bn254); 5×32 commitments + u64 expiry |
 | Prove time (localnet test proof) | 8,250,797 ms (2 h 17 m) | CPU prover on this machine (`proveMs` in the fixture); unchanged from M1 |
