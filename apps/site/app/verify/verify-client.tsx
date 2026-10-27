@@ -113,14 +113,21 @@ export function VerifyClient() {
       banner.classList.remove('is-drop', 'is-fade');
       if (tone === 'idle') return;
       M.restart(banner, tone === 'running' ? 'is-fade' : 'is-drop');
+      // phone width: the checklist sits under the input, so a finished result is brought into view
+      if ((tone === 'pass' || tone === 'fail') && window.matchMedia('(max-width: 719.98px)').matches) {
+        requestAnimationFrame(() => {
+          const top = banner.getBoundingClientRect().top;
+          if (top < 0 || top > window.innerHeight * 0.5) out.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
+        });
+      }
     }
     function idleBanner() {
       setBanner('idle', 'Waiting for an attestation', '');
       // the demo path above the fold: the same handlers as the input panel's buttons
       $('.vf-banner__sub', banner).innerHTML =
-        '<button type="button" class="btn link vf-banner__link" data-demo="sample">Load a sample</button>' +
+        '<button type="button" class="btn link vf-banner__link" data-demo="sample">use the valid sample</button>' +
         '<span class="vf-banner__dot" aria-hidden="true">·</span>' +
-        '<button type="button" class="btn link vf-banner__link" data-demo="tampered">Load the tampered one</button>';
+        '<button type="button" class="btn link vf-banner__link" data-demo="tampered">use the altered one</button>';
     }
     const onBannerClick = (e: Event) => {
       const b = (e.target as Element).closest && (e.target as Element).closest('[data-demo]');
@@ -144,7 +151,7 @@ export function VerifyClient() {
       const ok = v.length > 0 && parses(v);
       btnVerify.disabled = !ok || running;
       help.classList.toggle('is-warn', v.length > 0 && !ok);
-      help.textContent = !v.length ? 'Paste the JSON, or load a sample below.' :
+      help.textContent = !v.length ? 'Paste the JSON, or try a valid or an altered proof.' :
         ok ? (fmt.bytes ? fmt.bytes(new Blob([v]).size) : v.length + ' chars') + ' of JSON, held in this tab only.' :
           'Not valid JSON yet. Verify unlocks when it parses.';
     }

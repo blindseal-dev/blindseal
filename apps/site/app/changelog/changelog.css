@@ -12,12 +12,13 @@
    still lights the current one), back to top floats (app/narrow.css), the entry head wraps, the notes
    read at 15 px and long identifiers break instead of widening the page. */
 @media (max-width: 719.98px) {
-  .cl-mast { width: calc(100% - 2 * var(--frame) - 24px); height: auto; min-height: 0; padding: 32px 0; }
+  .cl-mast { width: calc(100% - 2 * var(--gutter)); height: auto; min-height: 0; padding: 32px 0; }
   .cl-mast__copy { padding: 0 20px; }
   .cl-mast__title { font-size: clamp(28px, 7.6vw, 36px); line-height: 1.15; }
   .cl-mast__lede { font-size: var(--fs-16); line-height: 26px; }
-  .cl { width: calc(100% - 2 * var(--frame) - 24px); gap: 20px; margin-top: 20px; }
+  .cl { width: calc(100% - 2 * var(--gutter)); gap: 20px; margin-top: 20px; }
   .cl-rail__track { display: none; }
+  .bs-js .cl.is-rising .cl-rail { animation: none; }   /* a transformed ancestor would capture the fixed back-to-top button */
   .cl-rail__list { flex-direction: row; flex-wrap: wrap; gap: 8px; }
   .cl-rail__link { align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px 8px 12px; border: var(--hairline); border-radius: var(--r-full); font-size: var(--fs-13); line-height: 18px; }
   .cl-rail__link.is-active { border-color: var(--line-strong); background: var(--surface-hover); }

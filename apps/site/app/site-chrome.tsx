@@ -5,6 +5,7 @@
 // footer's aria-current are set by the kit on the client (the layout has no pathname on the server).
 import { createRequire } from 'node:module';
 import { ROUTES } from './routes';
+import { SiteMenu } from './site-menu';
 const req = createRequire(import.meta.url);
 const tpl = req('../kit/site-templates.cjs') as { navHtml: (c: unknown) => string; footerHtml: (c: unknown) => string };
 
@@ -17,6 +18,8 @@ export function SiteChromeTop() {
       <a className="skip-link" href="#main-content">Skip to content</a>
       <div className="site-frame" aria-hidden="true" />
       <header className="site-notch" data-site-nav-root="" dangerouslySetInnerHTML={{ __html: tpl.navHtml(CTX) }} />
+      {/* wires the phone menu rendered inside the header above; renders nothing */}
+      <SiteMenu />
     </>
   );
 }

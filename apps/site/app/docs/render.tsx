@@ -82,7 +82,8 @@ function PrevNext({ pg }: { pg: DocPage }) {
 
 export function docMetadata(slug: string): Metadata {
   const pg = BY_SLUG[slug];
-  return { title: `${pg.title} · Docs · Blindseal`, description: pg.summary.replace(/[`*]/g, '') };
+  // per-page meta description = the page summary; the shared OG text for every docs page = the tagline
+  return { title: `${pg.title} · Docs · Blindseal`, description: pg.summary.replace(/[`*]/g, ''), openGraph: { title: `${pg.title} · Blindseal docs`, description: "Prove an agent's action was screened — without showing what it was." } };
 }
 
 export function DocRoute({ slug }: { slug: string }) {

@@ -249,7 +249,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
 
     const draw = (animate: boolean) => {
       const list = days(), n = list.length;
-      const W = Math.max(320, Math.round(plotSvg.clientWidth || plot.clientWidth));
+      const W = Math.max(240, Math.round(plotSvg.clientWidth || plot.clientWidth))   // draw at the real container width: a wider viewBox scales the axis text below 12px on phones;
       const plotH = H - PAD_T - PAD_B, slot = (W - PAD_L) / n, bw = Math.max(2, Math.min(BAR_MAX, slot - GAP));
       let max = 0; list.forEach((d) => { if (d.count > max) max = d.count; });
       const top = niceTop(max), yBase = PAD_T + plotH;

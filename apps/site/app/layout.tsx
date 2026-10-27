@@ -7,10 +7,10 @@ import { SiteChromeTop, SiteFooter } from './site-chrome';
 export const metadata: Metadata = {
   metadataBase: new URL('https://blindseal.tech'),
   alternates: { canonical: '/' },
-  openGraph: { type: 'website', url: 'https://blindseal.tech', siteName: 'Blindseal', title: 'Blindseal — prove an agent was screened', description: 'A privacy-preserving, verifiable screening layer for AI agents. Nothing sensitive leaves the machine.' },
-  twitter: { card: 'summary', title: 'Blindseal — prove an agent was screened', description: 'A privacy-preserving, verifiable screening layer for AI agents. Nothing sensitive leaves the machine.' },
+  openGraph: { type: 'website', url: 'https://blindseal.tech', siteName: 'Blindseal', title: 'Blindseal — prove an agent was screened', description: 'Prove an agent\'s action was screened — without showing what it was.' },
+  twitter: { card: 'summary', title: 'Blindseal — prove an agent was screened', description: 'Prove an agent\'s action was screened — without showing what it was.' },
   title: 'Blindseal — prove an agent was screened',
-  description: 'A privacy-preserving, verifiable screening layer for AI agents. Nothing sensitive leaves the machine.',
+  description: 'Prove an agent\'s action was screened — without showing what it was.',
   // the favicon icons.js used to inject (same SVG, the tokens' --canvas / --ink values)
   icons: { icon: 'data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2716%27%20fill%3D%27%23060510%27%2F%3E%3Ccircle%20cx%3D%2732%27%20cy%3D%2732%27%20r%3D%2719%27%20fill%3D%27none%27%20stroke%3D%27%23f7f7f7%27%20stroke-width%3D%274%27%2F%3E%3Crect%20x%3D%2722%27%20y%3D%2729%27%20width%3D%2720%27%20height%3D%276%27%20rx%3D%273%27%20fill%3D%27none%27%20stroke%3D%27%23f7f7f7%27%20stroke-width%3D%273.5%27%2F%3E%3C%2Fsvg%3E' },
 };

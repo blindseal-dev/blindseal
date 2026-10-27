@@ -1,16 +1,82 @@
-/* Phone-width addition to the verbatim kit (DECISIONS 2026-10-23): the mockups' site.css carries no width
-   queries, so the notch nav (logo | tabs | action) and the three-column footer overflow at 443 px. Below
-   720 px the notch becomes two rows — logo + action, then the tabs full-width and scrollable — and the
-   footer stacks. Nothing here applies at or above 720 px. */
+/* Phone-width addition to the verbatim kit (DECISIONS 2026-10-23, 2026-10-27): the mockups' site.css carries no
+   width queries. Below 720 px the chrome is a phone header — ONE solid 56 px row across the full width (logo
+   left; GitHub and the menu button right; no frame, no notch wings, no tab row), the page full-bleed with
+   16 px gutters, and the routes in a full-screen sheet opened by the menu button (markup server-rendered in
+   kit/site-templates.cjs, wired by app/site-menu.tsx). Nothing here applies at or above 720 px except the
+   two display:none rules that keep the phone-only markup out of the desktop layout. */
+.notch__menu, .site-menu { display: none; }
+
 @media (max-width: 719.98px) {
-  .site-notch__row { grid-template-columns: 1fr auto; grid-template-rows: var(--notch-h) var(--notch-h); height: auto; }
-  .notch--logo { grid-column: 1; grid-row: 1; }
-  .notch--actions { grid-column: 2; grid-row: 1; padding-left: 12px; }
-  .notch--center { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; max-width: 100%; overflow-x: auto; scrollbar-width: none;
-    border-radius: 0 0 var(--notch-r) var(--notch-r); border-top: 1px solid var(--line); }
-  .notch--center::-webkit-scrollbar { display: none; }
-  .notch__wing { display: none; }
-  .site-main { padding-top: var(--notch-h); }            /* the second notch row would otherwise cover the masthead */
+  /* the chrome tokens at phone width: no frame; the row sits under the top safe area */
+  html.bs-site {
+    --frame: 0px; --notch-top: env(safe-area-inset-top, 0px); --notch-h: 56px; --gutter: 16px;
+    --gut-l: max(var(--gutter), env(safe-area-inset-left, 0px)); --gut-r: max(var(--gutter), env(safe-area-inset-right, 0px));
+    scroll-padding-top: calc(var(--notch-top) + var(--notch-h) + 16px);
+    /* no rendered text under 12 px on a phone: the kit's 10 / 11 px steps (eyebrows, chips, kv keys,
+       table heads, code labels) read at 12 */
+    --fs-10: 12px; --fs-11: 12px; --t-chip: 12px/15px;
+  }
+  .site-frame { display: none; }
+  /* the header: a solid bar, full width, the page never shows beside or behind it */
+  .site-notch {
+    height: calc(var(--notch-top) + var(--notch-h));
+    background: var(--canvas); box-shadow: inset 0 -1px 0 var(--line);
+  }
+  .site-notch__row {
+    z-index: 1; top: var(--notch-top); left: 0; right: 0; max-width: none; height: var(--notch-h);
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: var(--notch-h); align-items: center;
+    padding: 0 var(--gut-r) 0 var(--gut-l); pointer-events: auto;
+  }
+  .site-notch:not(.site-notch--glass) .notch { height: var(--notch-h); padding: 0; border: 0; border-radius: 0; background: transparent; }
+  .notch--center, .notch__wing { display: none; }
+  .notch--logo { grid-column: 1; grid-row: 1; justify-self: start; min-width: 0; }
+  .notch--actions { grid-column: 2; grid-row: 1; gap: 4px; }
+  .site-brand { min-height: 44px; padding: 9px 6px; margin-left: -6px; }
+  .notch__cta.glass-btn { min-width: 0; min-height: 44px; height: 44px; padding: 0 14px; font-size: var(--fs-13); }
+  .site-main { padding-top: 0; }
+
+  /* the menu button: 44 × 44, two bars that turn into a cross while the sheet is open */
+  .notch__menu {
+    display: inline-grid; place-items: center; width: 44px; height: 44px; margin-right: -6px; padding: 0;
+    border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .notch__menu:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+  .notch__menu-bars { position: relative; display: block; width: 20px; height: 1.5px; }
+  .notch__menu-bars::before, .notch__menu-bars::after {
+    content: ""; position: absolute; left: 0; width: 20px; height: 1.5px; border-radius: 1px; background: currentColor;
+    transition: transform var(--d-160) var(--ease-out-quint);
+  }
+  .notch__menu-bars::before { top: -3.5px; }
+  .notch__menu-bars::after { top: 3.5px; }
+  .notch__menu[aria-expanded="true"] .notch__menu-bars::before { transform: translateY(3.5px) rotate(45deg); }
+  .notch__menu[aria-expanded="true"] .notch__menu-bars::after { transform: translateY(-3.5px) rotate(-45deg); }
+
+  /* the sheet: the whole viewport under the header row (the row stays on top, so the button closes it);
+     always 1 px taller than its box so a drag never scrolls the page behind it */
+  .site-notch:has(.site-menu:not([hidden])) { z-index: calc(var(--z-sheet) + 1); }
+  .site-menu:not([hidden]) {
+    display: block; position: fixed; inset: 0; z-index: 0;
+    padding: calc(var(--notch-top) + var(--notch-h) + 8px) var(--gut-r) calc(24px + env(safe-area-inset-bottom, 0px)) var(--gut-l);
+    background: var(--canvas); overflow-y: auto; overscroll-behavior: contain;
+  }
+  .site-menu__nav { min-height: calc(100% + 1px); }
+  .site-menu__list { display: grid; margin: 0; padding: 0; list-style: none; }
+  .site-menu__item {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 0 8px; margin: 0 -8px;
+    border-bottom: var(--hairline); color: var(--muted);
+    font: var(--fw-medium) 24px/1.2 var(--font-sans); letter-spacing: -0.02em;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .site-menu__item[aria-current="page"] { color: var(--ink); }
+  .site-menu__item[aria-current="page"]::after { content: ""; width: 7px; height: 7px; border-radius: var(--r-full); background: var(--accent); flex: none; }
+  .site-menu__item--ext { color: var(--ink); border-bottom: 0; }
+  .site-menu__ext { flex: none; color: var(--muted); }
+  .site-menu__item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: var(--r-control); }
+  @media (hover: hover) and (pointer: fine) { .site-menu__item:hover { color: var(--ink); } }
+  body[data-motion="reduce"] .notch__menu-bars::before, body[data-motion="reduce"] .notch__menu-bars::after { transition: none; }
+
+  /* the footer stacks */
   .site-footer { grid-template-columns: minmax(0, 1fr); }
   .site-footer__routes { grid-template-columns: repeat(2, max-content); }
 }
@@ -23,35 +89,14 @@
    Tokens only; no colour literal.
    ════════════════════════════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 719.98px) {
-  /* ── the notch: 44 px targets, a snapping tab row, the active tab in view ────────────────────── */
-  html.bs-site { scroll-padding-top: calc(var(--notch-top) + 2 * var(--notch-h) + 16px); }   /* two rows of chrome above an anchor */
-  .site-notch__row { --notch-item-h: 44px; }
-  .site-brand { min-height: 44px; padding: 9px 6px; }
-  .notch--logo { padding: 0 16px 0 12px; }
-  .notch--actions { padding: 0 8px 0 12px; }
-  .notch__cta.glass-btn { min-width: 0; padding: 0 14px; }
-  .notch--center { justify-content: safe center; padding: 0 8px; scroll-snap-type: x proximity; scroll-padding: 0 8px; overscroll-behavior-x: contain; }
-  .notch__items { gap: 4px; }
-  .notch__item { scroll-snap-align: start; padding: 0 12px; }
-  /* the row holds five tabs and scrolls; the active one must be in view on load. The kit marks it with
-     aria-current (notch__items: pill, then the five links, then the ink layer). When the active link is
-     one of the last two, the scroller runs right-to-left — its initial scroll position is then its right
-     end — while the row itself keeps reading left-to-right. No script, no DOM change. */
-  .notch--center:has(> .notch__items > .notch__item[aria-current="page"]:nth-child(n + 5)) { direction: rtl; }
-  .notch--center .notch__items { direction: ltr; }
-  /* in that mirrored scroller Chromium's first snap would carry the row to its far end, so the snap target
-     becomes the row itself (its start edge = the right end, where the active tab is) */
-  .notch--center:has(> .notch__items > .notch__item[aria-current="page"]:nth-child(n + 5)) .notch__item { scroll-snap-align: none; }
-  .notch--center:has(> .notch__items > .notch__item[aria-current="page"]:nth-child(n + 5)) .notch__items { scroll-snap-align: start; }
-
   /* ── the footer: one column, 44 px links ────────────────────────────────────────────────────── */
-  .site-footer { width: calc(100% - 2 * var(--frame) - 24px); gap: 20px; padding: 28px 0 32px; }
+  .site-footer { width: calc(100% - 2 * var(--gutter)); gap: 20px; padding: 28px 0 32px; }
   .site-footer__line { max-width: none; font-size: var(--fs-15); line-height: 24px; }
   .site-footer__routes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
   .site-footer__routes a { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--fs-15); }
 
   /* ── the shared column + section head ───────────────────────────────────────────────────────── */
-  .site-section { width: calc(100% - 2 * var(--frame) - 24px); padding: 28px 0; }
+  .site-section { width: calc(100% - 2 * var(--gutter)); padding: 28px 0; }
   .site-section + .site-section { margin-top: 20px; }
   .site-section .section-head, .section-head--split { grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
   .section-head__body { max-width: none; font-size: var(--fs-15); line-height: 24px; }
@@ -63,6 +108,11 @@
   .site-grid-2, .site-grid-3 { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
   /* ── primitives: tap targets, wrapping, scrolling in place ───────────────────────────────────── */
+  .skip-link { min-height: 44px; }
+  input.input, .textarea { font-size: 16px; }                 /* iOS zooms into anything smaller on focus */
+  body { min-height: 100svh; }
+  /* inline text links keep the line's rhythm; their hit box is taller than the line (44 px) */
+  :is(p, li, td, dd) > a.link { padding-block: 14px; }
   .btn, .btn.sm, .glass-btn, .glass-btn.sm, .seg__item, .copy { min-height: 44px; }
   .btn.sm { padding: 0 12px; }
   .btn.link { min-height: 44px; min-width: 44px; padding: 0; }
@@ -79,13 +129,15 @@
   .table-box { overflow-x: auto; }
   .callout { max-width: none; }
   .callout__body { font-size: var(--fs-15); line-height: 24px; }
-  .check__detail, .check__reason { font-size: var(--fs-13); line-height: 18px; }
+  .check__detail, .check__reason { font-size: var(--fs-15); line-height: 22px; }
   .kv { gap: 14px 16px; }
   .empty__body { max-width: none; }
 
   /* ── S01 · home ─────────────────────────────────────────────────────────────────────────────── */
-  .hero { min-height: 100svh; padding: calc(var(--notch-top) + var(--notch-h) + 32px) 0 56px; }
-  .hero__content { padding: 0 calc(var(--frame) + 12px); }
+  /* the hero shows the nebula at phone width (site.js / kit-provider skip the CRT under 720 px), held still */
+  .hero__space .space__nebula { animation: none; }
+  .hero { min-height: 0; padding: calc(var(--notch-top) + var(--notch-h) + 32px) 0 48px; }   /* the hero hugs its content: no empty band under the trust row */
+  .hero__content { padding: 0 var(--gut-r) 0 var(--gut-l); }
   .hero__col { max-width: none; }
   .hero__title { width: auto; max-width: none; margin: 20px 0 18px; font-size: clamp(32px, 9.2vw, 44px); line-height: 1.08; }
   .hero__title br { display: none; }                      /* the mockup's hand-set break is for 1440 (the sub keeps its own: no space precedes it) */
@@ -114,22 +166,36 @@
   .site-cta .hero__actions { margin-top: 20px; }
 
   /* ── S03 · verify ───────────────────────────────────────────────────────────────────────────── */
-  .vf-mast { width: calc(100% - 2 * var(--frame) - 24px); height: auto; min-height: 0; padding: 32px 0; }
+  .vf-mast { width: calc(100% - 2 * var(--gutter)); height: auto; min-height: 0; padding: 32px 0; }
   .vf-mast__copy { padding: 0 20px; }
   .vf-mast__title { font-size: clamp(28px, 7.6vw, 36px); line-height: 1.15; text-wrap: balance; }
   .vf-mast__lede { font-size: var(--fs-16); line-height: 26px; }
-  .vf { grid-template-columns: minmax(0, 1fr); gap: 16px; width: calc(100% - 2 * var(--frame) - 24px); margin-top: 20px; }
+  .vf { grid-template-columns: minmax(0, 1fr); gap: 16px; width: calc(100% - 2 * var(--gutter)); margin-top: 20px; }
   .vf-in { position: static; }
   .vf .site-panel { gap: 16px; }
   .vf-head--split { flex-wrap: wrap; }
   .vf-source { max-width: 100%; }
-  .vf-actions { flex-wrap: wrap; gap: 8px; }
+  /* the input panel reorders (grid + order; the action row's children join it): the two tries first,
+     then the drop zone, the paste field (3 rows until focused), Clear + Verify, the note */
+  .vf-in.site-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 8px; row-gap: 12px; }
+  .vf-in > * { grid-column: 1 / -1; }
+  .vf-in > .vf-head { order: 1; }
+  .vf-actions { display: contents; }
   .vf-actions__spacer { display: none; }
-  .vf-actions .btn.link { margin: 0 8px 0 auto; }
-  .vf-help { font-size: var(--fs-13); line-height: 18px; }
-  .vf-note { font-size: var(--fs-14); line-height: 20px; }
+  .vf-actions > #vf-load-sample { order: 2; grid-column: 1 / -1; justify-content: center; }
+  .vf-actions > #vf-load-tampered { order: 3; grid-column: 1 / -1; justify-content: center; }
+  .vf-in > .vf-drop { order: 4; margin-top: 4px; }
+  .vf-in > .vf-field { order: 5; }
+  .vf-actions > #vf-clear { order: 6; grid-column: 2; margin: 0 8px 0 0; }
+  .vf-actions > #vf-verify { order: 6; grid-column: 3; }
+  .vf-in > .vf-note { order: 7; }
+  .vf-text.textarea { font-size: 16px; line-height: 22px; height: calc(10 * 22px + 22px); transition: height var(--d-160) var(--ease-out-quint); }   /* 16 px: iOS does not zoom on focus */
+  .vf-text.textarea:not(:focus) { height: calc(3 * 22px + 22px); resize: none; }
+  body[data-motion="reduce"] .vf-text.textarea { transition: none; }
+  .vf-help { font-size: var(--fs-15); line-height: 22px; }
+  .vf-note { font-size: var(--fs-15); line-height: 22px; }
   .vf-banner { grid-template-columns: 28px minmax(0, 1fr); height: auto; min-height: 64px; padding: 12px 14px; gap: 6px 12px; }
-  .vf-banner__sub { white-space: normal; font-size: var(--fs-14); line-height: 20px; }
+  .vf-banner__sub { white-space: normal; font-size: var(--fs-15); line-height: 22px; }
   .vf-banner__sub:has(.vf-banner__link) { flex-wrap: wrap; }
   .vf-banner__link.btn.link { min-height: 44px; }
   .vf-banner__end { grid-column: 2; }
@@ -147,19 +213,19 @@
   .vf-hidden__n { display: none; }
   .vf-hidden__lede { grid-column: 1; }
   .vf-hidden__row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 0; }
-  .vf-hidden__why { grid-column: 1 / -1; font-size: var(--fs-14); line-height: 20px; }
+  .vf-hidden__why { grid-column: 1 / -1; font-size: var(--fs-15); line-height: 22px; }
   .vf-hidden__name { font-size: var(--fs-15); line-height: 22px; }
   .vf-hidden__foot { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-  .vf-hidden__pub { font-size: var(--fs-14); line-height: 20px; }
+  .vf-hidden__pub { font-size: var(--fs-15); line-height: 22px; }
 
   /* ── S05 · explorer ─────────────────────────────────────────────────────────────────────────── */
-  .ex-mast { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0; width: calc(100% - 2 * var(--frame) - 24px); height: auto; min-height: 0; padding: 32px 0 24px; }
+  .ex-mast { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0; width: calc(100% - 2 * var(--gutter)); height: auto; min-height: 0; padding: 32px 0 24px; }
   .ex-mast__copy { padding: 0 20px; }
   .ex-mast__title { font-size: clamp(28px, 7.6vw, 36px); line-height: 1.15; text-wrap: balance; }
   .ex-mast__lede { font-size: var(--fs-16); line-height: 26px; }
   .ex-mast__end { align-self: auto; justify-items: start; padding: 20px 20px 0; }
   .ex-cluster { min-height: 44px; height: auto; flex-wrap: wrap; white-space: normal; }
-  .ex { width: calc(100% - 2 * var(--frame) - 24px); gap: 16px; margin-top: 16px; }
+  .ex { width: calc(100% - 2 * var(--gutter)); gap: 16px; margin-top: 16px; }
   .ex-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }      /* 2 × 2 … */
   .ex-stat { min-height: 0; padding: 16px; }
   .ex-stat__v { margin-top: 14px; font-size: var(--fs-28); line-height: 32px; }
@@ -191,7 +257,7 @@
    into inline lists, so the button needs a home of its own). Disabled (y < 8) = hidden. ──────────── */
 @media (max-width: 719.98px) {
   .hiw-toc__top, .docs-otp__top, .cl-rail__top {
-    position: fixed; right: calc(var(--frame) + 12px); bottom: calc(var(--frame) + 12px); z-index: var(--z-sheet);
+    position: fixed; right: var(--gut-r); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: var(--z-sheet);
     margin: 0; min-height: 44px; padding: 0 16px 0 12px; gap: 8px;
     border: var(--hairline); border-radius: var(--r-full); background: var(--panel); box-shadow: var(--shadow-raised);
     color: var(--ink); font-size: var(--fs-13); line-height: 16px;
@@ -211,3 +277,14 @@
   .ex-mast__space, .hiw-mast__space, .cl-mast__space, .vf-mast__space, .hero__space, [data-space], .space { overflow: hidden; }
   html, body { overflow-x: clip; }
 }
+
+/* the figures' phone variants (public/kit/diagrams.js FIGS_V, rendered only below 720 px): 300 units
+   wide, never wider than 360 px, so a unit is ≥ 1.09 px in a 328 px column and the smallest label
+   (12 units) renders ≥ 13 px. The type steps are set in units here; desktop figures are untouched. */
+.fig__art > svg.dg-v { max-width: 360px; }
+.fig svg.dg-v .dg-title { font-size: 15px; }
+.fig svg.dg-v .dg-sub { font-size: 12.5px; }
+.fig svg.dg-v .dg-label { font-size: 12px; letter-spacing: .1em; }
+.fig svg.dg-v :is(.dg-idx, .dg-num) { font-size: 12px; }
+.fig svg.dg-v .dg-mono { font-size: 13px; }
+.fig svg.dg-v .dg-hash { font-size: 12.5px; }

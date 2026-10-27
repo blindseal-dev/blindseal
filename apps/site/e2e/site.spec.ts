@@ -36,7 +36,7 @@ test('verify: sample valid, tampered invalid, disclosure accepted, nothing store
   await page.goto('/verify');
   // the kit paints the idle checklist (four pending steps) once it has mounted
   await expect(page.locator('#vf-checks .check')).toHaveCount(4);
-  await page.getByRole('button', { name: 'Load sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
   await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Valid attestation');
   await expect(page.locator('#vf-checks .check').nth(1)).toHaveAttribute('data-state', 'pass');
@@ -46,7 +46,7 @@ test('verify: sample valid, tampered invalid, disclosure accepted, nothing store
   await page.locator('#vf-checks [data-n4]').click();
   await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'fail', { timeout: 10_000 });
   await expect(page.locator('#vf-checks .check').nth(3)).toContainText('RPC unavailable');
-  await page.getByRole('button', { name: 'Load tampered', exact: true }).click();
+  await page.getByRole('button', { name: 'Try an altered proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'fail', { timeout: 20_000 });
   await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Does not verify');
   // The real Groth16 verifier ran: a flipped proof fails the on-curve check at step 2; 3 and 4 are skipped.

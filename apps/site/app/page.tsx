@@ -30,20 +30,20 @@ export default function Home() {
         <div className="s01-problem__lines">
           <p className="s01-problem__line reveal">AI agents are easy to trick — put the wrong text in front of one and it does what the attacker wants.</p>
           <p className="s01-problem__line reveal">When a tricked agent shows up at an app, the app can&apos;t tell.</p>
-          <p className="s01-problem__line reveal">The only fix today is a service that reads all your agent&apos;s prompts, so proving you&apos;re safe means handing over your secrets.</p>
+          <p className="s01-problem__line reveal">A hosted screening service has to read all your agent&apos;s prompts, so proving the agent was checked means handing over your data.</p>
         </div>
       </section>
 
       <section className="site-section reveal s01-how" aria-labelledby="how-h">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / How it works</p><h2 className="section-head__title" id="how-h">Screen, attest, prove, verify.</h2></div>
-          <p className="section-head__body">Blindseal checks every action your agent takes, on your own machine, and never sends your data anywhere. When your agent needs to prove it was checked, Blindseal gives it a one-time stamp.</p>
+          <p className="section-head__body">Blindseal checks every request sent through it, on your own machine, and never sends your data anywhere. When your agent needs to prove it was checked, Blindseal gives it a one-time stamp.</p>
         </div>
         <figure className="fig s01-flow" data-figure="flow4" aria-label="Screen → attest → prove → verify" />
         <ol className="s01-cols reveal cascade" aria-label="The four steps">
           <li className="s01-col"><span className="s01-col__k">Screen</span><p className="s01-col__p">It sits between an agent and its tools as a local proxy, inspecting every tool call with four layers of prompt-injection detection before the call executes.</p></li>
           <li className="s01-col"><span className="s01-col__k">Attest</span><p className="s01-col__p">Blindseal produces a zero-knowledge attestation that a specific tool call passed a committed policy.</p></li>
-          <li className="s01-col"><span className="s01-col__k">Prove</span><p className="s01-col__p">The proof is generated locally. It is single-use.</p></li>
+          <li className="s01-col"><span className="s01-col__k">Prove</span><p className="s01-col__p">The proof is generated locally, on CPU — it takes hours, so you prove first and act after. It is single-use.</p></li>
           <li className="s01-col"><span className="s01-col__k">Verify</span><p className="s01-col__p">Verified with one Solana instruction, so any program can gate agent actions without seeing the prompt, the arguments, the operator&apos;s rules, or which agent was screened.</p></li>
         </ol>
         <p className="s01-more"><Link className="btn link s01-link" href="/how-it-works">Read the long version<i data-lucide="arrow-right" className="nudge" /></Link></p>
@@ -68,7 +68,7 @@ export default function Home() {
 
       <section className="site-section reveal" aria-labelledby="scope-h">
         <div className="callout s01-scope"><p className="callout__eyebrow" id="scope-h">What we claim</p>
-          <p className="callout__body">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p>
+          <p className="callout__body">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p>
         </div>
       </section>
 

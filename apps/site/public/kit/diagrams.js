@@ -166,13 +166,14 @@
   /* a copyable hash label: <g role="button" tabindex="0" data-dg-hash="full"> holding a
      fixed-width hit / focus-ring rect (the label can swap to "Copied" without anything moving,
      text-anchor is middle), a <title> with the full value for hover, and the short text */
-  Builder.prototype.hash = function (x, y, full, w, cls, li, key, label) {
+  Builder.prototype.hash = function (x, y, full, w, cls, li, key, label, hh) {
     var self = this, txt = null;
+    hh = hh || 16;   /* the hit / focus-ring height (the phone variant: 44) */
     this.interactive = true;
     this.g({ k: key + "g", cls: "dg-hashbtn", role: "button", tabindex: "0", "data-dg-hash": full,
              "aria-label": (label ? label + " " : "") + full + ". Copy" }, function () {
       self.add("title", { k: key + "t" }, (label ? label + " " : "") + full);
-      self.add("rect", { k: key + "r", cls: "dg-hashhit", x: f(x - w / 2), y: f(y - 8), width: f(w), height: 16, rx: 3 });
+      self.add("rect", { k: key + "r", cls: "dg-hashhit", x: f(x - w / 2), y: f(y - hh / 2), width: f(w), height: hh, rx: 3 });
       txt = self.text(x, y, shortHash(full), cls, li, "middle", { k: key });
     });
     return txt;
@@ -545,10 +546,289 @@
     b.text(424, 92, "L1 proven · L0 next", "dg-label is-active", 5, "start", { k: "k0b" });
     b.text(424, 216, "model-based", "dg-label", 6, "start", { k: "k1a" });
     b.text(424, 234, "attested", "dg-label is-active", 6, "start", { k: "k1b" });
-    return { b: b, caption: "L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally or in a TEE, and are attested." };
+    return { b: b, caption: "L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally (TEE mode planned), and are attested." };
   }
 
   var FIGS = { flow4: flow4, architecture: architecture, lifecycle: lifecycle, chain: chain, layers: layers };
+
+  /* ══ phone-width variants (DECISIONS 2026-10-27) ═════════════════════════
+     The five figures are 560–1066 units wide; scaled into a phone column their
+     11-unit labels render at 4–7 px. Below 720 px render() builds these
+     vertical variants instead: 300 units wide (the svg carries .dg-v, capped at
+     360 px by app/narrow.css, so a unit is ≥ 1.09 px in a 328 px column) with
+     the type at 12–15 units. Same data, same captions, same draw-in; the
+     desktop builders above are untouched. */
+  var VW = 300;
+  function chevU(x, y) { return "M" + f(x - 5) + " " + f(y + 7) + "L" + f(x) + " " + f(y) + "L" + f(x + 5) + " " + f(y + 7); }
+  function wrapWords(s, max) {
+    var out = [], cur = "";
+    String(s).split(" ").forEach(function (w) { if (cur && (cur + " " + w).length > max) { out.push(cur); cur = w; } else cur = cur ? cur + " " + w : w; });
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  /* 1v · flow4: four steps stacked, the hidden | public rule across, before verify */
+  function flow4V(o, uid) {
+    var act = o.active;
+    if (typeof act === "string") act = FLOW.map(function (n) { return n.k; }).indexOf(act);
+    if (typeof act !== "number" || act < 0 || act > 3) act = -1;
+    var aria = "Four steps: screen, attest, prove, verify. Screening, attestation and proving stay on the machine; " +
+      "the proof is verified publicly with one Solana instruction." + (act >= 0 ? " Highlighted: " + FLOW[act].k + "." : "");
+    var X = 32, W = VW - X, CX = 60, RULE = 292, Ys = [8, 104, 200, 324];
+    var subs = FLOW.map(function (n) { return wrapWords(n.s, 36); });
+    var Hs = subs.map(function (l) { return 46 + l.length * 15; });
+    var b = new Builder(uid, VW, Ys[3] + Hs[3] + 8, o.label || aria);
+    b.draw(dashH(0, CX - 10, RULE, 4, 4) + dashH(CX + 10, VW, RULE, 4, 4), "dg-rule", 7, { k: "rule", fast: true });
+    b.text(VW, RULE - 14, "stays on the machine", "dg-label", 4, "end", { k: "rl0" });
+    b.text(VW, RULE + 14, "public", "dg-label is-accent", 5, "end", { k: "rl1" });
+    FLOW.forEach(function (n, k) {
+      var y = Ys[k], H = Hs[k], i = k * 2, on = k === act ? " is-active" : "";
+      b.fill(rr(X, y, W, H, 6), on, i, { k: "nf" + k });
+      b.draw(rr(X, y, W, H, 6), "dg-node" + on, i, { k: "n" + k });
+      b.text(0, y + 22, pad2(k + 1), "dg-num", k, "start", { k: "ni" + k });
+      b.text(X + 16, y + 22, n.t, "dg-title" + on, k, "start", { k: "nt" + k });
+      subs[k].forEach(function (line, j) { b.text(X + 16, y + 42 + j * 15, line, "dg-sub", k, "start", { k: "ns" + k + "-" + j }); });
+      if (k < 3) {
+        var y2 = Ys[k + 1], cls = k === 2 ? "dg-accent" : "dg-conn";
+        b.draw("M" + CX + " " + (y + H) + "V" + (y2 - 4), cls, i + 1, { k: "c" + k });
+        b.tip(chevD(CX, y2 - 4), cls, i + 1, { k: "ct" + k });
+      }
+    });
+    return { b: b, caption: flow4(o, uid).caption };
+  }
+
+  /* 2v · architecture: agent → proxy (L0–L3) → tools; prover and audit log under it; the rule; the verifier */
+  function architectureV(o, uid) {
+    var focus = o.focus || "";
+    var on = function (k) { return focus === k ? " is-active" : ""; };
+    var full = architecture(o, uid);
+    var b = new Builder(uid, VW, 720, full.b.svg.getAttribute("aria-label"));
+    var hid = "dg" + uid + "-hatch";
+    hatch(b, hid);
+    /* agent */
+    b.fill(rr(0, 8, VW, 48, 6), on("agent"), 0, { k: "agf" });
+    b.draw(rr(0, 8, VW, 48, 6), "dg-node" + on("agent"), 0, { k: "ag" });
+    b.text(16, 32, "Agent", "dg-title" + on("agent"), 0, "start", { k: "agt" });
+    b.text(VW - 16, 32, "MCP client", "dg-sub", 0, "end", { k: "ags" });
+    b.draw("M150 56V80", "dg-conn", 1, { k: "c-ag" });
+    b.tip(chevD(150, 80), "dg-conn", 1, { k: "c-agt" });
+    /* the proxy and its four layers */
+    b.fill(rr(0, 84, VW, 252, 8), on("proxy"), 2, { k: "pxf" });
+    b.draw(rr(0, 84, VW, 252, 8), "dg-node" + on("proxy"), 2, { k: "px" });
+    b.text(16, 106, "The proxy", "dg-title" + on("proxy"), 2, "start", { k: "pxt" });
+    b.text(VW - 16, 106, "127.0.0.1", "dg-idx", 2, "end", { k: "pxs" });
+    var bandY = [124, 170, 236, 282];
+    LAYERS.forEach(function (L, k) {
+      var y = bandY[k], i = k < 2 ? 3 + k : 4 + k;
+      b.draw(rr(16, y, 268, 40, 4), "dg-node", i, { k: "band" + k });
+      b.text(30, y + 20, L.id, "dg-idx", i, "start", { k: "bid" + k });
+      b.text(62, y + 20, L.name, "dg-title", i, "start", { k: "bn" + k });
+      b.text(270, y + 20, L.kind, "dg-label", i, "end", { k: "bk" + k });
+    });
+    b.add("path", { k: "gatef", d: "M16 216H76V226H16Z", fill: "url(#" + hid + ")", cls: "dg-fill--hatch", i: 5, "data-draw-fill": "" });
+    b.draw("M16 216H76V226H16Z", "dg-conn", 5, { k: "gate", fast: true });
+    b.text(88, 221, "secrets and PII redacted", "dg-label", 5, "start", { k: "gatel" });
+    /* tools: three drops from the proxy */
+    ["MCP server", "RPC", "Filesystem"].forEach(function (t, k) {
+      var x0 = k * 104, cx = x0 + 46;
+      b.draw("M" + cx + " 336V370", "dg-conn", 8, { k: "fan" + k });
+      b.tip(chevD(cx, 370), "dg-conn", 8, { k: "fant" + k });
+      b.fill(rr(x0, 374, 92, 44, 6), on("tools"), 9, { k: "tf" + k });
+      b.draw(rr(x0, 374, 92, 44, 6), "dg-node" + on("tools"), 9, { k: "tn" + k });
+      b.text(cx, 396, t, "dg-sub" + on("tools"), 9, "middle", { k: "tt" + k });
+    });
+    /* prover (left) and the audit log (right), fed from the proxy through the gaps between the tools */
+    b.draw("M98 336V448", "dg-conn", 10, { k: "c-pr" });
+    b.tip(chevD(98, 448), "dg-conn", 10, { k: "c-prt" });
+    b.fill(rr(0, 452, 140, 64, 6), on("prover"), 11, { k: "prf" });
+    b.draw(rr(0, 452, 140, 64, 6), "dg-node" + on("prover"), 11, { k: "pr" });
+    b.text(70, 472, "Prover", "dg-title" + on("prover"), 11, "middle", { k: "prt" });
+    b.text(70, 492, "zero-knowledge", "dg-sub", 11, "middle", { k: "prs" });
+    b.text(70, 506, "attestation", "dg-sub", 11, "middle", { k: "prs2" });
+    b.draw("M202 336V448", "dg-conn", 10, { k: "c-al" });
+    b.tip(chevD(202, 448), "dg-conn", 10, { k: "c-alt" });
+    for (var a = 0; a < 4; a++) {
+      var ax = 153 + a * 36;
+      b.fill(rr(ax, 452, 26, 26, 4), on("audit"), 11, { k: "abf" + a });
+      b.draw(rr(ax, 452, 26, 26, 4), "dg-node" + on("audit"), 11, { k: "ab" + a });
+      if (a < 3) b.draw("M" + (ax + 26) + " 465H" + (ax + 36), "dg-conn", 11, { k: "abl" + a, fast: true });
+    }
+    b.text(153, 494, "audit log", "dg-label" + on("audit"), 10, "start", { k: "all" });
+    b.text(153, 510, "hash-chained, local", "dg-idx", 11, "start", { k: "als" });
+    /* the rule, then the one accent path across it */
+    b.draw(dashH(0, 60, 554, 4, 4) + dashH(80, VW, 554, 4, 4), "dg-rule", 12, { k: "rule" });
+    b.text(VW, 540, "stays on the machine", "dg-label", 12, "end", { k: "rl0" });
+    b.text(VW, 568, "public", "dg-label is-accent", 12, "end", { k: "rl1" });
+    b.draw("M70 516V600", "dg-accent", 13, { k: "acc" });
+    b.tip(chevD(70, 600), "dg-accent", 13, { k: "acct" });
+    b.text(82, 588, "proof · public inputs", "dg-label", 13, "start", { k: "accl" });
+    /* Solana verifier + what it sees */
+    b.fill(rr(0, 604, 150, 64, 6), on("verifier"), 14, { k: "vff" });
+    b.draw(rr(0, 604, 150, 64, 6), "dg-node" + on("verifier"), 14, { k: "vf" });
+    b.text(75, 626, "Solana verifier", "dg-title" + on("verifier"), 14, "middle", { k: "vft" });
+    b.text(75, 648, "one instruction", "dg-sub", 14, "middle", { k: "vfs" });
+    b.text(170, 612, "public inputs", "dg-label", 15, "start", { k: "publ" });
+    ["action hash", "policy root", "detector version", "expiry slot", "nullifier"].forEach(function (p, k) { b.text(170, 634 + k * 18, p, "dg-idx", 15, "start", { k: "pub" + k }); });
+    b.draw("M162 624V712", "dg-conn", 15, { k: "pubr", fast: true });
+    b.draw("M162 636H156", "dg-conn", 15, { k: "publead" });
+    b.tip(chevL(155, 636), "dg-conn", 15, { k: "publeadt" });
+    return { b: b, caption: full.caption };
+  }
+
+  /* 3v · lifecycle: the six states down a track; the expiry ruler beside the last three */
+  function lifecycleV(o, uid) {
+    var full = lifecycle(o, uid);
+    var st = String(o.status || "consumed");
+    var reach = LIFE.indexOf(st);
+    if (reach < 0) reach = LIFE_END.hasOwnProperty(st) ? LIFE_END[st] : 5;
+    var stop = (st === "rejected" || st === "failed") ? reach : -1;
+    var expired = st === "expired";
+    var note = LIFE_NOTE[st] || "";
+    var b = new Builder(uid, VW, 396, full.b.svg.getAttribute("aria-label"));
+    var X = 36, R = 7, GAP = 13;
+    var ys = LIFE.map(function (_, k) { return 40 + k * 52; });
+    var track = "";
+    for (var k = 0; k < 5; k++) track += "M" + X + " " + (ys[k] + GAP) + "V" + (ys[k + 1] - GAP);
+    b.draw(track, "dg-conn", 0, { k: "track" });
+    for (var pk = 0; pk < reach; pk++) b.draw("M" + X + " " + (ys[pk] + GAP) + "V" + (ys[pk + 1] - GAP), "dg-accent", 2 + pk, { k: "pg" + pk });
+    LIFE.forEach(function (name, k) {
+      var y = ys[k], done = k <= reach && k !== stop, hit = done ? " is-reached" : "", i = 1 + k;
+      if (k < 5) {
+        b.fill(ring(X, y, R), "dg-fill--clear" + hit, i, { k: "lf" + k });
+        b.draw(ring(X, y, R), "dg-node dg-conn" + (done ? " is-active" : ""), i, { k: "ln" + k });
+      }
+      b.text(60, y, name, "dg-label" + (k === reach ? " is-active" : ""), k, "start", { k: "ll" + k });
+      b.text(0, y, pad2(k + 1), "dg-num", k, "start", { k: "lx" + k });
+    });
+    var yc = ys[5], spent = reach >= 5 ? " is-active" : "";
+    b.draw(ring(X, yc, 10), "dg-node dg-conn" + spent, 6, { k: "nul" });
+    b.draw("M" + (X - 5) + " " + yc + "H" + (X + 5), spent ? "dg-conn dg-accent" : "dg-conn is-off", 7, { k: "slot", fast: true });
+    b.text(60, yc + 18, "nullifier", "dg-idx", 6, "start", { k: "nulx" });
+    var RX = 284, R0 = ys[3] - 8, R1 = ys[5] + 36;
+    b.draw("M" + RX + " " + R0 + "V" + R1, "dg-tick", 8, { k: "rul" });
+    var ticks = "";
+    for (var t = 0, y = R0; y < R1 - 2; y += 12, t++) ticks += "M" + RX + " " + y + "H" + (RX - (t % 5 === 0 ? 7 : 4));
+    b.draw(ticks, "dg-tick", 9, { k: "ticks", fast: true });
+    b.draw("M" + (RX - 14) + " " + R1 + "H" + (RX + 6), expired ? "dg-inkline" : "dg-conn", 10, { k: "exp", fast: true });
+    b.text(VW, R1 + 18, expired ? "expiry slot · expired" : "expiry slot", "dg-label" + (expired ? " is-ink" : ""), 7, "end", { k: "expl" });
+    if (stop >= 0) {
+      var sy = ys[stop];
+      b.draw("M" + (X - 3.5) + " " + (sy - 3.5) + "L" + (X + 3.5) + " " + (sy + 3.5) + "M" + (X + 3.5) + " " + (sy - 3.5) + "L" + (X - 3.5) + " " + (sy + 3.5),
+        "dg-conn", 6, { k: "stop:" + st, fast: true });
+    }
+    b.text(VW, R0 - 18, "valid from generation", "dg-idx", 7, "end", { k: "expv" });
+    b.text(0, R1 + 48, "status · " + (note || st), "dg-idx", 8, "start", { k: "stat" });
+    b.text(VW, R1 + 48, "single-use", "dg-label is-accent", 8, "end", { k: "single" });
+    return { b: b, caption: full.caption };
+  }
+
+  /* 4v · chain: one entry per row, oldest first; each row points back up at the one before */
+  function chainV(o, uid) {
+    var full = chain(o, uid);
+    var count = Math.max(2, Math.min(10, o.count || 10));
+    var entries = [];
+    if (o.entries && o.entries.length) {
+      entries = o.entries.slice(0, count).map(function (e) { return { index: e.index, hash: e.hash }; });
+      count = entries.length;
+    } else {
+      var start = o.start == null ? 1 : o.start;
+      for (var n = 0; n < count; n++) entries.push({ index: start + n, hash: "0x" + hex64(start + n) });
+    }
+    var first = entries[0].index, last = entries[count - 1].index;
+    var pos = function (idx) { for (var j = 0; j < count; j++) if (entries[j].index === idx) return j; return -1; };
+    var win = o.window && o.window.length === 2 ? [Math.max(first, Math.min(o.window[0], o.window[1])), Math.min(last, Math.max(o.window[0], o.window[1]))] : null;
+    if (win && win[0] > win[1]) win = null;
+    var brk = o.brokenAt != null ? pos(o.brokenAt) : -1;
+    if (brk === 0) brk = -1;
+    var X = 20, W = VW - X, H = 48, STEP = 64, Y0 = 40, CXL = 36;
+    var yOf = function (j) { return Y0 + j * STEP; };
+    var bottom = yOf(count - 1) + H;
+    var b = new Builder(uid, VW, bottom + 32, full.b.svg.getAttribute("aria-label"));
+    entries.forEach(function (e, j) {
+      var y = yOf(j), inWin = win && e.index >= win[0] && e.index <= win[1], i = j;
+      var after = brk > 0 && j >= brk;
+      b.fill(rr(X, y, W, H, 6), inWin ? "is-active" : "", i, { k: "bf" + j });
+      b.draw(rr(X, y, W, H, 6), "dg-node" + (inWin ? " is-active" : ""), i, { k: "b" + j });
+      b.text(CXL, y + H / 2, "#" + e.index, "dg-mono" + (after ? " is-dim" : ""), j, "start", { k: "bi" + j });
+      b.hash(180, y + H / 2, String(e.hash), 140, "dg-hash" + (after ? " is-dim" : ""), j, "bh" + j, "#" + e.index, 44);
+      if (j < count - 1) {
+        var off = brk === j + 1 ? " is-off" : "";
+        b.draw("M" + CXL + " " + (yOf(j + 1) - 1) + "V" + (y + H + 4), "dg-conn" + off, i + 1, { k: "l" + j, fast: true });
+        b.tip(chevU(CXL, y + H + 4), "dg-conn" + off, i + 1, { k: "lt" + j });
+      }
+    });
+    b.text(VW - 8, yOf(count - 1) + H / 2, "head", "dg-idx", count - 1, "end", { k: "head" });
+    b.text(X, bottom + 18, "prev ← hash", "dg-idx", 0, "start", { k: "prevl" });
+    if (win) {
+      var a0 = yOf(pos(win[0])), a1 = yOf(pos(win[1])) + H;
+      b.g({ k: "win:" + win[0] + "-" + win[1] }, function () {
+        b.draw("M" + (X - 6) + " " + a0 + "H" + (X - 12) + "V" + a1 + "H" + (X - 6), "dg-accent", count, { k: "wb" });
+        b.text(X, 18, "disclosed range · content-free", "dg-label is-accent", count, "start", { k: "wl" });
+      });
+    }
+    if (brk > 0) {
+      var ya = yOf(brk - 1) + H, yb = yOf(brk), my = (ya + yb) / 2;
+      b.g({ k: "brk:" + entries[brk].index }, function () {
+        var d = "", yy = ya + 3;
+        while (yy < yb - 2) { d += "M" + CXL + " " + f(yy) + "V" + f(Math.min(yy + 3, yb - 2)); yy += 6; }
+        b.draw(d, "dg-conn is-broken", count + 1, { k: "bd", fast: true });
+        b.draw("M" + (CXL + 10) + " " + (my - 4) + "L" + (CXL + 18) + " " + (my + 4) + "M" + (CXL + 18) + " " + (my - 4) + "L" + (CXL + 10) + " " + (my + 4),
+          "dg-conn is-broken", count + 1, { k: "bx", fast: true });
+        b.text(VW, bottom + 18, "chain broken at #" + entries[brk].index, "dg-label is-active", count, "end", { k: "bl" });
+      });
+    }
+    return { b: b, caption: full.caption };
+  }
+
+  /* 5v · layers: the four bands full width; the two kinds of evidence as label rows above each pair */
+  function layersV(o, uid) {
+    var full = layers(o, uid);
+    var paint = {};
+    var VERDICTS = { pass: 1, block: 1, flag: 1, skip: 1 };
+    if (o.results && o.results.length) {
+      o.results.forEach(function (r) { if (r && VERDICTS[r.verdict]) paint[r.layer] = r.verdict; });
+    } else if (o.highlight) {
+      var hl = Array.isArray(o.highlight) ? o.highlight : [o.highlight];
+      var v0 = VERDICTS[o.verdict] ? o.verdict : "block";
+      hl.forEach(function (id) { paint[String(id).toUpperCase()] = v0; });
+    }
+    var b = new Builder(uid, VW, 306, full.b.svg.getAttribute("aria-label"));
+    var hid = "dg" + uid + "-hatch";
+    hatch(b, hid);
+    var Y = [24, 82, 190, 248], H = 50;
+    b.text(0, 10, "deterministic", "dg-label", 5, "start", { k: "k0a" });
+    b.text(VW, 10, "L1 proven · L0 next", "dg-label is-active", 5, "end", { k: "k0b" });
+    b.text(0, 176, "model-based", "dg-label", 6, "start", { k: "k1a" });
+    b.text(VW, 176, "attested", "dg-label is-active", 6, "end", { k: "k1b" });
+    LAYERS.forEach(function (L, k) {
+      var y = Y[k], i = k < 2 ? k : k + 1, v = paint[L.id], cls = v ? " is-" + v : "";
+      var nodeCls = v === "block" ? " is-active" : v === "flag" ? " is-flag" : v === "skip" ? " is-skip" : "";
+      b.fill(rr(0, y, VW, H, 6), cls, i, { k: "lf" + k });
+      b.draw(rr(0, y, VW, H, 6), "dg-node" + nodeCls, i, { k: "l" + k });
+      b.text(16, y + H / 2, L.id, "dg-idx", i, "start", { k: "li" + k });
+      b.text(48, y + H / 2, L.name, "dg-title", i, "start", { k: "ln" + k });
+      b.text(VW - 16, y + H / 2, v ? v + " · " + L.sees : L.sees, "dg-sub", i, "end", { k: "ls" + k });
+    });
+    b.add("path", { k: "gatef", d: "M0 142H60V152H0Z", fill: "url(#" + hid + ")", cls: "dg-fill--hatch", i: 2, "data-draw-fill": "" });
+    b.draw("M0 142H60V152H0Z", "dg-conn", 2, { k: "gate", fast: true });
+    b.text(72, 147, "secrets and PII redacted", "dg-label", 2, "start", { k: "gatel" });
+    return { b: b, caption: full.caption };
+  }
+
+  var FIGS_V = { flow4: flow4V, architecture: architectureV, lifecycle: lifecycleV, chain: chainV, layers: layersV };
+  var NARROW_Q = "(max-width: 719.98px)", narrowMq = null, narrowHosts = [];
+  function narrow() { return !!(window.matchMedia && window.matchMedia(NARROW_Q).matches); }
+  /* crossing 720 px (rotation, a resized window) re-renders each figure in the other variant */
+  function watchNarrow(host) {
+    if (narrowHosts.indexOf(host) < 0) narrowHosts.push(host);
+    if (narrowMq || !window.matchMedia) return;
+    narrowMq = window.matchMedia(NARROW_Q);
+    var onChange = function () {
+      narrowHosts = narrowHosts.filter(function (h) { return h.isConnected; });
+      narrowHosts.forEach(function (h) { if (h.__dg) render(h.__dg.name, h, h.__dg.opts); });
+    };
+    if (narrowMq.addEventListener) narrowMq.addEventListener("change", onChange); else if (narrowMq.addListener) narrowMq.addListener(onChange);
+  }
 
   /* ── update in place: keyed attribute patch ───────────────────────────── */
   function syncAttrs(o, n) {
@@ -606,7 +886,8 @@
   function render(name, host, opts) {
     ensureStyle();
     host = resolve(host);
-    var fn = FIGS[name];
+    var vert = narrow() && FIGS_V[name] ? FIGS_V[name] : null;
+    var fn = vert || FIGS[name];
     if (!host) { console.warn("[BS.diagrams] render(" + name + "): no host"); return null; }
     if (!fn) { console.warn("[BS.diagrams] unknown figure \"" + name + "\"; known: " + Object.keys(FIGS).join(", ")); return host; }
     opts = opts || {};
@@ -614,6 +895,7 @@
     var out = fn(opts, host.__dgUid);
     var svg = out.b.svg, steps = out.b.steps;
     if (out.b.interactive) svg.setAttribute("role", "group");
+    if (vert) svg.setAttribute("class", "dg-v");
     host.classList.add("fig");
     host.setAttribute("data-diagram", name);
     host.setAttribute("data-dg-ready", "");
@@ -626,7 +908,7 @@
 
     var prev = host.__dg;
     var oldSvg = art.querySelector(":scope > svg");
-    if (prev && prev.name === name && oldSvg && host.classList.contains("is-drawn") && !reduced()) {
+    if (prev && prev.name === name && !!prev.v === !!vert && oldSvg && host.classList.contains("is-drawn") && !reduced()) {
       host.classList.add("is-settled");
       patch(oldSvg, svg);
     } else {
@@ -641,7 +923,8 @@
       if (cap.hasAttribute("data-dg-caption")) cap.textContent = typeof opts.caption === "string" ? opts.caption : out.caption;
     } else if (cap && cap.hasAttribute("data-dg-caption")) { cap.parentNode.removeChild(cap); }
 
-    host.__dg = { name: name, opts: opts, stop: prev.stop };
+    host.__dg = { name: name, opts: opts, stop: prev.stop, v: !!vert };
+    watchNarrow(host);
     return host;
   }
 

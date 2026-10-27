@@ -94,6 +94,9 @@
     [].forEach.call(document.querySelectorAll("[data-site-foot]"), function (a) {
       if (a.getAttribute("data-site-foot") === id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
+    [].forEach.call(document.querySelectorAll("[data-site-menu-link]"), function (a) {   /* the phone menu sheet */
+      if (a.getAttribute("data-site-menu-link") === id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
     measure(!!o.animate && !reduced() && refs.items.classList.contains("is-animated"));
   }
 
@@ -114,12 +117,17 @@
   }
 
   var crt = null;
+  function narrow() { return !!(window.matchMedia && window.matchMedia("(max-width: 719.98px)").matches); }
   /* the hero background: data-bg="crt" on the .hero__space (or BS.mountSite({ hero: { background: "crt", crt: {…} } }))
      mounts the CRT field (crt.js, D37); anything else, or no WebGL2, the nebula (D04) */
   function mountCrtHero(host) {
     var hero = opts.hero || {};
     var want = host.getAttribute("data-bg") || hero.background || "nebula";
     if (want !== "crt") return false;
+    /* phone width (< 720 px): the nebula, not the CRT — the WebGL field is capped at 1.5× DPR and reads
+       blocky on a 3× phone, and a full-screen multi-pass shader is the wrong battery trade there; the
+       nebula is CSS gradients + SVG, crisp at any DPR (DECISIONS 2026-10-27) */
+    if (narrow()) { host.dataset.bg = "nebula"; return false; }
     var api = BS.mountCRT ? BS.mountCRT(host, hero.crt || {}) : null;
     if (!api) { host.dataset.bg = "nebula"; return false; }
     crt = api;

@@ -19,7 +19,7 @@ The proof covers **L1 today** — the committed deterministic rule automata. It 
 screened by this detector version under the policy with this root, the committed L1 rules found it clean, and the
 screening is bound to one on-chain action, one expiry and one nonce — usable once.* **L0** (decode-then-L1) runs in
 the proxy but is **not inside the proof yet**; it is the next increment and will change the detector version. The
-model-based layers **L2/L3** (embeddings, LLM judge) run locally or in a TEE and are **attested, not proven**.
+model-based layers **L2/L3** (embeddings, LLM judge) run locally and are **attested, not proven** (a TEE mode is planned).
 Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.
 Proving takes hours on CPU: the sample attestation took 2 h 16 min on an Apple M1 Max (32 GB). The honest numbers
 are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is proven" page.
@@ -82,7 +82,7 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
              ├─ L1 rules (committed DFAs — PROVEN)
              ├─ L0 decode-then-L1 (deterministic; in the proxy, not in the proof yet)
              ├─ redaction of secrets / PII
-             ├─ L2 embeddings + L3 judge (ATTESTED; local or TEE)
+             ├─ L2 embeddings + L3 judge (ATTESTED; local; TEE planned)
              ├─ hash-chained audit log (content-free; signed disclosures)
              └─ on demand: SP1 → Groth16 attestation ──► Solana verifier ──► gated program
 ```

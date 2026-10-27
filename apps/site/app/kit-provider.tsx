@@ -54,9 +54,10 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   document.querySelectorAll<HTMLElement>('.hero__space, [data-space]').forEach((host) => {
     if (host.hasAttribute('data-space-mounted')) return;
     host.setAttribute('data-space-mounted', '');
-    const wantCrt = host.getAttribute('data-bg') === 'crt';
+    // phone width: the nebula, never the CRT (site.js mountCrtHero, DECISIONS 2026-10-27)
+    const wantCrt = host.getAttribute('data-bg') === 'crt' && !window.matchMedia('(max-width: 719.98px)').matches;
     if (wantCrt && BS.mountCRT?.(host, {})) return;
-    if (wantCrt) host.dataset.bg = 'nebula';
+    if (host.getAttribute('data-bg') === 'crt') host.dataset.bg = 'nebula';
     const i = host.getAttribute('data-intensity') || host.getAttribute('data-space') || 'hero';
     try { BS.mountSpace?.(host, { intensity: i === 'faint' ? 'faint' : 'hero', fade: host.getAttribute('data-fade') !== 'false' }); } catch {}
   });

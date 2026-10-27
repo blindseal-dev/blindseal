@@ -44,12 +44,12 @@ export default function VerifyPage() {
             <label htmlFor="vf-text">…or paste it</label>
             <textarea className="textarea mono vf-text" id="vf-text" rows={10} spellCheck={false} autoComplete="off" autoCapitalize="off" wrap="off"
               placeholder='{ "version": 1, "actionHash": "0x…", … }' aria-describedby="vf-help" defaultValue="" />
-            <p className="help vf-help" id="vf-help" aria-live="polite">Paste the JSON, or load a sample below.</p>
+            <p className="help vf-help" id="vf-help" aria-live="polite">Paste the JSON, or try a valid or an altered proof.</p>
           </div>
 
           <div className="vf-actions">
-            <button type="button" className="btn secondary vf-enter" id="vf-load-sample"><i data-lucide="file-check" />Load sample</button>
-            <button type="button" className="btn secondary vf-enter" id="vf-load-tampered"><i data-lucide="file-json" />Load tampered</button>
+            <button type="button" className="btn secondary vf-enter" id="vf-load-sample"><i data-lucide="file-check" />Try a valid proof</button>
+            <button type="button" className="btn secondary vf-enter" id="vf-load-tampered"><i data-lucide="file-json" />Try an altered proof</button>
             <span className="vf-actions__spacer" />
             <button type="button" className="btn link vf-enter" id="vf-clear">Clear</button>
             <button type="button" className="glass-btn primary sm vf-enter vf-verify" id="vf-verify" disabled>Verify</button>
@@ -72,7 +72,7 @@ export default function VerifyPage() {
             <span className="vf-banner__mark" aria-hidden="true" />
             <div className="vf-banner__main">
               <p className="vf-banner__title">Waiting for an attestation</p>
-              <p className="vf-banner__sub">Load a sample, drop a file or paste JSON. The checks fill in, in order.</p>
+              <p className="vf-banner__sub">Try a valid or an altered proof, drop a file, or paste JSON. The checks fill in, in order.</p>
             </div>
             <span className="vf-banner__end" />
           </div>

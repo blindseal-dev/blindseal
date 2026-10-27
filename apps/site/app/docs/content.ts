@@ -46,7 +46,7 @@ export const API_ENDPOINTS: Endpoint[] = [
   { method: 'POST', path: '/api/attestations', comment: 'Request an attestation for a decision with an action.' },
   { method: 'POST', path: '/api/attestations/:id/submit', comment: 'Submit to Solana mainnet → tx signature.' },
   { method: 'GET', path: '/api/nullifiers/:nullifier', comment: 'On-chain status of a nullifier (mainnet, read server-side).' },
-  { method: 'GET', path: '/api/tee/quote', comment: 'The L3 TEE quote (when L3 runs in a TEE).' },
+  { method: 'GET', path: '/api/tee/quote', comment: 'The L3 TEE quote. TEE mode is planned; today this returns mode "local".' },
   { method: 'WS', path: '/events', comment: 'Live stream: decision, status, policy, attestation frames.' },
 ];
 
@@ -74,7 +74,7 @@ nullifier       = sha256("blindseal.nullifier.v1" || actionHash)`;
 const PAGE_LIST: Omit<DocPage, 'prev' | 'next'>[] = [
   {
     slug: 'quickstart', path: '/docs', group: 'Getting started', title: 'Quickstart',
-    summary: 'Ten minutes on a fresh machine: install from npm, run the proxy in front of an MCP server, see every tool call screened, and verify an attestation without trusting this site. Node 20+ is the only requirement — the verifier ships as WebAssembly, so no Rust or Solana toolchain is needed to use Blindseal. Building from the repository is a separate page: [From source](/docs/source).',
+    summary: 'Ten minutes on a fresh machine to install from npm, run the proxy in front of an MCP server, see every tool call screened, and verify an attestation without trusting this site. Producing an attestation of your own takes hours on CPU. Node 20+ is the only requirement — the verifier ships as WebAssembly, so no Rust or Solana toolchain is needed to use Blindseal. Building from the repository is a separate page: [From source](/docs/source).',
     sections: [
       { id: 'install', heading: 'Install and run', blocks: [
         code(`$ npm i -g blindseal              # or run every command below with npx: npx blindseal …
@@ -229,7 +229,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
   },
   {
     slug: 'scope', path: '/docs/scope', group: 'What is proven — and what is not', title: 'What is proven — and what is not', nav: 'What is proven',
-    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally or in a TEE and are attested, not proven. Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.',
+    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.',
     sections: [
       { id: 'proven', heading: 'Proven (zero-knowledge, verifiable by anyone)', blocks: [
         list([

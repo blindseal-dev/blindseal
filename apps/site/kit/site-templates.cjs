@@ -1,4 +1,4 @@
-/* The site chrome markup — skip-link, frame, notch (wings, row, items, pill, ink, CTA) and footer —
+/* The site chrome markup — skip-link, frame, notch (wings, row, items, pill, ink, CTA, phone menu) and footer —
    as pure template functions, extracted verbatim from site.js (the mockups' _shared/site.js) so the
    SAME strings render on the server (app/site-chrome.tsx) and are known to the kit, which only ADOPTS
    them (site.js: no element is created or inserted into html/head/body). Works as CommonJS and, when
@@ -53,8 +53,26 @@
       "</div>" +
       tab("actions") + WING.tl + WING.br +
         '<a class="glass-btn primary notch__cta" href="' + esc(a.href) + '" data-site-cta' + (a.external ? ' target="_blank" rel="noopener"' : "") + '>' + esc(a.label) + "</a>" +
+        /* phone width only (< 720 px, app/narrow.css): the menu button; display:none on desktop */
+        '<button type="button" class="notch__menu" data-site-menu-btn aria-expanded="false" aria-controls="site-menu" aria-label="Menu"><span class="notch__menu-bars" aria-hidden="true"></span></button>' +
       "</div>" +
-    "</div>";
+    "</div>" +
+    menuHtml(ctx);
+  }
+  /* the phone menu: a disclosure (the button carries aria-expanded / aria-controls; no aria-modal, so the button
+     stays reachable to a screen reader) — a full-screen sheet under the header row, listing the five routes and the action.
+     Server-rendered with the rest of the chrome, [hidden] until the menu button opens it (wired by
+     app/site-menu.tsx, a client component — never created by the kit). display:none on desktop. */
+  function menuHtml(ctx) {
+    var a = ctx.action;
+    return '<div class="site-menu" id="site-menu" data-site-menu hidden>' +
+      '<nav class="site-menu__nav" aria-label="Site menu"><ul class="site-menu__list">' +
+        NAV.map(function (n) {
+          return '<li><a class="site-menu__item" href="' + esc(ctx.routes[n.id] || "#") + '" data-site-menu-link="' + n.id + '">' + esc(n.label) + "</a></li>";
+        }).join("") +
+        '<li><a class="site-menu__item site-menu__item--ext" href="' + esc(a.href) + '"' + (a.external ? ' target="_blank" rel="noopener"' : "") + ">" + esc(a.label) +
+          '<svg class="site-menu__ext" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M8 7h9v9"/></svg></a></li>' +
+      "</ul></nav></div>";
   }
   function footerHtml(ctx) {
     return '<div class="site-footer__brand"><a class="site-brand" href="' + esc(ctx.routes.home) + '">' + mark(20) + "<span>" + esc(ctx.brand || "Blindseal") + "</span></a>" +
@@ -63,5 +81,5 @@
         return '<a href="' + esc(ctx.routes[f.id] || "#") + '" data-site-foot="' + f.id + '">' + esc(f.label) + "</a>";
       }).join("") + "</nav>";
   }
-  return { NAV: NAV, FOOT: FOOT, WING: WING, navHtml: navHtml, footerHtml: footerHtml, mark: mark };
+  return { NAV: NAV, FOOT: FOOT, WING: WING, navHtml: navHtml, menuHtml: menuHtml, footerHtml: footerHtml, mark: mark };
 });

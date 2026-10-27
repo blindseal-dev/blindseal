@@ -1,3 +1,6 @@
+/* the phone contents toggle (toc-toggle.tsx) exists only below 720 px */
+.hiw-toc__toggle { display: none; }
+
 /* S02 · How it works — narrow-viewport rules only. The mockup's page.css (kit/pages/s02.css, loaded
    verbatim) has no width queries and overflows under ~720px (the 220px rail + 56 gap grid, the
    three-column redaction panel, the five-column kv). Nothing here applies at the mockup's 1440 width.
@@ -35,18 +38,41 @@
    inline list of 44 px chips under the masthead (the scroll-spy still lights the current one), back to
    top floats (app/narrow.css), the figures scale to the column, the prose reads at 15 px. */
 @media (max-width: 719.98px) {
-  .hiw-mast { width: calc(100% - 2 * var(--frame) - 24px); padding: 32px 0; }
+  .hiw-mast { width: calc(100% - 2 * var(--gutter)); padding: 32px 0; }
   .hiw-mast__copy { padding: 0 20px; }
   .hiw-mast__title { font-size: clamp(28px, 7.6vw, 36px); }
   .hiw-mast__lede { font-size: var(--fs-16); line-height: 26px; }
-  .hiw { width: calc(100% - 2 * var(--frame) - 24px); gap: 24px; margin-top: 24px; }
-  .hiw-toc-col { display: block; }
-  .hiw-toc { position: static; }
-  .hiw-toc__track { display: none; }
-  .hiw-toc__list { flex-direction: row; flex-wrap: wrap; gap: 8px; }
-  .hiw-toc__link { align-items: center; min-height: 44px; padding: 8px 14px 8px 12px; border: var(--hairline); border-radius: var(--r-full); font-size: var(--fs-14); line-height: 18px; }
-  .hiw-toc__link.is-active { border-color: var(--line-strong); background: var(--surface-hover); }
-  .hiw-sec { padding-top: 32px; margin-top: 32px; }
+  .hiw { width: calc(100% - 2 * var(--gutter)); gap: 24px; margin-top: 24px; }
+  /* the contents: a collapsed bar that sticks under the header for the whole page (the column is the
+     sticky box, inside the .hiw grid); the toggle (toc-toggle.tsx) opens the section list as a panel
+     under it, the scroll-spy's current section is lit there and named on the bar */
+  .hiw-toc-col { display: block; position: sticky; top: calc(var(--notch-top) + var(--notch-h)); z-index: 5; align-self: start;
+    margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter); background: var(--canvas); box-shadow: inset 0 -1px 0 var(--line); }
+  .hiw-toc { position: relative; top: auto; }
+  .bs-js .hiw.is-rising .hiw-toc { animation: none; }   /* a transformed ancestor would capture the fixed back-to-top button */
+  .hiw-toc__head, .hiw-toc__track { display: none; }
+  .hiw-toc__toggle {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0; border: 0; background: transparent;
+    color: var(--ink); font: var(--fw-medium) var(--fs-15)/20px var(--font-sans); text-align: left; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hiw-toc__toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: var(--r-control); }
+  .hiw-toc__toggle-k { flex: none; font: var(--fw-body) var(--fs-12)/16px var(--font-mono); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--muted); }
+  .hiw-toc__toggle-v { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hiw-toc__toggle-chev { flex: none; margin-left: auto; color: var(--muted); transition: transform var(--d-160) var(--ease-out-quint); }
+  .hiw-toc__toggle[aria-expanded="true"] .hiw-toc__toggle-chev { transform: rotate(180deg); }
+  body[data-motion="reduce"] .hiw-toc__toggle-chev { transition: none; }
+  .hiw-toc:not([data-open]) .hiw-toc__rail { display: none; }
+  .hiw-toc[data-open] .hiw-toc__rail {
+    position: absolute; top: 100%; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter));
+    max-height: calc(100svh - var(--notch-top) - var(--notch-h) - 64px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 4px var(--gutter) 12px; background: var(--canvas); box-shadow: inset 0 -1px 0 var(--line), var(--shadow-raised);
+  }
+  .hiw-toc__list { gap: 0; }
+  .hiw-toc__link { align-items: center; gap: 12px; min-height: 48px; padding: 0; border-bottom: var(--hairline); font-size: var(--fs-15); line-height: 20px; }
+  .hiw-toc__list li:last-child .hiw-toc__link { border-bottom: 0; }
+  .hiw-toc__n { width: 20px; font-size: var(--fs-12); }
+  .hiw-sec { padding-top: 32px; margin-top: 32px; scroll-margin-top: 48px; }   /* clear of the sticky contents bar */
   .hiw-sec .section-head__body { max-width: none; font-size: var(--fs-15); line-height: 24px; }
   .hiw-fig.fig { margin-top: 24px; }
   .hiw-fig .fig__art > svg, .fig .fig__art > svg { max-width: 100%; height: auto; }
@@ -63,7 +89,7 @@
   .hiw-redact { padding: 16px; }
   .hiw-redact__sub { font-size: var(--fs-15); line-height: 24px; }
   .hiw-redact__v { margin-left: 0; }
-  .hiw-redact__note { font-size: var(--fs-13); line-height: 18px; }
+  .hiw-redact__note { font-size: var(--fs-15); line-height: 22px; }
   .hiw-panel, .hiw-bind { padding: 16px; }
   .kv.hiw-kv { grid-template-columns: minmax(0, 1fr); }
   .hiw-kv .kv__v { flex-wrap: wrap; }

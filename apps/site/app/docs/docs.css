@@ -28,9 +28,9 @@
    stays hidden (the tree carries navigation) but its back-to-top button floats (app/narrow.css). Tables
    and code scroll inside their boxes; the key → value lines stack. */
 @media (max-width: 719.98px) {
-  .docs { --docs-top: 84px; width: calc(100% - 2 * var(--frame) - 24px); row-gap: 24px; }
+  .docs { --docs-top: calc(var(--notch-top) + var(--notch-h) + 24px); width: calc(100% - 2 * var(--gutter)); row-gap: 24px; }
   .docs-side__in { gap: 14px; }
-  .docs-search .input { min-height: 44px; font-size: var(--fs-15); }
+  .docs-search .input { min-height: 44px; font-size: 16px; }
   .docs-tree { gap: 10px; }
   .docs-tree__group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .docs-tree__head { flex: 1 0 100%; margin: 0 0 2px; padding-left: 2px; }
@@ -58,7 +58,8 @@
   .docs-kv { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .docs-kv__v { font-size: var(--fs-13); line-height: 20px; }
   .docs-kv__v .docs-url { white-space: normal; overflow-wrap: anywhere; }
-  .docs .table .is-note { min-width: 180px; font-size: var(--fs-14); line-height: 20px; }
+  .docs .table .is-note { min-width: 180px; font-size: var(--fs-15); line-height: 22px; }
+  .docs-side__sub, .docs-pn__start { font-size: var(--fs-15); line-height: 22px; }
   .docs .table .is-mono { white-space: nowrap; }
   .api-m { width: 40px; }
   .docs-pn { gap: 12px; margin-top: 40px; padding-top: 24px; }

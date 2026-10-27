@@ -545,7 +545,7 @@
     b.text(424, 92, "L1 proven · L0 next", "dg-label is-active", 5, "start", { k: "k0b" });
     b.text(424, 216, "model-based", "dg-label", 6, "start", { k: "k1a" });
     b.text(424, 234, "attested", "dg-label is-active", 6, "start", { k: "k1b" });
-    return { b: b, caption: "L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally or in a TEE, and are attested." };
+    return { b: b, caption: "L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally (TEE mode planned), and are attested." };
   }
 
   var FIGS = { flow4: flow4, architecture: architecture, lifecycle: lifecycle, chain: chain, layers: layers };
