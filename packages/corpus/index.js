@@ -9,7 +9,7 @@ export function loadCorpus() {
   const binPath = path.join(here, 'embeddings.bin');
   if (!existsSync(metaPath) || !existsSync(binPath)) {
     throw new Error(
-      'blindseal/corpus: embeddings missing — run `pnpm --filter @blindseal/corpus build` first',
+      'blindseal/corpus: embeddings missing — run `pnpm --filter @blindseal/corpus embed` first',
     );
   }
   const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
