@@ -70,3 +70,6 @@ crates/prover/attestation.json
 keys/
 target*/
 crates/*/target*/
+
+# internal copy briefs (competitive positioning; never published)
+docs/internal/copy/

@@ -25,7 +25,7 @@ Each batch is in its own JSON file with `source` fields citing the upstream:
 | `03-blog-pocs.json` | Simon Willison (simonwillison.net/.../prompt-injection*); Johann Rehberger (embracethered.com); Riley Goodside (Twitter @goodside published examples) | Verbatim or close-paraphrase of published PoCs | ~30 |
 | `04-owasp-llm.json` | OWASP LLM Top 10 v1.1 (genai.owasp.org) — LLM01 Prompt Injection examples | Authored-from-pattern matching OWASP categorization | ~20 |
 | `05-encoded-payloads.json` | Original synthesis using established encoding techniques (base64, hex, ROT13, homoglyph, zero-width, RTL override) — each instance encodes a known attack and asks the agent to decode-and-act | Synthetic but technique-real | ~30 |
-| `06-multi-turn.json` | Composed multi-turn setup patterns from Greshake (indirect channel poisoning), a third-party detector Gandalf publicly-disclosed solutions, HackAPrompt 2023 winning submissions where the prompts are publicly available | Authored matching published patterns | ~25 |
+| `06-multi-turn.json` | Composed multi-turn setup patterns from Greshake (indirect channel poisoning), publicly disclosed prompt-injection game solutions, HackAPrompt 2023 winning submissions where the prompts are publicly available | Authored matching published patterns | ~25 |
 | `07-roleplay-jailbreak.json` | "DAN" family, "Developer Mode" prompts, "STAN", "AIM" — all well-documented in public r/ChatGPT discussions and security research papers (Shen et al. 2023 "Do Anything Now") | Authored variants — exact verbatim DAN prompts are 1000+ chars; we use shorter representative slices that preserve the attack semantics | ~30 |
 
 Total target: **200+ entries**.

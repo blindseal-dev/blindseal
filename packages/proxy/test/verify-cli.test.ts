@@ -8,6 +8,8 @@ import { verifyAttestationFile, formatDecoded, DECODED_LABELS } from '../src/cli
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MAINNET = path.resolve(here, '../../../tests/fixtures/attestation-mainnet.json');
 
+const FIX = JSON.parse(readFileSync(new URL('../../../tests/fixtures/attestation-mainnet.json', import.meta.url), 'utf8')) as { expirySlot: number };
+
 describe('blindseal verify — attestation report', () => {
   it('prints VALID and every decoded public-input field for the mainnet fixture', async () => {
     const att = JSON.parse(readFileSync(MAINNET, 'utf8')) as Attestation;
@@ -21,7 +23,7 @@ describe('blindseal verify — attestation report', () => {
       expect(r.text).toContain(`${k}`);
       expect(r.text).toContain(String(blob[k]));
     }
-    expect(r.text).toContain('expirySlot       2000000000 (no expiry)');
+    expect(r.text).toContain(`expirySlot       ${FIX.expirySlot}`);
   }, 30_000);
 
   it('reports the decoded (blob) values, not the labels, when a label is tampered', async () => {

@@ -1,7 +1,7 @@
 {
   "name": "@blindseal/eval",
   "version": "0.0.1",
-  "description": "Blindseal Red Team — eval harness comparing Blindseal against a third-party detector / OpenAI Moderation / raw Anthropic judge",
+  "description": "Blindseal Red Team — eval harness comparing Blindseal's layers against generic baselines (a moderation endpoint, a raw LLM judge)",
   "private": true,
   "type": "module",
   "bin": {

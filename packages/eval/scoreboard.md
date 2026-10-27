@@ -13,7 +13,7 @@ Each competitor classifies every sample as flagged (likely injection) or clean.
 
 ## Not run
 
-- **a third-party detector** — a third-party detector_API_KEY not set
+- **public research** — public research_API_KEY not set
 - **openai-moderation** — OPENAI_API_KEY not set
 
 ## Per-sample (top miss diffs)
