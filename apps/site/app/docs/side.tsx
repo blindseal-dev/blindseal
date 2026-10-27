@@ -33,6 +33,7 @@ export function DocsSide() {
   return (
     <aside className="docs-side" aria-label="Documentation">
       <div className="docs-side__in">
+        <p className="docs-side__tag">Prove an agent&apos;s action was screened — without showing what it was.</p>
         <div className="docs-search">
           <label className="sr-only" htmlFor="docs-search">Search the docs</label>
           <div className="input-group has-end">

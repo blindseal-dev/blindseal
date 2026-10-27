@@ -16,6 +16,10 @@ B_GENERIC='hashicorp blindseal|blindseal \(hashicorp\)|ansible-blindseal|x-blind
 B_ALLOW='^(LICENSE|BLINDSEAL\.md|DECISIONS\.md|README\.md|FRONTEND\.md|RH-INTEGRATION\.md|docs/.*\.md)$'
 FILES=$(git ls-files --cached --others --exclude-standard | grep -vE '\.(png|jpg|woff2?|wasm|bin|so|cast)$')
 fail=0
+# competitor names: never anywhere in the tracked tree (internal copy briefs stay local-only, gitignored)
+COMP_RE='a third-party detector|a third-party detector|prompt ?guard|a third-party detector|protect ?ai|a third-party detector|a third-party detector|llm ?guard|a third-party detector'
+ch=$(git grep -ilE "$COMP_RE" -- . ':!scripts/identity-sweep.sh' ':!scripts/npm-pack-audit.sh' 2>/dev/null || true)
+[ -n "$ch" ] && { echo "competitor names in tracked files:"; echo "$ch" | sed 's/^/  /'; fail=1; }
 hitsA=$(echo "$FILES" | xargs grep -IlniE "$A_RE" 2>/dev/null)
 if [ -n "$hitsA" ]; then echo "PART A hits:"; echo "$hitsA" | sed 's/^/  /'; fail=1; fi
 hitsB=$(echo "$FILES" | xargs grep -IniE "$B_RE" 2>/dev/null | grep -viE "$B_GENERIC" | cut -d: -f1 | sort -u | grep -vE "$B_ALLOW" | grep -vE '^scripts/(identity-sweep|npm-pack-audit)\.sh$')

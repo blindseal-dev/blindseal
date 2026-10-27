@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 PKGS=("$@"); [ ${#PKGS[@]} -gt 0 ] || PKGS=(packages/proxy packages/sdk packages/verifier-wasm)
 A_RE="$( [ -f .identity-sweep ] && grep -v '^#' .identity-sweep | grep . | tr '\n' '|' | sed 's/|$//' || echo '__none__')"
-B_RE='blindseal|partner-chain|transfer-gate|@blindseal|\bblindseal\b|BLINDSEAL_|\bveil\b'
+B_RE='blindseal|partner-chain|transfer-gate|@blindseal|\bblindseal\b|BLINDSEAL_|\bveil\b|a third-party detector|a third-party detector|prompt ?guard|a third-party detector|a third-party detector|a third-party detector|llm ?guard|a third-party detector'
 SECRET_RE='npm_[A-Za-z0-9]{30,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY|"privateKey"|_authToken'
 PATH_RE='/Users/[a-z]+|/home/[a-z]+|C:\\Users'
 PATH_OK='/home/user/|/home/you/|/Users/you/|/Users/me/|/home/me/'   # documentation / fixture placeholders, not a real home

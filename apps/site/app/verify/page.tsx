@@ -18,8 +18,8 @@ export default function VerifyPage() {
         <div className="vf-mast__space" aria-hidden="true" />
         <div className="vf-mast__copy">
           <p className="vf-mast__eyebrow">Verify</p>
-          <h1 className="vf-mast__title" id="vf-title">Check an attestation.</h1>
-          <p className="vf-mast__lede">Runs in your browser. Nothing is uploaded, nothing is stored.</p>
+          <h1 className="vf-mast__title" id="vf-title">Don&apos;t take our word for it. Check the proof yourself.</h1>
+          <p className="vf-mast__lede">Try a real Blindseal proof in your browser. Then try an altered one and watch verification fail. No wallet or installation needed.</p>
         </div>
       </header>
 
@@ -30,7 +30,7 @@ export default function VerifyPage() {
         <section className="vf-in site-panel" aria-labelledby="vf-in-title">
           <div className="vf-head vf-enter">
             <p className="site-panel__n">Input</p>
-            <h2 className="site-panel__title" id="vf-in-title">Your attestation</h2>
+            <h2 className="site-panel__title" id="vf-in-title">Your proof file</h2>
           </div>
 
           <button type="button" className="vf-drop vf-enter" id="vf-drop" aria-describedby="vf-drop-sub">
@@ -63,7 +63,7 @@ export default function VerifyPage() {
           <div className="vf-head vf-head--split vf-enter">
             <div>
               <p className="site-panel__n">Checklist</p>
-              <h2 className="site-panel__title" id="vf-out-title">What the verifier finds</h2>
+              <h2 className="site-panel__title" id="vf-out-title">What the proof covers</h2>
             </div>
             <span className="vf-source" id="vf-source" hidden />
           </div>

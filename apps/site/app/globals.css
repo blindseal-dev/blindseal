@@ -20,4 +20,5 @@ html, body { margin: 0; background: var(--canvas); color: var(--ink); }
 @import '../kit/pages/s05.css';
 @import '../kit/pages/s06.css';
 /* phone-width addition to the kit (see the file) */
+@import './home.css';
 @import './narrow.css';

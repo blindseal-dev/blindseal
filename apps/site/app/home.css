@@ -1,0 +1,29 @@
+/* Home page additions for the 02 copy (three steps, example panel, notes, FAQ, the hero's secondary disclaimer).
+   Built from the kit's tokens; nothing here restyles an existing kit class. */
+.hero__note { max-width: 620px; margin-top: calc(-1 * var(--s-3)); font: var(--fw-body) var(--fs-13)/20px var(--font-sans); color: var(--muted); opacity: .85; }
+.hero__primary { min-height: 44px; }
+.s01-cols.hm-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hm-note { max-width: 760px; margin-top: var(--s-6); font: var(--fw-body) var(--fs-14)/22.4px var(--font-sans); color: var(--muted); text-wrap: pretty; }
+.hm-example { margin-top: var(--s-7); gap: var(--s-3); }
+.hm-example__title { font: var(--fw-medium) var(--fs-20)/28px var(--font-sans); color: var(--ink); text-wrap: balance; }
+.hm-example strong, .s01-scope strong { color: var(--ink); font-weight: var(--fw-medium); }
+.hm-who { gap: var(--s-3); }
+.hm-scope__title { margin: 6px 0 var(--s-3); font: var(--fw-medium) var(--fs-20)/28px var(--font-sans); color: var(--ink); text-wrap: balance; }
+.s01-scope .callout__body + .callout__body { margin-top: var(--s-3); }
+.s01-hp__rows > li { padding: 12px 0; border-top: var(--hairline); font: var(--fw-body) var(--fs-14)/22px var(--font-sans); color: var(--ink); }
+.s01-hp__rows > li:first-child { border-top: 0; }
+.hm-faq { display: grid; max-width: 820px; margin-top: var(--s-7); border-top: var(--hairline); }
+.hm-faq__item { border-bottom: var(--hairline); }
+.hm-faq__q { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); min-height: 56px; padding: 12px 0;
+  font: var(--fw-medium) var(--fs-16)/24px var(--font-sans); color: var(--ink); cursor: pointer; list-style: none; }
+.hm-faq__q::-webkit-details-marker { display: none; }
+.hm-faq__q::after { content: "+"; flex: none; font: var(--fw-body) var(--fs-18)/1 var(--font-mono); color: var(--muted); transition: transform var(--d-150) var(--ease-in-out); }
+.hm-faq__item[open] .hm-faq__q::after { transform: rotate(45deg); }
+.hm-faq__q:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 4px; }
+.hm-faq__a { display: grid; gap: var(--s-3); padding: 0 0 var(--s-5); max-width: 68ch; font: var(--fw-body) var(--fs-15)/24px var(--font-sans); color: var(--muted); }
+.hm-cta__body { margin: var(--s-3) auto var(--s-6); max-width: 560px; }
+.site-cta .hero__actions { justify-content: center; flex-wrap: wrap; }
+@media (max-width: 719.98px) {
+  .s01-cols.hm-steps { grid-template-columns: minmax(0, 1fr); }
+  .hm-note, .s01-hp__rows > li { font-size: var(--fs-15); }
+}

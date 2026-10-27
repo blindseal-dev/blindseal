@@ -1,3 +1,4 @@
+.docs-side__tag { margin: 0 0 var(--s-4); font: var(--fw-body) var(--fs-13)/20px var(--font-sans); color: var(--muted); text-wrap: balance; }
 /* A code line longer than the column scrolls; the kit's 48px right padding would put the lang label
    (right: 44px) over its text, so the docs column keeps the text clear of it. */
 .docs .code { padding-right: 96px; }

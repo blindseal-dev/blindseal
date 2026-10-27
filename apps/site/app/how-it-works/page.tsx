@@ -84,8 +84,9 @@ export default function HowItWorks() {
         <div className="hiw-mast__space" aria-hidden />
         <div className="hiw-mast__copy">
           <p className="hiw-mast__eyebrow">How it works</p>
-          <h1 className="hiw-mast__title" id="hiw-title">A screening layer that can prove it ran.</h1>
-          <p className="hiw-mast__lede">Blindseal is a privacy-preserving, verifiable screening layer for AI agents. It sits between an agent and its tools as a local proxy, inspecting every tool call with four layers of prompt-injection detection before the call executes. Nothing sensitive leaves the machine: secrets and PII are redacted before the judge sees them, and the judge runs locally (running it inside a TEE, with an attestation you can present, is planned).</p>
+          <h1 className="hiw-mast__title" id="hiw-title">Your agent acts. Blindseal checks.</h1>
+          <p className="hiw-caption hiw-caption--mast">A screening layer that can prove it ran.</p>
+          <p className="hiw-mast__lede">Blindseal sits between your AI agent and its tools. Each request sent through it is checked before it goes through.</p>
         </div>
       </header>
 
@@ -119,8 +120,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="architecture" aria-labelledby="h-architecture">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>01</b> / Architecture</p><h2 className="section-head__title" id="h-architecture">One proxy between the agent and its tools.</h2></div>
-                <p className="section-head__body">The agent&apos;s MCP client talks to 127.0.0.1 instead of the server; the proxy screens, forwards and logs every call.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>01</b> / Architecture</p><h2 className="section-head__title" id="h-architecture">One checkpoint for your agent&apos;s tools</h2><p className="hiw-caption">One proxy between the agent and its tools.</p></div>
+                <p className="section-head__body">Instead of talking directly to a tool, the agent talks through Blindseal running on your computer.</p>
               </div>
             </div>
             <figure className="hiw-fig" id="fig-architecture" data-fig="architecture" data-fig-n="1" />
@@ -144,8 +145,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="four-layers" aria-labelledby="h-four-layers">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / Four layers</p><h2 className="section-head__title" id="h-four-layers">Two layers that match, two that judge.</h2></div>
-                <p className="section-head__body">L0 and L1 are deterministic: the same payload always gets the same answer, so a proof can cover them. Today the proof covers L1; L0 runs in the proxy and goes inside the proof next. L2 and L3 are model-based; they run locally and are attested, not proven. A TEE mode is planned.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / Four layers</p><h2 className="section-head__title" id="h-four-layers">Four ways to spot suspicious instructions</h2><p className="hiw-caption">Two layers that match, two that judge.</p></div>
+                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. Today&apos;s proof covers only the pattern checks.</p>
               </div>
             </div>
             <div className="hiw-layers">
@@ -172,8 +173,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="redaction" aria-labelledby="h-redaction">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>03</b> / Redaction before the judge</p><h2 className="section-head__title" id="h-redaction">The judge sees less than the agent sent.</h2></div>
-                <p className="section-head__body">Nothing sensitive leaves the machine: secrets and PII are redacted before the judge sees them, and the judge runs locally (running it inside a TEE, with an attestation you can present, is planned).</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>03</b> / Redaction before the judge</p><h2 className="section-head__title" id="h-redaction">Hide private details before deeper checks</h2><p className="hiw-caption">The judge sees less than the agent sent.</p></div>
+                <p className="section-head__body">Secrets and personal details are removed before the AI-based checks examine the request.</p>
               </div>
             </div>
             <div className="hiw-redact reveal" data-redact="">
@@ -203,8 +204,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="attestation" aria-labelledby="h-attestation">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>04</b> / The attestation</p><h2 className="section-head__title" id="h-attestation">One attestation, one action, one use.</h2></div>
-                <p className="section-head__body">An attestation starts from one screened decision and ends in one Solana instruction. Everything in between happens on the machine.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>04</b> / The attestation</p><h2 className="section-head__title" id="h-attestation">One proof for one action</h2><p className="hiw-caption">One attestation, one action, one use.</p></div>
+                <p className="section-head__body">The proof is tied to an exact action. It cannot approve a different action or be used twice on Solana.</p>
               </div>
             </div>
             <figure className="hiw-fig" id="fig-lifecycle" data-fig="lifecycle" data-fig-n="3" />
@@ -219,8 +220,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="binding" aria-labelledby="h-binding">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>05</b> / What binds it</p><h2 className="section-head__title" id="h-binding">Hashed into the attestation.</h2></div>
-                <p className="section-head__body">The attestation binds to the action itself: target program, recipient, amount, policy root, and expiry are hashed into it, so it is worthless for any other call.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>05</b> / What binds it</p><h2 className="section-head__title" id="h-binding">The proof cannot be swapped onto another transfer</h2><p className="hiw-caption">Hashed into the attestation.</p></div>
+                <p className="section-head__body">Change the app, sending account, receiving account, token, or amount and the proof no longer matches.</p>
               </div>
             </div>
             <div className="hiw-bind reveal" data-bind="">
@@ -241,8 +242,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="audit-chain" aria-labelledby="h-audit-chain">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>06</b> / The audit chain</p><h2 className="section-head__title" id="h-audit-chain">A log that commits to itself.</h2></div>
-                <p className="section-head__body">Every decision is written to a hash-chained local log with selective disclosure: prove a time window was clean, or that a specific event occurred, without exposing traffic.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>06</b> / The audit chain</p><h2 className="section-head__title" id="h-audit-chain">A record that helps reveal changes</h2><p className="hiw-caption">A log that commits to itself.</p></div>
+                <p className="section-head__body">Each entry links to the previous one. Changing an earlier entry breaks that chain of digital fingerprints.</p>
               </div>
             </div>
             <figure className="hiw-fig" id="fig-chain" data-fig="chain" data-fig-n="4" />
@@ -267,8 +268,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="claim" aria-labelledby="h-claim">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>07</b> / What we claim</p><h2 className="section-head__title" id="h-claim">A deliberately narrow claim.</h2></div>
-                <p className="section-head__body">One claim per call, and a plain line where it stops. The left column is what a verifier never learns; the right is all it gets.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>07</b> / What we claim</p><h2 className="section-head__title" id="h-claim">What Blindseal proves, and what it doesn&apos;t</h2><p className="hiw-caption">A deliberately narrow claim.</p></div>
+                <p className="section-head__body">Proof of passing specific checks is not a promise that an action is completely safe.</p>
               </div>
             </div>
             <div className="hiw-claim reveal cascade">
@@ -293,8 +294,8 @@ export default function HowItWorks() {
           <section className="hiw-sec" id="next" aria-labelledby="h-next">
             <div className="hiw-head reveal">
               <div className="section-head">
-                <div className="section-head__lead"><p className="section-head__eyebrow"><b>08</b> / Next</p><h2 className="section-head__title" id="h-next">Check it yourself.</h2></div>
-                <p className="section-head__body">Paste an attestation into the verifier, or read how to point an agent at the proxy.</p>
+                <div className="section-head__lead"><p className="section-head__eyebrow"><b>08</b> / Next</p><h2 className="section-head__title" id="h-next">Try the proof yourself</h2><p className="hiw-caption">Check it yourself.</p></div>
+                <p className="section-head__body">Load a sample, check that it passes, then try the altered version.</p>
               </div>
             </div>
             <div className="hiw-next reveal cascade">

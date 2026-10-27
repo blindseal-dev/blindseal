@@ -87,7 +87,7 @@ export function VerifyClient() {
       const kv = document.createElement('div'); kv.className = 'kv vf-kv'; kv.hidden = true; main3.appendChild(kv);
       const main4 = $('.check__main', li(3));
       const row = document.createElement('div'); row.className = 'vf-n4'; row.hidden = true;
-      row.innerHTML = '<button type="button" class="btn secondary sm" data-n4>' + ico('radio') + '<span>Check on mainnet</span></button>';
+      row.innerHTML = '<button type="button" class="btn secondary sm" data-n4>' + ico('radio') + '<span>Check whether this proof was used on Solana</span></button>';
       main4.appendChild(row);
       $('[data-n4]', row).addEventListener('click', checkNullifier);
     }
@@ -289,7 +289,7 @@ export function VerifyClient() {
       if (stale(tok)) return;
       running = false; hasResult = true;
       btnVerify.removeAttribute('aria-busy'); syncGate();
-      if (ok) setBanner('pass', 'Valid attestation', 'Schema, proof and public inputs check out. The nullifier check is optional.', '3 of 3');
+      if (ok) setBanner('pass', 'Proof verified', 'The proof is valid. It shows that the pattern checks passed for the request tied to this action. It does not mean the action is guaranteed safe. This browser check does not approve an action on Solana. The receiving app must also check that the proof matches its action, uses approved rules and software, has not expired, and has not already been used.', '3 of 3');
       else setBanner('fail', 'Does not verify', 'Failed at step ' + failedAt + ', ' + failedName + '.' + ((failedAt as number) < 3 ? ' Later steps were skipped.' : ''), 'Step ' + failedAt);
     }
 

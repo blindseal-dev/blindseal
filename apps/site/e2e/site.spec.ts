@@ -38,7 +38,7 @@ test('verify: sample valid, tampered invalid, disclosure accepted, nothing store
   await expect(page.locator('#vf-checks .check')).toHaveCount(4);
   await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
-  await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Valid attestation');
+  await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Proof verified');
   await expect(page.locator('#vf-checks .check').nth(1)).toHaveAttribute('data-state', 'pass');
   // step 3 decoded the single public-input blob into its six fields
   await expect(page.locator('#vf-checks .vf-kv .kv__item')).toHaveCount(7);

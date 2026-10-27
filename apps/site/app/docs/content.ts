@@ -74,7 +74,7 @@ nullifier       = sha256("blindseal.nullifier.v1" || actionHash)`;
 const PAGE_LIST: Omit<DocPage, 'prev' | 'next'>[] = [
   {
     slug: 'quickstart', path: '/docs', group: 'Getting started', title: 'Quickstart',
-    summary: 'Ten minutes on a fresh machine to install from npm, run the proxy in front of an MCP server, see every tool call screened, and verify an attestation without trusting this site. Producing an attestation of your own takes hours on CPU. Node 20+ is the only requirement — the verifier ships as WebAssembly, so no Rust or Solana toolchain is needed to use Blindseal. Building from the repository is a separate page: [From source](/docs/source).',
+    summary: 'Install Blindseal, place it between your agent and its tools, and see requests being checked on your own computer. You can try the local dashboard without connecting a real agent. No Solana development tools are needed for basic use.',
     sections: [
       { id: 'install', heading: 'Install and run', blocks: [
         code(`$ npm i -g blindseal              # or run every command below with npx: npx blindseal …
@@ -160,9 +160,10 @@ program    = 6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx  (Solana mainnet)`, 't
   },
   {
     slug: 'integrate', path: '/docs/integrate', group: 'Gating a program on an attestation', title: 'Gating a program on an attestation', nav: 'Gated programs',
-    summary: 'A gated program executes an action only if a Blindseal attestation for *that exact action* verifies and is consumed in the same transaction.',
+    summary: 'A Solana program can make proof of screening a requirement. It checks that a valid Blindseal proof belongs to the exact action it is about to perform, and rejects the action if the proof is wrong, expired, or already used.',
     sections: [
       { id: 'rule', heading: 'The one rule', blocks: [
+        p('The action details must come from the receiving program’s own intended action, not separate details supplied by the agent. The program must also check that the proof uses approved rules and software, and verify it in the same transaction as the action.'),
         { kind: 'callout', title: 'What makes this sound', body: 'The action fields you forward to the verifier must come from what **your program** is about to execute — your own id, your instruction discriminator, the signer you debit, the recipient, the mint, the amount — never from anything the agent hands you.' },
       ] },
       { id: 'cpi', heading: 'CPI verify_and_consume', blocks: [
@@ -231,6 +232,10 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
     slug: 'scope', path: '/docs/scope', group: 'What is proven — and what is not', title: 'What is proven — and what is not', nav: 'What is proven',
     summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.',
     sections: [
+      { id: 'plain', heading: 'In plain words', blocks: [
+        { kind: 'callout', title: 'What we prove today', body: 'A specific request was checked under a specific set of rules and software version. Its pattern checks passed, and the proof is tied to one exact action.' },
+        { kind: 'callout', title: 'What we do not prove yet', body: 'That all four layers passed inside the proof, that every agent action went through Blindseal, or that an action is risk-free. Blindseal does not cover requests that bypass it or protect against a compromised computer.', muted: true },
+      ] },
       { id: 'proven', heading: 'Proven (zero-knowledge, verifiable by anyone)', blocks: [
         list([
           'The payload with this hash was screened by the detector with this verifying key, under the policy with this root.',
@@ -256,9 +261,9 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
       { id: 'privacy', heading: 'What is public', blocks: [
         p('Six hashes and a slot number. No prompt, no tool arguments, no policy contents or thresholds, no model scores, and nothing that names the agent or the operator. The explorer shows counts and policy roots only.'),
       ] },
-      { id: 'upgradeable', heading: 'The programs are upgradeable', blocks: [
+      { id: 'upgradeable', heading: 'Who can update the programs?', blocks: [
+        p('The verifier and example payment gate can currently be updated by a single project key. Requiring multiple approvals and a waiting period for updates is planned.'),
         p('Both on-chain programs — the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` and the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the repository, and `solana-verify` lets you check that the deployed bytes match the public source.'),
-        p('Planned: the authority moves to a Squads multisig with a timelock, and the program ids stay the same. Until then, treat the single key as the trust root it is.'),
       ] },
     ],
   },
