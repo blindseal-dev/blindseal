@@ -168,12 +168,12 @@ describe('blindseal demo — runDemo offline (no API key, no Ollama)', () => {
     expect(buf.content).toContain('8 scans');
   });
 
-  it('outputs install guidance and blindseal.io', async () => {
+  it('outputs install guidance and blindseal.tech', async () => {
     const { runDemo } = await import('../src/cli/demo.js');
     const buf = makeBuffer();
     await runDemo({ out: buf, pauseMs: 0, noColor: true });
     expect(buf.content).toContain('npx blindseal --');
-    expect(buf.content).toContain('blindseal.io');
+    expect(buf.content).toContain('blindseal.tech');
   });
 
   it('outputs corpus_id for each scan so users can verify provenance', async () => {

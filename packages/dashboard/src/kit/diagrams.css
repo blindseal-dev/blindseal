@@ -23,7 +23,7 @@
      labels 400ms after paths × 80ms ........ protocol.css:211 (row 48); + i × 40ms per label
                                                = ProtocolPage.tsx:133
      fills 600ms ease, Δ200ms ............... about.css:527 burn area (row 53)
-     state changes 200ms in-out ............. DECISIONS interaction thesis (150-200ms in-out)
+     state changes 200ms in-out ............. interaction thesis (150-200ms in-out)
 
    Slow-mo: html[data-motion="slow"]. When the kit's motion engine is present
    (BS.motion or PF.motion with syncMotionAttr) it slows every animation and

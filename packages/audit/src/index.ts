@@ -1,5 +1,5 @@
 /// Blindseal audit: hash-chained local log + encrypted content store + signed selective
-/// disclosure (BLINDSEAL.md §3.6). Entries are content-free; content is encrypted at rest.
+/// disclosure. Entries are content-free; content is encrypted at rest.
 export { AuditChain } from './chain.js';
 export type { AuditEntry, AuditHead, AppendInput, VerifyResult } from './chain.js';
 export { ContentStore } from './content.js';

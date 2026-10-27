@@ -4,6 +4,6 @@ body { margin: 0; }
 #root { min-height: 100%; }
 
 /* Active nav: a static white pill (the kit's sliding pill is JS-driven in shell.js; we use the
-   aria-current state instead — logged as a divergence in DECISIONS). */
+   aria-current state instead, a deliberate divergence). */
 .bs-navitem[aria-current="page"] { background: var(--pill); color: var(--pill-ink); box-shadow: var(--shadow-pill); }
 .bs-navitem[aria-current="page"] svg { color: var(--pill-ink); }

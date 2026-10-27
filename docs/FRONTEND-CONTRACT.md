@@ -1,13 +1,13 @@
 # Frontend data contract (authoritative)
 
-The mockups in `frontend-reference/` were built from `FRONTEND.md` **without** `BLINDSEAL.md`, so
-their client-side mock backend (`frontend-reference/mockups/_shared/fixtures.js`) **guessed** several
+The design mockups (`design/mockups/`) were built before the engine existed, so
+their client-side mock backend (`design/mockups/mockups/_shared/fixtures.js`) **guessed** several
 shapes. This file is the source of truth. Where a mockup shape disagrees with this file, this file
 wins, and the production frontend must follow it.
 
 The production dashboard and site do **not** use `fixtures.js`. They call the proxy's local API
-(`packages/proxy/src/api/mock-server.ts` in mock mode, the real engine later) over the `FRONTEND.md`
-§5 contract, served from `fixtures/*.json`. `fixtures.js` is reference-only and is discarded in the
+(`packages/proxy/src/api/mock-server.ts` in mock mode, the real engine later) over the
+endpoints listed in §6, served from `fixtures/*.json`. `fixtures.js` is reference-only and is discarded in the
 production port.
 
 Verified against: `crates/guest/src/main.rs`, `crates/prover/src/main.rs`,
@@ -96,8 +96,7 @@ leaves.
 
 ## 4. Action binding — `actionHash` and `nullifier`
 
-Action fields (`ActionFields`, `crates/detector-core`), **including `sourceAuthority`** (spec
-amendment §1):
+Action fields (`ActionFields`, `crates/detector-core`), **including `sourceAuthority`**:
 
 `chainId: u16` (1 = solana mainnet; 2 reserved — there is no devnet target), `targetProgram: [u8;32]`,
 `sourceAuthority: [u8;32]`, `instruction: [u8;8]` (anchor discriminator or `sha256(name)[..8]`),
@@ -135,7 +134,7 @@ the attestation — only hashes. Keep that panel.
 ## 6. Where the dashboard gets each thing (mock mode)
 
 `GET /decisions`, `/decisions/:id`, `/policy`, `/attestations`, `/attestations/:id`, `/audit`, the
-`/events` WebSocket, etc. — the `FRONTEND.md` §5 contract, served by `mock-server.ts` from
+`/events` WebSocket, etc. — the local API contract, served by `mock-server.ts` from
 `fixtures/*.json`. Build the dashboard against this; it is the shape the real engine will also serve.
 
 ### Added in M2 — on-chain reads (server-side, same-origin for the UI)

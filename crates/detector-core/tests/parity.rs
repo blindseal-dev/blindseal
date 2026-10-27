@@ -1,6 +1,6 @@
 //! L0/L1 parity gate: detector-core must agree with the TS reference on every vector in
 //! evals/vectors/parity.json (raw verdict + pattern SET, for both L1 and L0). Regenerate the
-//! vectors with evals/parity/dump-vectors.ts. See BLINDSEAL.md §3.4 / DECISIONS.md M1.
+//! vectors with evals/parity/dump-vectors.ts.
 use blindseal_detector_core::{run_layer0, run_layer1, Severity};
 use serde::Deserialize;
 use std::collections::BTreeSet;

@@ -92,7 +92,7 @@ export async function runSubmitCli(argv: string[]): Promise<number> {
     process.stdout.write(`gated transfer: ${sig}\nnullifier ${att.nullifier} consumed on mainnet by transfer-gate (${att.action.amount} lamports → ${att.action.recipient})\n`);
     return 0;
   } catch (e) {
-    if (e instanceof WrongClusterError) { process.stderr.write(`blindseal submit: ${e.message}\n`); return 3; }
+    if (e instanceof WrongClusterError) { process.stderr.write(`blindseal submit: ${(e as Error).message}\n`); return 3; }
     const msg = e instanceof Error ? e.message : String(e);
     const logs = (e as any)?.logs as string[] | undefined;
     process.stderr.write(`blindseal submit: ${msg}\n${logs ? logs.join('\n') + '\n' : ''}`);

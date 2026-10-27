@@ -3,8 +3,7 @@ import type { Metadata } from 'next';
 import { pageMeta, ONE_LINER } from './meta';
 import { CopyButton } from './copy';
 
-// Copy: docs/internal/copy/02-final-copy.md (verbatim; owner's edits: "digital certificate" → "proof", the hero
-// disclaimer as small secondary text). Layout reuses the S01 kit classes; additions live in app/home.css.
+// Plain-language copy; the hero disclaimer is small secondary text. Layout reuses the S01 kit classes; additions live in app/home.css.
 const INSTALL = 'npx blindseal init';
 
 const FAQ: [string, React.ReactNode][] = [

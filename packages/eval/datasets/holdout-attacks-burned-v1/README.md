@@ -1,4 +1,4 @@
-RETIRED 2026-05-20. This data was used to motivate contaminated detection work and is no longer valid for measurement. See POSTMORTEM-2026-05-20-contamination.md. Do not read these files during detection-modification sessions.
+RETIRED 2026-05-20. This data was used to motivate contaminated detection work and is no longer valid for measurement. See "What happened" below. Do not read these files during detection-modification sessions.
 
 ## What happened
 
@@ -16,4 +16,3 @@ Exception: one-time use during clean-baseline verification to confirm the revert
 
 - Contaminated HEAD tagged: archive/contaminated-90pct-2026-05-20
 - Clean baseline branch: clean-baseline (from 6c422e8)
-- Postmortem: POSTMORTEM-2026-05-20-contamination.md (to be written on Day 3)

@@ -1,9 +1,9 @@
-# crates/ — Blindseal Rust (M0 stub)
+# crates/ — Blindseal Rust
 
-Layout fixed in M0 per BLINDSEAL.md §4; **not yet compiled** (Rust/SP1 toolchains absent
-in the M0 env — see DECISIONS.md).
-
-- `detector-core` — L0 + L1 port (M1), shared by guest and parity tests.
-- `guest` — SP1 guest; separate build unit for the SP1 riscv target (M0.5 spike → M1).
-- `prover` — SP1 host → `attestation.json`; local CPU only, never the network prover (M1).
-- `verifier-wasm` — off-chain Groth16 verifier compiled to WASM (M1).
+- `detector-core` — L0 + L1 port of the proxy's deterministic layers, shared by the guest and the parity
+  tests (`cargo test` at the repo root; vectors in `evals/vectors/`).
+- `guest` — the SP1 guest; separate build unit for the SP1 riscv target (succinct toolchain, Rust 1.85).
+  The prebuilt ELF is committed under `guest/elf/`.
+- `prover` — SP1 host → `attestation.json`; local CPU proving only, never the network prover.
+- `verifier-wasm` — the off-chain Groth16 verifier, built natively for its tests and to WebAssembly
+  for `packages/verifier-wasm`.

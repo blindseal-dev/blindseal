@@ -1,6 +1,6 @@
 # Blindseal example gated program (M2): a native-SOL transfer that requires an attestation.
 # CPIs blindseal-verify in the same transaction with the action fields IT executes. Ships as an
-# example, not a published crate (BLINDSEAL.md §8 Q5 default).
+# example, not a published crate.
 [package]
 name = "transfer-gate"
 version = "0.0.0"

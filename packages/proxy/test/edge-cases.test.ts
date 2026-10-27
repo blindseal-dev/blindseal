@@ -494,10 +494,10 @@ describe('edge cases — no ANTHROPIC_API_KEY', () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────────
-// Scenario 7: BLINDSEAL_ATTEST=1 + bogus BLINDSEAL_BASE_RPC_URL — scans must not block
+// Scenario 7: unreachable Solana RPC (BLINDSEAL_RPC_URL) — the scan verdict must not wait on the chain
 // ────────────────────────────────────────────────────────────────────────────────
-describe('edge cases — attestation enabled but RPC unreachable', () => {
-  it('does not block a malicious-payload scan when attestation cannot connect', async () => {
+describe('edge cases — Solana RPC unreachable', () => {
+  it('delivers a block verdict promptly when the configured RPC cannot connect', async () => {
     const fixturePath = writeFixture(tmpDirs, 'mal2.mjs', `
       import { createInterface } from 'node:readline';
       const rl = createInterface({ input: process.stdin });
@@ -522,9 +522,7 @@ describe('edge cases — attestation enabled but RPC unreachable', () => {
     const proxy = spawnProxy({
       fixturePath,
       extraEnv: {
-        BLINDSEAL_ATTEST: '1',
-        BLINDSEAL_BASE_RPC_URL: 'http://127.0.0.1:1/sepolia',  // unreachable port; "sepolia" picks default schema UIDs
-        BLINDSEAL_ATTESTER_PRIVATE_KEY: '0x' + '1'.repeat(64),
+        BLINDSEAL_RPC_URL: 'http://127.0.0.1:1',  // unreachable port
       },
     });
     proxy.send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
@@ -539,7 +537,7 @@ describe('edge cases — attestation enabled but RPC unreachable', () => {
     expect(r.result.content[0].text).toMatch(/\[BLINDSEAL_BLOCKED\]/);
     // The scan verdict was delivered without waiting on the chain submission.
     // We allow a generous 3s cap (cold L1+L2 path on the embedder) — the point is
-    // that attestation timeout (~10–30s on a closed port) did NOT serialize.
+    // that no chain round-trip (~10–30s on a closed port) is on the scan path.
     expect(elapsed).toBeLessThan(3000);
 
     proxy.close();

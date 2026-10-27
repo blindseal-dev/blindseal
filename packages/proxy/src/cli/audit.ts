@@ -1,6 +1,6 @@
 /// `blindseal audit verify` — recompute the hash chain from genesis.
 /// `blindseal audit disclose --from <i> --to <j> [--out <file>]` — signed, content-free disclosure
-/// of a window (BLINDSEAL.md §3.6). Both work offline on ~/.blindseal (or --dir).
+/// of a window. Both work offline on ~/.blindseal (or --dir).
 import { writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

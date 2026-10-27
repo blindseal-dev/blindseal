@@ -1,6 +1,6 @@
-/// Solana chain adapter (BLINDSEAL.md §3.2 "action = parseAction(payload)"). Recognizes a
+/// Solana chain adapter ("action = parseAction(payload)"). Recognizes a
 /// tool call as an on-chain Solana action and extracts the fields the attestation binds via
-/// actionHash (§3.3): target program, instruction, recipient, mint, amount, source authority.
+/// actionHash (see /docs/hashing): target program, instruction, recipient, mint, amount, source authority.
 /// Returns null when the call is not a recognizable on-chain action. Key-based extraction,
 /// like the trade-guard, so it works across MCP servers with different arg names.
 export type SolanaChain = 'mainnet';

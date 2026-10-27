@@ -102,7 +102,7 @@ export function decodePublicInputs(a: AttestationDoc): Decoded {
   return dec;
 }
 
-/* ── disclosures (BLINDSEAL.md §3.6): signature, chain, clean window ───── */
+/* ── disclosures: signature, chain, clean window ───── */
 export interface DisclosureResult { sigOk: boolean; chainOk: boolean | null; clean: boolean; reason: string | null; }
 
 export async function verifyDisclosureSteps(d: Disclosure): Promise<DisclosureResult> {

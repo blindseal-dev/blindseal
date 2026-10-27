@@ -1,7 +1,7 @@
 /* ============================================================================
    _shared/tokens.css — Blindseal mockups · the ONE token layer (J00)
    ----------------------------------------------------------------------------
-   Dark only (DECISIONS D01), on :root. Three layers, in order:
+   Dark only, on :root. Three layers, in order:
      1. the Blindseal palette, VERBATIM from the Blindseal kit/tokens.css
         (medals and avatar colours dropped: no leaderboard, no avatars).
      2. the kit names (--canvas, --panel, --line, --ink, --muted, --accent,
@@ -15,7 +15,7 @@
    glass optics in glass.css (white / black alphas and the glass fills) and the
    star alphas in space.css. Pages read these tokens; they never write a hex.
 
-   The grammar (visual thesis, DECISIONS §1): a notary's desk in deep space.
+   The grammar (visual thesis): a notary's desk in deep space.
    Flat ink panels on a near-black canvas, one cobalt accent, hairlines do the
    separating. PASS looks boring (muted on a hairline). BLOCK is the accent.
    FLAG is amber. Green is never a verdict; red appears only on a rejected or

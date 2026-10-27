@@ -3,9 +3,11 @@
 This document is an honest, public list of things Blindseal does NOT reliably catch
 today. It ships with the product. We will keep it current.
 
-Blindseal is a layered defense. None of the three layers — L1 regex heuristics, L2
-embedding similarity against a known-attack corpus, L3 LLM judge — is sufficient
-alone. The limitations below describe what gets through all the layers we run.
+Blindseal is a layered defense. None of the four detection layers — L0 decode-then-L1,
+L1 deterministic rules, L2 embedding similarity against a known-attack corpus, L3 LLM
+judge — is sufficient alone. The limitations below describe what gets through the
+layers we run. Only L1 is inside the zero-knowledge proof today; see
+[`SECURITY_MODEL.md`](./SECURITY_MODEL.md) for what is proven and what is not.
 
 Numbers cited below come from:
 
@@ -105,8 +107,7 @@ this reason. The same content served as a `text/plain` body would be caught.
 (it's the agent-visible surface). The defense for this class is either (a) an
 MCP-server-side scan before normalization, or (b) configuring fetch-class
 servers to return raw HTML rather than rendered Markdown when the operator
-wants Blindseal to see all hidden content. We will document this in
-`SECURITY_MODEL.md`.
+wants Blindseal to see all hidden content. See `SECURITY_MODEL.md`.
 
 ### 13. No request-level timeout; upstream hang or crash propagates as-is
 The stdio proxy is intentionally transparent: every line on the child's stdout is
@@ -171,7 +172,7 @@ fix. Operators who proxy git-style tools against repos that discuss prompt
 injection should configure `BLINDSEAL_MODE=log` for those servers (verdicts
 emitted to stderr but content not blocked) until L3 is enabled.
 
-**Status:** Open and considered acceptable for the launch threat model.
+**Status:** Open and considered acceptable for the current threat model.
 
 ## Limitations we accept (every security system has these)
 

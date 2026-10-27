@@ -14,7 +14,8 @@ before details, with credit if you want it.
 ## Scope
 
 In scope:
-- The on-chain programs: proof verification, the §3.7 check order, nullifier (replay) protection, the
+- The on-chain programs: proof verification, the check order documented in
+  `programs/blindseal-verify/src/lib.rs`, nullifier (replay) protection, the
   policy-root and vkey allowlists, upgrade/pause authority handling.
 - The SP1 guest and prover (`crates/`): anything that lets an attestation be produced for a call the
   committed policy would not pass, or that leaks the payload through the public inputs.
@@ -34,6 +35,8 @@ The most recent release on npm and the programs currently deployed at the ids ab
 
 ## Known limitations
 
-The zero-knowledge proof covers the deterministic layers (L0 and L1) only. That is the claim: a specific
-call was screened under a committed policy by a specific detector version and the deterministic layers
-passed. It is not a proof that an agent is safe.
+Blindseal proves that a specific call was screened under a committed policy by a specific detector version,
+and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the
+model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove
+an agent is safe, and does not cover traffic that doesn't pass through the proxy. Details:
+`packages/SECURITY_MODEL.md` and `packages/LIMITATIONS.md`.

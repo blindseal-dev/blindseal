@@ -1,6 +1,6 @@
 # Blindseal on-chain verifier (M2) — Anchor program, built with `anchor build`.
 # Groth16 verify via sp1-solana (SP1 v5 VK) + nullifier set + vkey/policy allowlists
-# (BLINDSEAL.md §3.7). Versions pinned in DECISIONS.md: anchor 0.31.1, sp1-solana 0.1.0.
+# (check order in src/lib.rs). Pinned: anchor 0.31.1, sp1-solana 0.1.0.
 [package]
 name = "blindseal-verify"
 version = "0.0.0"

@@ -1,5 +1,5 @@
 /* ============================================================================
-   _shared/space.css — the nebula (DECISIONS D04), filled by BS.mountSpace()
+   _shared/space.css — the nebula, filled by BS.mountSpace()
    ----------------------------------------------------------------------------
    A gradient field, never neon. Layers, back to front, inside .space (absolute,
    inset 0, overflow hidden, pointer-events none, behind the host's content):

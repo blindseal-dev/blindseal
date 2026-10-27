@@ -1,10 +1,10 @@
 /* ============================================================================
    _shared/sheet.js — the sheet (the kit port; ui.sheet)
    Blindseal J00: the sheet.js, VERBATIM. Used for the
-   attestation detail (DECISIONS D10).
+   attestation detail.
    ----------------------------------------------------------------------------
    Frame: panel 70vw (max 70rem) from the right, opaque page colour, sticky
-   56px GLASS header (.glass-head, DECISIONS Q6 "sheet headers"), body
+   56px GLASS header (.glass-head), body
    20/24/64, optional two columns (1.55fr / 1fr, gap 24). Used for the trade
    detail sheet in the Blindseal kit; in Blindseal the attestation detail (D05).
    Motion (verbatim numbers):

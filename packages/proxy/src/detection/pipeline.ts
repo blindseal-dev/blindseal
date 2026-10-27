@@ -46,7 +46,7 @@ export async function runPipeline(text: string, context?: JudgeContext): Promise
     return { ...l1, layer: 1, l3Status: 'skipped_gate' };
   }
 
-  // Redactor (BLINDSEAL.md §3.2): strip secrets/PII before the model layers see the text, so
+  // Redactor: strip secrets/PII before the model layers see the text, so
   // L2 (embeddings) and L3 (the LLM judge, possibly in a TEE or remote) never observe raw
   // credentials. L0/L1 above run on the raw text; L2/L3 below run on the redacted text.
   const redactedText = redact(text).redacted;

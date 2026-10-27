@@ -1,4 +1,4 @@
-// React wrappers over the kit JS primitives (internals untouched — see DECISIONS). Components emit
+// React wrappers over the kit JS primitives (internals untouched). Components emit
 // the kit's class names so the verbatim kit CSS styles them; behaviour calls window.BS.*.
 import { useEffect, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';

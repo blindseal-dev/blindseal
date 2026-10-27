@@ -374,7 +374,7 @@
     b.text(961, 428, "Solana verifier", "dg-title" + on("verifier"), 14, "middle", { k: "vft" });
     b.text(961, 452, "one instruction", "dg-sub", 14, "middle", { k: "vfs" });
 
-    /* what the verifier sees: the public inputs (FRONTEND §1.3 step 3) */
+    /* what the verifier sees: the public inputs */
     var PUB = ["action hash", "policy root", "detector version", "expiry slot", "nullifier"];
     b.draw("M872 252V372", "dg-conn", 15, { k: "pubr", fast: true });
     b.text(884, 236, "public inputs", "dg-label", 15, "start", { k: "publ" });
@@ -551,7 +551,7 @@
 
   var FIGS = { flow4: flow4, architecture: architecture, lifecycle: lifecycle, chain: chain, layers: layers };
 
-  /* ══ phone-width variants (DECISIONS 2026-10-27) ═════════════════════════
+  /* ══ phone-width variants ═════════════════════════
      The five figures are 560–1066 units wide; scaled into a phone column their
      11-unit labels render at 4–7 px. Below 720 px render() builds these
      vertical variants instead: 300 units wide (the svg carries .dg-v, capped at

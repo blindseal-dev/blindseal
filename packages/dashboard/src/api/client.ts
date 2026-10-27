@@ -1,5 +1,5 @@
 // API client for the proxy local API. The bearer token arrives in the URL fragment on first load
-// (`#token=…`, FRONTEND.md "Auth") and is kept in memory only — never localStorage/sessionStorage
+// (`#token=…`) and is kept in memory only — never localStorage/sessionStorage
 // (privacy rule: the dashboard stores nothing sensitive). All requests are same-origin to the
 // proxy (dev: Vite proxies /api and /events to 127.0.0.1); nothing leaves the host.
 

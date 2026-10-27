@@ -381,6 +381,6 @@ export async function runDemo(opts?: DemoOptions): Promise<void> {
   write(
     `\n  ${col.bold('Wrap your MCP server:')}\n` +
       `  ${col.cyan('npx blindseal -- <your server command>')}\n` +
-      `\n  ${col.dim('blindseal.io')}\n\n`,
+      `\n  ${col.dim('blindseal.tech')}\n\n`,
   );
 }

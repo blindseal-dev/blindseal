@@ -41,12 +41,11 @@ overnight-sprint.txt
 packages/eval/results/eval-*.json
 packages/eval/results/eval-*.md
 
-# local-only identity sweep list (BLINDSEAL.md §7)
+# local-only identity sweep list (scripts/identity-sweep.sh)
 .identity-sweep
 
 # Rust / Anchor / SP1 spike build artifacts
 target/
-docs/internal/m05-spike/target/
 **/m05-metrics.json
 .anchor/
 test-ledger/
@@ -71,5 +70,10 @@ keys/
 target*/
 crates/*/target*/
 
-# internal copy briefs (competitive positioning; never published)
-docs/internal/copy/
+# internal docs live in a private repository; keep local copies out of this one
+docs/internal/
+/BLINDSEAL.md
+/DECISIONS.md
+/FRONTEND.md
+/POSTMORTEM-*.md
+packages/collector/

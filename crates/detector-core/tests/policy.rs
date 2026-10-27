@@ -1,4 +1,4 @@
-//! Policy commitment (BLINDSEAL.md §3.3): deterministic Merkle root over the committed L1
+//! Policy commitment (canonical hashing spec): deterministic Merkle root over the committed L1
 //! rules + the zero-width threshold. The guest recomputes this and commits it as a public
 //! value; the on-chain program allowlists roots. The root is written to
 //! evals/vectors/policy-root.txt as the cross-language test vector (TS/on-chain assert it).

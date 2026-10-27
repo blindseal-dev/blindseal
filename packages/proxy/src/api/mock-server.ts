@@ -1,5 +1,5 @@
-/// Blindseal local API — MOCK mode (M0). Serves fixtures/ over the FRONTEND.md §5
-/// contract with a fake WS event stream, so the dashboard/site can be built day one.
+/// Blindseal local API — MOCK mode (M0). Serves fixtures/ over the local API contract
+/// (docs/FRONTEND-CONTRACT.md) with a fake WS event stream, so the dashboard/site can be built day one.
 /// No prover, policy engine, or audit chain is involved: this reads static JSON.
 /// The real API (backed by the M1 engine) replaces the handlers, not the contract.
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
@@ -150,7 +150,7 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
   const fx = loadFixtures(opts.fixturesDir);
   const startedAt = Date.now();
 
-  // Mock state switch (FRONTEND.md / the mockups' ?state=): BLINDSEAL_MOCK_STATE=<state> is the
+  // Mock state switch (the mockups' ?state=): BLINDSEAL_MOCK_STATE=<state> is the
   // default, overridable per request with ?state=<state> so the dashboard can flip states without a
   // restart. Server-meaningful states are handled here; no-action/not-found/loading are data/UI-side.
   const envState = process.env.BLINDSEAL_MOCK_STATE ?? '';

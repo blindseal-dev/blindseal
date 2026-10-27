@@ -1,6 +1,4 @@
-# Blindseal Rust workspace — M0 stub. Real guest/prover/programs land in M0.5 and M1/M2.
-# NOT YET COMPILED: the Rust/Solana/Anchor/SP1 toolchains are not installed in the M0
-# environment (see DECISIONS.md). This file fixes the layout per BLINDSEAL.md §4.
+# Blindseal host Rust workspace: the detector core (L0 + L1) and its parity tests.
 [workspace]
 resolver = "2"
 members = [

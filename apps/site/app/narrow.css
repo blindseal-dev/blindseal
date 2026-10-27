@@ -1,4 +1,4 @@
-/* Phone-width addition to the verbatim kit (DECISIONS 2026-10-23, 2026-10-27): the mockups' site.css carries no
+/* Phone-width addition to the verbatim kit: the mockups' site.css carries no
    width queries. Below 720 px the chrome is a phone header — ONE solid 56 px row across the full width (logo
    left; GitHub and the menu button right; no frame, no notch wings, no tab row), the page full-bleed with
    16 px gutters, and the routes in a full-screen sheet opened by the menu button (markup server-rendered in

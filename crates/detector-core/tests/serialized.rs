@@ -1,4 +1,4 @@
-//! The guest runs pre-serialized DFAs (§3.4); this proves that path is identical to the
+//! The guest runs pre-serialized DFAs; this proves that path is identical to the
 //! build-time path on every parity vector, so the proof covers the same L1 verdict the proxy
 //! acts on. Serialize once, then compare run_layer1 vs run_layer1_serialized.
 use blindseal_detector_core::{run_layer1, run_layer1_serialized, serialize_l1};

@@ -15,7 +15,6 @@ design
 frontend-reference
 packages/eval
 packages/corpus
-packages/collector
 packages/proxy
 packages/redactor
 packages/audit

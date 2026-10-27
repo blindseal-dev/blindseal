@@ -126,7 +126,7 @@
     if (want !== "crt") return false;
     /* phone width (< 720 px): the nebula, not the CRT — the WebGL field is capped at 1.5× DPR and reads
        blocky on a 3× phone, and a full-screen multi-pass shader is the wrong battery trade there; the
-       nebula is CSS gradients + SVG, crisp at any DPR (DECISIONS 2026-10-27) */
+       nebula is CSS gradients + SVG, crisp at any DPR */
     if (narrow()) { host.dataset.bg = "nebula"; return false; }
     var api = BS.mountCRT ? BS.mountCRT(host, hero.crt || {}) : null;
     if (!api) { host.dataset.bg = "nebula"; return false; }
@@ -153,10 +153,10 @@
     [].forEach.call(document.querySelectorAll(".hero"), function (h) { h.classList.add("is-rising"); });
   }
 
-  /* notch is the only nav mode on the site (DECISIONS: nav stays notch); the glass variant lived in setNav */
+  /* notch is the only nav mode on the site; the glass variant lived in setNav */
   function setNav() { if (console && console.warn) console.warn("BS.site.setNav: the site renders the notch chrome server-side; nav mode is fixed"); }
 
-  /* ADOPT-ONLY (DECISIONS 2026-10-23): the chrome — skip-link, frame, notch, footer — is rendered by React
+  /* ADOPT-ONLY: the chrome — skip-link, frame, notch, footer — is rendered by React
      on the server from kit/site-templates.cjs (the same strings this file used to build). mountSite finds
      those nodes and wires them; it creates nothing and writes nothing on html, head or body children. */
   function mountSite(o) {

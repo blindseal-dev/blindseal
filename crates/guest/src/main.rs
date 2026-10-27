@@ -1,5 +1,5 @@
 //! Blindseal SP1 guest (M1). Recomputes payloadHash and policyRoot, runs detector-core's L1 on
-//! pre-serialized DFAs (no regex compilation in-zkVM, §3.4), asserts the deterministic layer
+//! pre-serialized DFAs (no regex compilation in-zkVM), asserts the deterministic layer
 //! PASSES (a proof exists only if clean), binds the on-chain action via actionHash + nullifier,
 //! and commits the public values. detectorVersion is a public INPUT (the guest cannot know its
 //! own vkey); the Solana program checks it equals the vkey it verified with.

@@ -1,4 +1,4 @@
-/// Selective disclosure (BLINDSEAL.md §3.6). A disclosure bundle is a window of audit
+/// Selective disclosure. A disclosure bundle is a window of audit
 /// entries [from..to] plus the current head, signed with the proxy's ed25519 identity key
 /// (~/.blindseal/identity.key). A verifier recomputes the entry-hash chain within the window
 /// and checks the signature — no raw traffic is revealed. A "clean window" is a disclosure

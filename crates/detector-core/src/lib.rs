@@ -1,10 +1,10 @@
 //! Blindseal L0 + L1 detector core — a Rust port of the proxy's TS `layer1-heuristics.ts`
 //! (regex heuristics) and `layer0-decoder.ts` (decode-then-L1), behaviour-identical and
 //! gated by the parity harness in `evals/`. Built on regex-automata DFAs (the engine the
-//! SP1 guest runs, §3.4). The raw L0/L1 verdict here is what the proof commits to — NOT the
-//! combined pipeline verdict (L2 can overrule L1; see DECISIONS.md).
+//! SP1 guest runs). The raw L0/L1 verdict here is what the proof commits to — NOT the
+//! combined pipeline verdict (L2 can overrule L1).
 //!
-//! JS/Rust regex dialect gaps handled (see DECISIONS.md M1):
+//! JS/Rust regex dialect gaps handled:
 //!  - `<WS>` placeholder = JS `\s` without the `u` flag (includes U+FEFF, excludes U+0085).
 //!  - `<B>` placeholder = `(?-u:\b)`, ASCII word boundary (JS `\b` without `u`).
 //!  - case-insensitive rules use inline `(?i-u:…)` → ASCII folding (never ſ/K).
@@ -379,7 +379,7 @@ pub fn run_layer0(content: &str) -> Option<L0Fire> {
     None
 }
 
-// ---------------- policy commitment (BLINDSEAL.md §3.3) ----------------
+// ---------------- policy commitment (canonical hashing spec) ----------------
 // policyRoot = merkle_sha256(leaves), leaf_i = sha256("blindseal.rule.v1" || rule_id || layer
 // || kind || compiled_bytes). compiled_bytes = serialized dense-DFA bytes for a regex rule,
 // a fixed descriptor for the zero-width threshold. Tree sorted by rule_id; empty tree =
@@ -410,7 +410,7 @@ fn leaf_hash(rule_id: &str, layer: &str, kind: &str, compiled: &[u8]) -> [u8; 32
     h.finalize().into()
 }
 
-/// Policy leaves (rule_id, hash), sorted by rule_id as §3.3 requires.
+/// Policy leaves (rule_id, hash), sorted by rule_id as the hashing spec requires.
 fn policy_leaves() -> Vec<(String, [u8; 32])> {
     let mut leaves: Vec<(String, [u8; 32])> = RULES
         .iter()
@@ -463,7 +463,7 @@ pub fn policy_leaf_count() -> usize {
     policy_leaves().len()
 }
 
-// ---------------- serialized / guest-side L1 execution (BLINDSEAL.md §3.4) ----------------
+// ---------------- serialized / guest-side L1 execution ----------------
 // The guest must NOT compile regexes (expensive, unbounded cycles). Instead the policy carries
 // pre-serialized forward dense-DFA bytes (same bytes policy_root commits to), and the guest
 // deserializes + runs them. `SerializedL1` is that policy; `run_layer1_serialized` runs it and
@@ -521,7 +521,7 @@ pub fn run_layer1_serialized(text: &str, pol: &SerializedL1) -> RawResult {
     combine_l1(text, &matched)
 }
 
-// ---------------- action binding: actionHash + nullifier (BLINDSEAL.md §3.3) ----------------
+// ---------------- action binding: actionHash + nullifier (canonical hashing spec) ----------------
 // actionHash commits the on-chain action the agent is about to take, bound to the screening.
 // The guest computes it; the Solana consumer program recomputes it from the instruction IT is
 // executing and compares. Layout is fixed and little-endian for scalars. sourceAuthority was
@@ -576,7 +576,7 @@ pub fn action_hash(a: &ActionFields, c: &Commitments) -> [u8; 32] {
 }
 
 /// nullifier = sha256(domain || actionHash). A pure function of the action hash so a consumer
-/// can't be tricked into accepting a nullifier for a different action (§3.3).
+/// can't be tricked into accepting a nullifier for a different action.
 pub fn nullifier(action_hash: &[u8; 32]) -> [u8; 32] {
     let mut h = Sha256::new();
     h.update(NULLIFIER_DOMAIN.as_bytes());

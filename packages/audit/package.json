@@ -1,7 +1,7 @@
 {
   "name": "@blindseal/audit",
   "version": "0.0.1",
-  "description": "Hash-chained local audit log with encrypted content store and signed selective disclosure (BLINDSEAL.md §3.6).",
+  "description": "Hash-chained local audit log with encrypted content store and signed selective disclosure.",
   "private": true,
   "type": "module",
   "main": "src/index.ts",

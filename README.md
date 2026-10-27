@@ -1,12 +1,17 @@
 # Blindseal
 
-**Prove an agent's action was screened — without showing what it was.**
+**AI agents can be tricked. Blindseal helps stop them.**
 
-Blindseal is a privacy-preserving, verifiable screening layer for AI agents. It sits between an agent and its
-tools as a local MCP proxy, inspects every tool call with four layers of prompt-injection detection before the
-call executes, and — when something downstream needs proof — produces a zero-knowledge attestation that a
-specific call passed a committed policy. The attestation is verified by one Solana instruction. Nothing sensitive
-leaves the machine: not the prompt, not the tool arguments, not the policy, not which agent was screened.
+Blindseal checks your agent's requests for hidden threats, right on your computer. For supported actions, it can
+issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security
+rules stay private.
+
+It runs on your computer between the AI agent and its tools, as a local MCP proxy, and checks every request sent
+through it before passing it on; requests that fail the checks can be blocked. For supported actions that pass, your
+computer can create a zero-knowledge proof that the pattern checks passed, tied to the exact action and the rule set
+used. A Solana program verifies the proof and records it, so it can be used only once.
+
+Today's proof covers checks for known attack patterns. It does not guarantee that an action is safe.
 
 - Site and docs: **https://blindseal.tech** (quickstart, concepts, hashing spec, gated-program guide, scope, verify page)
 - Verifier program (Solana mainnet): `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`
@@ -27,7 +32,7 @@ are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is
 ## Quickstart
 
 Node ≥ 20; no Rust or Solana toolchain needed (the verifier ships as WebAssembly). Three unscoped packages on npm:
-`blindseal` (proxy + CLI), `blindseal-sdk`, `blindseal-verifier-wasm`.
+`blindseal` (proxy + CLI) and `blindseal-sdk` at 0.6.0, `blindseal-verifier-wasm` at 0.5.2.
 
 ```sh
 npm i -g blindseal                 # or prefix every command with npx: npx blindseal …
@@ -89,9 +94,9 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 
 - **Policy** is a Merkle root over the committed rule automata; the rules never leave the operator's machine.
 - **Attestation** = proof + six public inputs: `payloadHash`, `policyRoot`, `detectorVersion` (the vkey),
-  `actionHash`, `nullifier`, `expirySlot`. Spec: `BLINDSEAL.md` §3; hashing: `docs/hashing`.
+  `actionHash`, `nullifier`, `expirySlot`. Hashing spec: https://blindseal.tech/docs/hashing.
 - **On chain**: the verifier checks the proof, the allowlists and the expiry, and records the nullifier so the
-  attestation cannot be replayed. Any program can gate an action on it via CPI (see `programs/transfer-gate`).
+  attestation cannot be replayed (the exact check order is in the header of `programs/blindseal-verify/src/lib.rs`). Any program can gate an action on it via CPI (see `programs/transfer-gate`).
 - **Audit**: every decision is appended to a hash chain; a disclosure proves a window was clean without exposing
   traffic.
 
@@ -107,18 +112,17 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 | `crates/` | detector core (Rust, DFA rules), SP1 guest, prover, verifier |
 | `programs/` | Anchor programs: `blindseal-verify`, `transfer-gate` |
 | `apps/site` | the public site (Next.js) |
-| `docs/` | hashing spec, integration guide, performance numbers, launch checklist |
+| `docs/` | performance numbers, the local API data contract |
 
 Build the programs with `scripts/build-programs.sh`; run the on-chain suite with `scripts/test-m2.sh`.
-Deployed bytes reproduce with `solana-verify` from this repository at the tagged commit (see "From source" above and `docs/LAUNCH-CHECKLIST.md`).
+Deployed bytes reproduce with `solana-verify` from this repository at the tagged commit (see "From source" above).
 
 ## Upgradeability
 
 Both programs keep an upgrade authority, held today by a single key. Every upgrade is logged with its
-signature in `docs/internal/REPORT.md`; moving the authority to a Squads multisig with a timelock is on the roadmap.
+signature in the release notes (https://blindseal.tech/changelog); moving the authority to a Squads multisig with a timelock is on the roadmap.
 Treat the authority as the trust root it is.
 
-## Lineage and license
+## License
 
-MIT. The detection layers and the red-team corpus derive from the MIT-licensed Blindseal proxy; the redaction
-step, the zero-knowledge attestation, the Solana verifier and the audit chain are Blindseal's.
+MIT — see `LICENSE`.

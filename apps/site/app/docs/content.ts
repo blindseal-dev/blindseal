@@ -50,8 +50,9 @@ export const API_ENDPOINTS: Endpoint[] = [
   { method: 'WS', path: '/events', comment: 'Live stream: decision, status, policy, attestation frames.' },
 ];
 
-// BLINDSEAL.md §3.3, verbatim. Edit the spec, then this file — never the other way round.
-const HASHING_SPEC = `payloadHash     = sha256(payload_bytes)            -- payload_bytes = canonical_json({tool, args}); no domain prefix in v1 (the shipped guest; see DECISIONS 2026-10-23)
+// The canonical hashing spec. detector-core, blindseal-verify and the SDK reproduce it byte for byte;
+// change all of them together with this text.
+const HASHING_SPEC = `payloadHash     = sha256(payload_bytes)            -- payload_bytes = canonical_json({tool, args}); no domain prefix in v1 (the shipped guest)
 policyRoot      = merkle_sha256(leaves), leaf_i = sha256("blindseal.rule.v1" || rule_id || layer || kind || compiled_bytes)
                   (compiled_bytes = DFA bytes for regex rules, raw value otherwise; tree sorted by rule_id; empty tree = sha256("blindseal.policy.empty.v1"))
 detectorVersion = sp1 vkey hash of the guest program (bytes32)
@@ -145,7 +146,7 @@ $ blindseal submit attestation.json --check   # has this nullifier been consumed
     summary: 'All hashes are SHA-256 (a Solana syscall and an SP1 precompile), domain-separated.',
     sections: [
       { id: 'spec', heading: 'The spec', blocks: [
-        p('This is BLINDSEAL.md §3.3 verbatim; three implementations reproduce it byte for byte and are tested against each other: the Rust detector core (host and in-zkVM), the on-chain program, and the TypeScript SDK.'),
+        p('This is the canonical spec; three implementations reproduce it byte for byte and are tested against each other: the Rust detector core (host and in-zkVM), the on-chain program, and the TypeScript SDK.'),
         code(HASHING_SPEC, 'text'),
         p('Nonce exists so two legitimately identical actions get distinct attestations. Nullifier is a pure function of the action hash so the consumer can’t be tricked into accepting a nullifier for a different action.'),
       ] },
@@ -265,7 +266,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
       ] },
       { id: 'upgradeable', heading: 'Who can update the programs?', blocks: [
         p('The verifier and example payment gate can currently be updated by a single project key. Requiring multiple approvals and a waiting period for updates is planned.'),
-        p('Both on-chain programs — the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` and the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the repository, and `solana-verify` lets you check that the deployed bytes match the public source.'),
+        p('Both on-chain programs — the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx` and the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa` — keep an upgrade authority, held today by a single key. Whoever holds it can change what the verifier accepts; the integrity of past consumptions is unaffected, but a verifier you trust is a verifier whose authority you trust. Every upgrade so far is listed with its signature in the [changelog](/changelog), and `solana-verify` lets you check that the deployed bytes match the public source.'),
       ] },
     ],
   },

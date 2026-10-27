@@ -97,7 +97,7 @@ export function decodeHtmlEntities(content: string): DecodedResult[] {
     // Guard against invalid code points (> U+10FFFF or the surrogate range): String.fromCodePoint
     // throws a RangeError on those, which — with no try/catch in runLayer0/pipeline — would let an
     // oversized-entity payload (e.g. "&#x110000;"...) crash the scan and pass unscreened. Leave any
-    // such entity undecoded instead. (Security fix; Blindseal M1. See DECISIONS.md.)
+    // such entity undecoded instead. (Security fix.)
     const fromCp = (cp: number, original: string): string =>
       Number.isInteger(cp) && cp >= 0 && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff)
         ? String.fromCodePoint(cp)

@@ -1,5 +1,5 @@
 // Blindseal synthetic fixtures generator (M0). Deterministic, no real traffic.
-// Produces the files in FRONTEND.md §5.3 with shapes from §5.1.
+// Produces the files of the local API contract (docs/FRONTEND-CONTRACT.md).
 //   node fixtures/generate.mjs
 // Re-run anytime; output is stable for a fixed SEED.
 import { createHash } from 'node:crypto';

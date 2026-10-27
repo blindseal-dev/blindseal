@@ -373,7 +373,7 @@
     b.text(961, 428, "Solana verifier", "dg-title" + on("verifier"), 14, "middle", { k: "vft" });
     b.text(961, 452, "one instruction", "dg-sub", 14, "middle", { k: "vfs" });
 
-    /* what the verifier sees: the public inputs (FRONTEND §1.3 step 3) */
+    /* what the verifier sees: the public inputs */
     var PUB = ["action hash", "policy root", "detector version", "expiry slot", "nullifier"];
     b.draw("M872 252V372", "dg-conn", 15, { k: "pubr", fast: true });
     b.text(884, 236, "public inputs", "dg-label", 15, "start", { k: "publ" });

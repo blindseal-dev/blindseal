@@ -1,4 +1,4 @@
-// Blindseal SDK (BLINDSEAL.md §3.8). Mainnet is the only deploy target: chainId 1 = Solana
+// Blindseal SDK. Mainnet is the only deploy target: chainId 1 = Solana
 // mainnet, 2 is reserved. `submit()` refuses any RPC whose genesis hash is not mainnet-beta's.
 // The verifier accepts verify_and_consume only as a CPI from the attestation's target program, so
 // `submit()` sends the GATED transaction (transfer-gate's gated_transfer) and nothing else.

@@ -1,4 +1,4 @@
-RETIRED 2026-05-20. This data was used to motivate contaminated detection work and is no longer valid for measurement. See POSTMORTEM-2026-05-20-contamination.md. Do not read these files during detection-modification sessions.
+RETIRED 2026-05-20. This data was used to motivate contaminated detection work and is no longer valid for measurement. It is kept for transparency only (the contamination is described in ../../datasets/holdout-attacks-burned-v1/README.md). Do not read these files during detection-modification sessions.
 
 ## What is in here
 

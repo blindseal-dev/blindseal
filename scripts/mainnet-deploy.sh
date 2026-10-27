@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy blindseal-verify + transfer-gate to Solana MAINNET and initialise the verifier.
-# Upgrade authority = the dedicated keypair in ~/.blindseal/mainnet-authority.json (docs/internal/BLOCKERS.md),
+# Upgrade authority = the dedicated keypair in ~/.blindseal/mainnet-authority.json,
 # NOT ~/.config/solana/id.json. Program keypairs live OFFLINE in ~/.blindseal/programs/ (never in the repo).
 # Preflight refuses any RPC that is not mainnet-beta and any unfunded authority.
 set -euo pipefail
@@ -23,7 +23,7 @@ GEN=$(solana genesis-hash --url "$RPC")
 AUTH_PK=$(solana-keygen pubkey "$AUTH")
 BAL=$(solana balance "$AUTH_PK" --url "$RPC" | awk '{print $1}')
 echo "   authority $AUTH_PK balance $BAL SOL"
-awk -v b="$BAL" 'BEGIN{ if (b+0 < 3.0) { print "   needs ≥ 3 SOL for two program deploys + rent; fund it (docs/internal/BLOCKERS.md)"; exit 1 } }'
+awk -v b="$BAL" 'BEGIN{ if (b+0 < 3.0) { print "   needs ≥ 3 SOL for two program deploys + rent; fund it"; exit 1 } }'
 
 deploy() { # name
   local id; id=$(solana-keygen pubkey "$HOME/.blindseal/programs/$1-keypair.json")
@@ -44,4 +44,4 @@ deploy transfer_gate
 
 echo "→ initialize Config + register the default policy root"
 ( cd "$ROOT" && BLINDSEAL_RPC_URL="$RPC" BLINDSEAL_MAINNET_AUTHORITY="$AUTH" pnpm exec tsx scripts/mainnet-init.mts )
-echo "mainnet deploy complete. Record the program ids + signatures in docs/internal/REPORT.md."
+echo "mainnet deploy complete. Record the program ids + signatures in the release notes (apps/site/app/changelog/releases.ts)."

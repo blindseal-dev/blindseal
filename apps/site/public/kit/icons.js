@@ -7,7 +7,7 @@
    Three names are Lucide aliases resolved to their canonical nodes:
    circle-help = circle-question-mark, filter = funnel, file-json = file-braces.
 
-   THE AVOID LIST (FRONTEND §2, DECISIONS D16): no shield, lock, padlock, eye,
+   THE AVOID LIST: no shield, lock, padlock, eye,
    eye-off or mask glyph exists in this map, and none may be added. Asking for
    one warns once and renders nothing.
 

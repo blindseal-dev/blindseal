@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { captureToken } from './api/client';
 import App from './App';
 
-// Kit CSS, carried verbatim from design/mockups/_shared (DECISIONS: FE port architecture).
+// Kit CSS, carried verbatim from design/mockups/_shared.
 import './kit/tokens.css';
 import './kit/fonts.css';
 import './kit/motion.css';

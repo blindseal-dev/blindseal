@@ -1,4 +1,4 @@
-// Browser-side disclosure verification (BLINDSEAL.md §3.6), byte-for-byte the audit package's
+// Browser-side disclosure verification, byte-for-byte the audit package's
 // verifyDisclosure: canonical (sorted-key) JSON, sha256 domain-separated entry hashes, in-window
 // prevHash links, and an ed25519 signature over the canonical window by the stated signer.
 // WebCrypto only; nothing is uploaded. Ed25519 in WebCrypto needs a current browser.
@@ -35,7 +35,7 @@ async function sha256Domain(domain: string, text: string): Promise<string> {
 export async function verifyDisclosure(d: Disclosure): Promise<DisclosureVerdict> {
   // 1) signature over canonicalJson({from,to,head,entries,signerPubkey}); signer = SPKI DER hex
   //    (12-byte Ed25519 SPKI prefix + 32-byte key). WebCrypto Ed25519 where the browser has it
-  //    (Chromium ≥ 137), else the pure-JS @noble/ed25519 fallback (DECISIONS 2026-10-23).
+  //    (Chromium ≥ 137), else the pure-JS @noble/ed25519 fallback.
   const spki = fromHex(d.signerPubkey);
   if (spki.length !== 44) return { ok: false, reason: 'bad signer pubkey' };
   const preimage = enc.encode(canonicalJson({ from: d.from, to: d.to, head: d.head, entries: d.entries, signerPubkey: d.signerPubkey }));

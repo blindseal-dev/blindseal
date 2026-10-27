@@ -1,4 +1,4 @@
-/// Encrypted content store (BLINDSEAL.md §3.6). The audit chain entries are content-free;
+/// Encrypted content store. The audit chain entries are content-free;
 /// the actual decision content (layer results, redacted payload, redaction counts) lives
 /// here, encrypted at rest with XChaCha20-Poly1305. The key sits at ~/.blindseal/content.key
 /// (generated on first use, 0600). Loss of the key means loss of the content, never of the

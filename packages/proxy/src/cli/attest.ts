@@ -1,4 +1,4 @@
-/// `blindseal attest` — a REAL screened decision → a Groth16 attestation (BLINDSEAL.md §3.2/§3.3).
+/// `blindseal attest` — a REAL screened decision → a Groth16 attestation.
 ///
 /// 1. Screens the tool call with the proven layers (L0 decode-then-L1, L1 heuristics) — the same
 ///    code the proxy runs. A non-clean verdict stops here: there is no proof for a blocked call.

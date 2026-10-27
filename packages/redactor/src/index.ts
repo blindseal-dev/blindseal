@@ -1,4 +1,4 @@
-/// Blindseal redactor (M1, BLINDSEAL.md §3.2). Strips secrets and PII from tool-output text
+/// Blindseal redactor. Strips secrets and PII from tool-output text
 /// BEFORE it reaches L2 (embeddings) and L3 (the LLM judge), so neither the local model nor
 /// a TEE/remote judge ever sees raw credentials. Replaces each hit with `[REDACTED:<kind>:<n>]`
 /// (n is a per-kind 1-based counter). Counts are returned for the Decision; originals are

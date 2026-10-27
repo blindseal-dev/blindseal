@@ -1,4 +1,4 @@
-//! Blindseal on-chain verifier (BLINDSEAL.md §3.7).
+//! Blindseal on-chain verifier.
 //!
 //! `verify_and_consume(proof, public_inputs, action)` checks, in this exact order (each failure
 //! is a distinct error so a consumer can tell them apart):
@@ -21,7 +21,7 @@
 //! Steps 1–2 close a griefing path: before them, anyone who copied a submitted proof could call
 //! `verify_and_consume` directly with the same action fields and burn the nullifier before the
 //! real gated transaction landed. Now only the program the attestation was screened for can
-//! consume it, and `consumer_program` is the true caller (DECISIONS.md, 2026-10-27).
+//! consume it, and `consumer_program` is the true caller.
 //!
 //! The five wrong-field cases (recipient / amount / mint / target program / source authority)
 //! all surface as `ActionHashMismatch` by construction: the proof binds a single hash over all of
@@ -52,7 +52,7 @@ solana_security_txt::security_txt! {
     source_code: "https://github.com/blindseal-dev/blindseal"
 }
 
-/// Domain separators — identical to detector-core (§3.3).
+/// Domain separators — identical to detector-core (the canonical hashing spec).
 pub const ACTION_DOMAIN: &[u8] = b"blindseal.action.v1";
 pub const NULLIFIER_DOMAIN: &[u8] = b"blindseal.nullifier.v1";
 /// The committed public-values blob: payloadHash‖policyRoot‖detectorVersion‖actionHash‖nullifier

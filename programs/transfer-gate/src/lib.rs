@@ -1,4 +1,4 @@
-//! Blindseal example gated program (BLINDSEAL.md §3.7): a native-SOL transfer that executes
+//! Blindseal example gated program: a native-SOL transfer that executes
 //! only if a Blindseal attestation for THIS exact transfer verifies and is consumed in the same
 //! transaction.
 //!

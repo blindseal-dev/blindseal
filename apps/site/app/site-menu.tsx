@@ -4,8 +4,8 @@ import { usePathname } from 'next/navigation';
 
 // The phone menu (< 720 px). Its markup — the button in the header row and the full-screen sheet — is
 // server-rendered with the chrome (kit/site-templates.cjs → site-chrome.tsx); this component renders
-// nothing and only wires it, so it works with or without the kit and creates nothing in html/head/body
-// (DECISIONS 2026-10-23). Open: aria-expanded, the sheet unhidden, focus to its first link, Tab /
+// nothing and only wires it, so it works with or without the kit and creates nothing in html/head/body.
+// Open: aria-expanded, the sheet unhidden, focus to its first link, Tab /
 // Shift+Tab kept inside (button + sheet links), Escape closes and returns focus to the button. Leaving
 // phone width or changing route closes it.
 // Scroll lock while open: the page behind must not scroll (iOS Safari ignores overflow:hidden on body

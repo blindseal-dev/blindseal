@@ -1,4 +1,4 @@
-/// Append-only hash-chained audit log (BLINDSEAL.md §3.6). Entries are content-free by
+/// Append-only hash-chained audit log. Entries are content-free by
 /// construction (only hashes/ids/verdict); decision content lives in the encrypted
 /// ContentStore. Persisted as JSONL so appends are atomic line writes and the chain can be
 /// recomputed from genesis.

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Blindseal local dashboard — Vite + React, hand-ported from design/mockups with the kit CSS carried verbatim. Data over the FRONTEND.md §5 API.",
+  "description": "Blindseal local dashboard — Vite + React, hand-ported from design/mockups with the kit CSS carried verbatim. Data over the local API (docs/FRONTEND-CONTRACT.md).",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -1,5 +1,5 @@
 /* ============================================================================
-   _shared/shell.js — BS.mountShell(): the dashboard frame (DECISIONS D06)
+   _shared/shell.js — BS.mountShell(): the dashboard frame
    ----------------------------------------------------------------------------
    Port of the V1 sidebar shell (the shell
    + the kit route cover), re-wired for Blindseal. The V2 top-nav branch
@@ -79,7 +79,7 @@
   var ROUTE_KEY = "bs-route-v1";
   var RAIL_KEY = "bs-sidebar-v1";
 
-  /* samples for a page that runs without fixtures.js (the shapes of FRONTEND §5) */
+  /* samples for a page that runs without fixtures.js (the shapes of docs/FRONTEND-CONTRACT.md) */
   var SAMPLE = {
     version: "0.4.0",
     uptimeSec: 11536,

@@ -19,7 +19,7 @@ fn hex_to_vec(s: &str) -> Vec<u8> {
 
 /// Verify an attestation JSON string. Checks the Groth16 proof against the committed
 /// publicInputs and the detectorVersion (vkey hash). Does NOT check expiry/nullifier/policy
-/// allowlist — that is the consumer's / on-chain program's job (§3.7).
+/// allowlist — that is the consumer's / on-chain program's job.
 pub fn verify_attestation(json: &str) -> Outcome {
     let v: serde_json::Value = match serde_json::from_str(json) {
         Ok(v) => v,

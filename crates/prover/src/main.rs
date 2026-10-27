@@ -3,7 +3,7 @@
 //! actionHash, nullifier, expirySlot), and writes a full attestation.json. The guest asserts the
 //! deterministic layer PASSED, so a proof exists only for a clean payload. Local CPU prover only.
 //!
-//! The action fields are the ones the gated program will execute (§3.7): the proof binds the
+//! The action fields are the ones the gated program will execute: the proof binds the
 //! target program, the source authority the transfer debits, the recipient, mint, amount and
 //! the instruction discriminator. The private `nonce` is carried in the attestation so the
 //! on-chain program can recompute actionHash; it is not a public value.

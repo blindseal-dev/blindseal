@@ -1,7 +1,7 @@
 # Blindseal — performance (real numbers only)
 
 Estimates are not allowed here. Every row is filled from an actual run on a named machine.
-Updated at the end of M0.5, M1, and M2 (BLINDSEAL.md §9.4).
+Updated at the end of M0.5, M1, and M2.
 
 ## Reference machine
 - Apple Silicon, macOS 27 (arm64), 10 CPU cores, 32 GB RAM.
@@ -11,7 +11,7 @@ Updated at the end of M0.5, M1, and M2 (BLINDSEAL.md §9.4).
 
 A minimal SP1 guest (sha256 a few bytes, commit the digest) was proven to a local Groth16
 proof and **verified on the Solana runtime** through `sp1-solana` (`GROTH16_VK_5_0_0_BYTES`,
-alt_bn128 syscalls), via `solana-program-test`. Source: `docs/internal/m05-spike/`.
+alt_bn128 syscalls), via `solana-program-test`. The throwaway spike code is not part of this repository.
 
 ### Version matrix (the whole point of M0.5)
 | Component | Version | Note |
@@ -51,7 +51,7 @@ version, **not** a silent downgrade.
 
 Deployed `blindseal-m05-program` (`cargo build-sbf`, BPFLoaderUpgradeab1e) to a real
 `solana-test-validator` and sent the SP1 v5 Groth16 verify instruction with the committed proof
-(`docs/internal/m05-spike/script/m05-localnet.rs`; metrics in `m05-localnet-metrics.json`).
+(the spike's localnet script).
 
 | Field | Value |
 |---|---|
@@ -85,8 +85,8 @@ own logic. This closes the M0.5 CU gap that program-test (native processor) coul
   the 5.2.4 prover's versioned mount path), so they were placed manually.
 - **Docker memory:** the gnark Groth16 wrap OOM-killed at Docker's default 7.7 GB on 8.38 M
   constraints; raising Docker Desktop to 24 GB fixed it.
-- **Reproducing:** `docs/internal/m05-spike/` holds the guest, host, and on-chain program. The prebuilt guest
-  ELF is committed; the SP1/Solana toolchains and the 3 GB circuit artifacts are machine-local.
+- **Reproducing:** the spike was superseded by `crates/guest`, `crates/prover` and `programs/blindseal-verify`;
+  the SP1/Solana toolchains and the 3 GB circuit artifacts are machine-local.
 
 ## M1 — attestation engine
 <!-- end-to-end proving time + RAM for a real fixture decision -->
@@ -144,10 +144,9 @@ fixed ids). Numbers are from `simulateTransaction` on the exact transaction that
 
 Program ids (localnet = mainnet): verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`,
 transfer-gate `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa`. Pins: anchor 0.31.1, sp1-solana 0.1.0
-(`GROTH16_VK_5_0_0_BYTES`), SP1 5.0.0. Mainnet figures are recorded in docs/internal/REPORT.md when the
-acceptance transfer runs.
+(`GROTH16_VK_5_0_0_BYTES`), SP1 5.0.0. Mainnet figures follow.
 
 ### Mainnet (2026-10-23)
-The acceptance transaction `7iwA4nxn…` (docs/internal/REPORT.md) — verify + consume + 0.001 SOL through `transfer-gate` —
+The acceptance transaction `7iwA4nxn…` — verify + consume + 0.001 SOL through `transfer-gate` —
 consumed **259,324 CU** on mainnet-beta with an 893-byte transaction; the replay `42QVDVFj…` failed at step 6
 after 8,176 CU in the verifier (`NullifierAlreadyConsumed`). Program rent: verifier 2.29 SOL, gate 1.18 SOL.

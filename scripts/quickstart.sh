@@ -11,7 +11,7 @@ step() { printf '\n\033[1m→ %s\033[0m\n' "$*"; }
 step "1/5 install (pnpm workspace)"
 command -v pnpm >/dev/null || { echo "pnpm is required (npm i -g pnpm)"; exit 1; }
 pnpm install --frozen-lockfile
-git config core.hooksPath .githooks 2>/dev/null || true   # §7: commit-msg hook strips attribution trailers
+git config core.hooksPath .githooks 2>/dev/null || true   # commit-msg hook strips attribution trailers
 
 step "2/5 build the dashboard (served by the proxy with application/wasm + CSP)"
 pnpm -C packages/dashboard exec vite build

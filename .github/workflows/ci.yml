@@ -6,22 +6,37 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '24'
   PNPM_VERSION: '10'
+  # The L2 embedding model. @xenova/transformers caches it under its own package dir (<pkg>/.cache).
+  L2_MODEL_ID: Xenova/bge-small-en-v1.5
+  # Solana toolchain for the on-chain suite (scripts/build-programs.sh, scripts/test-m2.sh). Agave 4.3.1 is
+  # what the suite was developed on; its linux release is not published, so CI runs the 4.3.2 patch release.
+  # Program bytes come from platform-tools v1.57 (cargo build-sbf --tools-version v1.57), not from Agave.
+  AGAVE_VERSION: v4.3.2
+  PLATFORM_TOOLS_VERSION: v1.57
+  ANCHOR_VERSION: '0.31.1'
 
 jobs:
   ts-packages:
     name: typescript packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -29,32 +44,204 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
-      - name: build the layer 2 corpus (proxy tests depend on it)
-        run: pnpm --filter @blindseal/corpus build
+      - name: locate the L2 model cache
+        id: model
+        run: |
+          pkg="$(node -p "require('path').dirname(require.resolve('@xenova/transformers/package.json', { paths: ['packages/proxy'] }))")"
+          echo "dir=$pkg/.cache" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('$pkg/package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: typecheck — proxy + collector + eval
+      - name: cache the L2 embedding model
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.model.outputs.dir }}
+          key: l2-model-${{ env.L2_MODEL_ID }}-transformers-${{ steps.model.outputs.version }}
+
+      # Workspace packages import each other's build output (blindseal-sdk resolves to dist/), so build
+      # everything the proxy, dashboard and SDK need before typecheck/test. The corpus is NOT rebuilt: its
+      # committed embeddings are what the npm package ships and what the tests must run against.
+      - name: build workspace packages
+        run: pnpm --filter './packages/**' --filter '!@blindseal/corpus' build
+
+      - name: typecheck
         run: pnpm -r typecheck
 
-      - name: test — workspace
+      - name: test
         run: pnpm -r test
-
-      - name: build — proxy + collector
-        run: |
-          pnpm --filter blindseal build
-          pnpm --filter @blindseal/collector build
 
       - name: bundle size check
         run: |
           PROXY_SIZE=$(stat -c%s packages/proxy/dist/index.js)
-          COLLECTOR_SIZE=$(stat -c%s packages/collector/dist/index.js)
           echo "proxy bin: $PROXY_SIZE bytes"
-          echo "collector bin: $COLLECTOR_SIZE bytes"
-          # Hard ceilings — fail if we accidentally pull in a giant dep.
+          # Hard ceiling — fail if we accidentally pull in a giant dep.
           if [ "$PROXY_SIZE" -gt 200000 ]; then
             echo "proxy bin exceeded 200KB ceiling"
             exit 1
           fi
-          if [ "$COLLECTOR_SIZE" -gt 50000 ]; then
-            echo "collector bin exceeded 50KB ceiling"
+
+  rust:
+    name: rust (host crates + programs, test + clippy)
+    # Host-buildable crates only. crates/guest is skipped: it builds for the SP1 riscv target with the
+    # succinct toolchain (its prebuilt ELF is committed). The prover is compiled and linted, not run.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            crates/verifier-wasm -> target
+            crates/prover -> target
+            programs -> target
+
+      - name: deps (prover)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq pkg-config libssl-dev clang cmake
+
+      - name: detector-core — test
+        run: cargo test --locked
+
+      - name: detector-core — clippy
+        run: cargo clippy --locked --all-targets
+
+      - name: verifier (native) — test
+        run: cargo test --locked --manifest-path crates/verifier-wasm/Cargo.toml
+
+      - name: verifier (native) — clippy
+        run: cargo clippy --locked --all-targets --manifest-path crates/verifier-wasm/Cargo.toml
+
+      - name: programs (host) — test
+        run: cargo test --locked --manifest-path programs/Cargo.toml
+
+      - name: programs (host) — clippy
+        run: cargo clippy --locked --all-targets --manifest-path programs/Cargo.toml
+
+      - name: prover — clippy (compile check)
+        run: cargo clippy --locked --manifest-path crates/prover/Cargo.toml
+
+  parity:
+    name: detector parity gate (TS ↔ Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: regenerate the L0/L1 vectors from the TypeScript detector
+        run: pnpm -C packages/proxy exec tsx ../../evals/parity/dump-vectors.ts
+
+      - name: the committed vectors must not drift
+        run: git diff --exit-code -- evals/vectors/
+
+      - name: Rust detector-core agrees byte for byte (parity, policy root, action hash)
+        run: cargo test --locked --test parity --test policy --test action
+
+      - name: no vector drift after the Rust tests
+        run: git diff --exit-code -- evals/vectors/
+
+  m2-localnet:
+    name: on-chain suite (localnet)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: build the SDK (the suite imports blindseal-sdk)
+        run: pnpm --filter blindseal-sdk build
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cache the Solana toolchain (Agave + platform-tools + anchor)
+        id: solana-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.local/share/agave-${{ env.AGAVE_VERSION }}
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS_VERSION }}
+            ~/.local/bin/anchor
+          key: solana-${{ runner.os }}-agave-${{ env.AGAVE_VERSION }}-tools-${{ env.PLATFORM_TOOLS_VERSION }}-anchor-${{ env.ANCHOR_VERSION }}
+
+      - name: install Agave + anchor
+        if: steps.solana-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/share/agave-$AGAVE_VERSION ~/.local/bin
+          curl -sSfL "https://github.com/anza-xyz/agave/releases/download/$AGAVE_VERSION/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
+            | tar -xj -C ~/.local/share/agave-$AGAVE_VERSION
+          curl -sSfL -o ~/.local/bin/anchor \
+            "https://github.com/solana-foundation/anchor/releases/download/v$ANCHOR_VERSION/anchor-$ANCHOR_VERSION-x86_64-unknown-linux-gnu"
+          chmod +x ~/.local/bin/anchor
+
+      - name: put the toolchain on PATH
+        run: |
+          echo "$HOME/.local/share/agave-$AGAVE_VERSION/solana-release/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: toolchain versions
+        run: solana --version && cargo-build-sbf --version && anchor --version
+
+      - name: build the programs (cargo build-sbf v1.57 + anchor idl build)
+        run: scripts/build-programs.sh
+
+      - name: M2 suite on a local validator
+        run: scripts/test-m2.sh
+
+  identity-sweep:
+    name: identity sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # the sweep also checks every commit's author, committer and message
+
+      - name: write the pattern file from the secret
+        id: patterns
+        env:
+          IDENTITY_SWEEP_PATTERNS: ${{ secrets.IDENTITY_SWEEP_PATTERNS }}
+          FROM_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ -z "$IDENTITY_SWEEP_PATTERNS" ]; then
+            if [ "$FROM_FORK" = "true" ]; then
+              echo "::notice::identity sweep skipped: secrets are not available to pull requests from forks"
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::secret IDENTITY_SWEEP_PATTERNS is not set (the .identity-sweep pattern file; format in scripts/lib/identity-patterns.sh)"
             exit 1
           fi
+          # outside the checkout, so the sweep never sees its own pattern file
+          printf '%s\n' "$IDENTITY_SWEEP_PATTERNS" > "$RUNNER_TEMP/identity-sweep"
+          echo "IDENTITY_SWEEP_FILE=$RUNNER_TEMP/identity-sweep" >> "$GITHUB_ENV"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: sweep
+        if: steps.patterns.outputs.run == 'true'
+        run: scripts/identity-sweep.sh

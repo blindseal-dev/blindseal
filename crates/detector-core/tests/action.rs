@@ -1,4 +1,4 @@
-//! actionHash + nullifier vectors (BLINDSEAL.md §3.3). Deterministic layout; the TS SDK and
+//! actionHash + nullifier vectors (canonical hashing spec). Deterministic layout; the TS SDK and
 //! the Solana program must reproduce these exactly. Written to evals/vectors/action-hash.txt.
 use blindseal_detector_core::{action_hash, nullifier, ActionFields, Commitments};
 

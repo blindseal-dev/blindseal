@@ -1,4 +1,4 @@
-//! Tamper suite (M1, BLINDSEAL.md §3.7). A real attestation must verify; any single-byte change
+//! Tamper suite. A real attestation must verify; any single-byte change
 //! to the proof, a public input, or the vkey (detectorVersion) must make verification fail. The
 //! sample is a real Groth16 attestation from the detector-core guest (tests/fixtures/).
 use blindseal_verifier::verify_attestation;

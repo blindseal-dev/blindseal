@@ -1,4 +1,4 @@
-/// Canonical hashing for the Blindseal audit chain (BLINDSEAL.md §3.3/§3.6). All hashes are
+/// Canonical hashing for the Blindseal audit chain. All hashes are
 /// SHA-256, domain-separated, over canonical (sorted-key) JSON so the digest is independent
 /// of key insertion order.
 import { createHash } from 'node:crypto';

@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Pre-publish audit (BLINDSEAL.md §7): packs each publishable package the way `npm publish` would, extracts
-# the tarball and scans EVERY file in it for personal names (the local .identity-sweep list — never
-# committed), the base/other project names, e-mail addresses other than the project's, secrets (npm/GitHub/
-# AWS tokens, private keys, Solana keypair arrays), absolute home paths, and the package.json identity
-# fields. Exit 1 on any hit. Usage: scripts/npm-pack-audit.sh [package dirs…]
+# Pre-publish audit: packs each publishable package the way `npm publish` would, extracts the tarball and
+# scans EVERY file in it for personal names, base/competitor project names (both from the uncommitted
+# pattern file — `.identity-sweep` or $IDENTITY_SWEEP_FILE; format in scripts/lib/identity-patterns.sh),
+# e-mail addresses other than the project's, secrets (npm/GitHub/AWS tokens, private keys, Solana keypair
+# arrays), absolute home paths, and the package.json identity fields. Exit 1 on any hit.
+# Usage: scripts/npm-pack-audit.sh [package dirs…]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
+. "$ROOT/scripts/lib/identity-patterns.sh"
 PKGS=("$@"); [ ${#PKGS[@]} -gt 0 ] || PKGS=(packages/proxy packages/sdk packages/verifier-wasm)
-A_RE="$( [ -f .identity-sweep ] && grep -v '^#' .identity-sweep | grep . | tr '\n' '|' | sed 's/|$//' || echo '__none__')"
-B_RE='blindseal|partner-chain|transfer-gate|@blindseal|\bblindseal\b|BLINDSEAL_|\bveil\b|a third-party detector|a third-party detector|prompt ?guard|a third-party detector|a third-party detector|a third-party detector|llm ?guard|a third-party detector'
+PF="$(identity_file "$ROOT")"
+[ -f "$PF" ] || { echo "identity pattern file missing ($PF) — cannot audit"; exit 1; }
+A_RE="$(identity_patterns "$PF" personal)"; A_RE="${A_RE:-__none__}"
+B_RE="$(printf '%s\n%s\n' "$(identity_patterns "$PF" base)" "$(identity_patterns "$PF" competitor)" | { grep . || true; } | paste -sd'|' -)"; B_RE="${B_RE:-__none__}"
 SECRET_RE='npm_[A-Za-z0-9]{30,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY|"privateKey"|_authToken'
 PATH_RE='/Users/[a-z]+|/home/[a-z]+|C:\\Users'
 PATH_OK='/home/user/|/home/you/|/Users/you/|/Users/me/|/home/me/'   # documentation / fixture placeholders, not a real home
@@ -24,7 +28,7 @@ for p in "${PKGS[@]}"; do
   hits() { local label="$1" re="$2"; local out; out="$(grep -rnIiE "$re" "$d/package" 2>/dev/null | grep -vE 'node_modules' | head -8 || true)"; if [ -n "$out" ]; then echo "   ✗ $label:"; echo "$out" | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no $label"; fi; }
   # PART A: full list on every file; on minified bundles (one-line JS/CSS under dashboard/assets) the 2–4 letter
   # initials pattern would match generated identifiers, so those files are scanned with the ≥5-char patterns only
-  A_LONG="$(grep -v '^#' .identity-sweep | grep . | sed 's/\\b//g' | awk 'length($0) >= 5' | tr '\n' '|' | sed 's/|$//')"
+  A_LONG="$(identity_patterns "$PF" personal | tr '|' '\n' | sed 's/\\b//g' | awk 'length($0) >= 5' | paste -sd'|' -)"; A_LONG="${A_LONG:-__none__}"
   pa="$(grep -rnIiE "$A_RE" "$d/package" 2>/dev/null | grep -vE 'node_modules|dashboard/assets/[^:]+\.(js|css):' | head -8 || true)"
   pm="$(grep -rnIiE "$A_LONG" "$d/package/dashboard/assets" 2>/dev/null | head -8 || true)"
   if [ -n "$pa$pm" ]; then echo "   ✗ personal names (PART A):"; printf '%s\n%s\n' "$pa" "$pm" | grep . | sed "s|$d/package/|      |" | cut -c1-160; fail=1; else echo "   ✓ no personal names (PART A)"; fi

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Static bundle served by the proxy (FRONTEND.md §3). No SSR. In dev, /api and /events proxy to
+// Static bundle served by the proxy. No SSR. In dev, /api and /events proxy to
 // the local mock API so the dashboard talks to the real contract (mock-server.ts) with no CORS.
 export default defineConfig({
   plugins: [react()],

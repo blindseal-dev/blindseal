@@ -1,5 +1,5 @@
 # Blindseal SP1 guest (M1). Recomputes payloadHash, runs detector-core's L0/L1 on PRE-SERIALIZED
-# DFAs (no regex compilation in-zkVM, §3.4), asserts PASS, and commits public values. Built for
+# DFAs (no regex compilation in-zkVM), asserts PASS, and commits public values. Built for
 # the SP1 riscv target with the succinct toolchain; NOT part of the host workspace.
 [package]
 name = "blindseal-guest"

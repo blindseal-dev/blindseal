@@ -1,4 +1,4 @@
-// Blindseal local API types (FRONTEND.md §5 + docs/FRONTEND-CONTRACT.md). The authoritative
+// Blindseal local API types. The authoritative
 // shapes the proxy serves in mock mode (mock-server.ts) and, later, the real engine.
 
 export type Verdict = 'pass' | 'flag' | 'block';

@@ -65,8 +65,8 @@ export ANTHROPIC_API_KEY=...
   enough; report adaptive results too.
 - **Report utility/false-positives**, not just ASR. Our known-payee allowlist can block a
   legitimate first-time payee — that trade-off has to be shown, not hidden.
-- **On-chain receipts are audit, not the headline metric.** The headline is Targeted ASR on
-  AgentDojo. Receipts are tamper-evident logging of what was blocked.
-- **Where Blindseal is not novel** (per landscape research): injection scanning and tool
-  allowlisting are commoditized (Invariant/Snyk, others). The defensible story is the
-  action layer for trading plus per-tool behavioral reputation. Benchmark accordingly.
+- **The zero-knowledge proof is not the metric here.** The headline is Targeted ASR on AgentDojo;
+  the proof covers L1 screening of one action, not the action guard's decision.
+- **Where Blindseal is not novel:** injection scanning and tool allowlisting are widely available.
+  What this benchmark measures is the action layer in front of money-movement tools. Benchmark
+  accordingly.

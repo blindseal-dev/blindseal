@@ -13,7 +13,7 @@ const { ok, reason } = JSON.parse(verify_attestation_json(attestationJsonString)
 ```
 `verify_attestation_json` returns a JSON string `{"ok":bool,"reason":string|null}`. It checks only
 the proof against its committed public inputs and vkey — expiry / nullifier / policy-allowlist are
-the consumer's or the on-chain program's job (BLINDSEAL.md §3.7).
+the consumer's or the on-chain program's job (the on-chain check order is documented in `programs/blindseal-verify/src/lib.rs`).
 
 ## Regenerating (`pkg/` is generated and committed)
 ```
@@ -22,4 +22,4 @@ the consumer's or the on-chain program's job (BLINDSEAL.md §3.7).
 Requires the `wasm32-unknown-unknown` rustup target and `wasm-bindgen-cli =0.2.129` (pinned to the
 crate's `wasm-bindgen`). The script remaps `$HOME` out of embedded panic paths and fails if any
 identity string lands in the binary. `pkg/` is committed so the frontend builds without a Rust
-toolchain (see DECISIONS.md).
+toolchain.

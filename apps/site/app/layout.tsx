@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 // The kit (one ordered bundle, public/kit/kit.js, built by scripts/bundle-kit.mjs in the mockups' load
 // order) is injected AFTER hydration by KitProvider and does nothing at load. The chrome — skip-link,
 // frame, notch, footer — is rendered HERE on the server from the kit's own templates
-// (kit/site-templates.cjs); BS.mountSite only adopts it (DECISIONS 2026-10-23: the kit creates nothing and
+// (kit/site-templates.cjs); BS.mountSite only adopts it (the kit creates nothing and
 // writes nothing on <html>, <head> or body children, so hydration cannot race it). fixtures.js is never
 // loaded (no BS.data in the app).
 export default function RootLayout({ children }: { children: React.ReactNode }) {

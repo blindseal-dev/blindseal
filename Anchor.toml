@@ -1,4 +1,4 @@
-# Blindseal Anchor workspace (BLINDSEAL.md §3.7, §4). Programs live in their own Cargo
+# Blindseal Anchor workspace. Programs live in their own Cargo
 # workspace (programs/Cargo.toml). Program IDs are FIXED (keypairs in keys/localnet/, synced to
 # target/deploy by scripts/anchor-keys.sh) and shared by localnet and mainnet — the test proof
 # binds transfer_gate's id, so it must be stable across machines. Mainnet is the only deploy

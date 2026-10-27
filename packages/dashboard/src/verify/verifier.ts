@@ -61,7 +61,7 @@ export function tamper(json: string): string {
   } catch { return json; }
 }
 
-/** A disclosure.json (BLINDSEAL.md §3.6): signature + in-window chain consistency, in the browser. */
+/** A disclosure.json: signature + in-window chain consistency, in the browser. */
 async function verifyDisclosureDoc(d: Disclosure): Promise<VerifyResult> {
   const v = await verifyDisclosure(d);
   const n = d.entries.length;

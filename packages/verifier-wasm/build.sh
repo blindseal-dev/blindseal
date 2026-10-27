@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerate blindseal-verifier-wasm from the Rust crate (crates/verifier-wasm).
-# Location-relative (no hardcoded home — see DECISIONS run-localnet.sh lesson).
+# Location-relative (no hardcoded home paths).
 # Requires: rustup wasm32-unknown-unknown target + wasm-bindgen-cli =0.2.129 (pinned to the crate).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -20,9 +20,12 @@ rm -rf "$PKG" && mkdir -p "$PKG"
 wasm-bindgen --target web --out-dir "$PKG" --out-name blindseal_verifier "$WASM"
 
 echo "→ identity sweep (PART A) on the shipped binary"
-# home paths always; plus the local §7 grep list (.identity-sweep, never committed) when present
+# home paths always; plus the personal patterns of the uncommitted identity pattern file when present
+# (.identity-sweep or $IDENTITY_SWEEP_FILE; format in scripts/lib/identity-patterns.sh)
 A_RE="/Users/|/home/"
-[ -f "$HERE/../../.identity-sweep" ] && A_RE="$A_RE|$(grep -v '^#' "$HERE/../../.identity-sweep" | grep . | tr '\n' '|' | sed 's/|$//')"
+. "$HERE/../../scripts/lib/identity-patterns.sh"
+PERSONAL="$(identity_patterns "$(identity_file "$HERE/../..")" personal)"
+[ -n "$PERSONAL" ] && A_RE="$A_RE|$PERSONAL"
 if strings "$PKG"/blindseal_verifier_bg.wasm | grep -iqE "$A_RE"; then
   echo "‼ identity string found in wasm — aborting"; exit 1
 fi

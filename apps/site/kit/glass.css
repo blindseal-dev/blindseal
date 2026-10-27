@@ -2,7 +2,7 @@
    _shared/glass.css — the liquid glass (Blindseal J00: the glass.css, VERBATIM)
    ----------------------------------------------------------------------------
    Source: (the kit)/_shared/glass.css (itself stylesheet verbatim),
-   DECISIONS Q5 / Q6. Recipe kept: 1px border · blur(5px) saturate(1.9)
+   Recipe kept: 1px border · blur(5px) saturate(1.9)
    brightness(1.05) + the SVG refraction filter (feTurbulence → blur →
    displacement, injected by glass.js) · the six-layer inset shadow + one drop ·
    three sheens (top, 115° streak at .7, screen-blended edges) · the
@@ -37,7 +37,7 @@
    Kept verbatim: fill rgba(214,224,255,.05) (cool, sits in a cool-grey
    family), hairline rgba(255,255,255,.12), every inset and sheen.
 
-      WHERE GLASS IS ALLOWED (Blindseal DECISIONS D06): the site's notch-nav
+      WHERE GLASS IS ALLOWED: the site's notch-nav
    controls (and the nav itself in the nav:"glass" variant), the dashboard top
    bar and status bar, controls (buttons, pills, segments), menus, toasts and
    sheet headers. Cards, tables and panels are FLAT var(--panel) + the hairline.
@@ -310,7 +310,7 @@ button.glass-pill:active, a.glass-pill:active { transform: scale(.98); }
 .glass-menu  { border-radius: var(--r-panel); }
 .glass-toast { border-radius: var(--r-panel); }
 
-/* ══ 7 · .glass-dock — the chat dock pill (messages, DECISIONS Q12) ══════ */
+/* ══ 7 · .glass-dock — the chat dock pill (messages) ══════ */
 .glass-dock {
   display: inline-flex; align-items: center; gap: 10px;
   min-height: 44px; padding: 0 8px 0 14px; border-radius: var(--r-full);

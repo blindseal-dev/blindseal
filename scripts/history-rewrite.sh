@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Pre-public history rewrite (BLINDSEAL.md §7). LOCAL ONLY — never pushes.
+# Pre-public history rewrite. LOCAL ONLY — never pushes.
 #   1. backup: refs/backup/pre-rewrite + a git bundle under ~/.blindseal/backup/
 #   2. git filter-repo over refs/heads/main:
 #        - every commit's author AND committer = the project identity
 #        - Co-Authored-By / session-URL trailers stripped from messages
 #        - messages: the local `.history-msg-subs` pairs (old<TAB>new) applied
 #        - blobs: the local `.history-subs` pairs applied to every TEXT blob EXCEPT blobs that belong
-#          (in any revision) to the paths where the base project's name is allowed by §7 — LICENSE,
-#          the named docs, docs/, and the two sweep scripts (which carry the grep lists by design);
-#          the local `.identity-sweep` patterns are replaced in every blob and message
+#          (in any revision) to the paths where the base project's name was allowed — LICENSE, the
+#          named docs and docs/ (ALLOWED_PATHS below); the `personal` patterns of the local identity
+#          pattern file (.identity-sweep or $IDENTITY_SWEEP_FILE; format in scripts/lib/identity-patterns.sh)
+#          are replaced in every blob and message
 #      Neither list is ever committed — this script carries no names.
 #      paths: the local `.history-path-renames` pairs (old<TAB>new) rename files in every revision, so old
 #      names never appear in diff headers; `.history-drop-paths` removes directories that were never Blindseal's
@@ -17,9 +18,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 export PATH="/opt/homebrew/bin:$PATH"
 NAME="blindseal"; EMAIL="347208916+blindseal-dev@users.noreply.github.com"
-ALLOWED_PATHS=(LICENSE BLINDSEAL.md DECISIONS.md README.md FRONTEND.md docs scripts/identity-sweep.sh scripts/history-rewrite.sh scripts/npm-pack-audit.sh)
-for f in .identity-sweep .history-subs .history-msg-subs; do [ -f "$f" ] || { echo "$f missing (local list)"; exit 1; }; done
-A_RE="$(grep -v '^#' .identity-sweep | grep . | tr '\n' '|' | sed 's/|$//')"
+ALLOWED_PATHS=(LICENSE BLINDSEAL.md DECISIONS.md README.md FRONTEND.md docs)
+. "$ROOT/scripts/lib/identity-patterns.sh"
+PF="$(identity_file "$ROOT")"
+for f in "$PF" .history-subs .history-msg-subs; do [ -f "$f" ] || { echo "$f missing (local list)"; exit 1; }; done
+A_RE="$(identity_patterns "$PF" personal)"
+[ -n "$A_RE" ] || { echo "no personal patterns in $PF"; exit 1; }
 B_RE="$(grep -v '^#' .history-subs | grep . | cut -f1 | tr '\n' '|' | sed 's/|$//')"
 [ -z "$(git remote)" ] || { echo "remotes exist: $(git remote | tr '\n' ' ') — remove them first (this never pushes)"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean"; exit 1; }
@@ -113,7 +117,7 @@ tr=$(git log refs/heads/main --format='%B' | grep -cE "^Co-Authored-By:|claude\.
 echo "   trailers remaining: $tr"; [ "$tr" = "0" ] || fail=1
 ahits=$(git log -p refs/heads/main --format='commit %H%n%an %ae %cn %ce%n%B' | grep -ciE "$A_RE" || true)
 echo "   PART A hits across every diff + message + identity: $ahits"; [ "$ahits" = "0" ] || fail=1
-bhits=$(git log -p refs/heads/main --format='%B' -- . ':!LICENSE' ':!BLINDSEAL.md' ':!DECISIONS.md' ':!README.md' ':!FRONTEND.md' ':!docs' ':!scripts/identity-sweep.sh' ':!scripts/history-rewrite.sh' ':!scripts/npm-pack-audit.sh' | grep -ciE "$B_RE" || true)
+bhits=$(git log -p refs/heads/main --format='%B' -- . ':!LICENSE' ':!BLINDSEAL.md' ':!DECISIONS.md' ':!README.md' ':!FRONTEND.md' ':!docs' | grep -ciE "$B_RE" || true)
 echo "   PART B occurrences across every diff + message outside the allowed paths: $bhits"; [ "$bhits" = "0" ] || fail=1
 [ $fail -eq 0 ] && echo "history sweep: clean" || { echo "history sweep: FAILED"; exit 1; }
 echo "done — review: git log --oneline | head; backup at refs/backup/pre-rewrite (delete after the owner's review)"

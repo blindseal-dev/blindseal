@@ -14,7 +14,7 @@
      BS.PORTS        board 4830 · mockups 4831 · app 3004 · proxy 7777 (D14)
 
      BS.VERSION      { proxy, detector, dashboard }
-     BS.NEVER_WRITE  the brief's never-write list (FRONTEND §4, D16) as
+     BS.NEVER_WRITE  the brief's never-write list as
                      { label, re } pairs; BS.neverWriteScan(text?) → hits[]
                      scans document.body.innerText by default (the kitchen
                      sinks run it as a dev check)
@@ -27,7 +27,7 @@
   BS.BRAND = "Blindseal";
 
   BS.COPY = Object.freeze({
-    oneLiner: "Prove an agent's action was screened — without showing what it was.",   /* copy-bank one-liner (FRONTEND.md §4); founder may revert to the "pwn" line */
+    oneLiner: "Prove an agent's action was screened — without showing what it was.",   /* copy-bank one-liner; founder may revert to the "pwn" line */
     honestScope: "Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn't pass through the proxy.",
     detailedLead: "Blindseal is a privacy-preserving, verifiable screening layer for AI agents."
   });
@@ -76,7 +76,7 @@
 
   BS.VERSION = Object.freeze({ proxy: "0.4.0", detector: "det-2026.10.1", dashboard: "0.4.0" });
 
-  /* the never-write list (FRONTEND §4). "zero-trust" is banned as a NOUN only:
+  /* the never-write list. "zero-trust" is banned as a NOUN only:
      the pattern flags it when no word follows ("…a zero-trust." / "zero-trust,"). */
   BS.NEVER_WRITE = Object.freeze([
     { label: "unhackable", re: /\bunhackable\b/i },

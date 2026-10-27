@@ -1,7 +1,7 @@
 // The site chrome, rendered by React on the SERVER from the same templates the kit knows
 // (kit/site-templates.cjs, extracted verbatim from site.js), so the markup is the mockups' and the kit
 // only adopts it: BS.mountSite finds these nodes, wires the sliding pill, setActive, the hero spaces and
-// the rise — it creates nothing in html/head/body (DECISIONS 2026-10-23). The active item and the
+// the rise — it creates nothing in html/head/body. The active item and the
 // footer's aria-current are set by the kit on the client (the layout has no pathname on the server).
 import { createRequire } from 'node:module';
 import { ROUTES } from './routes';

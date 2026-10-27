@@ -1,4 +1,4 @@
-// M2 verifier suite (BLINDSEAL.md §3.7 "Done when"), run by scripts/test-m2.sh on localnet.
+// M2 verifier suite (every check in the blindseal-verify header, in order), run by scripts/test-m2.sh on localnet.
 // One real Groth16 attestation (tests/fixtures/attestation-test.json, produced by
 // crates/prover for the seed-derived test wallets) covers every case: the verifier's checks
 // are ordered BEFORE the Groth16 step, so each negative case is reached with the real proof

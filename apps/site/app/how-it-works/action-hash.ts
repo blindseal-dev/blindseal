@@ -1,4 +1,4 @@
-// Server-side canonical hashing for the "What binds it" demo (BLINDSEAL.md §3.3), byte-for-byte
+// Server-side canonical hashing for the "What binds it" demo, byte-for-byte
 // packages/sdk/src/ix.ts `computeActionHash` / `computeNullifier` (the SDK is TypeScript source
 // outside this app and is not in its transpilePackages, so the layout is mirrored here on
 // node:crypto; page.tsx asserts the result against the attestation's recorded actionHash and

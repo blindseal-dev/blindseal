@@ -5,7 +5,7 @@ import { ROUTES } from './routes';
 export { ROUTES };
 
 // The ONE place the kit is mounted. The kit JS (window.BS) is injected from a useEffect — i.e. only
-// after React has hydrated — and no kit module does anything at load (DECISIONS 2026-10-23: every
+// after React has hydrated — and no kit module does anything at load (every
 // boot()/mount()/observer was stripped from the modules), so the kit can never touch React-owned DOM
 // mid-hydration. The mockups ran their mount sequence on DOMContentLoaded — here it runs once the
 // script has loaded and again on every route change, idempotently, in the same order:
@@ -54,7 +54,7 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   document.querySelectorAll<HTMLElement>('.hero__space, [data-space]').forEach((host) => {
     if (host.hasAttribute('data-space-mounted')) return;
     host.setAttribute('data-space-mounted', '');
-    // phone width: the nebula, never the CRT (site.js mountCrtHero, DECISIONS 2026-10-27)
+    // phone width: the nebula, never the CRT (site.js mountCrtHero)
     const wantCrt = host.getAttribute('data-bg') === 'crt' && !window.matchMedia('(max-width: 719.98px)').matches;
     if (wantCrt && BS.mountCRT?.(host, {})) return;
     if (host.getAttribute('data-bg') === 'crt') host.dataset.bg = 'nebula';
