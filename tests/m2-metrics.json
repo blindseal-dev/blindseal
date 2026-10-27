@@ -1,12 +1,12 @@
 {
-  "measuredAt": "2026-10-27T18:53:52.545Z",
+  "measuredAt": "2026-10-27T20:45:16.168Z",
   "cluster": "localnet",
-  "gatedTransferCU": 268973,
+  "gatedTransferCU": 269024,
   "txBytes": 926,
   "proofBytes": 260,
   "publicInputBytes": 168,
   "anchor": "0.31.1",
   "sp1Solana": "0.1.0",
   "sp1": "5.0.0",
-  "tx": "2pKkbQXdWgkgTDCob7DMr51MikbwnSd2rAzyiKmTpBd7ThQP6tLxYkjKdFS2qTVrsEmxWTEQ6HNcXNGbfq1NRaZQ"
+  "tx": "5frMeem5y9N4KUPgLjhJD6wZ1Z8uFi4TPzGbD5fgphvSr63ziwW7uXDRHQGZxeM7tQWm44RGqRqGcHG2Jkcd4ug4"
 }

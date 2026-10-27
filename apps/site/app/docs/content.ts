@@ -106,7 +106,7 @@ attestation written: attestation.json`, 'shell'),
       ] },
       { id: 'verify', heading: 'Verify it — anywhere', blocks: [
         code(`$ blindseal verify attestation.json        # off-chain, the wasm verifier
-$ blindseal submit attestation.json        # Solana mainnet: verifies on chain, consumes the nullifier
+$ blindseal submit attestation.json --wallet source.json   # Solana mainnet: the gated transfer — transfer-gate verifies and consumes in one transaction
 $ blindseal submit attestation.json --check   # has this nullifier been consumed?`, 'shell'),
         p('Or drop the file on the [verify page](/verify): it runs the same verifier in your browser and uploads nothing. `submit` compares the RPC’s genesis hash with mainnet-beta’s before sending; there is no other cluster. `blindseal audit verify` recomputes the local audit chain, and `blindseal dashboard` reopens the dashboard for a running proxy.'),
       ] },

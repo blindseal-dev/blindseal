@@ -2,6 +2,17 @@
 // release matching packages/proxy's version). Inline markup in a note: `code`, and {{id:<base58>}} /
 // {{sig:<base58>}} for a program id / transaction signature (rendered as a copyable, truncated hash).
 export const RELEASES: { v: string; date: string; added: string[]; changed: string[]; fixed: string[] }[] = [
+  {
+    v: '0.6.0', date: '2026-10-27',
+    added: ['`blindseal submit --wallet <source keypair>` sends the gated transfer through transfer-gate; the SDK’s `submit()` does the same and `decodeNullifier` reads a nullifier record'],
+    changed: [
+      'The verifier only accepts a call from the attestation’s target program, one level deep (instructions sysvar + stack height): a direct call fails with `DirectCallNotAllowed`, any other caller with `CallerNotTargetProgram`. The nullifier records that program as the consumer. This also stops anyone who copies a submitted proof from consuming it before the real transaction lands. Programs upgraded on Solana mainnet: transfer-gate {{sig:2HZ68TJpVvj3oS6td2iRhErGrjVPSt42ftum2Qq5Xnp1jU9NBUqpXMNDaqmC3znUvoMzrEdVHjpv2kctg2RW8bes}}, then the verifier {{sig:3mwn7MYCNH7AA5tz7N4Pp77oygN1aQrZcG42zgeS6TLjHd17gUbY5b7FXqgva4kRN3yFmtugpvcVZeEcw7sCC2Ha}}; both re-verified against the source with solana-verify',
+      'security.txt in both programs points at blindseal.tech',
+      'The sample proof is a new one from a separate demo wallet, consumed through transfer-gate on mainnet ({{sig:4hZUeGx4jAEAGMXwVqoLZmf6BUD3vFYtP1yjfm3vhDGFF8hfTTZCznCnayihErpaG2BgykL2f45sC1HKBChnTTpS}}); its replay was rejected ({{sig:5XcMWnxBnG3YsDMU4dFGYmCWfeXcWzNm2PUaLqE1dQoGEhmdGzFF3XX4XQWa7Xpn2CSS71GsxWxybzYyw6HMAbV5}})',
+      'The previous verifier {{id:merZNYKpKwwX4CGgzvma3jPvLfrMTkZcb1cSXUKANcb}} and transfer-gate {{id:ErAS5x2oUky3aCJPasSKNaf8USVE9of5vzHHCPWwSEVG}} are closed; their past transactions stay on chain',
+    ],
+    fixed: ['A record consumed by a direct call before this release shows as a direct submission, not as program 1111…'],
+  },
   { v: '0.5.4', date: '2026-10-27', added: ['The dashboard ships inside the blindseal npm package and `blindseal run` serves it; `blindseal dashboard` opens it'], changed: ['Wording across the CLI, dashboard and site: model-based checks run locally and are attested, not proven; a TEE mode is planned'], fixed: [] },
   { v: '0.5.3', date: '2026-10-26', added: ['`attest` warns when the last proof on this machine took more than half the expiry window'], changed: ['`attest --expiry` defaults to the current slot + 40,000 (about 4.4 hours); `--expiry` overrides, `--no-expiry` is opt-in'], fixed: [] },
   {

@@ -9,7 +9,11 @@ NEW="${1:?usage: $0 <new-authority-pubkey from the Ledger>}"
 RPC="${BLINDSEAL_RPC_URL:-https://api.mainnet-beta.solana.com}"
 OLD_KEY="$HOME/.blindseal/mainnet-authority.json"
 PROGRAMS=(6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa)
+LEDGER="$(solana-keygen pubkey "usb://ledger?key=0")" || { echo "Ledger not reachable: connect it, unlock it, open the Solana app"; exit 1; }
+[ "$LEDGER" = "$NEW" ] || { echo "the connected Ledger key is $LEDGER, not $NEW — stopping"; exit 1; }
 echo "current authority: $(solana-keygen pubkey "$OLD_KEY")"; echo "new authority (Ledger): $NEW"
+echo "NOTE: this moves the UPGRADE authority only. The verifier's config authority (accepted vkeys, pause, policy roots) stays"
+echo "      with the old key until the program gains an instruction to hand it over — see DECISIONS.md (2026-10-27)."
 for id in "${PROGRAMS[@]}"; do solana program show "$id" --url "$RPC" | grep -E "Program Id|Authority"; done
 read -r -p "Type 'yes' to move both programs to $NEW: " ok; [ "$ok" = "yes" ] || { echo "aborted"; exit 1; }
 for id in "${PROGRAMS[@]}"; do

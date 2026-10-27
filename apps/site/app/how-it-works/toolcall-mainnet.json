@@ -3,7 +3,7 @@
   "args": {
     "to": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
     "lamports": 1000000,
-    "from": "88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj",
-    "memo": "blindseal m2 mainnet acceptance: one gated 0.001 SOL transfer"
+    "from": "GdPZNkh4Ugt3PCauGtUdNVDXsxDHFigbGqy4gjYGNC3L",
+    "memo": "blindseal mainnet sample: one gated 0.001 SOL transfer from the demo wallet"
   }
 }

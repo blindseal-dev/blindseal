@@ -14,8 +14,8 @@ import { TocToggle } from './toc-toggle';
 //
 // Every value page.js pulled from the mockup fixtures comes from real, committed, deterministic
 // sources (fixtures.js is never loaded by the site):
-//   attestation-mainnet.json  the attestation consumed on Solana mainnet-beta on 2026-10-23
-//                             (tests/fixtures/attestation-mainnet.json, verbatim): action fields,
+//   attestation-mainnet.json  the attestation consumed on Solana mainnet-beta on 2026-10-27 through transfer-gate
+//                             from the demo wallet (tests/fixtures/attestation-mainnet-demo.json, verbatim): action fields,
 //                             hashes, nullifier, expiry slot, nonce. Its tx signature is TX_SIG
 //                             (REPORT.md, "Mainnet signatures").
 //   toolcall-mainnet.json     the tool call `blindseal attest` screened for it
