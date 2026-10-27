@@ -23,3 +23,5 @@ packages/dashboard
 tests
 docs
 *.md
+# the site reads the proxy's version from its manifest at build time
+!packages/proxy/package.json
