@@ -1,0 +1,6 @@
+/* Verify page additions for the 02 copy: the pass banner carries a two-sentence explanation (the kit truncates the
+   banner line), and the longer "Try a valid proof" / "Try an altered proof" labels need the action row to wrap. */
+.vf-banner__sub { white-space: normal; overflow: visible; text-overflow: clip; display: block; -webkit-line-clamp: unset; }
+.vf-actions { flex-wrap: wrap; row-gap: var(--s-3); }
+.vf-banner { height: auto; min-height: 64px; align-items: start; padding-top: 12px; padding-bottom: 12px; }
+.vf-banner > :first-child { margin-top: 2px; }

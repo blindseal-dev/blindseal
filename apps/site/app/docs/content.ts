@@ -230,7 +230,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
   },
   {
     slug: 'scope', path: '/docs/scope', group: 'What is proven — and what is not', title: 'What is proven — and what is not', nav: 'What is proven',
-    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.',
+    summary: 'Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn\'t pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.',
     sections: [
       { id: 'plain', heading: 'In plain words', blocks: [
         { kind: 'callout', title: 'What we prove today', body: 'A specific request was checked under a specific set of rules and software version. Its pattern checks passed, and the proof is tied to one exact action.' },
@@ -348,4 +348,4 @@ export function targetsOf(pg: DocPage): Target[] {
 }
 
 // the sidebar footer: the docs track the latest proxy release (the top entry of /changelog)
-export const LATEST = { version: '0.5.0', dateLabel: 'Oct 23, 2026', href: '/changelog' };
+export const LATEST = { version: '0.5.4', dateLabel: 'Oct 27, 2026', href: '/changelog' };

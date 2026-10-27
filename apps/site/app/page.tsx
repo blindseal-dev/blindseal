@@ -31,8 +31,8 @@ export default function Home() {
             <Link className="hero__secondary" href="/docs">Install Blindseal<i data-lucide="arrow-right" /></Link>
           </div>
           <ul className="hero__trust">
-            <li><span className="hero__trust-ico"><i data-lucide="shield-check" /></span>Checks before tools run</li>
-            <li><span className="hero__trust-ico"><i data-lucide="eye-off" /></span>Private instructions and rules stay out of the proof</li>
+            <li><span className="hero__trust-ico"><i data-lucide="file-check" /></span>Checks before tools run</li>
+            <li><span className="hero__trust-ico"><i data-lucide="terminal" /></span>Private instructions and rules stay out of the proof</li>
             <li><span className="hero__trust-ico"><i data-lucide="stamp" /></span>One-time proof checked on Solana</li>
           </ul>
         </div></div>

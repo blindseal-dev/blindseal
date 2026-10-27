@@ -129,7 +129,7 @@ export default function HowItWorks() {
               <div className="hiw-art">
                 <p className="hiw-art__eyebrow">The path</p>
                 <h3 className="hiw-art__title">Every call goes through 127.0.0.1</h3>
-                <p className="hiw-art__body">The agent&apos;s MCP client talks to the proxy instead of the server. The proxy screens each call, forwards what passes to the upstream server, and writes the decision to the local log either way.</p>
+                <p className="hiw-art__body">The agent&apos;s connection to its tools (MCP) goes to the proxy — software on your computer that sits between the agent and its tools — instead of straight to the server. The proxy screens each call, forwards what passes to the upstream server, and writes the decision to the local log either way.</p>
                 <p className="hiw-route"><span>Agent</span><span aria-hidden>→</span><span>Proxy <span className="hiw-route__port" data-port="" /></span><span aria-hidden>→</span><strong data-upstreams="">Tools</strong></p>
               </div>
               <div className="hiw-art">

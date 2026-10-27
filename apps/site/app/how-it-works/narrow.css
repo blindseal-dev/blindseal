@@ -1,6 +1,6 @@
 /* the original technical headings, kept as small captions under the plain-language ones (02 copy) */
 .hiw-caption { margin-top: 6px; font: var(--fw-body) var(--fs-12)/18px var(--font-mono); letter-spacing: .02em; color: var(--muted); }
-.hiw-caption--mast { margin-top: var(--s-3); }
+.hiw-caption--mast { margin: var(--s-3) 0 var(--s-5); }
 /* the phone contents toggle (toc-toggle.tsx) exists only below 720 px */
 .hiw-toc__toggle { display: none; }
 

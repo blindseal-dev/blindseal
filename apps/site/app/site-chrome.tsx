@@ -9,7 +9,7 @@ import { SiteMenu } from './site-menu';
 const req = createRequire(import.meta.url);
 const tpl = req('../kit/site-templates.cjs') as { navHtml: (c: unknown) => string; footerHtml: (c: unknown) => string };
 
-export const SITE_VERSION = '0.5.0';
+export const SITE_VERSION = '0.5.4';
 const CTX = { routes: ROUTES, brand: 'Blindseal', action: { label: 'GitHub', href: 'https://github.com/blindseal-dev/blindseal', external: true }, oneLiner: "Prove an agent's action was screened — without showing what it was.", version: SITE_VERSION };
 
 export function SiteChromeTop() {

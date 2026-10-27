@@ -26,8 +26,8 @@ type Step = { n: number; title: string; idle: string };
 const STEPS: Step[] = [
   { n: 1, title: 'Schema valid', idle: 'Version 1, groth16 on bn254, every required field present.' },
   { n: 2, title: 'Proof verifies', idle: 'In this tab, via blindseal-verifier-wasm (the real groth16 check).' },
-  { n: 3, title: 'Public inputs decoded', idle: 'Payload hash, policy root, detector version, action hash, nullifier, expiry slot.' },
-  { n: 4, title: 'Nullifier status on chain', idle: 'Optional · reads mainnet through this site · the only step that touches the network.' },
+  { n: 3, title: 'Public data decoded', idle: 'Fingerprints of the request, the rules, the software version and the action; the reuse marker; the time limit.' },
+  { n: 4, title: 'Already used on Solana?', idle: 'Optional · reads mainnet through this site · the only step that touches the network.' },
 ];
 const DSTEPS: Step[] = [
   { n: 1, title: 'Schema valid', idle: 'A disclosure window: head, entries, signer and signature present.' },
@@ -122,7 +122,7 @@ export function VerifyClient() {
       }
     }
     function idleBanner() {
-      setBanner('idle', 'Waiting for an attestation', '');
+      setBanner('idle', 'Waiting for a proof', '');
       // the demo path above the fold: the same handlers as the input panel's buttons
       $('.vf-banner__sub', banner).innerHTML =
         '<button type="button" class="btn link vf-banner__link" data-demo="sample">use the valid sample</button>' +
@@ -219,7 +219,7 @@ export function VerifyClient() {
       if (stale(tok)) return;
       let ms = fmt.ms(Math.round(now() - t0));
       if (!res.ok) {
-        setCheck(1, 'fail', { detail: res.loadError ? 'The verifier could not be loaded in this tab.' : 'The proof does not verify against its public inputs.', reason: res.reason || 'proof did not verify', end: res.loadError ? '' : ms });
+        setCheck(1, 'fail', { detail: res.loadError ? 'The verifier could not be loaded in this tab.' : 'The proof does not match its public data.', reason: res.reason || 'proof did not verify', end: res.loadError ? '' : ms });
         skipFrom(2, 'Skipped: the proof did not verify.');
         return done(tok, false, 2, 'Proof verifies');
       }
@@ -227,7 +227,7 @@ export function VerifyClient() {
 
       // 3 · decode
       setCheck(2, 'running');
-      setBanner('running', 'Verifying in this tab', 'Step 3 of 3 · Public inputs decoded', '');
+      setBanner('running', 'Verifying in this tab', 'Step 3 of 3 · Public data decoded', '');
       await hold(220);
       if (stale(tok)) return;
       const dec = decodePublicInputs(att);
@@ -235,8 +235,8 @@ export function VerifyClient() {
         const more = dec.mismatches.length > 1 ? ' (+' + (dec.mismatches.length - 1) + ' more)' : '';
         setCheck(2, 'fail', { detail: 'The blob decodes, but the file’s fields do not match it.', reason: dec.mismatches[0] + more });
         renderKv(dec);
-        skipFrom(3, 'Skipped: the public inputs did not match.');
-        return done(tok, false, 3, 'Public inputs decoded');
+        skipFrom(3, 'Skipped: the public data did not match.');
+        return done(tok, false, 3, 'Public data decoded');
       }
       decoded = dec;
       setCheck(2, 'pass', { detail: 'Six fields from one blob, exactly as the on-chain program reads them; each matches the file.' });
@@ -314,7 +314,7 @@ export function VerifyClient() {
       ];
       kv.innerHTML = items.map((p, i) =>
         '<div class="kv__item" style="--i:' + i + '"><span class="kv__k">' + esc(p[0]) + '</span><span class="kv__v">' + p[1] + '</span></div>').join('') +
-        '<div class="vf-kv__foot"><p class="help">Download them as text; the attestation itself stays here.</p>' +
+        '<div class="vf-kv__foot"><p class="help">Download them as text; the proof file itself stays here.</p>' +
         '<button type="button" class="btn ghost sm" data-dl>' + ico('download') + '<span>Public inputs .txt</span></button></div>';
       kv.hidden = false;
       kv.classList.remove('is-in');
@@ -339,7 +339,7 @@ export function VerifyClient() {
         document.body.appendChild(a); a.click();
         later(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
       } catch { /* no-op */ }
-      BS.toast({ title: 'Saved public-inputs.txt', body: 'Six public inputs as text. The attestation never left this tab.', tone: 'ok', id: 'vf-dl' });
+      BS.toast({ title: 'Saved public-inputs.txt', body: 'The six public values as text. The proof file never left this tab.', tone: 'ok', id: 'vf-dl' });
     }
 
     /* ── step 4: the one network step, on its button (a same-origin server read) ── */
@@ -348,7 +348,7 @@ export function VerifyClient() {
       const tok = runTok;
       const row = $('.vf-n4', li(3)), b = $<HTMLButtonElement>('[data-n4]', row);
       b.disabled = true; b.setAttribute('aria-busy', 'true');
-      setCheck(3, 'running', { detail: 'Looking up the nullifier PDA on mainnet…' });
+      setCheck(3, 'running', { detail: 'Checking Solana for this proof’s reuse marker…' });
       const t0 = now();
       const read = fetch('/verify/nullifier?n=' + encodeURIComponent(decoded.nullifier), { cache: 'no-store' })
         .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j as { consumed: boolean; consumedAtSlot?: number; consumerProgram?: string }; })
@@ -365,7 +365,7 @@ export function VerifyClient() {
         let html: string;
         if (r.r.consumed) html = '<span class="vf-res">' + ui.status('consumed') + '<span>at slot</span><span class="vf-mono num">' + esc(fmt.slot(r.r.consumedAtSlot)) + '</span>' +
           (r.r.consumerProgram ? '<span>by</span>' + ui.hash(r.r.consumerProgram, { label: 'Consumer program', lg: true }) : '') + '</span>';
-        else html = '<span class="vf-res"><span class="chip outline">unused</span><span>No transaction has consumed this nullifier yet.</span></span>';
+        else html = '<span class="vf-res"><span class="chip outline">unused</span><span>This proof has not been used on Solana yet.</span></span>';
         setCheck(3, 'pass', { detail: html, html: true, end: 'mainnet · ' + ms });
         $('span', b).textContent = 'Check again';
       });

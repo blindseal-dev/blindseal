@@ -1,8 +1,9 @@
 /* Home page additions for the 02 copy (three steps, example panel, notes, FAQ, the hero's secondary disclaimer).
    Built from the kit's tokens; nothing here restyles an existing kit class. */
-.hero__note { max-width: 620px; margin-top: calc(-1 * var(--s-3)); font: var(--fw-body) var(--fs-13)/20px var(--font-sans); color: var(--muted); opacity: .85; }
+.hero__note { max-width: 620px; margin-top: 14px; font: var(--fw-body) var(--fs-13)/20px var(--font-sans); color: var(--muted); opacity: .85; }
 .hero__primary { min-height: 44px; }
-.s01-cols.hm-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.s01-cols.hm-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; }   /* the kit indents .s01-cols under its old flow figure */
+.s01-how .s01-more { padding-left: 0; }
 .hm-note { max-width: 760px; margin-top: var(--s-6); font: var(--fw-body) var(--fs-14)/22.4px var(--font-sans); color: var(--muted); text-wrap: pretty; }
 .hm-example { margin-top: var(--s-7); gap: var(--s-3); }
 .hm-example__title { font: var(--fw-medium) var(--fs-20)/28px var(--font-sans); color: var(--ink); text-wrap: balance; }
@@ -21,9 +22,12 @@
 .hm-faq__item[open] .hm-faq__q::after { transform: rotate(45deg); }
 .hm-faq__q:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 4px; }
 .hm-faq__a { display: grid; gap: var(--s-3); padding: 0 0 var(--s-5); max-width: 68ch; font: var(--fw-body) var(--fs-15)/24px var(--font-sans); color: var(--muted); }
-.hm-cta__body { margin: var(--s-3) auto var(--s-6); max-width: 560px; }
-.site-cta .hero__actions { justify-content: center; flex-wrap: wrap; }
+.hm-cta__body { margin: var(--s-3) 0 var(--s-6); max-width: 560px; }
+.site-cta .hero__actions { justify-content: flex-start; flex-wrap: wrap; }
 @media (max-width: 719.98px) {
   .s01-cols.hm-steps { grid-template-columns: minmax(0, 1fr); }
   .hm-note, .s01-hp__rows > li { font-size: var(--fs-15); }
 }
+/* the trust row wraps with the longer 02 items: the kit's dot separators would start a wrapped line, so they go; the gap separates */
+.hero__trust { column-gap: 32px; }
+.hero__trust > li + li::before { display: none; }

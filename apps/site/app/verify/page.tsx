@@ -7,7 +7,7 @@ import { VerifyClient } from './verify-client';
 // mounts, so nothing here depends on time, randomness or the viewport.
 export const metadata: Metadata = {
   title: 'Verify · Blindseal',
-  description: 'Check a Blindseal attestation in your browser. Nothing is uploaded, nothing is stored.',
+  description: 'Check a Blindseal proof in your browser. Nothing is uploaded, nothing is stored.',
 };
 
 export default function VerifyPage() {
@@ -35,7 +35,7 @@ export default function VerifyPage() {
 
           <button type="button" className="vf-drop vf-enter" id="vf-drop" aria-describedby="vf-drop-sub">
             <span className="vf-drop__ico"><i data-lucide="upload" /></span>
-            <span className="vf-drop__title">Drop attestation.json</span>
+            <span className="vf-drop__title">Drop a proof file (attestation.json)</span>
             <span className="vf-drop__sub" id="vf-drop-sub">or choose a file · it is read in this tab, never uploaded</span>
           </button>
           <input type="file" id="vf-file" accept=".json,application/json" hidden />
@@ -55,7 +55,7 @@ export default function VerifyPage() {
             <button type="button" className="glass-btn primary sm vf-enter vf-verify" id="vf-verify" disabled>Verify</button>
           </div>
 
-          <p className="vf-note vf-enter"><i data-lucide="cpu" /><span>Verification runs in the browser via the WASM verifier. The nullifier check is optional and is the only step that touches the network.</span></p>
+          <p className="vf-note vf-enter"><i data-lucide="cpu" /><span>Verification runs in your browser. Checking whether the proof was already used on Solana is optional, and it is the only step that goes online.</span></p>
         </section>
 
         {/* right: checklist */}
@@ -63,7 +63,7 @@ export default function VerifyPage() {
           <div className="vf-head vf-head--split vf-enter">
             <div>
               <p className="site-panel__n">Checklist</p>
-              <h2 className="site-panel__title" id="vf-out-title">What the proof covers</h2>
+              <h2 className="site-panel__title" id="vf-out-title">What was checked</h2>
             </div>
             <span className="vf-source" id="vf-source" hidden />
           </div>
@@ -71,7 +71,7 @@ export default function VerifyPage() {
           <div className="vf-banner vf-enter" id="vf-banner" data-tone="idle" role="status" aria-live="polite">
             <span className="vf-banner__mark" aria-hidden="true" />
             <div className="vf-banner__main">
-              <p className="vf-banner__title">Waiting for an attestation</p>
+              <p className="vf-banner__title">Waiting for a proof</p>
               <p className="vf-banner__sub">Try a valid or an altered proof, drop a file, or paste JSON. The checks fill in, in order.</p>
             </div>
             <span className="vf-banner__end" />
@@ -82,13 +82,13 @@ export default function VerifyPage() {
           <section className="vf-hidden" id="vf-hidden" aria-labelledby="vf-hidden-title" hidden>
             <div className="vf-hidden__head">
               <p className="vf-hidden__n">05</p>
-              <h3 className="vf-hidden__title" id="vf-hidden-title">What this does not reveal</h3>
-              <p className="vf-hidden__lede">The attestation carries hashes and a proof. These stay on the machine that screened the call.</p>
+              <h3 className="vf-hidden__title" id="vf-hidden-title">What the proof covers</h3>
+              <p className="vf-hidden__lede">The proof file carries the proof and digital fingerprints. The private details stay on the computer that checked the request.</p>
             </div>
             <ul className="vf-hidden__rows" id="vf-hidden-rows" />
             <div className="vf-hidden__foot">
               <p className="vf-hidden__k">Public</p>
-              <p className="vf-hidden__pub">That a valid attestation exists · Policy root (a hash) · Detector version · Action hash, expiry, nullifier</p>
+              <p className="vf-hidden__pub">That a valid proof exists · Fingerprint of the security rules · Version of the checking software · Fingerprint of the action, its time limit, and a marker that prevents reuse</p>
             </div>
           </section>
         </section>
