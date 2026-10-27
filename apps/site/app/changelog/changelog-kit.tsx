@@ -141,7 +141,9 @@ export function ChangelogKit({ entries: LOG }: { entries: Entry[] }) {
       let n = 0; const h = window.innerHeight;
       entries.forEach((el) => {
         const r = el.getBoundingClientRect();
-        if (r.top < h * 0.88 && r.bottom > 0) show(el, REVEAL_BASE + REVEAL_STEP * n++);
+        // already on screen when the kit mounts: the server rendered it visible, so it stays visible (no entrance) —
+        // re-hiding it to animate it in would blink
+        if (r.top < h && r.bottom > 0) { el.classList.add('is-in'); n++; }
       });
       io = new IntersectionObserver((hits) => {
         hits.forEach((e) => { if (e.isIntersecting) show(e.target as HTMLElement, 0); });
