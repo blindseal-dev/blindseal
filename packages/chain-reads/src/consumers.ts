@@ -1,5 +1,6 @@
 /// Consumer-program bookkeeping, browser-safe (no node: imports) so the site's client components can use it.
 /// A Nullifier's consumer_program is the gated program on a CPI, or Pubkey::default() on a DIRECT submission.
+/// MIRROR of the same definitions in ./index.ts (see the note there); test/direct.test.ts keeps them in step.
 
 /// Pubkey::default() (32 zero bytes, base58): the verifier's consumer_program on a DIRECT submission —
 /// the attestation was consumed by calling the verifier itself (SDK submit / CLI), no gated program.

@@ -109,3 +109,15 @@ test('getExplorerSnapshot: consumerPrograms keeps the direct entry, flagged', as
     assert.deepEqual(splitConsumers(s.consumerPrograms), { programs: [{ programId: GATE, count: 1, name: 'transfer-gate (example)' }], direct: 1 });
   } finally { restore(); }
 });
+
+test('the browser-safe mirror (consumers.ts) agrees with index.ts', async () => {
+  const idx = await import('../src/index.ts');
+  const mir = await import('../src/consumers.ts');
+  assert.equal(mir.DIRECT_CONSUMER, idx.DIRECT_CONSUMER);
+  assert.deepEqual(mir.KNOWN_PROGRAM_NAMES, idx.KNOWN_PROGRAM_NAMES);
+  const input = [GATE, DIRECT_CONSUMER, 'So11111111111111111111111111111111111111112', GATE, DIRECT_CONSUMER, DIRECT_CONSUMER];
+  assert.deepEqual(mir.aggregateConsumers(input), idx.aggregateConsumers(input));
+  const list = idx.aggregateConsumers(input);
+  assert.deepEqual(mir.splitConsumers(list), idx.splitConsumers(list));
+  for (const v of [GATE, DIRECT_CONSUMER, undefined, null, '']) assert.equal(mir.isDirectConsumer(v), idx.isDirectConsumer(v));
+});
