@@ -120,12 +120,29 @@ export function startProxy(cmd: string, args: string[]): void {
     process.exit(1);
   });
 
-  child.on('exit', (code, signal) => {
+  // Shutdown. The proxy mirrors the child's exit: a code is passed through, a signal is
+  // re-raised on the proxy itself. Our own SIGINT/SIGTERM listeners are removed first — with
+  // them still installed the re-raised signal was swallowed and the proxy never exited.
+  const signalHandlers = new Map<NodeJS.Signals, () => void>();
+  let finishing = false;
+  /// The signal the proxy itself received: re-raised on exit even if the server had to be
+  /// SIGKILLed, so the parent sees the signal it sent.
+  let requested: NodeJS.Signals | null = null;
+  const finish = async (code: number | null, signal: NodeJS.Signals | null): Promise<void> => {
+    if (finishing) return;
+    finishing = true;
+    try { await audit.shutdown(); } catch { /* ignore */ }
+    try { scanStore.close(); } catch { /* ignore */ }
     if (signal) {
+      for (const [sig, h] of signalHandlers) process.removeListener(sig, h);
       process.kill(process.pid, signal);
       return;
     }
     process.exit(code ?? 0);
+  };
+
+  child.on('exit', (code, signal) => {
+    void finish(code, requested ?? signal);
   });
 
   const childStdin = child.stdin;
@@ -361,14 +378,27 @@ export function startProxy(cmd: string, args: string[]): void {
     });
   });
 
+  // SIGINT/SIGTERM: forward to the server and exit when it does (see finish above). A server
+  // that ignores the signal is killed after CHILD_KILL_GRACE_MS so the proxy cannot hang.
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-    process.on(sig, () => {
-      void audit.shutdown();
-      try { scanStore.close(); } catch { /* ignore */ }
-      if (!child.killed) child.kill(sig);
-    });
+    const h = () => {
+      requested ??= sig;
+      if (child.exitCode !== null || child.signalCode !== null) {
+        void finish(null, sig);
+        return;
+      }
+      child.kill(sig);
+      setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      }, CHILD_KILL_GRACE_MS).unref();
+    };
+    signalHandlers.set(sig, h);
+    process.on(sig, h);
   }
 }
+
+/// How long a wrapped server gets to exit after SIGINT/SIGTERM before it is SIGKILLed.
+export const CHILD_KILL_GRACE_MS = 5000;
 
 // Re-exported for tests.
 export type { CapabilityConfig };
