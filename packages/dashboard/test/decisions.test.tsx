@@ -51,3 +51,13 @@ it('shows the token screen on 401', async () => {
   renderPage();
   await waitFor(() => expect(screen.getByText('Dashboard token required')).toBeTruthy());
 });
+
+it('shows a degraded badge on decisions made without layer 2', async () => {
+  mockFetch((u) => u.includes('/status') ? { status: 200, body: STATUS } : { status: 200, body: { items: [{ ...dec('d1', 'pass'), degraded: true }, dec('d2', 'pass')] } });
+  const { container } = renderPage();
+  await waitFor(() => expect(within(container).getAllByText('list_channels').length).toBe(2));
+  const rows = Array.from(container.querySelectorAll('tr.d01-row'));
+  const badge = (id: string) => rows.find((r) => r.getAttribute('data-id') === id)!.querySelector('.d01-degraded');
+  expect(badge('d1')?.textContent).toBe('degraded');
+  expect(badge('d2')).toBeNull();
+});

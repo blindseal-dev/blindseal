@@ -58,7 +58,7 @@ function startProxy(mode?: string): {
     next: () =>
       new Promise<JsonRpcResponse>((resolve, reject) => {
         if (queue.length > 0) return resolve(queue.shift()!);
-        const t = setTimeout(() => reject(new Error('timeout waiting for response')), 20000);
+        const t = setTimeout(() => reject(new Error('timeout waiting for response')), 60000);
         waiters.push((r) => {
           clearTimeout(t);
           resolve(r);

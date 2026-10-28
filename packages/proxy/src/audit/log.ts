@@ -22,6 +22,10 @@ export interface DetectionAuditEntry {
   mutated: boolean;
   reasoning?: string;
   contentPreview?: string;
+  /// 'request' = tool-call arguments screened before forwarding; absent = tool response.
+  direction?: 'request';
+  /// Present (true) only when layer 2 was unavailable for this decision.
+  degraded?: boolean;
 }
 
 export interface CapabilityAuditEntry {

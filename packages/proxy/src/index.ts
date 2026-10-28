@@ -4,6 +4,8 @@ import { startScanHttp } from './transports/scan-http.js';
 import { runDemo } from './cli/demo.js';
 import { runHistoryCli } from './cli/history.js';
 import { packageVersion } from './paths.js';
+import { loadConfig } from './config.js';
+import { preflightLayer2 } from './detection/layer2-preflight.js';
 
 const HELP = `blindseal — a local MCP proxy that screens every tool call, keeps a hash-chained audit
 log, and produces zero-knowledge attestations verifiable on Solana.
@@ -36,6 +38,9 @@ Proxy flags
   --port, --listen-port <n>           default: 8800 (http) / 9787 (scan-http)
   --host <addr>                       default: 127.0.0.1
   --server-url <url>                  logical server identifier for scan-http (default: scan-http:blindseal)
+  --allow-degraded                    start even if the layer-2 embedding model fails to load (block
+                                      mode otherwise refuses to start, exit code 4); decisions made
+                                      without layer 2 are marked degraded
   --version, -v                       print version
   --help, -h                          this help
 
@@ -47,6 +52,9 @@ Detection (env)
   BLINDSEAL_LAYER3_BASE_URL      base URL override (ollama or custom endpoint)
   BLINDSEAL_LAYER3_TIMEOUT_MS    judge call hard timeout (default 15000)
   BLINDSEAL_L3_FP_SAFE           1 = demote suspicious→clean when L3 unavailable
+  BLINDSEAL_MODEL_DIR            cache directory for the layer-2 embedding model
+  BLINDSEAL_MODEL_HOST           mirror to download the layer-2 model from (default: Hugging Face Hub)
+  BLINDSEAL_MODEL_OFFLINE        1 = never download the layer-2 model (it must already be cached)
   ANTHROPIC_API_KEY              BYO key for Layer 3 (Anthropic)  ← strongly recommended
   OPENAI_API_KEY                 BYO key for Layer 3 (OpenAI / compat)
   OLLAMA_HOST                    Ollama base URL (default: http://localhost:11434); set to enable offline L3
@@ -80,7 +88,7 @@ Nothing leaves this machine except the RPC calls you ask for (attest/submit/veri
 `;
 
 const SUBCOMMANDS = new Set(['init', 'run', 'dashboard', 'demo', 'attest', 'submit', 'verify', 'audit', 'history']);
-const PROXY_FLAGS = new Set(['--', '--transport', '--upstream', '--port', '--listen-port', '--host', '--server-url']);
+const PROXY_FLAGS = new Set(['--', '--transport', '--upstream', '--port', '--listen-port', '--host', '--server-url', '--allow-degraded']);
 
 interface ParsedArgs {
   transport: 'stdio' | 'http' | 'scan-http';
@@ -88,6 +96,7 @@ interface ParsedArgs {
   port?: number;
   host?: string;
   serverUrl?: string;
+  allowDegraded?: boolean;
   stdioTarget?: { cmd: string; args: string[] };
 }
 
@@ -101,6 +110,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let port: number | undefined;
   let host: string | undefined;
   let serverUrl: string | undefined;
+  let allowDegraded = false;
 
   for (let i = 0; i < flagArgs.length; i++) {
     const a = flagArgs[i];
@@ -119,6 +129,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       host = flagArgs[++i];
     } else if (a === '--server-url') {
       serverUrl = flagArgs[++i];
+    } else if (a === '--allow-degraded') {
+      allowDegraded = true;
     } else if (a && a.startsWith('--')) {
       throw new Error(`unknown flag: ${a}`);
     } else if (a) {
@@ -128,18 +140,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   if (transport === 'http') {
     if (!upstream) throw new Error('--transport http requires --upstream <url>');
-    return { transport, upstream, port: port ?? 8800, host: host ?? '127.0.0.1' };
+    return { transport, upstream, port: port ?? 8800, host: host ?? '127.0.0.1', allowDegraded };
   }
 
   if (transport === 'scan-http') {
-    return { transport, port: port ?? 9787, host: host ?? '127.0.0.1', serverUrl };
+    return { transport, port: port ?? 9787, host: host ?? '127.0.0.1', serverUrl, allowDegraded };
   }
 
   // stdio: the target command must come after `--`
   if (sepIdx < 0) throw new Error('wrapping an MCP server requires "--": blindseal -- <command> [args...]');
   const cmd = afterSep[0];
   if (!cmd) throw new Error('no command after "--": blindseal -- <command> [args...]');
-  return { transport: 'stdio', stdioTarget: { cmd, args: afterSep.slice(1) } };
+  return { transport: 'stdio', allowDegraded, stdioTarget: { cmd, args: afterSep.slice(1) } };
 }
 
 function fail(prefix: string, err: unknown): never {
@@ -217,6 +229,14 @@ function main(): void {
     process.exit(2);
   }
 
+  // Layer-2 preflight runs before any server is spawned or port opened.
+  void preflightLayer2({ mode: loadConfig().mode, allowDegraded: parsed.allowDegraded === true }).then((pre) => {
+    if (pre.exitCode !== undefined) process.exit(pre.exitCode);
+    startTransport(parsed);
+  });
+}
+
+function startTransport(parsed: ParsedArgs): void {
   if (parsed.transport === 'http') {
     startHttpProxy({ upstream: parsed.upstream!, listenPort: parsed.port!, listenHost: parsed.host });
     return;

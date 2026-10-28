@@ -18,6 +18,9 @@ export interface DetectionResult {
   distance?: number;
   l3Status?: L3Status;
   bypassReason?: string;
+  /// True when Layer 2 (embeddings) was unavailable for this decision: the verdict came from
+  /// Layer 3 (if configured) or Layer 1 alone.
+  degraded?: boolean;
 }
 
 export function rankVerdict(v: Verdict): number {

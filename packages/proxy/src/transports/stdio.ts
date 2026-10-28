@@ -25,8 +25,11 @@ import {
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
+  buildOutboundBlockedResponse,
+  inspectToolCallArguments,
   inspectToolCallResponse,
   isToolCallResponse,
+  responseText,
   tryParse,
   type JsonRpcMessage,
   type ToolCallResult,
@@ -38,12 +41,8 @@ function addResponseToTaint(
   taint: TaintStore,
   trusted: boolean,
 ): void {
-  const now = Date.now();
-  for (const item of msg.result.content) {
-    if (item.type === 'text' && typeof item.text === 'string' && item.text.length > 0) {
-      taint.add({ toolName, content: item.text, addedAt: now, trusted });
-    }
-  }
+  const content = responseText(msg.result);
+  if (content.length > 0) taint.add({ toolName, content, addedAt: Date.now(), trusted });
 }
 
 function reportManifestVerdict(verdict: ManifestVerdict, mode: 'on' | 'strict'): void {
@@ -151,6 +150,35 @@ export function startProxy(cmd: string, args: string[]): void {
       const params = msg.params as { name?: unknown; arguments?: unknown } | undefined;
       const name = params && typeof params.name === 'string' ? params.name : null;
       if (name) {
+        // Outbound screen (L0 + L1) on the arguments before anything else sees them.
+        const outbound = inspectToolCallArguments(name, params?.arguments, config.mode);
+        if (outbound.verdict !== 'clean') {
+          process.stderr.write(
+            `blindseal: ${outbound.verdict} (L${outbound.layer ?? '?'}) arguments to '${name}' (mode=${config.mode}, ${outbound.action === 'block' ? 'not forwarded' : 'forwarded'})\n`,
+          );
+          if (audit.enabled) {
+            audit.log({
+              type: 'detection',
+              direction: 'request',
+              toolName: name,
+              layer: outbound.layer ?? null,
+              verdict: outbound.verdict,
+              confidence: outbound.result?.confidence ?? 0,
+              patterns: outbound.result?.detectedPatterns ?? [],
+              mode: config.mode,
+              mutated: outbound.action === 'block',
+              reasoning: outbound.result?.reasoning,
+              contentPreview: preview(outbound.scannedText),
+            });
+          }
+          if (outbound.action === 'block' && outbound.result) {
+            process.stdout.write(
+              JSON.stringify(buildOutboundBlockedResponse(msg.id, name, outbound.result)) + '\n',
+            );
+            return; // never forwarded to the server
+          }
+        }
+
         toolNameById.set(msg.id, name);
 
         const decision = mergeDecisions(
@@ -240,14 +268,13 @@ export function startProxy(cmd: string, args: string[]): void {
         const outcome = await inspectToolCallResponse(msg, toolName, config.mode);
         if (outcome.verdict !== 'clean') {
           process.stderr.write(
-            `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
+            `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
           );
         }
         if (audit.enabled) {
-          const previewText = (msg.result.content
-            .map((c) => (typeof c.text === 'string' ? c.text : ''))
-            .join('\n'));
+          const previewText = responseText(msg.result);
           audit.log({
+            ...(outcome.degraded ? { degraded: true } : {}),
             type: 'detection',
             toolName,
             layer: outcome.layer ?? null,
@@ -261,9 +288,7 @@ export function startProxy(cmd: string, args: string[]): void {
           });
         }
         if (scanStore.enabled) {
-          const rawText = msg.result.content
-            .map((c) => (typeof c.text === 'string' ? c.text : ''))
-            .join('\n');
+          const rawText = responseText(msg.result);
           try {
             scanStore.insert({
               serverKey: serverIdentifier,
@@ -278,6 +303,7 @@ export function startProxy(cmd: string, args: string[]): void {
               reasoning: outcome.result?.reasoning ?? null,
               mode: config.mode,
               mutated: outcome.mutated,
+              degraded: outcome.degraded,
             });
           } catch (err) {
             process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
