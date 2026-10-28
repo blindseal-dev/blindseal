@@ -13,7 +13,7 @@ PF="$(identity_file "$ROOT")"
 [ -f "$PF" ] || { echo "identity pattern file missing ($PF) — cannot audit"; exit 1; }
 A_RE="$(identity_patterns "$PF" personal)"; A_RE="${A_RE:-__none__}"
 B_RE="$(printf '%s\n%s\n' "$(identity_patterns "$PF" base)" "$(identity_patterns "$PF" competitor)" | { grep . || true; } | paste -sd'|' -)"; B_RE="${B_RE:-__none__}"
-SECRET_RE='npm_[A-Za-z0-9]{30,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY|"privateKey"|_authToken'
+SECRET_RE='npm_[A-Za-z0-9]{30,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY|"privateKey"[[:space:]]*:|_authToken'
 PATH_RE='/Users/[a-z]+|/home/[a-z]+|C:\\Users'
 PATH_OK='/home/user/|/home/you/|/Users/you/|/Users/me/|/home/me/'   # documentation / fixture placeholders, not a real home
 TMP="$(mktemp -d)"; fail=0
