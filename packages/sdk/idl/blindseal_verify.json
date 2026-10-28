@@ -149,6 +149,61 @@
       ]
     },
     {
+      "name": "set_authority",
+      "docs": [
+        "Authority only, and the new authority must co-sign (a typo cannot brick the config).",
+        "`new_authority` must equal the co-signing account."
+      ],
+      "discriminator": [
+        133,
+        250,
+        37,
+        21,
+        110,
+        163,
+        26,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "new_authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "set_config",
       "docs": [
         "Authority only. Each field is optional so a single call can flip just `paused`."
@@ -322,6 +377,19 @@
   ],
   "events": [
     {
+      "name": "AuthorityChanged",
+      "discriminator": [
+        31,
+        19,
+        174,
+        152,
+        4,
+        82,
+        215,
+        226
+      ]
+    },
+    {
       "name": "Consumed",
       "discriminator": [
         30,
@@ -405,6 +473,11 @@
       "code": 6013,
       "name": "CallerNotTargetProgram",
       "msg": "calling program is not the action's target program"
+    },
+    {
+      "code": 6014,
+      "name": "NewAuthorityMismatch",
+      "msg": "new_authority argument does not match the co-signing new authority account"
     }
   ],
   "types": [
@@ -458,6 +531,22 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_authority",
+            "type": "pubkey"
           }
         ]
       }

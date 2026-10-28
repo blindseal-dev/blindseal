@@ -22,4 +22,13 @@ for p in blindseal_verify transfer_gate; do
   echo "→ anchor idl build $p"
   ( cd "$ROOT" && CARGO_TARGET_DIR="$ROOT/target/idl-build" anchor idl build -p "$p" -o "target/idl/$p.json" -t "target/types/$p.ts" )
 done
+# transfer-gate numbers its errors from 7000 (#[error_code(offset = 7000)], so they never collide with
+# the verifier's 6000+ in the same transaction); anchor 0.31's IDL generator drops the offset, so
+# apply it to the generated IDL + types here.
+node -e '
+const fs = require("fs");
+for (const f of process.argv.slice(1)) {
+  const s = fs.readFileSync(f, "utf8");
+  fs.writeFileSync(f, s.replace(/("code": )(60\d\d)/g, (_, k, n) => k + (Number(n) + 1000)));
+}' "$ROOT/target/idl/transfer_gate.json" "$ROOT/target/types/transfer_gate.ts"
 ls -la "$ROOT/target/deploy/"*.so "$ROOT/target/idl/"*.json

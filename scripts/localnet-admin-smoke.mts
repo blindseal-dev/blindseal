@@ -2,11 +2,11 @@
 // built programs — initialize → decodeConfig → set_config(paused) → register_policy_root.
 // Exercises Anchor wire encoding, PDA seeds and the authority checks without a Groth16 proof.
 import { Connection, Keypair, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
-import { buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, decodeConfig, configPda, policyRootPda, PROGRAM_ID, TRANSFER_GATE_ID, hex } from 'blindseal-sdk';
+import { buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, decodeConfig, configPda, policyRootPda, PROGRAM_ID, TRANSFER_GATE_ID, hex, CURRENT_VKEY, DEFAULT_POLICY_ROOT } from 'blindseal-sdk';
 const conn = new Connection('http://127.0.0.1:8899', 'confirmed');
 const auth = Keypair.generate();
-const vkey = hex('0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e');
-const root = hex('0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397');
+const vkey = hex(CURRENT_VKEY);
+const root = hex(DEFAULT_POLICY_ROOT);
 const send = async (label: string, ix: any, signer = auth) => {
   const tx = new Transaction().add(ix); tx.feePayer = signer.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash; tx.sign(signer);

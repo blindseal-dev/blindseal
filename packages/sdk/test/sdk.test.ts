@@ -100,7 +100,7 @@ describe('buildGatedTransferIx', () => {
     expect(accts.map((a: any) => a.name)).toEqual(['config', 'policy_root', 'nullifier', 'payer', 'system_program', 'instructions']);
     expect(accts[5].address).toBe(SYSVAR_INSTRUCTIONS_PUBKEY.toBase58());
     const errs = idl.errors.map((e: any) => [e.code, e.name]);
-    expect(errs.slice(-3)).toEqual([[6011, 'DirectCallNotAllowed'], [6012, 'NestedCallNotAllowed'], [6013, 'CallerNotTargetProgram']]);
+    expect(errs.slice(11)).toEqual([[6011, 'DirectCallNotAllowed'], [6012, 'NestedCallNotAllowed'], [6013, 'CallerNotTargetProgram'], [6014, 'NewAuthorityMismatch']]);
   });
 });
 

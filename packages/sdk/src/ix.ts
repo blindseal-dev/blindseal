@@ -14,6 +14,20 @@ export const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
  *  action (the transfer-gate transaction measures ~269k on localnet, docs/performance.md). */
 export const VERIFY_CU_LIMIT = 400_000;
 
+/** detectorVersion (= SP1 vkey hash of the guest ELF) of the CURRENT guest: release 0.7.0, which binds
+ *  the screened payload to the action before hashing (crates/guest/elf; `cargo prove vkey --elf`). */
+export const CURRENT_VKEY = '0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967';
+/** Earlier guests still recognised so existing attestations (the mainnet samples, history) keep
+ *  verifying. Pre-0.7.0 guests did NOT bind the payload to the action; the owner removes these from
+ *  the on-chain allowlist once a sample under CURRENT_VKEY has landed. */
+export const LEGACY_VKEYS: readonly string[] = ['0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e'];
+/** On-chain cap on allowed_vkeys (blindseal-verify MAX_VKEYS). */
+export const MAX_VKEYS = 8;
+/** Default vkey allowlist for a fresh Config: the current guest + the legacy ones. */
+export const DEFAULT_ALLOWED_VKEYS: readonly string[] = [CURRENT_VKEY, ...LEGACY_VKEYS];
+/** The default policy root (detector-core's L1 rules + zero-width threshold; evals/vectors/policy-root.txt). */
+export const DEFAULT_POLICY_ROOT = '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397';
+
 export const ACTION_DOMAIN = 'blindseal.action.v1';
 export const NULLIFIER_DOMAIN = 'blindseal.nullifier.v1';
 
@@ -206,8 +220,10 @@ const boolB = (b: boolean) => Buffer.from([b ? 1 : 0]);
 const vecVkeys = (v: Uint8Array[]) => { const len = Buffer.alloc(4); len.writeUInt32LE(v.length); return Buffer.concat([len, ...v.map((k) => Buffer.from(k))]); };
 const option = (present: boolean, body: Buffer) => (present ? Buffer.concat([Buffer.from([1]), body]) : Buffer.from([0]));
 
-/** `initialize(allowed_vkeys, allowlist_policies)` — creates the Config PDA; `authority` pays and becomes the authority. */
-export function buildInitializeIx(authority: PublicKey, allowedVkeys: Uint8Array[], allowlistPolicies: boolean, programId = PROGRAM_ID): TransactionInstruction {
+/** `initialize(allowed_vkeys, allowlist_policies)` — creates the Config PDA; `authority` pays and becomes the authority.
+ *  Defaults (0.7.0): the current + legacy vkeys, and approved policies ON — only attestations under a
+ *  registered policy root verify (register it with `buildRegisterPolicyRootIx`, or use `buildDefaultInitIxs`). */
+export function buildInitializeIx(authority: PublicKey, allowedVkeys: Uint8Array[] = DEFAULT_ALLOWED_VKEYS.map(hex), allowlistPolicies = true, programId = PROGRAM_ID): TransactionInstruction {
   return new TransactionInstruction({
     programId,
     keys: [
@@ -247,6 +263,29 @@ export function buildRegisterPolicyRootIx(authority: PublicKey, root: Uint8Array
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.concat([discriminator('register_policy_root'), Buffer.from(root)]),
+  });
+}
+
+/** The default initialisation: `initialize(current + legacy vkeys, allowlist_policies = true)` then
+ *  `register_policy_root(DEFAULT_POLICY_ROOT)` — approved policies on, the default policy approved. */
+export function buildDefaultInitIxs(authority: PublicKey, programId = PROGRAM_ID): TransactionInstruction[] {
+  return [
+    buildInitializeIx(authority, DEFAULT_ALLOWED_VKEYS.map(hex), true, programId),
+    buildRegisterPolicyRootIx(authority, hex(DEFAULT_POLICY_ROOT), programId),
+  ];
+}
+
+/** `set_authority(new_authority)` — hands the Config authority over. BOTH the current authority and
+ *  `newAuthority` must sign (a mistyped key cannot take the config); emits `AuthorityChanged`. */
+export function buildSetAuthorityIx(authority: PublicKey, newAuthority: PublicKey, programId = PROGRAM_ID): TransactionInstruction {
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: configPda(programId), isSigner: false, isWritable: true },
+      { pubkey: authority, isSigner: true, isWritable: false },
+      { pubkey: newAuthority, isSigner: true, isWritable: false },
+    ],
+    data: Buffer.concat([discriminator('set_authority'), newAuthority.toBuffer()]),
   });
 }
 

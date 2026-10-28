@@ -31,6 +31,14 @@
 //!
 //! CPI-only. The gated program must pass the action fields IT is about to execute (see
 //! transfer-gate), never fields supplied by the agent, and must forward the instructions sysvar.
+//!
+//! Which payload a proof may carry for an action is the guest's job (0.7.0): before hashing, the
+//! guest parses the screened tool call and asserts it describes exactly the bound action, so a
+//! proof whose actionHash matches the caller's action here was screened for that action.
+//!
+//! Admin (authority only): `set_config`, `register_policy_root`, and `set_authority(new)` — the
+//! handover needs BOTH the current and the new authority to sign, so a mistyped key cannot take
+//! the config; it emits `AuthorityChanged`.
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
     hash::hashv,
@@ -97,6 +105,17 @@ pub mod blindseal_verify {
         if let Some(p) = paused {
             c.paused = p;
         }
+        Ok(())
+    }
+
+    /// Authority only, and the new authority must co-sign (a typo cannot brick the config).
+    /// `new_authority` must equal the co-signing account.
+    pub fn set_authority(ctx: Context<SetAuthority>, new_authority: Pubkey) -> Result<()> {
+        require_keys_eq!(ctx.accounts.new_authority.key(), new_authority, VerifyError::NewAuthorityMismatch);
+        let c = &mut ctx.accounts.config;
+        let old_authority = c.authority;
+        c.authority = new_authority;
+        emit!(AuthorityChanged { old_authority, new_authority });
         Ok(())
     }
 
@@ -309,6 +328,20 @@ pub struct AuthorityOnly<'info> {
     pub authority: Signer<'info>,
 }
 
+#[event]
+pub struct AuthorityChanged {
+    pub old_authority: Pubkey,
+    pub new_authority: Pubkey,
+}
+
+#[derive(Accounts)]
+pub struct SetAuthority<'info> {
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump, has_one = authority @ VerifyError::Unauthorized)]
+    pub config: Account<'info, Config>,
+    pub authority: Signer<'info>,
+    pub new_authority: Signer<'info>,
+}
+
 #[derive(Accounts)]
 #[instruction(root: [u8; 32])]
 pub struct RegisterPolicyRoot<'info> {
@@ -369,4 +402,7 @@ pub enum VerifyError {
     NestedCallNotAllowed,
     #[msg("calling program is not the action's target program")]
     CallerNotTargetProgram,
+    // Appended (0.7.0).
+    #[msg("new_authority argument does not match the co-signing new authority account")]
+    NewAuthorityMismatch,
 }

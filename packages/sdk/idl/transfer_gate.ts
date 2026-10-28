@@ -91,5 +91,17 @@ export type TransferGate = {
         }
       ]
     }
+  ],
+  "errors": [
+    {
+      "code": 7000,
+      "name": "unexpectedPolicyRoot",
+      "msg": "attestation's policy root is not one this gated program expects"
+    },
+    {
+      "code": 7001,
+      "name": "badPublicInputs",
+      "msg": "public inputs must be 168 bytes"
+    }
   ]
 };

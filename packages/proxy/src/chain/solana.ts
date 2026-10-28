@@ -22,15 +22,15 @@ export interface SolanaAction {
 const SYSTEM_PROGRAM = '11111111111111111111111111111111';
 const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
-const RECIPIENT_KEYS = ['recipient', 'to', 'destination', 'dest', 'receiver', 'toPubkey', 'toAddress'];
-const AMOUNT_KEYS = ['amount', 'lamports', 'value', 'tokenAmount', 'quantity'];
-const MINT_KEYS = ['mint', 'token', 'tokenMint', 'mintAddress'];
-const AUTHORITY_KEYS = ['authority', 'owner', 'from', 'source', 'payer', 'fromPubkey', 'signer'];
-const PROGRAM_KEYS = ['program', 'programId', 'programAddress'];
+export const RECIPIENT_KEYS = ['recipient', 'to', 'destination', 'dest', 'receiver', 'toPubkey', 'toAddress'];
+export const AMOUNT_KEYS = ['amount', 'lamports', 'value', 'tokenAmount', 'quantity'];
+export const MINT_KEYS = ['mint', 'token', 'tokenMint', 'mintAddress'];
+export const AUTHORITY_KEYS = ['authority', 'owner', 'from', 'source', 'payer', 'fromPubkey', 'signer'];
+export const PROGRAM_KEYS = ['program', 'programId', 'programAddress'];
 
-const TRANSFER_TOOL = /(?:^|_|\b)(?:transfer|send|pay|spl[_-]?transfer|transfer[_-]?checked)(?:_|\b|$)/i;
+export const TRANSFER_TOOL = /(?:^|_|\b)(?:transfer|send|pay|spl[_-]?transfer|transfer[_-]?checked)(?:_|\b|$)/i;
 
-function firstString(obj: Record<string, unknown>, keys: string[]): string | undefined {
+export function firstString(obj: Record<string, unknown>, keys: string[]): string | undefined {
   for (const k of keys) {
     const v = obj[k];
     if (typeof v === 'string' && v.length > 0) return v;
