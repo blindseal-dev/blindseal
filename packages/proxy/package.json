@@ -1,6 +1,6 @@
 {
   "name": "blindseal",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Blindseal — a local MCP proxy that screens every tool call (four detection layers), redacts before the model-based layers, keeps a hash-chained audit log, and produces zero-knowledge attestations verifiable on Solana.",
   "license": "MIT",
   "homepage": "https://blindseal.tech",
@@ -49,7 +49,7 @@
     "vitest": "^2.1.0",
     "@blindseal/redactor": "workspace:*",
     "@blindseal/audit": "workspace:*",
-    "blindseal-sdk": "workspace:^0.6.0",
+    "blindseal-sdk": "workspace:^0.7.0",
     "@blindseal/chain-reads": "workspace:*"
   },
   "keywords": [

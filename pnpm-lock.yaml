@@ -229,7 +229,7 @@ importers:
         specifier: ^22.10.0
         version: 22.19.19
       blindseal-sdk:
-        specifier: workspace:^0.6.0
+        specifier: workspace:^0.7.0
         version: link:../sdk
       tsup:
         specifier: ^8.3.0
