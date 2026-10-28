@@ -92,6 +92,8 @@ const BENIGN = {
   benign_link: `{"jsonrpc":"2.0","id":__ID__,"result":{"content":[{"type":"resource_link","uri":"file:///project/README.md","name":"README.md","description":"Project overview and setup steps"}]}}`,
   benign_error: `{"jsonrpc":"2.0","id":__ID__,"error":{"code":-32602,"message":"Unknown tool: nope","data":{"tool":"nope"}}}`,
   benign_structured: `{"jsonrpc":"2.0","id":__ID__,"result":{"content":[{"type":"text","text":"22.5 C"}],"structuredContent":{"temperature":22.5,"conditions":"Partly cloudy"}}}`,
+  // Mostly-silent PCM: its base64 is nearly all "A", which a character-ratio media test misread.
+  benign_audio: `{"jsonrpc":"2.0","id":__ID__,"result":{"content":[{"type":"audio","data":"${Buffer.alloc(120_000).toString('base64')}","mimeType":"audio/wav"}]}}`,
 };
 // Before its real reply, `stray` sends a reply to an id nobody asked for (must be dropped).
 const STRAY = `{"jsonrpc":"2.0","id":999999,"result":{"content":[{"type":"text","text":${lit(INJ)}}]}}`;

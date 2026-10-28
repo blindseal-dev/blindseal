@@ -225,33 +225,34 @@ export interface ScreenOutcome {
   degraded: boolean;
 }
 
-/// A long string that is only base64 (image `data`, resource `blob`) gets L0/L1 on its own and
-/// is left out of the model-layer text: embedding base64 tells L2 nothing and costs seconds.
-const MEDIA_MIN = 1024;
-/// Line breaks are allowed (wrapped base64), spaces are not. Base64 of binary data is also
-/// mixed-case with digits throughout; text joined by '/', '_' or '-' is not, and must reach L2/L3.
-const BASE64_RE = /^[A-Za-z0-9+/_-]+={0,2}$/;
-function isMediaString(s: string): boolean {
-  if (s.length < MEDIA_MIN) return false;
-  const t = s.replace(/\r?\n/g, '');
-  if (!BASE64_RE.test(t)) return false;
-  let upper = 0, digit = 0;
-  for (let i = 0; i < t.length; i++) {
-    const c = t.charCodeAt(i);
-    if (c >= 65 && c <= 90) upper++;
-    else if (c >= 48 && c <= 57) digit++;
-  }
-  return upper / t.length >= 0.2 && digit / t.length >= 0.05;
+/// Binary payloads by PROTOCOL position (never by value, and never by how the characters look): `data` of an image or
+/// audio content item and `blob` of an embedded resource (MCP's base64 fields). The agent's model
+/// receives these as media, not as text, so they are not text-screened at all: embedding base64
+/// tells L2 nothing, it trips the large-base64-blob heuristic, and L0/L1 are quadratic on long
+/// uniform runs (a silent audio clip is ~all "A"), which stalled the proxy for minutes.
+/// (A character-ratio test was tried and both let prose through and rejected real PCM audio.)
+function stripMedia(body: Obj): Obj {
+  const result = body.result;
+  if (!isPlainObject(result) || !Array.isArray(result.content)) return body;
+  const marker = (v: string) => `[media: ${v.length} chars]`;
+  const content = result.content.map((item) => {
+    if (!isPlainObject(item)) return item;
+    let out = item;
+    const copy = () => (out === item ? (out = Object.assign(Object.create(null) as Obj, item)) : out);
+    if ((item.type === 'image' || item.type === 'audio') && typeof item.data === 'string') copy().data = marker(item.data);
+    if (isPlainObject(item.resource) && typeof item.resource.blob === 'string') {
+      copy().resource = Object.assign(Object.create(null) as Obj, item.resource, { blob: marker(item.resource.blob) });
+    }
+    return out;
+  });
+  const r = Object.assign(Object.create(null) as Obj, result, { content });
+  return Object.assign(Object.create(null) as Obj, body, { result: r });
 }
 
-/// Strings in a body that the model layers (and the joined passes) need not see again: text
-/// items already screened on their own, and media. Replaced by a short marker, structure kept.
+/// The body with strings already screened on their own (text items) replaced by a short marker,
+/// structure kept.
 function withoutScreened(v: unknown, skip: Set<string>): unknown {
-  if (typeof v === 'string') {
-    if (skip.has(v)) return '[screened separately]';
-    if (isMediaString(v)) return `[media: ${v.length} chars]`;
-    return v;
-  }
+  if (typeof v === 'string') return skip.has(v) ? '[screened separately]' : v;
   if (Array.isArray(v)) return v.map((x) => withoutScreened(x, skip));
   if (isPlainObject(v)) {
     const o = Object.create(null) as Obj;
@@ -295,6 +296,7 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
   const body = messageBody(msg);
   const texts = textSurfaces(body.result);
   const skip = new Set(texts);
+  const noMedia = stripMedia(body);
   let worst: DetectionResult | null = null;
   let degraded = false;
   const consider = (r: DetectionResult) => {
@@ -308,20 +310,20 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
 
     // L0/L1 on every other string on its own (keys included): an injection is never diluted
     // by, or split across, its neighbours.
-    for (const s of stringLeaves(body)) {
+    for (const s of stringLeaves(noMedia)) {
       if (skip.has(s) || s.length < 8) continue;
       consider(runOutboundScreen(s));
     }
     // And L0/L1 over the string VALUES joined in the order the agent receives them (the passes
     // below sort keys and interleave them): a phrase split across neighbouring fields must not
     // slip between two leaves.
-    consider(runOutboundScreen(stringLeaves(body, 'as-sent', false).join('\n')));
-    consider(runOutboundScreen(stringLeaves(body, 'as-sent', true).join('\n'))); // keys too: a phrase split around a key
+    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', false).join('\n')));
+    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', true).join('\n'))); // keys too: a phrase split around a key
 
-    const rest = withoutScreened(body, skip);
+    const rest = withoutScreened(noMedia, skip);
     const leaves = stringLeaves(rest);
     if (leaves.every((s) => STRUCTURAL.has(s))) return;
-    const redacted = withoutScreened(redactStructure(body).value, skip);
+    const redacted = withoutScreened(redactStructure(noMedia).value, skip);
     const json = stableStringify(rest);
     consider(await runPipeline(json, ctx, { modelText: stableStringify(redacted) }));
     const joined = leaves.join('\n');

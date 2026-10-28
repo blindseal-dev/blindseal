@@ -303,3 +303,26 @@ describe('third review', () => {
     expect(() => parseJson('['.repeat(200) + ']'.repeat(200))).not.toThrow();
   });
 });
+
+describe('media is decided by protocol field, not by character ratios (fourth review)', () => {
+  it('~300 KB of low-entropy PCM audio is clean and does not take seconds', async () => {
+    // Silence with a short quiet blip: real WAV output is often mostly zero samples, whose base64
+    // has almost no digits (the ratio test treated it as text and L1 flagged it as a base64 blob).
+    const pcm = Buffer.alloc(220_000);
+    for (let i = 0; i < 2000; i++) pcm.writeInt16LE(Math.round(40 * Math.sin(i / 20)), 100_000 + i * 2);
+    const data = pcm.toString('base64');
+    const t0 = Date.now();
+    const { s, out } = await screen(`{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"audio","data":"${data}","mimeType":"audio/wav"}]}}`);
+    expect(s.outcome?.verdict, s.outcome?.result?.reasoning).toBe('clean');
+    expect(out).not.toBeNull();
+    expect(Date.now() - t0).toBeLessThan(5000);
+  }, 30000);
+
+  it('media is skipped by POSITION: the same string elsewhere in the reply is still screened', async () => {
+    const { out } = await screen(`{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"image","data":${JSON.stringify(INJ)},"mimeType":"image/png"},{"type":"text","text":"ok","_meta":{"hint":${JSON.stringify(INJ)}}}]}}`);
+    expectBlockedToolReply(out);
+  });
+
+  // Not asserted: a bare base64 string that decodes to an injection is not flagged by L0 today
+  // (pre-existing, any field). A model receives audio/image items as media, not as base64 text.
+});
