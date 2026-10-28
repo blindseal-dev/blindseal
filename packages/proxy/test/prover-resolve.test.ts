@@ -83,7 +83,7 @@ describe('prover resolution', () => {
   it('unsupported platform / failed download → exactly the actionable message', async () => {
     const msg = proverUnavailableMessage('win32-x64');
     expect(msg).toBe(
-      'blindseal attest: no prover binary for win32-x64. Build it: git clone https://github.com/blindseal-dev/blindseal && cd blindseal && cargo build --release -p blindseal-prover, then pass --prover <path> or set BLINDSEAL_PROVER.',
+      'blindseal attest: no prover binary for win32-x64. Build it: git clone https://github.com/blindseal-dev/blindseal && cd blindseal && cargo build --release --manifest-path crates/prover/Cargo.toml, then pass --prover crates/prover/target/release/blindseal-prover or set BLINDSEAL_PROVER.',
     );
     await expect(resolveProver({ env: {}, home, manifest: manifest(), platform: 'win32-x64', cwd: tmp, fetchImpl: fakeFetch(BIN) })).rejects.toThrow(msg);
     await expect(resolveProver({ env: {}, home, manifest: manifest(), platform: 'linux-x64', cwd: tmp, fetchImpl: fakeFetch(BIN, 404) })).rejects.toThrow(proverUnavailableMessage('linux-x64'));

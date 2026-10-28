@@ -288,9 +288,9 @@ $ scripts/test-m2.sh               # the on-chain suite against a local validato
         p('Requires Rust, the Solana CLI and Anchor. The script builds to SBF with `cargo build-sbf` (target dir outside `programs/`) and writes the `.so` files to `target/deploy/` and the IDLs to `target/idl/`. Program ids are fixed: the verifier `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, the transfer-gate example `9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa`.'),
       ] },
       { id: 'prover', heading: 'Build the prover', blocks: [
-        code(`$ cargo build --release -p blindseal-prover
+        code(`$ cargo build --release --manifest-path crates/prover/Cargo.toml
 $ blindseal attest call.json --target-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa \\
-    --out attestation.json --prover target/release/blindseal-prover`, 'shell'),
+    --out attestation.json --prover crates/prover/target/release/blindseal-prover`, 'shell'),
         p('The prover wraps the committed SP1 guest (`crates/guest`) and produces the Groth16 attestation. It needs the SP1 toolchain and, for the Groth16 wrap, Docker with about 24 GB of memory available. Proving takes hours on CPU — 2 h 16 min for the sample attestation on an Apple M1 Max (32 GB). Without `--prover`, `blindseal attest` uses the release binary it downloads on first use; the built binary is the same program.'),
       ] },
       { id: 'reproduce', heading: 'Reproduce the deployed programs', blocks: [

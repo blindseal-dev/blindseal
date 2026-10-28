@@ -30,8 +30,8 @@ export class ProverUnavailableError extends Error {
 export function proverUnavailableMessage(platform: string): string {
   return (
     `blindseal attest: no prover binary for ${platform}. Build it: ` +
-    'git clone https://github.com/blindseal-dev/blindseal && cd blindseal && cargo build --release -p blindseal-prover, ' +
-    'then pass --prover <path> or set BLINDSEAL_PROVER.'
+    'git clone https://github.com/blindseal-dev/blindseal && cd blindseal && cargo build --release --manifest-path crates/prover/Cargo.toml, ' +
+    'then pass --prover crates/prover/target/release/blindseal-prover or set BLINDSEAL_PROVER.'
   );
 }
 

@@ -73,7 +73,7 @@ Rust / Solana / Anchor toolchains are needed only for these:
 
 ```sh
 scripts/build-programs.sh                      # the Anchor programs (cargo build-sbf + anchor idl build)
-cargo build --release -p blindseal-prover      # the prover; pass it to `blindseal attest --prover`
+cargo build --release --manifest-path crates/prover/Cargo.toml   # the prover → crates/prover/target/release/blindseal-prover; pass it to `blindseal attest --prover`
 cd programs && solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name blindseal_verify   # reproduce the deployed bytes (also transfer_gate)
 ```
 
