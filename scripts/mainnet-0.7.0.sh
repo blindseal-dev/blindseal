@@ -205,7 +205,7 @@ case "$STEP" in
     fi
     BLINDSEAL_RPC_URL="$RPC" BLINDSEAL_MAINNET_AUTHORITY="$AUTH" pnpm exec tsx scripts/lib/mainnet-admin-0.7.0.mts --step "$STEP" --dry-run "${EXTRA[@]+"${EXTRA[@]}"}"
     [ -n "$DRY" ] && exit 0
-    confirm "$STEP"
+    # The helper asks for the typed confirmation itself ('send <step> to mainnet') before it signs.
     BLINDSEAL_RPC_URL="$RPC" BLINDSEAL_MAINNET_AUTHORITY="$AUTH" pnpm exec tsx scripts/lib/mainnet-admin-0.7.0.mts --step "$STEP" "${EXTRA[@]+"${EXTRA[@]}"}"
     ;;
 esac

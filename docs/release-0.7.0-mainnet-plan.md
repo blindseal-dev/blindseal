@@ -390,3 +390,17 @@ scripts/mainnet-0.7.0.sh --simulate d --ledger-pubkey <ledger pubkey>     # afte
     grows by 3,928 B but is extended by 10,240 B.
 - **No RPC URL in output:** the preflight prints the cluster name, and echoed commands show `<rpc>`.
 - **Real sends unchanged:** each step still needs its typed confirmation.
+
+## Confirmation and order checks moved into the helper (re-audit follow-up)
+
+Running `scripts/lib/mainnet-admin-0.7.0.mts` directly used to sign and send with no prompt: the typed confirmation
+lived only in the shell wrapper, the phrase was just the step name, and nothing checked that step 0 had landed.
+
+- **Typed confirmation in the helper.** Before it signs, the helper asks for `send <step> to mainnet` (or
+  `… to local`) on a terminal. With no terminal it refuses; a local rehearsal may pass the exact phrase in
+  `BLINDSEAL_REHEARSAL_CONFIRM`, which is refused on mainnet. The shell wrapper no longer asks a second time for
+  steps a–d (it still asks per program for step 0).
+- **Step 0 must have landed** before any of b, a, c1, c2 or d is sent: the helper compares both deployed executable
+  hashes with the 0.7.0 verifiable builds (`a0d51e46…` gate, `5a1f0e90…` verifier) and refuses otherwise. The
+  hash is computed like `solana-verify get-program-hash`; on today's mainnet it gives the recorded 0.6.0 hashes
+  (`51c4a28e…`, `d69490a1…`). `--simulate` and `--dry-run` are unaffected.

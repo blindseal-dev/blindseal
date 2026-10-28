@@ -18,6 +18,8 @@
 // Signer: the config authority keypair at $BLINDSEAL_MAINNET_AUTHORITY (default ~/.blindseal/mainnet-authority.json).
 // Prints the signature and the Config after each step.
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createInterface } from 'node:readline/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -44,6 +46,50 @@ const RPC = process.env.BLINDSEAL_RPC_URL ?? DEFAULT_RPC_URL;
 const AUTH = process.env.BLINDSEAL_MAINNET_AUTHORITY ?? path.join(os.homedir(), '.blindseal', 'mainnet-authority.json');
 const LEDGER_PATH = "44'/501'/0'"; // = usb://ledger?key=0
 const ORDER = ['b', 'a', 'c1', 'c2'] as const; // d is independent
+
+/// Step 0 (the program upgrades) must have landed before any config step is SENT: the executable
+/// hashes of the deployed programs must be the 0.7.0 verifiable builds (solana-verify's
+/// get-program-hash: ProgramData after its 45-byte header, trailing zero padding removed).
+const UPGRADEABLE_LOADER = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
+const GATE_ID = new PublicKey('9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa');
+const RELEASE_HASHES: Array<[string, PublicKey, string]> = [
+  ['transfer_gate', GATE_ID, 'a0d51e460d88919e137bd02d77a97d63def0e78c6bef1112df777c658107fb86'],
+  ['blindseal_verify', PROGRAM_ID, '5a1f0e90dd3e910ea04db2de02cff5cc7cac2de29db6925b9a6e1250ce078bed'],
+];
+
+async function deployedProgramHash(conn: Connection, programId: PublicKey): Promise<string | null> {
+  const [programData] = PublicKey.findProgramAddressSync([programId.toBuffer()], UPGRADEABLE_LOADER);
+  const acc = await conn.getAccountInfo(programData, 'confirmed');
+  if (!acc) return null;
+  let end = acc.data.length;
+  while (end > 45 && acc.data[end - 1] === 0) end--;
+  return createHash('sha256').update(acc.data.subarray(45, end)).digest('hex');
+}
+
+async function requireStep0(conn: Connection): Promise<void> {
+  for (const [name, id, want] of RELEASE_HASHES) {
+    const got = await deployedProgramHash(conn, id);
+    if (got !== want) {
+      throw new Error(`step 0 has not landed: ${name} (${id.toBase58()}) deployed hash is ${got ?? 'missing'}, the 0.7.0 build is ${want}. Run step 0 first.`);
+    }
+  }
+  console.log('step 0 landed: both programs are the 0.7.0 verifiable builds');
+}
+
+/// The typed confirmation lives here, not only in the shell wrapper, so running this helper
+/// directly cannot sign without it. It needs a terminal; a local rehearsal without one passes the
+/// exact phrase in BLINDSEAL_REHEARSAL_CONFIRM (refused on mainnet).
+async function confirmSend(step: string, where: 'mainnet' | 'local'): Promise<void> {
+  const phrase = `send ${step} to ${where}`;
+  if (!process.stdin.isTTY) {
+    if (where === 'local' && process.env.BLINDSEAL_REHEARSAL_CONFIRM === phrase) return;
+    throw new Error(`refusing to sign: no terminal to confirm on (the confirmation is the typed phrase '${phrase}')`);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const got = (await rl.question(`   type '${phrase}' to sign and send: `)).trim();
+  rl.close();
+  if (got !== phrase) throw new Error('aborted: the confirmation did not match');
+}
 type Cfg = ReturnType<typeof decodeConfig>;
 
 function loadKeypair(file: string): Keypair {
@@ -181,6 +227,7 @@ async function main() {
   const p = await plan(STEP, cfg, ctx);
   if (!p.ix) return;
   const ix = p.ix;
+  if (!DRY) await requireStep0(conn);
   const extraSigners: Array<(tx: Transaction) => Promise<void>> = [];
   if (STEP === 'd' && !DRY) {
     const kpFile = flag('--new-authority-keypair');
@@ -219,6 +266,7 @@ async function main() {
     console.log('DRY RUN: nothing signed or sent');
     return;
   }
+  await confirmSend(STEP, where);
   tx.partialSign(authority);
   for (const sign of extraSigners) await sign(tx);
   const sig = await conn.sendRawTransaction(tx.serialize());
