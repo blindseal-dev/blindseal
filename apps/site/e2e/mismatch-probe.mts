@@ -5,7 +5,7 @@
 // --kit lets the kit run and excludes what it creates. __errs collects console.error / reportError /
 // window 'error' entries mentioning 418, 423 or "hydrat".
 import { chromium } from 'playwright';
-import { INIT, DIFF, ROUTES, chromeViolations } from './mismatch-lib.ts';
+import { INIT, DIFF, ROUTES, CLOCKED, HOLD_CLOCK, chromeViolations } from './mismatch-lib.ts';
 const args = process.argv.slice(2); const base = args.shift();
 const KIT = args.includes('--kit'), THR = args.includes('--throttle');
 const routes = args.filter((a) => a.startsWith('/')); if (!routes.length) routes.push(...ROUTES);
@@ -13,6 +13,7 @@ const b = await chromium.launch(); let bad = 0;
 for (const vp of [{ width: 1440, height: 900 }, { width: 443, height: 714 }]) for (const r of routes) {
   const ctx = await b.newContext({ viewport: vp }); const page = await ctx.newPage();
   await page.addInitScript(INIT);
+  if (!KIT && CLOCKED.includes(r)) await page.addInitScript(HOLD_CLOCK);
   if (!KIT) await page.route('**/kit/kit.js', (route) => route.abort());
   if (THR) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 }); }
   await page.goto(base + r, { waitUntil: 'load' }); await page.waitForTimeout(5000);
