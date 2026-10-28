@@ -25,7 +25,7 @@ import {
   responseText,
   type JsonRpcMessage,
 } from './shared.js';
-import { isPlainObject, parseJson, PendingRequests, screenServerMessage } from './reply-screen.js';
+import { isPlainObject, parseErrorReply, parseJson, PendingRequests, requestScreeningErrorReply, screenServerMessage } from './reply-screen.js';
 import { computeServerIdentifier } from './server-id.js';
 
 function addResponseToTaint(
@@ -200,13 +200,32 @@ export function startProxy(cmd: string, args: string[]): void {
   // server that resolves duplicate keys differently cannot see arguments the gate did not.
   const inRl = createInterface({ input: process.stdin });
   inRl.on('line', (line) => {
+    if (!line.trim()) return;
     let parsed: unknown;
     try { parsed = parseJson(line); } catch { parsed = undefined; }
+    if (!isPlainObject(parsed) && !Array.isArray(parsed)) {
+      // Not something the gate can screen (not JSON, too deeply nested to parse, a bare value):
+      // never forwarded raw. The proxy answers as a JSON-RPC server would.
+      process.stdout.write(JSON.stringify(parseErrorReply()) + '\n');
+      return;
+    }
+    /// Gate one element; a gate that throws (e.g. arguments nested too deeply to serialise)
+    /// fails closed: the call is answered with an error and never forwarded.
+    const gate = (el: unknown): JsonRpcMessage | 'drop' | null => {
+      if (!isPlainObject(el)) return null;
+      try {
+        return gateToolCall(el as JsonRpcMessage);
+      } catch (err) {
+        process.stderr.write(`blindseal: request screening failed (${err instanceof Error ? err.message : String(err)}); not forwarded\n`);
+        const id = (el as JsonRpcMessage).id;
+        return id == null ? 'drop' : requestScreeningErrorReply(id);
+      }
+    };
     if (Array.isArray(parsed)) {
       const replies: JsonRpcMessage[] = [];
       const forward: unknown[] = [];
       for (const el of parsed) {
-        const reply = el && typeof el === 'object' && !Array.isArray(el) ? gateToolCall(el as JsonRpcMessage) : null;
+        const reply = gate(el);
         if (reply === 'drop') continue;
         if (reply) replies.push(reply); else { pending.track(el); forward.push(el); }
       }
@@ -214,18 +233,14 @@ export function startProxy(cmd: string, args: string[]): void {
       if (forward.length > 0) childStdin.write(JSON.stringify(forward) + '\n');
       return;
     }
-    if (parsed && typeof parsed === 'object') {
-      const reply = gateToolCall(parsed as JsonRpcMessage);
-      if (reply === 'drop') return;
-      if (reply) {
-        process.stdout.write(JSON.stringify(reply) + '\n');
-        return;
-      }
-      pending.track(parsed);
-      childStdin.write(JSON.stringify(parsed) + '\n');
+    const reply = gate(parsed);
+    if (reply === 'drop') return;
+    if (reply) {
+      process.stdout.write(JSON.stringify(reply) + '\n');
       return;
     }
-    childStdin.write(line + '\n'); // not JSON: the server answers with a parse error, which no request matches
+    pending.track(parsed);
+    childStdin.write(JSON.stringify(parsed) + '\n');
   });
   inRl.on('close', () => {
     childStdin.end();
@@ -271,7 +286,12 @@ export function startProxy(cmd: string, args: string[]): void {
     }
     const outcome = s.outcome!;
     if (s.kind === 'reply' && s.pending && outcome.verdict === 'clean' && isPlainObject(el) && 'result' in el) {
-      observeManifest(s.pending.method, el.result);
+      // A malformed initialize/tools/list result must not take the proxy down.
+      try {
+        observeManifest(s.pending.method, el.result);
+      } catch (err) {
+        process.stderr.write(`blindseal: manifest check skipped (${err instanceof Error ? err.message : String(err)})\n`);
+      }
     }
     if (outcome.verdict !== 'clean') {
       process.stderr.write(

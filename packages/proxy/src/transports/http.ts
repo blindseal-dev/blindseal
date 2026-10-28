@@ -30,7 +30,7 @@ import {
   type JsonRpcMessage,
 } from './shared.js';
 import { serializeSseEvent, streamScanSse } from './sse-scan.js';
-import { isPlainObject, parseJson, PendingRequests, screenServerMessage } from './reply-screen.js';
+import { isPlainObject, parseErrorReply, parseJson, PendingRequests, requestScreeningErrorReply, screenServerMessage } from './reply-screen.js';
 import { displayUrl, httpServerIdentifier } from './server-id.js';
 
 export interface HttpProxyOptions {
@@ -225,7 +225,12 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     }
     const outcome = s.outcome!;
     if (s.kind === 'reply' && s.pending && outcome.verdict === 'clean' && isPlainObject(el) && 'result' in el) {
-      observeManifest(s.pending.method, el.result);
+      // A malformed initialize/tools/list result must not take the proxy down.
+      try {
+        observeManifest(s.pending.method, el.result);
+      } catch (err) {
+        process.stderr.write(`blindseal[http]: manifest check skipped (${err instanceof Error ? err.message : String(err)})\n`);
+      }
     }
     if (outcome.verdict !== 'clean') {
       process.stderr.write(
@@ -308,6 +313,12 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     const reqText = bodyBuf.toString('utf8');
     let parsedReq: unknown;
     try { parsedReq = parseJson(reqText); } catch { parsedReq = undefined; }
+    if (!isPlainObject(parsedReq) && !Array.isArray(parsedReq)) {
+      // Not something the gate can screen (not JSON, too deeply nested to parse, a bare value):
+      // never forwarded raw. The proxy answers as a JSON-RPC server would.
+      sendJson(res, 400, parseErrorReply());
+      return;
+    }
     const isBatch = Array.isArray(parsedReq);
     const elements: unknown[] = isBatch ? (parsedReq as unknown[]) : parsedReq !== undefined ? [parsedReq] : [];
     /// Requests in this POST waiting for a reply; anything else the upstream answers is dropped.
@@ -320,7 +331,14 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       if (m && m.method === 'tools/call') {
         const params = m.params as { name?: unknown; arguments?: unknown } | undefined;
         if (params && typeof params.name === 'string') {
-          const reply = gateToolCall(m, params.name, params.arguments);
+          let reply: JsonRpcMessage | 'drop' | null;
+          try {
+            reply = gateToolCall(m, params.name, params.arguments);
+          } catch (err) {
+            // Fail closed: arguments the gate cannot serialise (e.g. nested too deeply) are not forwarded.
+            process.stderr.write(`blindseal[http]: request screening failed (${err instanceof Error ? err.message : String(err)}); not forwarded\n`);
+            reply = m.id == null ? 'drop' : (requestScreeningErrorReply(m.id) as JsonRpcMessage);
+          }
           if (reply === 'drop') { dropped++; continue; }
           if (reply) { synthetic.push(reply); continue; }
         }
@@ -335,9 +353,8 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       sendJson(res, 200, isBatch ? synthetic : synthetic[0]);
       return;
     }
-    // Re-serialised from what the gate screened (an unparseable body goes as-is: the upstream
-    // answers it with a parse error, which matches no request and is dropped).
-    const forwardBody = parsedReq === undefined ? reqText : JSON.stringify(isBatch ? forwarded : forwarded[0]);
+    // Re-serialised from what the gate screened.
+    const forwardBody = JSON.stringify(isBatch ? forwarded : forwarded[0]);
 
     // Forward to upstream.
     let upstreamResp: Response;

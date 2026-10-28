@@ -132,11 +132,12 @@ writeFileSync(path.join(T, 'table.json'), JSON.stringify({ table: TABLE, fuzz: F
 const STDIO_FIXTURE = path.join(T, 'stdio-fixture.mjs');
 writeFileSync(STDIO_FIXTURE, `
 import { createInterface } from 'node:readline';
-import { readFileSync } from 'node:fs';
+import { readFileSync, appendFileSync } from 'node:fs';
 const { table, fuzz, stray } = JSON.parse(readFileSync(process.env.PROBE_TABLE, 'utf8'));
 const out = (s) => process.stdout.write(s + '\\n');
 createInterface({ input: process.stdin }).on('line', (line) => {
-  const m = JSON.parse(line);
+  if (process.env.RECV_LOG) appendFileSync(process.env.RECV_LOG, line + '\\n');
+  let m; try { m = JSON.parse(line); } catch { return; }
   const id = JSON.stringify(m.id);
   if (m.method === 'initialize') return out(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'probe-fixture', version: '1' } } }));
   if (m.method === 'tools/list') return out(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { tools: [{ name: 'probe', inputSchema: { type: 'object' } }] } }));
@@ -160,7 +161,13 @@ function startHttpFixture() {
       if (m.method === 'initialize') reply = JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'probe-http', version: '1' } } });
       else if (m.method === 'tools/list') reply = JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { tools: [] } });
       else reply = (m.params.name === 'stray' ? TABLE.benign_text : TABLE[m.params.name]).replace('__ID__', id);
-      if (new URL(req.url, 'http://x').searchParams.get('sse') === '1') {
+      const sseMode = new URL(req.url, 'http://x').searchParams.get('sse');
+      if (sseMode === 'cr') {
+        // Lone-CR line endings: a client splits lines on CR too, so the data line must be screened.
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        return res.end(`event: message\rdata: ${reply}\r\r`);
+      }
+      if (sseMode === '1') {
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         if (m.params?.name === 'stray') res.write(`event: message\ndata: ${STRAY}\n\n`);
         res.end(`: ${INJ}\nevent: message\ndata: ${reply}\n\n`);
@@ -176,7 +183,7 @@ function startHttpFixture() {
 // ---------------------------------------------------------------- stdio client
 function startStdioProxy(extraEnv = {}) {
   const child = spawn(process.execPath, [CLI, '--', process.execPath, STDIO_FIXTURE, '--api-key', 'live-canary-777'], {
-    env: { ...ENV, PROBE_TABLE: path.join(T, 'table.json'), ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...ENV, PROBE_TABLE: path.join(T, 'table.json'), RECV_LOG: path.join(T, 'received.log'), ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'],
   });
   let raw = '';
   let err = '';
@@ -196,6 +203,18 @@ function startStdioProxy(extraEnv = {}) {
         const t = setTimeout(() => reject(new Error(`timeout waiting for ${method} #${id}\n${err.slice(-2000)}`)), timeout);
         waiters.set(JSON.stringify(id), (m) => { clearTimeout(t); resolve(m); });
         child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      });
+    },
+    /// Writes a raw line and resolves with the next message the agent receives.
+    raw1(line, timeout = 60000) {
+      return new Promise((resolve, reject) => {
+        const before = raw.length;
+        const t = setInterval(() => {
+          const nl = raw.indexOf('\n', before);
+          if (nl >= 0) { clearInterval(t); clearTimeout(to); resolve(JSON.parse(raw.slice(before, nl))); }
+        }, 20);
+        const to = setTimeout(() => { clearInterval(t); reject(new Error('timeout on raw line')); }, timeout);
+        child.stdin.write(line + '\n');
       });
     },
     async close() { child.kill('SIGTERM'); await new Promise((r) => child.once('exit', r)); },
@@ -285,6 +304,14 @@ try {
   }
   ok(fuzzBad === 0, `fuzz: no injected text in any decoded reply (${FUZZ_N} cases)`);
   ok(!p.raw().includes(MARK), 'stdio: the raw bytes the agent received never contain the injection');
+
+  console.log('\n[stdio] agent input the gate cannot read is never forwarded');
+  for (const depth of [4000, 60000]) {
+    const pad = '['.repeat(depth) + ']'.repeat(depth);
+    const m = await p.raw1(`{"jsonrpc":"2.0","id":"deep${depth}","method":"tools/call","params":{"name":"probe","arguments":{"text":${lit(INJ)},"pad":${pad}}}}`);
+    ok(!!m.error, `stdio: arguments nested ${depth} deep are answered with an error`, JSON.stringify(m).slice(0, 200));
+  }
+  ok(!readFileSync(path.join(T, 'received.log'), 'utf8').includes(MARK), 'stdio: the server never received the injection');
   await p.close();
   checkManifestDir('manifest after a run', ['rotated-canary-111', 'retired-canary-222', 'url-canary-333', 'live-canary-777']);
 
@@ -308,16 +335,16 @@ try {
 
   const up = await startHttpFixture();
   const upPort = up.address().port;
-  for (const mode of ['json', 'sse']) {
+  for (const mode of ['json', 'sse', 'sse-cr']) {
     console.log(`\n[http ${mode}] probes`);
     const port = 40000 + Math.floor(Math.random() * 20000);
-    const h = startHttpProxy(`http://127.0.0.1:${upPort}/mcp?token=http-canary-666${mode === 'sse' ? '&sse=1' : ''}`, port);
+    const h = startHttpProxy(`http://127.0.0.1:${upPort}/mcp?token=http-canary-666${mode === 'sse' ? '&sse=1' : mode === 'sse-cr' ? '&sse=cr' : ''}`, port);
     await h.ready();
     const post = async (id, name) => {
       const r = await fetch(`http://127.0.0.1:${port}/`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: {} } }) });
       const text = await r.text();
-      const msgs = mode === 'sse'
-        ? text.split('\n').filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6))).flat()
+      const msgs = mode !== 'json'
+        ? text.split(/\r\n|\r|\n/).filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6))).flat()
         : [JSON.parse(text)].flat();
       return { text, msgs };
     };

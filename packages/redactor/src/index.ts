@@ -84,6 +84,11 @@ function looksOpaque(m: string): boolean {
 /// never re-matches an already-inserted `[REDACTED:…]` marker (brackets/colons aren't in the
 /// token classes). `private_key`/`jwt`/`api_key` precede `high_entropy` so the catch-all
 /// doesn't mislabel a structured secret.
+const PROSE_WORDS = new Set(['the', 'and', 'for', 'your', 'with', 'from', 'are', 'was', 'not', 'but']); // checked: none is in the BIP39 English list
+function notProse(match: string): boolean {
+  return !match.split(/\s+/).some((w) => PROSE_WORDS.has(w));
+}
+
 const RULES: Rule[] = [
   // PEM blocks and raw 32-byte keys (eth-style 0x + 64 hex).
   {
@@ -101,9 +106,11 @@ const RULES: Rule[] = [
     kind: 'api_key',
     re: /\b(?:api[_-]?key|client[_-]?secret|access[_-]?key|private[_-]?key|privkey|secret|password|passwd|passphrase|mnemonic|token|authorization|bearer)\s*[:=]\s*["']?[A-Za-z0-9._\-+/=]{8,}["']?/gi,
   },
-  // BIP39-style mnemonic: 12 or 24 space-separated lowercase words.
-  { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){23}[a-z]{3,8}\b/g },
-  { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){11}[a-z]{3,8}\b/g },
+  // BIP39-style mnemonic: 12 or 24 space-separated lowercase words. Ordinary prose matches the
+  // shape too; a run containing an English function word (none of which is in the BIP39 list) is
+  // prose, and is left for L2/L3 to read.
+  { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){23}[a-z]{3,8}\b/g, keep: notProse },
+  { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){11}[a-z]{3,8}\b/g, keep: notProse },
   // Email.
   { kind: 'email', re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g },
   // US SSN (before card, so the 9-digit dashed form isn't eaten as a card).
@@ -210,6 +217,9 @@ function redactCompositeValues(text: string, ctx: Counter): string {
     const start = m.index + m[0].length;
     if (!kind || start < last) continue;
     const end = matchingBracket(text, start);
+    // Only a value that actually closes is replaced: an unbalanced '"token": [' must not redact
+    // the rest of the text (that would hide whatever follows from L2/L3).
+    if (end < 0) continue;
     out += text.slice(last, start) + `"${mark(ctx, kind)}"`;
     last = end;
     QUOTED_KEY_OPEN_RE.lastIndex = end;
@@ -218,7 +228,7 @@ function redactCompositeValues(text: string, ctx: Counter): string {
 }
 
 /// Index just past the bracket that closes the one at `start` (ignoring brackets inside JSON
-/// strings), or text.length when it never closes.
+/// strings), or -1 when it never closes.
 function matchingBracket(text: string, start: number): number {
   let depth = 0;
   let inStr = false;
@@ -236,7 +246,7 @@ function matchingBracket(text: string, start: number): number {
       if (depth === 0) return i + 1;
     }
   }
-  return text.length;
+  return -1;
 }
 
 function redactText(text: string, ctx: Counter): string {

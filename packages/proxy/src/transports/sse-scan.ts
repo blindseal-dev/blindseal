@@ -7,6 +7,7 @@
 /// `data:` lines in one event concatenate with `\n`. Comments start with `:`.
 
 import { parseJson } from './reply-screen.js';
+import { runOutboundScreen } from '../detection/pipeline.js';
 
 export interface SseScanHooks {
   /// Screens one JSON-RPC element (see reply-screen.ts screenServerMessage) and returns what the
@@ -24,7 +25,9 @@ interface ParsedEvent {
 }
 
 export function parseSseEvent(block: string): ParsedEvent {
-  const lines = block.split(/\r?\n/);
+  // Per the SSE spec a line ends at CRLF, LF or a lone CR: a client treats a lone CR as a line
+  // break, so the proxy must too, or a "data:" after it would pass unscreened.
+  const lines = block.split(/\r\n|\r|\n/);
   const preLines: string[] = [];
   const dataLines: string[] = [];
   for (const line of lines) {
@@ -54,15 +57,17 @@ export function serializeSseEvent(preLines: string[], data: string | null): stri
   return out.join('\n') + '\n\n';
 }
 
-/// SSE fields an agent's client acts on besides `data`. Comments and unknown fields are dropped.
+/// SSE fields an agent's client acts on besides `data`. Comments and unknown fields are dropped,
+/// and so is a kept field whose value does not pass L0/L1.
 const KEPT_FIELDS = /^(event|id|retry):/;
+const keepField = (l: string) => KEPT_FIELDS.test(l) && runOutboundScreen(l).verdict === 'clean';
 
 /// Process one fully-assembled SSE event block. Returns the bytes to forward ('' = nothing).
 /// A data event is always re-serialised from the screened JSON value: the original bytes never
 /// reach the agent, and data that is not a JSON-RPC message or batch is dropped.
 export async function processSseEvent(block: string, hooks: SseScanHooks): Promise<string> {
   const parsed = parseSseEvent(block);
-  const pre = parsed.preLines.filter((l) => KEPT_FIELDS.test(l));
+  const pre = parsed.preLines.filter(keepField);
   if (parsed.data === null) return pre.length > 0 ? serializeSseEvent(pre, null) : '';
 
   let msg: unknown;
@@ -99,12 +104,16 @@ export async function streamScanSse(
       if (done) break;
       if (!value) continue;
       buffer += decoder.decode(value, { stream: true });
-
+      // Normalise CRLF and lone CR to LF so events split exactly where a client splits them. A
+      // trailing CR is held back: it may be the first half of a CRLF in the next chunk.
+      const holdCr = buffer.endsWith('\r');
+      const ready = normaliseEol(holdCr ? buffer.slice(0, -1) : buffer);
+      buffer = ready + (holdCr ? '\r' : '');
       for (;;) {
-        const idx = findEventBoundary(buffer);
+        const idx = buffer.indexOf('\n\n');
         if (idx === -1) break;
-        const block = buffer.slice(0, idx.start);
-        buffer = buffer.slice(idx.end);
+        const block = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
         if (block.length === 0) continue; // empty leading blanks
         const out = await processSseEvent(block, hooks);
         if (out) write(out);
@@ -112,11 +121,10 @@ export async function streamScanSse(
     }
 
     // Flush trailing decoder bytes.
-    buffer += decoder.decode();
-
-    // Process any trailing event without a final blank line.
-    if (buffer.trim().length > 0) {
-      const out = await processSseEvent(buffer, hooks);
+    buffer = normaliseEol(buffer + decoder.decode());
+    for (const block of buffer.split('\n\n')) {
+      if (block.trim().length === 0) continue;
+      const out = await processSseEvent(block, hooks);
       if (out) write(out);
     }
   } finally {
@@ -128,16 +136,6 @@ export async function streamScanSse(
   }
 }
 
-/// Finds the next event-boundary in the buffer. Handles both `\n\n` and `\r\n\r\n`. Returns
-/// the [start, end) indices of the boundary so the caller can slice (`buffer.slice(0, start)`
-/// is the event, `buffer.slice(end)` is what remains).
-function findEventBoundary(s: string): { start: number; end: number } | -1 {
-  const idxLf = s.indexOf('\n\n');
-  const idxCrlf = s.indexOf('\r\n\r\n');
-  if (idxLf === -1 && idxCrlf === -1) return -1;
-  if (idxCrlf === -1) return { start: idxLf, end: idxLf + 2 };
-  if (idxLf === -1) return { start: idxCrlf, end: idxCrlf + 4 };
-  // Take the earlier of the two.
-  if (idxLf < idxCrlf) return { start: idxLf, end: idxLf + 2 };
-  return { start: idxCrlf, end: idxCrlf + 4 };
+function normaliseEol(s: string): string {
+  return s.replace(/\r\n|\r/g, '\n');
 }

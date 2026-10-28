@@ -110,3 +110,15 @@ describe('every model-layer pass over a structured tool result is redacted (re-a
     expect(out.verdict).toBe('malicious');
   });
 });
+
+/// Second review of db9e2ee: 1024+ characters of unpunctuated prose passed the "base64 media" test
+/// (whitespace was stripped first) and never reached L2/L3.
+describe('long prose is not mistaken for base64 media', () => {
+  it('L2 sees a long unpunctuated sentence in structuredContent', async () => {
+    const prose = Array.from({ length: 200 }, (_, i) => `word${i % 7}`).join(' ');
+    expect(prose.length).toBeGreaterThan(1024);
+    const m: any = { jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'see notes' }], structuredContent: { notes: prose } } };
+    await inspectToolCallResponse(m, 'notes', 'block');
+    expect(seen.l2.some((t) => t.includes('word3 word4 word5'))).toBe(true);
+  });
+});

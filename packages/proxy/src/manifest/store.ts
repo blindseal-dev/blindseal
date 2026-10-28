@@ -37,6 +37,8 @@ export function defaultCacheDir(): string {
 }
 
 const SERVER_KEY_RE = /^[0-9a-f]{16}$/;
+const TMP_RE = /^[0-9a-f]{16}\.json\.\d+\.[0-9a-f]{8}\.tmp$/;
+const STALE_TMP_MS = 10 * 60 * 1000;
 const HASH_RE = /^[0-9a-f]{64}$/;
 
 /// The record exactly as written: a fixed field list, so nothing else reaches disk.
@@ -88,7 +90,8 @@ export interface MigrationReport {
 }
 
 /// Tightens the cache directory to 0700, then brings every entry to the current schema at 0600:
-/// legacy records lose their raw command/args, unreadable or foreign entries are deleted.
+/// legacy records lose their raw command/args, unreadable records are deleted. Files the store did
+/// not write are not touched.
 /// Never follows symlinks; tolerates entries vanishing under concurrent migration; never throws.
 export function migrateCacheDir(dir: string): MigrationReport {
   const report: MigrationReport = { rewritten: 0, removed: 0 };
@@ -123,9 +126,18 @@ export function migrateCacheDir(dir: string): MigrationReport {
       continue; // removed concurrently
     }
     if (fst.isDirectory()) continue;
+    // Only files this store writes are touched: `<16 hex>.json` records and their temp files.
+    // Anything else in the directory (if BLINDSEAL_MANIFEST_CACHE_DIR points somewhere shared) is
+    // left alone. A temp file is removed only once stale, so a concurrent writer is not disturbed.
+    const tmp = TMP_RE.exec(name);
+    if (tmp) {
+      if (Date.now() - fst.mtimeMs > STALE_TMP_MS) { unlinkQuiet(file); report.removed++; }
+      continue;
+    }
     const key = name.endsWith('.json') ? name.slice(0, -5) : '';
-    if (!fst.isFile() || !SERVER_KEY_RE.test(key)) {
-      // A symlink, a stale temp file, or something that is not a record: none of it is ours to keep.
+    if (!SERVER_KEY_RE.test(key)) continue;
+    if (!fst.isFile()) {
+      // A symlink (or other non-file) named like a record: never followed, removed.
       unlinkQuiet(file);
       report.removed++;
       continue;
@@ -185,8 +197,13 @@ export class ManifestStore {
 
   save(record: StoredManifest): void {
     if (this.refused) return;
-    mkdirSync(this.dir, { recursive: true, mode: 0o700 });
-    chmodSync(this.dir, 0o700);
-    writeAtomic(this.pathFor(record.serverKey), serialise(record));
+    try {
+      mkdirSync(this.dir, { recursive: true, mode: 0o700 });
+      chmodSync(this.dir, 0o700);
+      writeAtomic(this.pathFor(record.serverKey), serialise(record));
+    } catch (err) {
+      // A cache write failure costs drift detection for this run; it must not stop the proxy.
+      process.stderr.write(`blindseal: manifest cache write failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    }
   }
 }

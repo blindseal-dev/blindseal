@@ -35,12 +35,30 @@ export function isPlainObject(v: unknown): v is Obj {
 /// prototype change and the key disappears from Object.keys. Null-prototype objects have no
 /// `__proto__` accessor, so the key stays an ordinary property everywhere downstream.
 export function parseJson(text: string): unknown {
-  return JSON.parse(text, (_k, v: unknown) => {
+  return toNullPrototype(JSON.parse(text));
+}
+
+/// Rebuilds every plain object of a parsed value with a null prototype. Iterative: a deeply nested
+/// message must not overflow the stack here (a reviver recursed, threw at ~3000 levels, and the
+/// caller then treated the line as "not JSON").
+function toNullPrototype(root: unknown): unknown {
+  const convert = (v: unknown): unknown => {
     if (!isPlainObject(v)) return v;
     const o = Object.create(null) as Obj;
     for (const k of Object.keys(v)) Object.defineProperty(o, k, { value: v[k], enumerable: true, writable: true, configurable: true });
     return o;
-  });
+  };
+  const top = convert(root);
+  const stack: unknown[] = [top];
+  while (stack.length > 0) {
+    const v = stack.pop();
+    if (Array.isArray(v)) {
+      for (let i = 0; i < v.length; i++) { v[i] = convert(v[i]); stack.push(v[i]); }
+    } else if (isPlainObject(v)) {
+      for (const k of Object.keys(v)) { v[k] = convert(v[k]); stack.push(v[k]); }
+    }
+  }
+  return top;
 }
 
 /// Deterministic JSON: object keys sorted recursively. Builds the string directly (no
@@ -72,7 +90,7 @@ export function stableStringify(value: unknown): string {
 
 /// Every string in a JSON value — object keys and string leaves — in stable key order. Iterative,
 /// so a deeply nested reply cannot overflow the stack.
-export function stringLeaves(value: unknown): string[] {
+export function stringLeaves(value: unknown, order: 'sorted' | 'as-sent' = 'sorted', keys = true): string[] {
   const out: string[] = [];
   const stack: unknown[] = [value];
   while (stack.length > 0) {
@@ -83,10 +101,10 @@ export function stringLeaves(value: unknown): string[] {
       for (let i = v.length - 1; i >= 0; i--) stack.push(v[i]);
       continue;
     }
-    const keys = Object.keys(v).sort();
-    for (let i = keys.length - 1; i >= 0; i--) {
-      stack.push((v as Obj)[keys[i]!]);
-      stack.push(keys[i]!); // the key is visited before its value
+    const names = order === 'sorted' ? Object.keys(v).sort() : Object.keys(v);
+    for (let i = names.length - 1; i >= 0; i--) {
+      stack.push((v as Obj)[names[i]!]);
+      if (keys) stack.push(names[i]!); // the key is visited before its value
     }
   }
   return out;
@@ -203,9 +221,11 @@ export interface ScreenOutcome {
 /// A long string that is only base64 (image `data`, resource `blob`) gets L0/L1 on its own and
 /// is left out of the model-layer text: embedding base64 tells L2 nothing and costs seconds.
 const MEDIA_MIN = 1024;
+/// Line breaks are allowed (wrapped base64), spaces are not: prose without punctuation would
+/// otherwise pass as base64 and skip L2/L3.
 const BASE64_RE = /^[A-Za-z0-9+/_-]+={0,2}$/;
 function isMediaString(s: string): boolean {
-  return s.length >= MEDIA_MIN && BASE64_RE.test(s.replace(/\s+/g, ''));
+  return s.length >= MEDIA_MIN && BASE64_RE.test(s.replace(/\r?\n/g, ''));
 }
 
 /// Strings in a body that the model layers (and the joined passes) need not see again: text
@@ -276,6 +296,10 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
       if (skip.has(s) || s.length < 8) continue;
       consider(runOutboundScreen(s));
     }
+    // And L0/L1 over the string VALUES joined in the order the agent receives them (the passes
+    // below sort keys and interleave them): a phrase split across neighbouring fields must not
+    // slip between two leaves.
+    consider(runOutboundScreen(stringLeaves(body, 'as-sent', false).join('\n')));
 
     const rest = withoutScreened(body, skip);
     const leaves = stringLeaves(rest);
@@ -355,6 +379,17 @@ export interface ScreenedMessage {
   mutated: boolean;
 }
 
+/// The proxy's answer to an agent message it could not parse (JSON-RPC -32700, id null). The
+/// message is not forwarded: what the gate cannot read, the server must not receive.
+export function parseErrorReply(): Obj {
+  return { jsonrpc: '2.0', id: null, error: { code: -32700, message: '[BLINDSEAL] parse error: the message was not forwarded' } };
+}
+
+/// The proxy's answer to an agent request whose screening threw (fail closed, not forwarded).
+export function requestScreeningErrorReply(id: string | number): { jsonrpc: '2.0'; id: string | number; error: { code: number; message: string } } {
+  return { jsonrpc: '2.0', id, error: { code: -32603, message: '[BLINDSEAL_ERROR] request screening failed; the call was not forwarded' } };
+}
+
 /// What the agent receives instead of a reply that could not be screened (fail closed).
 export function buildScreeningErrorReply(pending: PendingEntry): Obj {
   return {
@@ -371,6 +406,9 @@ export async function screenServerMessage(
 ): Promise<ScreenedMessage> {
   if (!isPlainObject(msg)) {
     return { kind: 'invalid', forward: null, label: 'unknown', problem: 'not a JSON-RPC object', mutated: true };
+  }
+  if ('method' in msg && ('result' in msg || 'error' in msg)) {
+    return { kind: 'invalid', forward: null, label: 'unknown', problem: 'a message cannot carry both a method and a result/error', mutated: true };
   }
   const isReply = !('method' in msg);
   if (!isReply) {

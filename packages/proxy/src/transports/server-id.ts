@@ -7,6 +7,8 @@ import path from 'node:path';
 
 /// Flags whose next argument is treated as a credential and never used as the server name.
 const SECRET_FLAG = /(key|token|secret|passw|pwd|auth|cred|bearer|cookie|session)/i;
+/// A server name: package (@scope/name, name@1.2), module (a.b_c), script path or URL.
+const SAFE_TARGET = /^[@A-Za-z0-9._/\\:+~-]+$/;
 
 /// Build a stable reputation identifier from the upstream command + args. The naive
 /// "stdio:<cmd>" collapses every npx-launched server into one bucket, making the on-chain
@@ -28,11 +30,15 @@ export function computeServerIdentifier(cmd: string, args: string[]): string {
       if (!a.includes('=') && SECRET_FLAG.test(a)) i++; // skip the flag's value
       continue;
     }
+    // Only something shaped like a package, module, script or URL names the server. Assignments
+    // (`env TOKEN=…`, `docker -e KEY=…`), shell snippets (`sh -c "…"`) and anything else are
+    // skipped: they can carry credentials.
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(a)) return `stdio:${cmd}:${urlHost(a)}`;
+    if (a.includes('=') || !SAFE_TARGET.test(a)) continue;
     target = a;
     break;
   }
   if (!target) return `stdio:${cmd}`;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return `stdio:${cmd}:${urlHost(target)}`;
   // Strip filesystem paths down to basename-without-extension. Scoped npm packages
   // (@scope/name) also contain '/' but should be preserved as-is — distinguish by leading '@'.
   const looksLikePath =

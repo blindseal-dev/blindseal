@@ -88,3 +88,11 @@ describe('server identifiers hold no credentials', () => {
     expect(displayUrl('https://user:pw@mcp.example/v1?token=SECRET123')).toBe('https://mcp.example/…');
   });
 });
+
+describe('server identifiers: assignments and shell snippets are never the server name', () => {
+  it('env VAR=…, docker -e KEY=…, sh -c "…"', () => {
+    expect(computeServerIdentifier('env', ['GITHUB_TOKEN=ghp_SECRET', 'npx', 'srv'])).toBe('stdio:env:npx');
+    expect(computeServerIdentifier('docker', ['run', '-e', 'TOKEN=abcSECRET', 'img'])).toBe('stdio:docker:run');
+    expect(computeServerIdentifier('sh', ['-c', 'API_KEY=SECRET node srv.js'])).toBe('stdio:sh');
+  });
+});

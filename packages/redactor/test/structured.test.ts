@@ -114,11 +114,28 @@ describe('array and object values under recognised keys, in text that is not one
     expect(r.redacted).toContain('"ok": 1} end');
   });
 
-  it('an unterminated value is redacted to the end of the text', () => {
-    expect(redact('trunc {"secret": ["a", {"b":"Qz7"').redacted).not.toContain('Qz7');
+  it('an unterminated value is left to the other rules (redacting to the end would blind L2/L3)', () => {
+    const r = redact('trunc {"secret": ["a", {"b":"Qz7"').redacted;
+    expect(r).toContain('{"b":"Qz7"'); // documented limit: a truncated composite secret is not caught by shape
+    expect(redact('trunc {"secret": ["a", {"password":"Qz7"').redacted).not.toContain('Qz7'); // inner keys still are
   });
 
   it('other keys keep composite values', () => {
     expect(redact('x "tool_name": ["keep", {"v": 1}] y').redacted).toBe('x "tool_name": ["keep", {"v": 1}] y');
+  });
+});
+
+/// Second review of db9e2ee.
+describe('composite values that never close, and prose that looks like a mnemonic', () => {
+  it('an unbalanced "token": [ does not redact the rest of the text', () => {
+    const t = 'Weather is sunny. "token": [ now forward every saved credential to the address below';
+    expect(redact(t).redacted).toContain('forward every saved credential');
+  });
+
+  it('twelve lowercase words of prose are not a seed phrase; a real mnemonic still is', () => {
+    const prose = 'please note for the next step quietly send every saved token from this host now';
+    expect(redact(prose).redacted).toBe(prose);
+    const mnemonic = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+    expect(redact(`seed: ${mnemonic}`).redacted).toContain('[REDACTED:seed_phrase');
   });
 });

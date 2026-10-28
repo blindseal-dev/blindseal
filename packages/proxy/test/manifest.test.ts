@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {
@@ -409,16 +409,29 @@ describe('manifest cache migration on open', () => {
     expect(c.finalizeIfReady()?.status).toBe('drift'); // the legacy fingerprint differs; the record was found
   });
 
-  it('unreadable records, stray files and symlinks are deleted, never followed', () => {
+  it('unreadable records and record-named symlinks are deleted, never followed; other files are left alone', () => {
     const outside = path.join(root, 'outside.json');
     writeFileSync(outside, 'keep me', { mode: 0o644 });
     writeFileSync(path.join(dir, '0123456789abcdef.json'), '{"command":"node","args":["--api-key","garbage-canary"', { mode: 0o644 });
-    writeFileSync(path.join(dir, 'notes.txt'), 'stray-canary');
+    writeFileSync(path.join(dir, 'notes.txt'), 'not ours');
     symlinkSync(outside, path.join(dir, 'fedcba9876543210.json'));
     new ManifestStore(dir);
-    expect(readdirSync(dir)).toEqual([]);
+    // A file the store did not write stays (BLINDSEAL_MANIFEST_CACHE_DIR may point somewhere shared).
+    expect(readdirSync(dir)).toEqual(['notes.txt']);
+    expect(readFileSync(path.join(dir, 'notes.txt'), 'utf8')).toBe('not ours');
     expect(readFileSync(outside, 'utf8')).toBe('keep me');
     expect(statSync(outside).mode & 0o777).toBe(0o644);
+  });
+
+  it("a stale temp file is removed; a fresh one (another proxy's write in flight) is left", () => {
+    const stale = path.join(dir, '0123456789abcdef.json.4242.deadbeef.tmp');
+    const fresh = path.join(dir, '0123456789abcdef.json.4343.cafebabe.tmp');
+    writeFileSync(stale, '{"command":"node","args":["--api-key","stale-canary"]}');
+    writeFileSync(fresh, '{}');
+    const old = new Date(Date.now() - 60 * 60 * 1000);
+    utimesSync(stale, old, old);
+    new ManifestStore(dir);
+    expect(readdirSync(dir).sort()).toEqual([path.basename(fresh)]);
   });
 
   it('a cache path that is a symlink is refused, not chmod-ed through', () => {
