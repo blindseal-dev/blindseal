@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
 
 permissions:
   contents: read
@@ -68,6 +68,14 @@ jobs:
 
       - name: test
         run: pnpm -r test
+
+      # The INSTALLED package (pnpm pack → npm install), not the workspace: the 0.7.0 re-audit reply
+      # probes over stdio, HTTP JSON and HTTP SSE, a seeded fuzz (seed = this run's id), and the
+      # manifest-cache migration. Block mode with layer 2 up, from the model cache above (no download).
+      - name: packed-proxy regressions
+        env:
+          BLINDSEAL_MODEL_DIR: ${{ steps.model.outputs.dir }}
+        run: node scripts/packed-proxy-regressions.mjs --fuzz 60 --seed ${{ github.run_id }}
 
       - name: bundle size check
         run: |

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeServerIdentifier } from '../src/transports/stdio.js';
+import { displayUrl, httpServerIdentifier } from '../src/transports/server-id.js';
 
 describe('computeServerIdentifier — distinguishes servers within the same launcher', () => {
   it('npx + scoped package', () => {
@@ -62,5 +63,28 @@ describe('computeServerIdentifier — distinguishes servers within the same laun
   it('idempotent', () => {
     const id = computeServerIdentifier('npx', ['-y', '@scope/server']);
     expect(computeServerIdentifier('npx', ['-y', '@scope/server'])).toBe(id);
+  });
+});
+
+/// 0.7.0 re-audit follow-up: the identifier is written to the audit chain and scan history, so it
+/// must never carry a credential from the command line or an upstream URL.
+describe('server identifiers hold no credentials', () => {
+  it('the value after a credential-looking flag is never the server name', () => {
+    expect(computeServerIdentifier('srv', ['--api-key', 'SECRET123'])).toBe('stdio:srv');
+    expect(computeServerIdentifier('node', ['--token', 'SECRET123', 'server.js'])).toBe('stdio:node:server.js');
+    expect(computeServerIdentifier('uvx', ['--auth', 'SECRET123', 'mcp-server-git'])).toBe('stdio:uvx:mcp-server-git');
+    expect(computeServerIdentifier('srv', ['--api-key=SECRET123', 'pkg'])).toBe('stdio:srv:pkg');
+  });
+
+  it('a URL argument is reduced to its host', () => {
+    expect(computeServerIdentifier('npx', ['-y', 'https://user:pw@mcp.example/sse?token=SECRET123'])).toBe('stdio:npx:mcp.example');
+  });
+
+  it('http upstreams: host plus a short hash, never path, query or user:password', () => {
+    const id = httpServerIdentifier('https://user:pw@mcp.example/v1/SECRETPATH?token=SECRET123');
+    expect(id).toMatch(/^http:mcp\.example#[0-9a-f]{8}$/);
+    expect(id).not.toMatch(/SECRET|pw/);
+    expect(httpServerIdentifier('https://mcp.example/a')).not.toBe(httpServerIdentifier('https://mcp.example/b'));
+    expect(displayUrl('https://user:pw@mcp.example/v1?token=SECRET123')).toBe('https://mcp.example/…');
   });
 });

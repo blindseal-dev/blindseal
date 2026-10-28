@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import path from 'node:path';
 import { loadConfig } from '../config.js';
 import {
   TaintStore,
@@ -12,26 +11,25 @@ import {
   type CapabilityConfig,
 } from '../capability/index.js';
 import {
-  ManifestChecker,
+  openManifestChecker,
   type InitializeResult,
   type ManifestVerdict,
   type ToolsListResult,
 } from '../manifest/index.js';
-import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger, type RecordedDecision } from '../audit/index.js';
+import { createAuditLogger, screeningErrorEntry, type AuditLogger, type RecordedDecision } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
   buildOutboundBlockedResponse,
   inspectToolCallArguments,
-  inspectToolCallResponse,
-  isToolCallResponse,
   responseText,
   type JsonRpcMessage,
-  type ToolCallResult,
 } from './shared.js';
+import { isPlainObject, parseJson, PendingRequests, screenServerMessage } from './reply-screen.js';
+import { computeServerIdentifier } from './server-id.js';
 
 function addResponseToTaint(
-  msg: JsonRpcMessage & { result: ToolCallResult },
+  msg: Record<string, unknown>,
   toolName: string,
   taint: TaintStore,
   trusted: boolean,
@@ -64,46 +62,16 @@ function reportManifestVerdict(verdict: ManifestVerdict, mode: 'on' | 'strict'):
   }
 }
 
-/// Build a stable reputation identifier from the upstream command + args. The naive
-/// "stdio:<cmd>" collapses every npx-launched server into one bucket, making the on-chain
-/// score useless. We append the first non-flag arg (typically the package name or module),
-/// stripping path / extension if it's a filesystem path. Examples:
-///   npx -y @modelcontextprotocol/server-filesystem /tmp → stdio:npx:@modelcontextprotocol/server-filesystem
-///   uvx mcp-server-git                                  → stdio:uvx:mcp-server-git
-///   python -m mcp_server_fs                             → stdio:python:mcp_server_fs
-///   node /home/user/server.js                           → stdio:node:server
-///   npx (bare, no args)                                 → stdio:npx
-export function computeServerIdentifier(cmd: string, args: string[]): string {
-  let target: string | undefined;
-  for (const a of args) {
-    if (typeof a !== 'string' || a.length === 0) continue;
-    if (a.startsWith('-')) continue;
-    target = a;
-    break;
-  }
-  if (!target) return `stdio:${cmd}`;
-  // Strip filesystem paths down to basename-without-extension. Scoped npm packages
-  // (@scope/name) also contain '/' but should be preserved as-is — distinguish by leading '@'.
-  const looksLikePath =
-    !target.startsWith('@') &&
-    (target.startsWith('/') ||
-      target.startsWith('./') ||
-      target.startsWith('../') ||
-      target.includes('\\'));
-  if (looksLikePath) {
-    target = path.basename(target).replace(/\.[a-z]+$/i, '');
-  }
-  return `stdio:${cmd}:${target}`;
-}
+export { computeServerIdentifier } from './server-id.js';
 
 export function startProxy(cmd: string, args: string[]): void {
   const config = loadConfig();
   const serverIdentifier = computeServerIdentifier(cmd, args);
-  const toolNameById = new Map<string | number, string>();
+  /// Agent requests waiting for a reply; a server reply that answers none of them is dropped.
+  const pending = new PendingRequests();
   const taint = new TaintStore(config.capability.windowSize);
   const tradeRate = new TradeRateState();
-  const manifest =
-    config.manifest.mode !== 'off' ? new ManifestChecker(cmd, args, config.manifest) : null;
+  const manifest = openManifestChecker(cmd, args, config.manifest);
   const audit: AuditLogger = createAuditLogger(config.audit);
   const scanStore: ScanStore = createScanStore(config.persistence);
 
@@ -192,8 +160,6 @@ export function startProxy(cmd: string, args: string[]): void {
       }
     }
 
-    if (msg.id != null) toolNameById.set(msg.id, name);
-
     const decision = mergeDecisions(
       decideCapability(name, params?.arguments, taint, config.capability),
       decideTradePolicy(name, params?.arguments, taint, config.tradePolicy, tradeRate),
@@ -218,7 +184,6 @@ export function startProxy(cmd: string, args: string[]): void {
         `blindseal: capability-block tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
       );
       if (msg.id == null) return 'drop';
-      toolNameById.delete(msg.id);
       return buildCapabilityBlockedResponse(
         msg.id,
         name,
@@ -231,21 +196,22 @@ export function startProxy(cmd: string, args: string[]): void {
 
   // agent → server: outbound screen + capability gate run here, for a single message and for
   // every element of a JSON-RPC batch. Blocked calls are answered by the proxy and never reach
-  // the server.
+  // the server. What is forwarded is re-serialised from the parsed value the gate screened, so a
+  // server that resolves duplicate keys differently cannot see arguments the gate did not.
   const inRl = createInterface({ input: process.stdin });
   inRl.on('line', (line) => {
     let parsed: unknown;
-    try { parsed = JSON.parse(line); } catch { parsed = undefined; }
+    try { parsed = parseJson(line); } catch { parsed = undefined; }
     if (Array.isArray(parsed)) {
       const replies: JsonRpcMessage[] = [];
       const forward: unknown[] = [];
       for (const el of parsed) {
         const reply = el && typeof el === 'object' && !Array.isArray(el) ? gateToolCall(el as JsonRpcMessage) : null;
         if (reply === 'drop') continue;
-        if (reply) replies.push(reply); else forward.push(el);
+        if (reply) replies.push(reply); else { pending.track(el); forward.push(el); }
       }
       if (replies.length > 0) process.stdout.write(JSON.stringify(replies) + '\n');
-      if (forward.length > 0) childStdin.write((forward.length !== parsed.length ? JSON.stringify(forward) : line) + '\n');
+      if (forward.length > 0) childStdin.write(JSON.stringify(forward) + '\n');
       return;
     }
     if (parsed && typeof parsed === 'object') {
@@ -255,75 +221,78 @@ export function startProxy(cmd: string, args: string[]): void {
         process.stdout.write(JSON.stringify(reply) + '\n');
         return;
       }
+      pending.track(parsed);
+      childStdin.write(JSON.stringify(parsed) + '\n');
+      return;
     }
-    childStdin.write(line + '\n');
+    childStdin.write(line + '\n'); // not JSON: the server answers with a parse error, which no request matches
   });
   inRl.on('close', () => {
     childStdin.end();
   });
 
-  // server → agent: detection runs here. After mutation (if any), the final content
-  // is added to the taint store so subsequent capability checks can see it.
-  /// Server → agent for ONE response element: manifest observation, then — for anything shaped
-  /// like a tool-call result, whether or not its id matches a call we saw — screening, audit,
-  /// persistence and taint. Returns what to send to the agent (a screening failure withholds it).
-  async function screenResponseElement(msg: JsonRpcMessage): Promise<JsonRpcMessage> {
-    if (manifest && msg.result && typeof msg.result === 'object') {
-      const result = msg.result as Record<string, unknown>;
-      if ('serverInfo' in result || 'protocolVersion' in result) {
-        manifest.observeInitialize(result as InitializeResult);
-      }
-      if ('tools' in result && Array.isArray(result.tools)) {
-        manifest.observeToolsList(result as ToolsListResult);
-      }
-      const verdict = manifest.finalizeIfReady();
-      if (verdict) {
-        reportManifestVerdict(
-          verdict,
-          config.manifest.mode === 'strict' ? 'strict' : 'on',
-        );
-        if (audit.enabled) {
-          audit.log({
-            type: 'manifest',
-            serverKey: verdict.serverKey,
-            fingerprint: verdict.fingerprint.fingerprint,
-            status: verdict.status,
-            changes: verdict.changes,
-          });
-        }
-      }
+  // server → agent. Every message the server writes is parsed, matched to the agent request it
+  // answers, validated and screened (reply-screen.ts); the agent receives only what
+  // screenServerMessage returns, re-serialised from the screened value. Lines that are not a
+  // JSON-RPC object or batch never reach the agent.
+  function observeManifest(method: string, result: unknown): void {
+    if (!manifest) return;
+    if (method === 'initialize') manifest.observeInitialize(result as InitializeResult);
+    else if (method === 'tools/list') manifest.observeToolsList(result as ToolsListResult);
+    else return;
+    const verdict = manifest.finalizeIfReady();
+    if (!verdict) return;
+    reportManifestVerdict(verdict, config.manifest.mode === 'strict' ? 'strict' : 'on');
+    if (audit.enabled) {
+      audit.log({
+        type: 'manifest',
+        serverKey: verdict.serverKey,
+        fingerprint: verdict.fingerprint.fingerprint,
+        status: verdict.status,
+        changes: verdict.changes,
+      });
     }
+  }
 
-    if (!isToolCallResponse(msg)) return msg;
-    const toolName =
-      (msg.id != null ? toolNameById.get(msg.id) : undefined) ?? 'unknown';
-    if (msg.id != null) toolNameById.delete(msg.id);
-
-    let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
-    try {
-      outcome = await inspectToolCallResponse(msg, toolName, config.mode);
-    } catch (err) {
-      // Screening failed: record it and fail closed (the response is withheld).
-      audit.log(screeningErrorEntry(msg, toolName, 'detection', err));
-      return screeningErrorResponse(msg.id ?? null) as unknown as JsonRpcMessage;
+  /// One server → agent element. Returns what to send to the agent, or null to drop it.
+  async function screenServerElement(el: unknown): Promise<Record<string, unknown> | null> {
+    const s = await screenServerMessage(el, pending, config.mode);
+    if (s.error !== undefined) {
+      audit.log(screeningErrorEntry(isPlainObject(el) ? el : {}, s.label, 'detection', s.error));
+      process.stderr.write(`blindseal: screening failed for '${s.label}'; ${s.forward ? 'reply withheld' : 'message dropped'}\n`);
+      return s.forward;
+    }
+    if (s.problem) {
+      process.stderr.write(`blindseal: ${s.forward ? 'blocked' : 'dropped'} a server ${s.kind} (${s.problem})\n`);
+      if (audit.enabled) {
+        audit.log({ type: 'error', toolName: s.label, stage: 'reply-shape', error: s.problem });
+      }
+      return s.forward;
+    }
+    const outcome = s.outcome!;
+    if (s.kind === 'reply' && s.pending && outcome.verdict === 'clean' && isPlainObject(el) && 'result' in el) {
+      observeManifest(s.pending.method, el.result);
     }
     if (outcome.verdict !== 'clean') {
       process.stderr.write(
-        `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
+        `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) ${s.kind} from '${s.label}' (mode=${config.mode}${s.mutated ? (s.forward ? ', replaced' : ', dropped') : ''}${outcome.degraded ? ', degraded' : ''})\n`,
       );
     }
+    // Every tools/call reply is a decision on the record; other messages only when flagged.
+    const isToolReply = s.kind === 'reply' && s.pending?.method === 'tools/call';
+    if (!isToolReply && outcome.verdict === 'clean') return s.forward;
     let recorded: RecordedDecision | null = null;
     if (audit.enabled) {
       recorded = audit.log({
         ...(outcome.degraded ? { degraded: true } : {}),
         type: 'detection',
-        toolName,
+        toolName: s.label,
         layer: outcome.layer ?? null,
         verdict: outcome.verdict,
         confidence: outcome.result?.confidence ?? 0,
         patterns: outcome.result?.detectedPatterns ?? [],
         mode: config.mode,
-        mutated: outcome.mutated,
+        mutated: s.mutated,
         reasoning: outcome.result?.reasoning,
         contentHash: outcome.contentHash,
         text: outcome.scannedText,
@@ -337,7 +306,7 @@ export function startProxy(cmd: string, args: string[]): void {
         scanStore.insert({
           serverKey: serverIdentifier,
           transport: 'stdio',
-          toolName,
+          toolName: s.label,
           verdict: outcome.verdict,
           layer: outcome.layer ?? null,
           confidence: outcome.result?.confidence ?? 0,
@@ -345,40 +314,40 @@ export function startProxy(cmd: string, args: string[]): void {
           contentHash: outcome.contentHash,
           decisionId: recorded?.decisionId ?? null,
           mode: config.mode,
-          mutated: outcome.mutated,
+          mutated: s.mutated,
           degraded: outcome.degraded,
         });
       } catch (err) {
         process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
       }
     }
-    if (config.capability.enabled || config.tradePolicy.enabled)
-      addResponseToTaint(msg, toolName, taint, isTrustedSource(toolName, config.tradePolicy));
-    return msg;
+    if (isToolReply && s.forward && (config.capability.enabled || config.tradePolicy.enabled)) {
+      addResponseToTaint(s.forward, s.label, taint, isTrustedSource(s.label, config.tradePolicy));
+    }
+    return s.forward;
   }
 
-  // server → agent: detection runs here, on single messages and on every element of a batch.
-  // After mutation (if any), the final content is added to the taint store so subsequent
-  // capability checks can see it.
   let chain: Promise<void> = Promise.resolve();
   const outRl = createInterface({ input: childStdout });
   outRl.on('line', (line) => {
     chain = chain.then(async () => {
       let parsed: unknown;
-      try { parsed = JSON.parse(line); } catch { parsed = undefined; }
+      try { parsed = parseJson(line); } catch { parsed = undefined; }
       if (Array.isArray(parsed)) {
         const out: unknown[] = [];
         for (const el of parsed) {
-          out.push(el && typeof el === 'object' && !Array.isArray(el) ? await screenResponseElement(el as JsonRpcMessage) : el);
+          const r = await screenServerElement(el);
+          if (r) out.push(r);
         }
-        process.stdout.write(JSON.stringify(out) + '\n');
+        if (out.length > 0) process.stdout.write(JSON.stringify(out) + '\n');
         return;
       }
-      if (!parsed || typeof parsed !== 'object') {
-        process.stdout.write(line + '\n');
+      if (!isPlainObject(parsed)) {
+        if (line.trim()) process.stderr.write('blindseal: dropped a server line that is not a JSON-RPC message\n');
         return;
       }
-      process.stdout.write(JSON.stringify(await screenResponseElement(parsed as JsonRpcMessage)) + '\n');
+      const r = await screenServerElement(parsed);
+      if (r) process.stdout.write(JSON.stringify(r) + '\n');
     });
   });
 

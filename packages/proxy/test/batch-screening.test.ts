@@ -130,9 +130,10 @@ describe('HTTP transport: JSON-RPC batch', () => {
     sse = false;
   }, 60000);
 
-  it('a tool result whose id matches no tools/call is still screened', async () => {
+  it('a reply to a non-tools/call request is screened too, and blocked as a JSON-RPC error', async () => {
     sse = false;
-    // Not a tools/call request, but the upstream answers with a tool-shaped result.
+    // Not a tools/call request, but the upstream answers with a tool-shaped result. Every reply is
+    // screened whatever it answers; a blocked non-tool reply becomes an error (allowlisted fields).
     upstream.removeAllListeners('request');
     upstream.on('request', async (req, res) => {
       for await (const _ of req) { /* drain */ }
@@ -140,7 +141,26 @@ describe('HTTP transport: JSON-RPC batch', () => {
       res.end(JSON.stringify({ jsonrpc: '2.0', id: 41, result: { content: [{ type: 'text', text: INJ }] } }));
     });
     const out = await post({ jsonrpc: '2.0', id: 41, method: 'custom/read', params: {} });
-    expect(textOf(out)).toMatch(/\[BLINDSEAL_BLOCKED\]/);
+    expect(Object.keys(out).sort()).toEqual(['error', 'id', 'jsonrpc']);
+    expect(out.id).toBe(41);
+    expect(out.error.message).toMatch(/\[BLINDSEAL_BLOCKED\]/);
+    expect(JSON.stringify(out)).not.toContain('IGNORE PREVIOUS');
+  }, 60000);
+
+  it('a reply whose id matches no request is dropped', async () => {
+    sse = false;
+    upstream.removeAllListeners('request');
+    upstream.on('request', async (req, res) => {
+      for await (const _ of req) { /* drain */ }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify([
+        { jsonrpc: '2.0', id: 51, result: { content: [{ type: 'text', text: 'asked for' }] } },
+        { jsonrpc: '2.0', id: 52, result: { content: [{ type: 'text', text: 'nobody asked' }] } },
+      ]));
+    });
+    const out = await post({ jsonrpc: '2.0', id: 51, method: 'tools/call', params: { name: 'w', arguments: {} } });
+    expect(JSON.stringify(out)).toContain('asked for');
+    expect(JSON.stringify(out)).not.toContain('nobody asked');
   }, 60000);
 });
 

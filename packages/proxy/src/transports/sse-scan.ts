@@ -1,37 +1,17 @@
-/// SSE event-stream scanner for the HTTP transport. Each Server-Sent Event is parsed,
-/// the `data:` field is extracted, JSON-decoded, and if it's a JSON-RPC tool-call response
-/// the same detection pipeline that runs against non-streaming responses is applied. Modified
-/// messages are re-serialized into the SSE event before forwarding to the client.
+/// SSE event-stream scanner for the HTTP transport. Each Server-Sent Event is parsed, the
+/// `data:` field is extracted and JSON-decoded, and every JSON-RPC element in it goes through
+/// the transport's screen (reply-screen.ts). The event is re-serialised from the screened value.
 ///
 /// Spec: per https://html.spec.whatwg.org/multipage/server-sent-events.html SSE events are
 /// blocks of `field: value` lines separated by blank lines (`\n\n` or `\r\n\r\n`). Multiple
 /// `data:` lines in one event concatenate with `\n`. Comments start with `:`.
 
-import {
-  inspectToolCallResponse,
-  isToolCallResponse,
-  type JsonRpcMessage,
-  type BlindsealMode,
-  type ToolCallResult,
-} from './shared.js';
-import { screeningErrorResponse } from '../audit/index.js';
+import { parseJson } from './reply-screen.js';
 
 export interface SseScanHooks {
-  /// Tool name to use when no per-id name is known (legacy single-call callers).
-  toolName: string | null;
-  /// Resolve the tool name of a response by its JSON-RPC id (batch requests). Responses with no
-  /// known name are still screened, as 'unknown'.
-  toolNameFor?: (id: string | number | undefined) => string | undefined;
-  mode: BlindsealMode;
-  /// Invoked AFTER inspectToolCallResponse mutates (or doesn't). Lets the transport hook
-  /// audit, persistence, taint, attestation.
-  onScanned?: (
-    msg: JsonRpcMessage & { result: ToolCallResult },
-    toolName: string,
-    outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>,
-  ) => void | Promise<void>;
-  /// Screening of one element threw: it is withheld (replaced by a JSON-RPC error).
-  onScreeningError?: (msg: JsonRpcMessage & { result: ToolCallResult }, toolName: string, err: unknown) => void;
+  /// Screens one JSON-RPC element (see reply-screen.ts screenServerMessage) and returns what the
+  /// agent may receive, or null to drop it.
+  screen: (el: unknown) => Promise<Record<string, unknown> | null>;
 }
 
 interface ParsedEvent {
@@ -74,54 +54,31 @@ export function serializeSseEvent(preLines: string[], data: string | null): stri
   return out.join('\n') + '\n\n';
 }
 
-/// Process one fully-assembled SSE event block. Returns the byte string to forward.
+/// SSE fields an agent's client acts on besides `data`. Comments and unknown fields are dropped.
+const KEPT_FIELDS = /^(event|id|retry):/;
+
+/// Process one fully-assembled SSE event block. Returns the bytes to forward ('' = nothing).
+/// A data event is always re-serialised from the screened JSON value: the original bytes never
+/// reach the agent, and data that is not a JSON-RPC message or batch is dropped.
 export async function processSseEvent(block: string, hooks: SseScanHooks): Promise<string> {
   const parsed = parseSseEvent(block);
-  if (parsed.data === null) {
-    // No data — pass through verbatim, preserving the trailing blank line.
-    return block + '\n\n';
-  }
+  const pre = parsed.preLines.filter((l) => KEPT_FIELDS.test(l));
+  if (parsed.data === null) return pre.length > 0 ? serializeSseEvent(pre, null) : '';
 
-  let msg: JsonRpcMessage | JsonRpcMessage[] | null;
-  try { msg = JSON.parse(parsed.data) as JsonRpcMessage | JsonRpcMessage[]; } catch { msg = null; }
-  if (!msg || typeof msg !== 'object') {
-    // Not JSON — pass through verbatim.
-    return block + '\n\n';
-  }
+  let msg: unknown;
+  try { msg = parseJson(parsed.data); } catch { return ''; }
 
   // A batch response arrives as one JSON array in one event: screen every element.
   if (Array.isArray(msg)) {
-    let changed = false;
     const out: unknown[] = [];
-    for (const el of msg as unknown[]) {
-      if (el && typeof el === 'object' && !Array.isArray(el)) {
-        const r = await screenElement(el as JsonRpcMessage, hooks);
-        if (r.screened) changed = true;
-        out.push(r.msg);
-      } else out.push(el);
+    for (const el of msg) {
+      const r = await hooks.screen(el);
+      if (r) out.push(r);
     }
-    return changed ? serializeSseEvent(parsed.preLines, JSON.stringify(out)) : block + '\n\n';
+    return out.length > 0 ? serializeSseEvent(pre, JSON.stringify(out)) : '';
   }
-
-  const r = await screenElement(msg, hooks);
-  // Re-serialize the (possibly mutated) message; anything else passes through verbatim.
-  return r.screened ? serializeSseEvent(parsed.preLines, JSON.stringify(r.msg)) : block + '\n\n';
-}
-
-async function screenElement(msg: JsonRpcMessage, hooks: SseScanHooks): Promise<{ msg: JsonRpcMessage; screened: boolean }> {
-  // Non-tool-call messages (initialize, tools/list, errors, notifications) pass through.
-  if (!isToolCallResponse(msg)) return { msg, screened: false };
-  const toolName = hooks.toolNameFor?.(msg.id) ?? hooks.toolName ?? 'unknown';
-  let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
-  try {
-    outcome = await inspectToolCallResponse(msg, toolName, hooks.mode);
-  } catch (err) {
-    if (!hooks.onScreeningError) throw err;
-    hooks.onScreeningError(msg, toolName, err);
-    return { msg: screeningErrorResponse(msg.id ?? null) as unknown as JsonRpcMessage, screened: true };
-  }
-  if (hooks.onScanned) await hooks.onScanned(msg, toolName, outcome);
-  return { msg, screened: true };
+  const r = await hooks.screen(msg);
+  return r ? serializeSseEvent(pre, JSON.stringify(r)) : '';
 }
 
 /// Stream-scans an SSE upstream response. Reads chunks from the upstream body, buffers until
@@ -150,7 +107,7 @@ export async function streamScanSse(
         buffer = buffer.slice(idx.end);
         if (block.length === 0) continue; // empty leading blanks
         const out = await processSseEvent(block, hooks);
-        write(out);
+        if (out) write(out);
       }
     }
 
@@ -160,7 +117,7 @@ export async function streamScanSse(
     // Process any trailing event without a final blank line.
     if (buffer.trim().length > 0) {
       const out = await processSseEvent(buffer, hooks);
-      write(out);
+      if (out) write(out);
     }
   } finally {
     try {

@@ -17,6 +17,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { loadConfig } from '../config.js';
+import { httpServerIdentifier } from './server-id.js';
 import { runPipeline } from '../detection/pipeline.js';
 import { sha256Hex } from './shared.js';
 import { createAuditLogger } from '../audit/index.js';
@@ -154,7 +155,7 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       text: parsed.text,
       l3Status: result.l3Status,
       transport: 'scan-http',
-      serverKey: serverUrl,
+      serverKey: serverUrl ? httpServerIdentifier(serverUrl) : undefined,
       ...(result.degraded ? { degraded: true } : {}),
     });
 

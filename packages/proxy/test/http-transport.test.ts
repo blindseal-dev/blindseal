@@ -196,7 +196,9 @@ describe('http transport — end-to-end through the proxy', () => {
     expect(r.status).toBe(200);
     const body = await r.json();
     expect(body.ok).toBe(true);
-    expect(body.upstream).toBe(ctx.fixtureUrl);
+    // The upstream URL can carry a token: health never echoes it (0.7.0 re-audit).
+    expect(body.upstream).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain(ctx.fixtureUrl);
   });
 
   it('returns 405 for non-POST tool-call requests', async () => {
@@ -239,12 +241,11 @@ describe('http transport — end-to-end through the proxy', () => {
       const resp = await fetch(proxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 100,
-          method: 'tools/call',
-          params: { name: 'read_file', arguments: { path: 'x' } },
-        }),
+        // Both ids are requested: a streamed reply to an id nobody asked for would be dropped.
+        body: JSON.stringify([
+          { jsonrpc: '2.0', id: 100, method: 'tools/call', params: { name: 'read_file', arguments: { path: 'x' } } },
+          { jsonrpc: '2.0', id: 101, method: 'tools/call', params: { name: 'read_file', arguments: { path: 'y' } } },
+        ]),
       });
       expect(resp.headers.get('content-type')).toContain('text/event-stream');
       const body = await resp.text();

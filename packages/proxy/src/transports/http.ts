@@ -16,24 +16,22 @@ import {
   mergeDecisions,
 } from '../capability/index.js';
 import {
-  ManifestChecker,
+  openManifestChecker,
   type InitializeResult,
   type ToolsListResult,
 } from '../manifest/index.js';
-import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger, type RecordedDecision } from '../audit/index.js';
+import { createAuditLogger, screeningErrorEntry, type AuditLogger, type RecordedDecision } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
   buildOutboundBlockedResponse,
   inspectToolCallArguments,
-  inspectToolCallResponse,
-  isToolCallResponse,
   responseText,
-  type InspectionOutcome,
   type JsonRpcMessage,
-  type ToolCallResult,
 } from './shared.js';
 import { serializeSseEvent, streamScanSse } from './sse-scan.js';
+import { isPlainObject, parseJson, PendingRequests, screenServerMessage } from './reply-screen.js';
+import { displayUrl, httpServerIdentifier } from './server-id.js';
 
 export interface HttpProxyOptions {
   upstream: string;
@@ -95,8 +93,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
   const config = loadConfig();
   const taint = new TaintStore(config.capability.windowSize);
   const tradeRate = new TradeRateState();
-  const manifest =
-    config.manifest.mode !== 'off' ? new ManifestChecker('http', [opts.upstream], config.manifest) : null;
+  const manifest = openManifestChecker('http', [opts.upstream], config.manifest);
   const audit: AuditLogger = createAuditLogger(config.audit);
   const scanStore: ScanStore = createScanStore(config.persistence);
 
@@ -107,6 +104,8 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
   }
 
   const upstreamUrl = opts.upstream;
+  /// What is recorded and printed for this upstream: never the URL itself (it can carry a token).
+  const serverId = httpServerIdentifier(upstreamUrl);
 
   /// Agent → server gate for ONE tools/call element: outbound L0/L1 screen on the arguments,
   /// then the capability / trade gate. Returns the synthetic reply when the call must not be
@@ -135,7 +134,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           contentHash: outbound.argsHash,
           text: outbound.scannedText,
           transport: 'http',
-          serverKey: upstreamUrl,
+          serverKey: serverId,
         });
       }
       if (outbound.action === 'block' && outbound.result) {
@@ -178,76 +177,11 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     return null;
   }
 
-  /// Audit + persistence + taint for one screened tool-call response.
-  function recordScreened(
-    scannedMsg: JsonRpcMessage & { result: ToolCallResult },
-    scannedTool: string,
-    outcome: InspectionOutcome,
-    transport: 'http' | 'sse',
-  ): void {
-    if (outcome.verdict !== 'clean') {
-      process.stderr.write(
-        `blindseal[${transport === 'sse' ? 'http/sse' : 'http'}]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${scannedTool}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
-      );
-    }
-    let recorded: RecordedDecision | null = null;
-    if (audit.enabled) {
-      recorded = audit.log({
-        ...(outcome.degraded ? { degraded: true } : {}),
-        type: 'detection',
-        toolName: scannedTool,
-        layer: outcome.layer ?? null,
-        verdict: outcome.verdict,
-        confidence: outcome.result?.confidence ?? 0,
-        patterns: outcome.result?.detectedPatterns ?? [],
-        mode: config.mode,
-        mutated: outcome.mutated,
-        reasoning: outcome.result?.reasoning,
-        contentHash: outcome.contentHash,
-        text: outcome.scannedText,
-        l3Status: outcome.result?.l3Status,
-        transport,
-        serverKey: upstreamUrl,
-      });
-    }
-    if (scanStore.enabled) {
-      try {
-        scanStore.insert({
-          serverKey: upstreamUrl,
-          transport,
-          toolName: scannedTool,
-          verdict: outcome.verdict,
-          layer: outcome.layer ?? null,
-          confidence: outcome.result?.confidence ?? 0,
-          patterns: outcome.result?.detectedPatterns ?? [],
-          contentHash: outcome.contentHash,
-          decisionId: recorded?.decisionId ?? null,
-          mode: config.mode,
-          mutated: outcome.mutated,
-          degraded: outcome.degraded,
-        });
-      } catch (err) {
-        process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
-      }
-    }
-    if (config.capability.enabled || config.tradePolicy.enabled) {
-      const content = responseText(scannedMsg.result);
-      if (content.length > 0) {
-        taint.add({ toolName: scannedTool, content, addedAt: Date.now(), trusted: isTrustedSource(scannedTool, config.tradePolicy) });
-      }
-    }
-  }
-
-  function observeManifest(respMsg: JsonRpcMessage): void {
+  function observeManifest(method: string, result: unknown): void {
     if (!manifest) return;
-    const result = respMsg.result as Record<string, unknown> | undefined;
-    if (!result || typeof result !== 'object') return;
-    if ('serverInfo' in result || 'protocolVersion' in result) {
-      manifest.observeInitialize(result as InitializeResult);
-    }
-    if ('tools' in result && Array.isArray(result.tools)) {
-      manifest.observeToolsList(result as ToolsListResult);
-    }
+    if (method === 'initialize') manifest.observeInitialize(result as InitializeResult);
+    else if (method === 'tools/list') manifest.observeToolsList(result as ToolsListResult);
+    else return;
     const verdict = manifest.finalizeIfReady();
     if (!verdict) return;
     const fp = verdict.fingerprint.fingerprint.slice(0, 12);
@@ -269,32 +203,90 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     }
   }
 
-  /// Server → agent for ONE JSON-RPC response element. Every element shaped like a tool-call
-  /// result is screened — matched to its request by id, and screened as 'unknown' when no
-  /// tools/call with that id was seen (a mismatched id must not be a way around screening).
-  /// A screening failure withholds that element only (fail closed).
-  async function screenResponseElement(
-    respMsg: JsonRpcMessage,
-    toolNameById: Map<string | number, string>,
+  /// Server → agent for ONE JSON-RPC element (JSON body or SSE event): matched to the request it
+  /// answers, validated and screened (reply-screen.ts), then audit, persistence and taint.
+  /// Returns what the agent may receive, or null to drop it.
+  async function screenServerElement(
+    el: unknown,
+    pending: PendingRequests,
     transport: 'http' | 'sse',
-  ): Promise<JsonRpcMessage> {
-    observeManifest(respMsg);
-    if (!isToolCallResponse(respMsg)) return respMsg;
-    const toolName = (respMsg.id != null ? toolNameById.get(respMsg.id) : undefined) ?? 'unknown';
-    let outcome: InspectionOutcome;
-    try {
-      outcome = await inspectToolCallResponse(respMsg, toolName, config.mode);
-    } catch (err) {
-      audit.log(screeningErrorEntry(respMsg, toolName, transport === 'sse' ? 'sse' : 'detection', err));
-      return screeningErrorResponse(respMsg.id ?? null) as unknown as JsonRpcMessage;
+  ): Promise<Record<string, unknown> | null> {
+    const tag = transport === 'sse' ? 'http/sse' : 'http';
+    const s = await screenServerMessage(el, pending, config.mode);
+    if (s.error !== undefined) {
+      audit.log(screeningErrorEntry(isPlainObject(el) ? el : {}, s.label, transport === 'sse' ? 'sse' : 'detection', s.error));
+      process.stderr.write(`blindseal[${tag}]: screening failed for '${s.label}'; ${s.forward ? 'reply withheld' : 'message dropped'}\n`);
+      return s.forward;
     }
-    recordScreened(respMsg, toolName, outcome, transport);
-    return respMsg;
+    if (s.problem) {
+      process.stderr.write(`blindseal[${tag}]: ${s.forward ? 'blocked' : 'dropped'} a server ${s.kind} (${s.problem})\n`);
+      if (audit.enabled) audit.log({ type: 'error', toolName: s.label, stage: 'reply-shape', error: s.problem });
+      return s.forward;
+    }
+    const outcome = s.outcome!;
+    if (s.kind === 'reply' && s.pending && outcome.verdict === 'clean' && isPlainObject(el) && 'result' in el) {
+      observeManifest(s.pending.method, el.result);
+    }
+    if (outcome.verdict !== 'clean') {
+      process.stderr.write(
+        `blindseal[${tag}]: ${outcome.verdict} (L${outcome.layer ?? '?'}) ${s.kind} from '${s.label}' (mode=${config.mode}${s.mutated ? (s.forward ? ', replaced' : ', dropped') : ''}${outcome.degraded ? ', degraded' : ''})\n`,
+      );
+    }
+    // Every tools/call reply is a decision on the record; other messages only when flagged.
+    const isToolReply = s.kind === 'reply' && s.pending?.method === 'tools/call';
+    if (!isToolReply && outcome.verdict === 'clean') return s.forward;
+    let recorded: RecordedDecision | null = null;
+    if (audit.enabled) {
+      recorded = audit.log({
+        ...(outcome.degraded ? { degraded: true } : {}),
+        type: 'detection',
+        toolName: s.label,
+        layer: outcome.layer ?? null,
+        verdict: outcome.verdict,
+        confidence: outcome.result?.confidence ?? 0,
+        patterns: outcome.result?.detectedPatterns ?? [],
+        mode: config.mode,
+        mutated: s.mutated,
+        reasoning: outcome.result?.reasoning,
+        contentHash: outcome.contentHash,
+        text: outcome.scannedText,
+        l3Status: outcome.result?.l3Status,
+        transport,
+        serverKey: serverId,
+      });
+    }
+    if (scanStore.enabled) {
+      try {
+        scanStore.insert({
+          serverKey: serverId,
+          transport,
+          toolName: s.label,
+          verdict: outcome.verdict,
+          layer: outcome.layer ?? null,
+          confidence: outcome.result?.confidence ?? 0,
+          patterns: outcome.result?.detectedPatterns ?? [],
+          contentHash: outcome.contentHash,
+          decisionId: recorded?.decisionId ?? null,
+          mode: config.mode,
+          mutated: s.mutated,
+          degraded: outcome.degraded,
+        });
+      } catch (err) {
+        process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
+    }
+    if (isToolReply && s.forward && (config.capability.enabled || config.tradePolicy.enabled)) {
+      const content = responseText(s.forward.result);
+      if (content.length > 0) {
+        taint.add({ toolName: s.label, content, addedAt: Date.now(), trusted: isTrustedSource(s.label, config.tradePolicy) });
+      }
+    }
+    return s.forward;
   }
 
   const server = createServer(async (req, res) => {
     if (req.method === 'GET' && (req.url === '/health' || req.url === '/')) {
-      sendJson(res, 200, { ok: true, upstream: upstreamUrl });
+      sendJson(res, 200, { ok: true });
       return;
     }
     if (req.method !== 'POST') {
@@ -315,10 +307,11 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     // from what is forwarded.
     const reqText = bodyBuf.toString('utf8');
     let parsedReq: unknown;
-    try { parsedReq = JSON.parse(reqText); } catch { parsedReq = undefined; }
+    try { parsedReq = parseJson(reqText); } catch { parsedReq = undefined; }
     const isBatch = Array.isArray(parsedReq);
     const elements: unknown[] = isBatch ? (parsedReq as unknown[]) : parsedReq !== undefined ? [parsedReq] : [];
-    const toolNameById = new Map<string | number, string>();
+    /// Requests in this POST waiting for a reply; anything else the upstream answers is dropped.
+    const pending = new PendingRequests();
     const synthetic: JsonRpcMessage[] = [];
     const forwarded: unknown[] = [];
     let dropped = 0;
@@ -330,9 +323,9 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           const reply = gateToolCall(m, params.name, params.arguments);
           if (reply === 'drop') { dropped++; continue; }
           if (reply) { synthetic.push(reply); continue; }
-          if (m.id != null) toolNameById.set(m.id, params.name);
         }
       }
+      pending.track(el);
       forwarded.push(el);
     }
 
@@ -342,7 +335,9 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       sendJson(res, 200, isBatch ? synthetic : synthetic[0]);
       return;
     }
-    const forwardBody = synthetic.length === 0 && dropped === 0 ? reqText : JSON.stringify(isBatch ? forwarded : forwarded[0]);
+    // Re-serialised from what the gate screened (an unparseable body goes as-is: the upstream
+    // answers it with a parse error, which matches no request and is dropped).
+    const forwardBody = parsedReq === undefined ? reqText : JSON.stringify(isBatch ? forwarded : forwarded[0]);
 
     // Forward to upstream.
     let upstreamResp: Response;
@@ -353,7 +348,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         body: forwardBody,
       });
     } catch (err) {
-      process.stderr.write(`blindseal[http]: upstream fetch failed: ${err}\n`);
+      process.stderr.write(`blindseal[http]: upstream fetch failed: ${(err instanceof Error ? err.message : String(err)).split(upstreamUrl).join(displayUrl(upstreamUrl))}\n`);
       sendJson(res, 502, { error: 'upstream fetch failed' });
       return;
     }
@@ -375,24 +370,14 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       try {
         await streamScanSse(
           upstreamResp.body,
-          {
-            toolName: null,
-            toolNameFor: (id) => (id != null ? toolNameById.get(id) : undefined),
-            mode: config.mode,
-            async onScanned(scannedMsg, scannedTool, outcome) {
-              recordScreened(scannedMsg, scannedTool, outcome, 'sse');
-            },
-            onScreeningError(msg, scannedTool, err) {
-              audit.log(screeningErrorEntry(msg, scannedTool, 'sse', err));
-            },
-          },
+          { screen: (el) => screenServerElement(el, pending, 'sse') },
           (chunk) => {
             res.write(chunk);
           },
         );
       } catch (err) {
         process.stderr.write(`blindseal[http/sse]: stream scan failed: ${err}\n`);
-        audit.log({ type: 'error', toolName: [...toolNameById.values()][0] ?? 'unknown', stage: 'sse', error: err instanceof Error ? err.message : String(err) });
+        audit.log({ type: 'error', toolName: 'unknown', stage: 'sse', error: err instanceof Error ? err.message : String(err) });
       }
       res.end();
       return;
@@ -408,33 +393,38 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     }
 
     let parsedResp: unknown;
-    try { parsedResp = JSON.parse(respText); } catch { parsedResp = undefined; }
-    if (parsedResp === undefined || parsedResp === null || typeof parsedResp !== 'object') {
+    try { parsedResp = parseJson(respText); } catch { parsedResp = undefined; }
+    if (!isPlainObject(parsedResp) && !Array.isArray(parsedResp)) {
       if (synthetic.length > 0) {
-        // Upstream sent nothing parseable (e.g. 202 for notifications) but the proxy answered
+        // Upstream sent nothing usable (e.g. 202 for notifications) but the proxy answered
         // blocked elements itself: those answers must still reach the agent.
         sendJson(res, 200, isBatch ? synthetic : synthetic[0]);
         return;
       }
-      // Not JSON-RPC — pass through verbatim.
-      res.writeHead(upstreamResp.status, { 'Content-Type': upstreamCT || 'application/json' });
-      res.end(respText);
+      if (respText.trim() === '') {
+        // An empty body (202 Accepted for notifications) carries nothing to screen.
+        res.writeHead(upstreamResp.status);
+        res.end();
+        return;
+      }
+      // Anything else that is not a JSON-RPC object or batch never reaches the agent.
+      process.stderr.write('blindseal[http]: dropped an upstream body that is not a JSON-RPC message\n');
+      sendJson(res, 502, { error: 'upstream reply was not a JSON-RPC message' });
       return;
     }
 
-    let out: unknown;
-    if (Array.isArray(parsedResp)) {
-      const screened: unknown[] = [];
-      for (const el of parsedResp) {
-        screened.push(el && typeof el === 'object' && !Array.isArray(el)
-          ? await screenResponseElement(el as JsonRpcMessage, toolNameById, 'http')
-          : el);
-      }
-      out = [...synthetic, ...screened];
-    } else {
-      const one = await screenResponseElement(parsedResp as JsonRpcMessage, toolNameById, 'http');
-      out = synthetic.length > 0 ? [...synthetic, one] : one;
+    const screened: unknown[] = [];
+    for (const el of Array.isArray(parsedResp) ? parsedResp : [parsedResp]) {
+      const r = await screenServerElement(el, pending, 'http');
+      if (r) screened.push(r);
     }
+    const all = [...synthetic, ...screened];
+    if (all.length === 0) {
+      res.writeHead(202);
+      res.end();
+      return;
+    }
+    const out: unknown = isBatch || Array.isArray(parsedResp) || all.length > 1 ? all : all[0];
 
     const payload = JSON.stringify(out);
     res.writeHead(upstreamResp.status, {
@@ -446,7 +436,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
 
   server.listen(opts.listenPort, opts.listenHost ?? '127.0.0.1', () => {
     process.stderr.write(
-      `blindseal[http]: listening on ${opts.listenHost ?? '127.0.0.1'}:${opts.listenPort} → ${upstreamUrl}\n`,
+      `blindseal[http]: listening on ${opts.listenHost ?? '127.0.0.1'}:${opts.listenPort} → ${displayUrl(upstreamUrl)}\n`,
     );
   });
 

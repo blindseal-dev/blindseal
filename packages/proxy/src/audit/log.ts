@@ -264,8 +264,9 @@ export function screeningErrorEntry(
   stage: string,
   err: unknown,
 ): ErrorAuditInput {
-  const content = (msg.result as { content?: Array<{ text?: unknown }> } | undefined)?.content ?? [];
-  const text = content.map((c) => (typeof c.text === 'string' ? c.text : '')).join('\n');
+  const raw = (msg.result as { content?: unknown } | null | undefined)?.content;
+  const content = Array.isArray(raw) ? (raw as Array<{ text?: unknown } | null>) : [];
+  const text = content.map((c) => (c && typeof c.text === 'string' ? c.text : '')).join('\n');
   return {
     type: 'error',
     toolName,
