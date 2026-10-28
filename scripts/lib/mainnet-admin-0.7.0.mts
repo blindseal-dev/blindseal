@@ -107,6 +107,9 @@ async function plan(step: string, cfg: Cfg, ctx: Ctx): Promise<Planned> {
       return { ...base, ix: buildSetConfigIx(ctx.authority, { allowedVkeys: next.map(hex) }), next: { ...cfg, allowedVkeys: next } };
     }
     case 'd': {
+      // After d the config authority is the Ledger, and this script signs set_config only with a keypair file:
+      // c2 must land first.
+      if (cfg.allowedVkeys.some((k) => LEGACY_VKEYS.includes(k))) refuse('d: the old vkey is still allowed — run c2 first (after d, set_config needs the Ledger, which this script cannot sign with)');
       const want = flag('--ledger-pubkey');
       const kpFile = flag('--new-authority-keypair');
       let newAuth: PublicKey;

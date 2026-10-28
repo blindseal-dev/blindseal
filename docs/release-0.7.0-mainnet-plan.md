@@ -14,7 +14,7 @@ Nothing was sent to mainnet or devnet.
 
 | | |
 |---|---|
-| Release branch HEAD | `15c772f` (last change under `programs/`: `84e52a6`, "0.7.0: guest binds the screened payload…"). `programs/` is clean. |
+| Release branch HEAD | `15c772f` when the builds were made (last change under `programs/`: `84e52a6`, "0.7.0: guest binds the screened payload…"). `programs/` is clean. This commit only changes scripts and docs: `git diff 15c772f HEAD -- programs` is empty. So the hashes below hold for the HEAD that step 0 will print, and for any commit whose `programs/` tree matches. |
 | Config PDA | `9je2jP8yLogrSbm6qxDFjjQXKKwk9A25KMqwXCqDb4M3` |
 | Default PolicyRoot PDA | `9XfreXFvq3TyQywnbjjKPNRV8FDxegzEZPj4DtMLe3CC` (root `0x36a9e9…8397`) |
 | Authority, fee payer and signer for every step | `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj`, balance **3.197621665 SOL** |
@@ -109,6 +109,10 @@ re-run, because a second buffer may not fit the balance. Instead, do one of thes
   `solana program deploy … --buffer <file>`.
 - **Reclaim:** run `solana program close <buffer>`. The CLI prints this command.
 
+**Stopping between the two upgrades is safe.** The first clone rehearsal (see section 2) aborted after the gate
+upgrade, which left the new gate in front of the old verifier. The demo sample still failed cleanly there with
+`NullifierAlreadyConsumed` (6006). Each upgrade has its own typed confirmation.
+
 A **mainnet simulation of step 0 is not meaningful.** `Upgrade` needs a buffer already written on chain, and
 writing a buffer is a send that costs the buffer rent. `--simulate 0` therefore prints the cost plan above, taken
 live from mainnet. The clone run below is the rehearsal.
@@ -168,6 +172,7 @@ If it were needed, the transaction would be:
 | Fee | 10,000 lamports (2 signatures) |
 | Config change | `authority` 88sR7X… → the Ledger |
 | Note | `set_authority` exists **only after step 0**. Against today's mainnet binary it fails with `InstructionFallbackNotFound` (101); see the simulation below. |
+| Order | **Run d last, after c2.** Once d lands, `set_config` needs the Ledger's signature, and this script only signs `set_config` with a keypair file. The script now refuses d while the old vkey is still allowed (on mainnet; on a simulation or a local rehearsal it reports this instead). |
 
 ### Totals, and whether the script's order matches the owner's
 
@@ -374,7 +379,9 @@ scripts/mainnet-0.7.0.sh --simulate d --ledger-pubkey <ledger pubkey>     # afte
   check and never on a flag:
   - c2's preconditions are reported but not enforced;
   - `d --new-authority-keypair <file>` uses a throwaway key in place of the Ledger.
-- **Gate:** `c1` refuses unless `a` is done.
+- **Gates:**
+  - `c1` refuses unless `a` is done;
+  - `d` refuses while the old vkey is still allowed, so it must come after c2.
 - **Step 0:**
   - prints the per-program transaction count, buffer rent, growth rent and fees, using rent from the cluster;
   - refuses to start below the required balance;

@@ -27,7 +27,8 @@
 #        then `blindseal attest` downloads prover 0.5.1 — old guest, old vkey — whose proofs c2 makes
 #        unconsumable), and a new-vkey sample has landed on mainnet:
 #          scripts/mainnet-0.7.0.sh c2 --new-sample <attestation.json>
-#   d    optional: set_authority(<Ledger pubkey>) — the config authority moves to the Ledger; both sign
+#   d    optional, LAST (refuses while the old vkey is allowed, i.e. before c2): set_authority(<Ledger pubkey>)
+#        — the config authority moves to the Ledger; both sign. After d this script cannot sign set_config.
 #          scripts/mainnet-0.7.0.sh d --ledger-pubkey <pubkey of usb://ledger?key=0>
 #
 # Order: 0 → b → a → c1, then (later) c2, then (optionally) d. b runs BEFORE a: turning approved policies
