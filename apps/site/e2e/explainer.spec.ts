@@ -3,7 +3,8 @@
 // hydrates (no diff before the clock's first tick); plays in view and stops its rAF offscreen, in a hidden tab
 // and on pause; every chapter dot works from the keyboard; the reduced-motion storyboard; quarter speed; no text
 // under 12 px inside the explainer; no horizontal overflow; never-write clean on every string (all chapters,
-// transcript, storyboard, the timeline's exported copy); content and transcript without JS.
+// transcript, storyboard, the timeline's exported copy); nothing crosses a card edge or a connector in any
+// chapter; content and transcript without JS.
 import { test, expect, type Page } from '@playwright/test';
 import { INIT, DIFF } from './mismatch-lib';
 import { INVISIBLE_TEXT } from './nojs-lib';
@@ -38,6 +39,39 @@ const SMALL_TEXT = (sel: string) => {
   // pseudo-element labels (the pips' passed / blocked / skipped)
   root.querySelectorAll('.ex-pip').forEach((p) => { const px = parseFloat(getComputedStyle(p, '::after').fontSize); if (px < 11.95) out.push(`${px}px ::after`); });
   return out;
+};
+// inside the stage: every visible text box (and chip) sits within its own lane's card, inside the border, and no
+// connector (wire, rule) crosses a visible text box. "Visible" = effective opacity > .05 up to the frame; the end
+// card is an overlay over the whole stage and is not part of the lanes.
+const GEOMETRY = () => {
+  const bad: string[] = [];
+  const stage = document.querySelector('.ex-live .ex-stage')!;
+  const opacity = (el: Element) => { let o = 1; for (let a: Element | null = el; a && !a.classList.contains('ex-frame'); a = a.parentElement) { const cs = getComputedStyle(a); if (cs.display === 'none' || cs.visibility === 'hidden') return 0; o *= Number(cs.opacity); } return o; };
+  const boxes: { el: Element; r: DOMRect; label: string }[] = [];
+  const name = (el: Element) => `<${el.tagName.toLowerCase()}.${[...el.classList].join('.')}> "${(el.textContent || (el as HTMLElement).dataset?.t || '').trim().slice(0, 30)}"`;
+  stage.querySelectorAll('*').forEach((el) => {
+    if (el.closest('svg')) return;
+    const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.nodeValue!.trim()) || el.matches('.ex-chip, .ex-hid, .ex-pip');
+    if (!own || opacity(el) <= 0.05) return;
+    let r: DOMRect;
+    if (el.matches('.ex-chip, .ex-hid, .ex-pip')) r = el.getBoundingClientRect();
+    else { const rg = document.createRange(); rg.selectNodeContents(el); r = rg.getBoundingClientRect(); }
+    if (r.width < 1 || r.height < 1) return;
+    boxes.push({ el, r, label: name(el) });
+  });
+  const inside = (a: DOMRect, b: DOMRect, inset: number) => a.left >= b.left + inset - 0.5 && a.right <= b.right - inset + 0.5 && a.top >= b.top + inset - 0.5 && a.bottom <= b.bottom - inset + 0.5;
+  const hit = (a: DOMRect, b: DOMRect) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  for (const b of boxes) {
+    const lane = b.el.closest('.ex-lane');
+    if (lane && !b.el.closest('.ex-pkt') && !inside(b.r, lane.getBoundingClientRect(), 1)) bad.push(`outside its card: ${b.label}`);
+    // a card it does not belong to
+    stage.querySelectorAll('.ex-lane').forEach((l) => { if (l !== lane && hit(b.r, l.getBoundingClientRect())) bad.push(`over another card: ${b.label}`); });
+  }
+  const lines: [string, DOMRect][] = [];
+  stage.querySelectorAll('.ex-wire').forEach((w) => { if (getComputedStyle(w).display !== 'none') lines.push(['wire', w.getBoundingClientRect()]); });
+  const rule = stage.querySelector('.ex-rule'); if (rule) lines.push(['rule', rule.getBoundingClientRect()]);
+  for (const [k, r] of lines) for (const b of boxes) if (!b.el.closest('.ex-pkt') && hit(r, b.r)) bad.push(`${k} crosses ${b.label}`);
+  return bad;
 };
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
@@ -144,6 +178,7 @@ test('every chapter: text ≥ 12 px inside the explainer, no horizontal overflow
     await page.waitForTimeout(250);
     expect.soft(await page.evaluate(SMALL_TEXT, 'figure.ex'), `small text, chapter ${i + 1}`).toEqual([]);
     expect.soft(await overflow(page), `overflow, chapter ${i + 1}`).toBe(0);
+    expect.soft(await page.evaluate(GEOMETRY), `card edges / connectors, chapter ${i + 1}`).toEqual([]);
     const hits = await page.evaluate(() => (window as any).BS.neverWriteScan());
     expect.soft(hits, `never-write, chapter ${i + 1}`).toEqual([]);
   }
@@ -151,6 +186,19 @@ test('every chapter: text ≥ 12 px inside the explainer, no horizontal overflow
   const all = [TAG, END_LINE, ...Object.values(ADDR), ...PRINTS.flat(), ...CHAPTERS.flatMap((c) => [c.title, c.text, c.scene])].join('\n');
   expect(await page.evaluate((t) => (window as any).BS.neverWriteScan(t), all)).toEqual([]);
   expect(errs).toEqual([]);
+});
+
+test('the geometry check catches a chip pushed across the card edge and a wire across text', async ({ page }) => {
+  await page.goto(PATH, { waitUntil: 'load' });
+  await page.locator('.ex-play').click();
+  await page.locator('.ex-dot').nth(4).click();
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(GEOMETRY)).toEqual([]);
+  await page.addStyleTag({ content: '.ex-stay__row { transform: translate(60px, 60px) !important; }' });
+  const hits = await page.evaluate(GEOMETRY);
+  expect(hits.some((h) => /outside its card: .*Rules/.test(h))).toBe(true);
+  await page.addStyleTag({ content: '.ex-g1 .ex-wire { max-width: none !important; max-height: none !important; right: auto !important; bottom: auto !important; left: -1500px !important; top: -1500px !important; width: 3000px !important; height: 3000px !important; }' });
+  expect((await page.evaluate(GEOMETRY)).some((h) => /^wire crosses/.test(h))).toBe(true);
 });
 
 for (const how of ['media', 'query'] as const) {

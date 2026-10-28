@@ -161,8 +161,9 @@
 .ex-pip[data-s="skip"] i { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--verdict-skip-line) calc(var(--p) * 100%), var(--line)); }
 .ex-pip[data-s="skip"]::after { content: "skipped"; }
 
-.ex-stay { display: grid; gap: 6px; justify-items: end; }
-.ex-stay__row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; transform: translateX(calc(var(--push) * (14px + var(--g2) / 2 - 6px))); }
+.ex-stay { display: grid; gap: 2px; justify-items: end; align-self: end; }
+.ex-stay__row { margin-top: 6px; }
+.ex-stay__row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; transform: translateX(calc(var(--push) * 6px)); }   /* a nudge toward the rule, then stop: they stay inside the card */
 
 /* chips: 12 px (the kit chip is 10 px) */
 .ex-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: var(--r-chip);
@@ -233,7 +234,7 @@
   .ex-g2 .ex-pkt { left: 75%; }
   .ex-pkt--dot { transform: translateY(calc(var(--k1) * var(--g1))); }
   .ex-pkt--proof { margin: -30px 0 0 -26px; transform: translateY(calc(var(--k2) * (var(--g2) + 40px))); }
-  .ex-stay__row { transform: translateY(calc(var(--push) * (14px + var(--g2) / 2 - 18px))); }
+  .ex-stay__row { transform: translateY(calc(var(--push) * 6px)); }
 }
 
 /* the lab page: clears the notch nav (the home page's section 02 sits below the hero instead) */

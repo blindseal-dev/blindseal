@@ -130,6 +130,7 @@ const Stage = memo(function Stage({ f }: { f: Frame }) {
             </div>
             <div className="ex-ly ex-stay" style={L('stay')}>
               <span className="ex-k">Stays on your computer</span>
+              <span className="ex-note">Only the fingerprints cross to Solana.</span>
               <span className="ex-stay__row"><span className="ex-chip ex-chip--line">Prompt</span><span className="ex-chip ex-chip--line">Private details</span><span className="ex-chip ex-chip--line">Rules</span></span>
             </div>
           </div>
