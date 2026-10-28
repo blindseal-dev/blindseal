@@ -17,6 +17,7 @@
 import { createHash } from 'node:crypto';
 import { redactStructure } from '@blindseal/redactor';
 import { runPipeline, runOutboundScreen } from '../detection/pipeline.js';
+import { ScanBudget } from '../detection/scan-budget.js';
 import { inDecisionScope } from '../detection/degraded-state.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 
@@ -228,8 +229,8 @@ export interface ScreenOutcome {
 /// Binary payloads by PROTOCOL position (never by value, and never by how the characters look): `data` of an image or
 /// audio content item and `blob` of an embedded resource (MCP's base64 fields). The agent's model
 /// receives these as media, not as text, so they are not text-screened at all: embedding base64
-/// tells L2 nothing, it trips the large-base64-blob heuristic, and L0/L1 are quadratic on long
-/// uniform runs (a silent audio clip is ~all "A"), which stalled the proxy for minutes.
+/// tells L2 nothing and it trips the large-base64-blob heuristic. (The skip is by position only;
+/// no string anywhere is skipped for its length.)
 /// (A character-ratio test was tried and both let prose through and rejected real PCM audio.)
 function stripMedia(body: Obj): Obj {
   const result = body.result;
@@ -304,30 +305,33 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
     if (r.verdict !== 'clean' && (!worst || rankVerdict(r.verdict) > rankVerdict(worst.verdict))) worst = r;
   };
   const ctx = { toolName, mcpMethod };
+  // One Layer 0/1 time allowance for every pass below: a message that cannot be fully scanned in time
+  // gets the non-clean budget result (blocked in block mode), never a partial clean.
+  const budget = new ScanBudget();
 
   await inDecisionScope(async () => {
-    for (const t of texts) consider(await runPipeline(t, ctx));
+    for (const t of texts) consider(await runPipeline(t, ctx, { budget }));
 
     // L0/L1 on every other string on its own (keys included): an injection is never diluted
     // by, or split across, its neighbours.
     for (const s of stringLeaves(noMedia)) {
       if (skip.has(s) || s.length < 8) continue;
-      consider(runOutboundScreen(s));
+      consider(runOutboundScreen(s, budget));
     }
     // And L0/L1 over the string VALUES joined in the order the agent receives them (the passes
     // below sort keys and interleave them): a phrase split across neighbouring fields must not
     // slip between two leaves.
-    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', false).join('\n')));
-    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', true).join('\n'))); // keys too: a phrase split around a key
+    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', false).join('\n'), budget));
+    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', true).join('\n'), budget)); // keys too: a phrase split around a key
 
     const rest = withoutScreened(noMedia, skip);
     const leaves = stringLeaves(rest);
     if (leaves.every((s) => STRUCTURAL.has(s))) return;
     const redacted = withoutScreened(redactStructure(noMedia).value, skip);
     const json = stableStringify(rest);
-    consider(await runPipeline(json, ctx, { modelText: stableStringify(redacted) }));
+    consider(await runPipeline(json, ctx, { modelText: stableStringify(redacted), budget }));
     const joined = leaves.join('\n');
-    if (joined && joined !== json) consider(await runPipeline(joined, ctx, { modelText: jsonStringLeaves(redacted) }));
+    if (joined && joined !== json) consider(await runPipeline(joined, ctx, { modelText: jsonStringLeaves(redacted), budget }));
   });
 
   const scannedText = stableStringify(body);

@@ -1,5 +1,6 @@
-import { runLayer1 } from './layer1-heuristics.js';
+import { runLayer1, base64Spans } from './layer1-heuristics.js';
 import type { DetectionResult } from './types.js';
+import { isBudgetResult, type ScanBudget } from './scan-budget.js';
 
 export interface DecodedResult {
   decoder: string;
@@ -28,11 +29,11 @@ function isPrintableAscii(s: string): boolean {
 
 export function decodeBase64(content: string): DecodedResult[] {
   const results: DecodedResult[] = [];
-  // Match strict base64 blobs (padding required OR '+' required to exclude hex/URL paths).
-  const re = /[A-Za-z0-9+/]{20,}={1,2}|[A-Za-z0-9/]{5,}[+][A-Za-z0-9+/]{15,}/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    const blob = m[0];
+  // Strict base64 blobs (padding required OR '+' required to exclude hex/URL paths), i.e. the
+  // matches of /[A-Za-z0-9+/]{20,}={1,2}|[A-Za-z0-9/]{5,}[+][A-Za-z0-9+/]{15,}/g, found in
+  // linear time (the regex is quadratic on long base64-character runs).
+  for (const [start, end] of base64Spans(content, 15)) {
+    const blob = content.slice(start, end);
     try {
       const decoded = Buffer.from(blob, 'base64').toString('utf8');
       if (isPrintableAscii(decoded) && decoded.length >= MIN_ENCODED_LEN) {
@@ -149,7 +150,35 @@ export function decodeNested(content: string, maxDepth: number = 3): DecodedResu
   return results;
 }
 
-export function runLayer0(content: string): L0Result {
+// Invisible characters that split a word without showing: zero-width space/non-joiner/joiner,
+// word joiner, BOM, soft hyphen.
+const INVISIBLE_RE = /[\u200B-\u200D\u2060\uFEFF\u00AD]/g;
+// Patterns the stripped text may share with the raw text without the stripping having revealed
+// anything: they do not make the zero-width-strip decoder fire on their own.
+const NOT_REVEALED = new Set(['large-base64-blob', 'zero-width-density']);
+
+/// The text with invisible characters removed, when it had any: "ig\u200Bnore previous …" is
+/// read as the phrase it renders as, at any length (the zero-width-density ratio alone is
+/// diluted by enough surrounding text).
+export function decodeInvisible(content: string): DecodedResult[] {
+  INVISIBLE_RE.lastIndex = 0;
+  if (!INVISIBLE_RE.test(content)) return [];
+  INVISIBLE_RE.lastIndex = 0;
+  return [{ decoder: 'zero-width-strip', decoded: content.replace(INVISIBLE_RE, ''), depth: 1 }];
+}
+
+export function runLayer0(content: string, budget?: ScanBudget): L0Result {
+  if (!budget) return layer0(content);
+  budget.enter();
+  try {
+    return layer0(content, budget);
+  } finally {
+    budget.leave();
+  }
+}
+
+function layer0(content: string, budget?: ScanBudget): L0Result {
+  if (budget?.expired()) return { fired: true, decoder: 'budget', l1Match: budget.result() };
   const candidates: DecodedResult[] = [
     ...decodeBase64(content),
     ...decodeHex(content),
@@ -159,8 +188,17 @@ export function runLayer0(content: string): L0Result {
   ];
 
   for (const c of candidates) {
-    const l1 = runLayer1(c.decoded);
+    const l1 = runLayer1(c.decoded, budget);
+    if (isBudgetResult(l1)) return { fired: true, decoder: 'budget', l1Match: l1 };
     if (l1.verdict !== 'clean') {
+      return { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
+    }
+  }
+  for (const c of decodeInvisible(content)) {
+    const l1 = runLayer1(c.decoded, budget);
+    if (isBudgetResult(l1)) return { fired: true, decoder: 'budget', l1Match: l1 };
+    const revealed = l1.detectedPatterns.filter((p) => !NOT_REVEALED.has(p));
+    if (revealed.length > 0) {
       return { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
     }
   }
@@ -169,6 +207,7 @@ export function runLayer0(content: string): L0Result {
 
 export function makeLayer0Result(l0: ReturnType<typeof runLayer0>): DetectionResult {
   const match = l0.l1Match!;
+  if (isBudgetResult(match)) return match;
   return {
     verdict: match.verdict,
     confidence: match.confidence,

@@ -31,6 +31,8 @@ import type { DetectionResult } from './types.js';
 import type { PipelineOptions } from './pipeline.js';
 import { emitDegradedWarningOnce } from './degraded-state.js';
 import { redact } from '@blindseal/redactor';
+import { runLayer0, makeLayer0Result } from './layer0-decoder.js';
+import { ScanBudget, isBudgetResult } from './scan-budget.js';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
 export const DEFAULT_STREAM_THRESHOLD = 8 * 1024;
@@ -69,7 +71,7 @@ export function chunkText(text: string, windowSize = WINDOW_BYTES, overlap = OVE
 
 /// Streaming variant of runPipeline. For inputs below the threshold, falls back to the
 /// regular pipeline. For larger inputs:
-///   1. L1 on the FULL text once (regex is fast and patterns may span chunks)
+///   1. L0 and L1 on the FULL text (bounded chunks under the scan budget)
 ///   2. L2 per chunk, short-circuit on first malicious
 ///   3. L3 on the FULL text iff at least one chunk was "suspicious"
 export async function runStreamingPipeline(
@@ -86,9 +88,13 @@ export async function runStreamingPipeline(
     return runPipeline(text, context, opts);
   }
 
-  // Layer 1 on full text — cheap and catches patterns that may straddle chunk boundaries
-  // (overlap is 512B but pathological cases exist).
-  const l1 = runLayer1(text);
+  // Layer 0 and Layer 1 on the full text (both scan it in bounded chunks under the budget), exactly
+  // as the whole-text pipeline does: a long text is never exempt from either.
+  const budget = opts?.budget ?? new ScanBudget();
+  const l0 = runLayer0(text, budget);
+  if (l0.fired) return makeLayer0Result(l0);
+  const l1 = runLayer1(text, budget);
+  if (isBudgetResult(l1)) return l1;
   if (l1.verdict === 'malicious' && l1.confidence >= L1_MALICIOUS_SHORT_CIRCUIT) {
     return { ...l1, layer: 1 };
   }

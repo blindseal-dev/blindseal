@@ -8,6 +8,7 @@ import type { DetectionResult } from './types.js';
 import { runStreamingPipeline, readStreamThreshold } from './streaming.js';
 import { emitDegradedWarningOnce, emitLayer2UnavailableNotice } from './degraded-state.js';
 import { redact } from '@blindseal/redactor';
+import { ScanBudget, isBudgetResult } from './scan-budget.js';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
 const L2_DEFAULT_THRESHOLD = 0.35;
@@ -29,25 +30,31 @@ function readL2Threshold(): number {
 /// one before redaction. For structured content it is derived from an already key-redacted
 /// object, since flattened key/value lines lose the JSON shape the key-based redactor needs.
 /// L0/L1 always run on `text`; the model text is still passed through redact().
+/// `budget`: the Layer 0/1 time allowance, shared by every pass over one message (a fresh one per call
+/// when omitted). It covers the synchronous L0/L1 scans only, not L2/L3.
 export interface PipelineOptions {
   modelText?: string;
+  budget?: ScanBudget;
 }
 
 export async function runPipeline(text: string, context?: JudgeContext, opts?: PipelineOptions): Promise<DetectionResult> {
   // Large payloads → streaming pipeline (chunked L2 with short-circuit). The streaming
   // function recursively calls back to runPipeline for sub-threshold inputs, so it's
   // safe to gate here.
+  const budget = opts?.budget ?? new ScanBudget();
   if (text.length >= readStreamThreshold()) {
-    return runStreamingPipeline(text, context, undefined, opts);
+    return runStreamingPipeline(text, context, undefined, { ...opts, budget });
   }
 
   // Layer 0: deterministic decode-then-L1. Catches encoded-payload attacks before L1
   // sees the raw text. Only fires when decoded content trips L1 — not on mere presence
   // of base64 or hex (which is common in benign tool responses).
-  const l0 = runLayer0(text);
+  const l0 = runLayer0(text, budget);
   if (l0.fired) return makeLayer0Result(l0);
 
-  const l1 = runLayer1(text);
+  const l1 = runLayer1(text, budget);
+  // Not fully scanned within the budget: never handed to the model layers to be cleared.
+  if (isBudgetResult(l1)) return l1;
 
   // Layer 1 is confident this is malicious — done.
   if (l1.verdict === 'malicious' && l1.confidence >= L1_MALICIOUS_SHORT_CIRCUIT) {
@@ -178,7 +185,7 @@ export async function layer2UnavailableFallback(
 /// text. No model layers: arguments are screened synchronously before forwarding. A lone
 /// `large-base64-blob` hit is ignored here: file uploads and binary payloads are routinely
 /// base64 in arguments, and Layer 0 has already decoded and screened any base64 it found.
-export function runOutboundScreen(text: string): DetectionResult {
+export function runOutboundScreen(text: string, budget = new ScanBudget()): DetectionResult {
   const clean: DetectionResult = {
     verdict: 'clean',
     confidence: 0,
@@ -190,9 +197,9 @@ export function runOutboundScreen(text: string): DetectionResult {
   if (!text) return clean;
   const isBase64Only = (patterns: string[]) =>
     patterns.length > 0 && patterns.every((p) => p.endsWith('large-base64-blob'));
-  const l0 = runLayer0(text);
+  const l0 = runLayer0(text, budget);
   if (l0.fired && !isBase64Only(l0.l1Match?.detectedPatterns ?? [])) return makeLayer0Result(l0);
-  const l1 = runLayer1(text);
+  const l1 = runLayer1(text, budget);
   if (l1.verdict === 'clean' || isBase64Only(l1.detectedPatterns)) return clean;
   return { ...l1, layer: 1, l3Status: 'skipped_gate' };
 }

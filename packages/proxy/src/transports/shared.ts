@@ -1,6 +1,7 @@
 /// Shared scanning + mutation logic used by both stdio and http transports.
 
 import { runOutboundScreen } from '../detection/pipeline.js';
+import { ScanBudget } from '../detection/scan-budget.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 import { createHash } from 'node:crypto';
 import { isPlainObject, jsonStringLeaves, parseJson, PendingRequests, screenServerMessage, stableStringify } from './reply-screen.js';
@@ -154,10 +155,11 @@ export function inspectToolCallArguments(
 ): OutboundOutcome {
   const scannedText = args === undefined ? '' : stableStringify(args);
   const argsHash = sha256Hex(scannedText);
-  let r = runOutboundScreen(scannedText);
+  const budget = new ScanBudget(); // one allowance for both passes over this call
+  let r = runOutboundScreen(scannedText, budget);
   const leaves = args === undefined ? '' : jsonStringLeaves(args);
   if (leaves && leaves !== scannedText) {
-    const rl = runOutboundScreen(leaves);
+    const rl = runOutboundScreen(leaves, budget);
     if (rankVerdict(rl.verdict) > rankVerdict(r.verdict)) r = rl;
   }
   if (r.verdict === 'clean') {

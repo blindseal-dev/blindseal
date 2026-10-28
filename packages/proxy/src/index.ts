@@ -56,6 +56,8 @@ Proxy flags
 Detection (env)
   BLINDSEAL_MODE                 block (default) | warn | log
   BLINDSEAL_LAYER2_THRESHOLD     cosine distance cutoff for L2 (default 0.35)
+  BLINDSEAL_SCAN_BUDGET_MS       L0/L1 time allowance per message (default 2000); a message not fully
+                                 scanned within it is blocked in block mode, flagged in warn mode
   BLINDSEAL_LAYER3_PROVIDER      ollama | anthropic | openai | custom  (default: off — L3 runs only when set;
                                  provider API keys in the environment never enable it)
   BLINDSEAL_LAYER3_MODEL         model id override
