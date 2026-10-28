@@ -92,3 +92,33 @@ describe('redactor — the JSON walk never drops content (guards the 0.7.0 walk 
     expect(r.redacted).toContain('constructor');
   });
 });
+
+/// 0.7.0 re-audit follow-up: text that is not one parseable JSON document (JSON inside prose, two
+/// JSON lines) only had the scalar quoted-key rule, so an array or object under a secret or
+/// personal key kept its contents.
+describe('array and object values under recognised keys, in text that is not one JSON document', () => {
+  it('Result: {"password":["Qz7"]}', () => {
+    expect(redact('Result: {"password":["Qz7"]}').redacted).toBe('Result: {"password":"[REDACTED:secret_field:1]"}');
+  });
+
+  it('two JSON lines, nested object under token', () => {
+    const r = redact('{"a":1}\n{"token":{"v":"Qz7","w":[1,{"x":"Qz8"}]}}');
+    expect(r.redacted).not.toContain('Qz7');
+    expect(r.redacted).not.toContain('Qz8');
+    expect(r.redacted).toContain('{"a":1}');
+  });
+
+  it('brackets inside strings do not end the value early', () => {
+    const r = redact('log: {"address": {"line1": "Flat ] 2 }", "city": "Qz7town"}, "ok": 1} end');
+    expect(r.redacted).not.toContain('Qz7town');
+    expect(r.redacted).toContain('"ok": 1} end');
+  });
+
+  it('an unterminated value is redacted to the end of the text', () => {
+    expect(redact('trunc {"secret": ["a", {"b":"Qz7"').redacted).not.toContain('Qz7');
+  });
+
+  it('other keys keep composite values', () => {
+    expect(redact('x "tool_name": ["keep", {"v": 1}] y').redacted).toBe('x "tool_name": ["keep", {"v": 1}] y');
+  });
+});

@@ -196,10 +196,53 @@ function mark(ctx: Counter, kind: RedactionKind): string {
 /// embedded in prose or logs. The value is a JSON string, number, or literal.
 const QUOTED_KEY_RE = /"((?:[^"\\]|\\.){1,128})"(\s*:\s*)("(?:[^"\\]|\\.)*"|-?\d[\d.eE+-]*|true|false)/g;
 
+/// `"key": [ … ]` / `"key": { … }` in text that is not (fully) parseable JSON. QUOTED_KEY_RE
+/// only matches scalar values, so an array or object under a secret/personal key would keep its
+/// contents. The value is cut at its matching bracket (string-aware); unbalanced → to the end.
+const QUOTED_KEY_OPEN_RE = /"((?:[^"\\]|\\.){1,128})"\s*:\s*(?=[[{])/g;
+
+function redactCompositeValues(text: string, ctx: Counter): string {
+  let out = '';
+  let last = 0;
+  QUOTED_KEY_OPEN_RE.lastIndex = 0;
+  for (let m = QUOTED_KEY_OPEN_RE.exec(text); m; m = QUOTED_KEY_OPEN_RE.exec(text)) {
+    const kind = keyKind(m[1]!);
+    const start = m.index + m[0].length;
+    if (!kind || start < last) continue;
+    const end = matchingBracket(text, start);
+    out += text.slice(last, start) + `"${mark(ctx, kind)}"`;
+    last = end;
+    QUOTED_KEY_OPEN_RE.lastIndex = end;
+  }
+  return out + text.slice(last);
+}
+
+/// Index just past the bracket that closes the one at `start` (ignoring brackets inside JSON
+/// strings), or text.length when it never closes.
+function matchingBracket(text: string, start: number): number {
+  let depth = 0;
+  let inStr = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (c === '\\') i++;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return text.length;
+}
+
 function redactText(text: string, ctx: Counter): string {
-  let out = text.replace(QUOTED_KEY_RE, (m, key: string, sep: string) => {
+  let out = redactCompositeValues(text, ctx).replace(QUOTED_KEY_RE, (m, key: string, sep: string, value: string) => {
     const kind = keyKind(key);
-    return kind ? `"${key}"${sep}"${mark(ctx, kind)}"` : m;
+    return kind && !value.startsWith('"[REDACTED:') ? `"${key}"${sep}"${mark(ctx, kind)}"` : m;
   });
   for (const rule of RULES) {
     out = out.replace(rule.re, (match) => {
