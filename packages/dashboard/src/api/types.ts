@@ -49,6 +49,8 @@ export interface Decision {
   auditHash: string;
   latencyMs: number;
   attestationId?: string;
+  /** Layer 2 (embeddings) was unavailable for this decision: judged by L3 if configured, else L0/L1. */
+  degraded?: boolean;
 }
 
 export interface DecisionPage {

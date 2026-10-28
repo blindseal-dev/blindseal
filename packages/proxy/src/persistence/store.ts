@@ -23,6 +23,8 @@ export interface ScanRecord {
   reasoning: string | null;
   mode: string;
   mutated: boolean;
+  /** Layer 2 was unavailable for this decision. */
+  degraded: boolean;
 }
 
 export interface ScanInput {
@@ -39,6 +41,7 @@ export interface ScanInput {
   reasoning?: string | null;
   mode: string;
   mutated: boolean;
+  degraded?: boolean;
 }
 
 export interface ScanFilter {
@@ -126,18 +129,25 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
       content_preview TEXT NOT NULL,
       reasoning TEXT,
       mode TEXT NOT NULL,
-      mutated INTEGER NOT NULL DEFAULT 0
+      mutated INTEGER NOT NULL DEFAULT 0,
+      degraded INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_scans_ts ON scans(ts);
     CREATE INDEX IF NOT EXISTS idx_scans_server ON scans(server_key);
     CREATE INDEX IF NOT EXISTS idx_scans_verdict ON scans(verdict);
   `);
 
+  // Databases created before the degraded column existed: add it in place.
+  const cols = db.prepare('PRAGMA table_info(scans)').all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'degraded')) {
+    db.exec('ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0');
+  }
+
   const insertStmt: Statement = db.prepare(`
     INSERT INTO scans
       (ts, server_key, transport, tool_name, verdict, layer, confidence,
-       patterns, content_hash, content_preview, reasoning, mode, mutated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       patterns, content_hash, content_preview, reasoning, mode, mutated, degraded)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const purgeStmt: Statement = db.prepare('DELETE FROM scans WHERE ts < ?');
@@ -165,6 +175,7 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
       reasoning: (row.reasoning as string | null) ?? null,
       mode: row.mode as string,
       mutated: !!row.mutated,
+      degraded: !!row.degraded,
     };
   }
 
@@ -186,6 +197,7 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
         input.reasoning ?? null,
         input.mode,
         input.mutated ? 1 : 0,
+        input.degraded ? 1 : 0,
       );
     },
     list(filter = {}) {

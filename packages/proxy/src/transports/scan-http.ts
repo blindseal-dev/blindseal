@@ -152,6 +152,7 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       matchedCategory: result.matchedCategory,
       distance: result.distance,
       l3Status: result.l3Status,
+      degraded: result.degraded === true,
       contentHash,
     });
   });

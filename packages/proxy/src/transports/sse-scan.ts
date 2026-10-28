@@ -13,6 +13,7 @@ import {
   tryParse,
   type JsonRpcMessage,
   type BlindsealMode,
+  type ToolCallResult,
 } from './shared.js';
 
 export interface SseScanHooks {
@@ -21,7 +22,7 @@ export interface SseScanHooks {
   /// Invoked AFTER inspectToolCallResponse mutates (or doesn't). Lets the transport hook
   /// audit, persistence, taint, attestation.
   onScanned?: (
-    msg: JsonRpcMessage & { result: { content: Array<{ type: string; text?: string }> } },
+    msg: JsonRpcMessage & { result: ToolCallResult },
     toolName: string,
     outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>,
   ) => void | Promise<void>;

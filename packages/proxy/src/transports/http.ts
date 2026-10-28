@@ -24,8 +24,11 @@ import { createAuditLogger, preview, type AuditLogger } from '../audit/index.js'
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
+  buildOutboundBlockedResponse,
+  inspectToolCallArguments,
   inspectToolCallResponse,
   isToolCallResponse,
+  responseText,
   tryParse,
   type JsonRpcMessage,
 } from './shared.js';
@@ -134,6 +137,33 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         toolName = params.name;
         toolArgs = params.arguments;
 
+        // Outbound screen (L0 + L1) on the arguments before the call is forwarded.
+        const outbound = inspectToolCallArguments(toolName, toolArgs, config.mode);
+        if (outbound.verdict !== 'clean') {
+          process.stderr.write(
+            `blindseal[http]: ${outbound.verdict} (L${outbound.layer ?? '?'}) arguments to '${toolName}' (mode=${config.mode}, ${outbound.action === 'block' ? 'not forwarded' : 'forwarded'})\n`,
+          );
+          if (audit.enabled) {
+            audit.log({
+              type: 'detection',
+              direction: 'request',
+              toolName,
+              layer: outbound.layer ?? null,
+              verdict: outbound.verdict,
+              confidence: outbound.result?.confidence ?? 0,
+              patterns: outbound.result?.detectedPatterns ?? [],
+              mode: config.mode,
+              mutated: outbound.action === 'block',
+              reasoning: outbound.result?.reasoning,
+              contentPreview: preview(outbound.scannedText),
+            });
+          }
+          if (outbound.action === 'block' && outbound.result) {
+            sendJson(res, 200, buildOutboundBlockedResponse(reqMsg.id, toolName, outbound.result));
+            return; // never forwarded upstream
+          }
+        }
+
         const decision = mergeDecisions(
           decideCapability(toolName, toolArgs, taint, config.capability),
           decideTradePolicy(toolName, toolArgs, taint, config.tradePolicy, tradeRate),
@@ -205,14 +235,13 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
             async onScanned(scannedMsg, scannedTool, outcome) {
               if (outcome.verdict !== 'clean') {
                 process.stderr.write(
-                  `blindseal[http/sse]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${scannedTool}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
+                  `blindseal[http/sse]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${scannedTool}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
                 );
               }
               if (audit.enabled) {
-                const previewText = scannedMsg.result.content
-                  .map((c) => (typeof c.text === 'string' ? c.text : ''))
-                  .join('\n');
+                const previewText = responseText(scannedMsg.result);
                 audit.log({
+                  ...(outcome.degraded ? { degraded: true } : {}),
                   type: 'detection',
                   toolName: scannedTool,
                   layer: outcome.layer ?? null,
@@ -226,9 +255,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
                 });
               }
               if (scanStore.enabled) {
-                const rawText = scannedMsg.result.content
-                  .map((c) => (typeof c.text === 'string' ? c.text : ''))
-                  .join('\n');
+                const rawText = responseText(scannedMsg.result);
                 try {
                   scanStore.insert({
                     serverKey: upstreamUrl,
@@ -243,16 +270,16 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
                     reasoning: outcome.result?.reasoning ?? null,
                     mode: config.mode,
                     mutated: outcome.mutated,
+                    degraded: outcome.degraded,
                   });
                 } catch (err) {
                   process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
                 }
               }
               if (config.capability.enabled || config.tradePolicy.enabled) {
-                for (const item of scannedMsg.result.content) {
-                  if (item.type === 'text' && typeof item.text === 'string' && item.text.length > 0) {
-                    taint.add({ toolName: scannedTool, content: item.text, addedAt: Date.now(), trusted: isTrustedSource(scannedTool, config.tradePolicy) });
-                  }
+                const content = responseText(scannedMsg.result);
+                if (content.length > 0) {
+                  taint.add({ toolName: scannedTool, content, addedAt: Date.now(), trusted: isTrustedSource(scannedTool, config.tradePolicy) });
                 }
               }
             },
@@ -321,14 +348,13 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       const outcome = await inspectToolCallResponse(respMsg, toolName, config.mode);
       if (outcome.verdict !== 'clean') {
         process.stderr.write(
-          `blindseal[http]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
+          `blindseal[http]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
         );
       }
       if (audit.enabled) {
-        const previewText = respMsg.result.content
-          .map((c) => (typeof c.text === 'string' ? c.text : ''))
-          .join('\n');
+        const previewText = responseText(respMsg.result);
         audit.log({
+          ...(outcome.degraded ? { degraded: true } : {}),
           type: 'detection',
           toolName,
           layer: outcome.layer ?? null,
@@ -342,9 +368,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         });
       }
       if (scanStore.enabled) {
-        const rawText = respMsg.result.content
-          .map((c) => (typeof c.text === 'string' ? c.text : ''))
-          .join('\n');
+        const rawText = responseText(respMsg.result);
         try {
           scanStore.insert({
             serverKey: upstreamUrl,
@@ -359,16 +383,16 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
             reasoning: outcome.result?.reasoning ?? null,
             mode: config.mode,
             mutated: outcome.mutated,
+            degraded: outcome.degraded,
           });
         } catch (err) {
           process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
         }
       }
       if (config.capability.enabled || config.tradePolicy.enabled) {
-        for (const item of respMsg.result.content) {
-          if (item.type === 'text' && typeof item.text === 'string' && item.text.length > 0) {
-            taint.add({ toolName, content: item.text, addedAt: Date.now(), trusted: isTrustedSource(toolName, config.tradePolicy) });
-          }
+        const content = responseText(respMsg.result);
+        if (content.length > 0) {
+          taint.add({ toolName, content, addedAt: Date.now(), trusted: isTrustedSource(toolName, config.tradePolicy) });
         }
       }
     }

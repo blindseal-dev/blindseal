@@ -99,6 +99,7 @@
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .d01-dir[data-dir="response"] { background: var(--surface-hover); box-shadow: none; }
+.d01-degraded { margin-left: 6px; font-size: .75em; color: var(--warn, currentColor); }
 .d01-act { gap: 4px; font-family: var(--font-mono); font-weight: var(--fw-medium); letter-spacing: .02em; }
 .d01-act svg { width: 11px; height: 11px; }
 

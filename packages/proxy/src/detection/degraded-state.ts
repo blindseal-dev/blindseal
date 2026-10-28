@@ -26,3 +26,9 @@ export function emitDegradedWarningAtStartup(): void {
 export function _resetDegradedWarningForTesting(): void {
   _missCount = 0;
 }
+
+/** One line per decision whose Layer 2 failed at runtime (the decision is marked degraded). */
+export function emitLayer2UnavailableNotice(reason: string): void {
+  const oneLine = reason.replace(/\s+/g, ' ').slice(0, 200);
+  process.stderr.write(`blindseal: layer-2 unavailable (${oneLine}) — decision marked degraded\n`);
+}

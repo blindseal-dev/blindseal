@@ -219,7 +219,9 @@ function Row({ d, onOpen }: { d: Decision; onOpen: () => void }) {
       <td>{d.server}</td>
       <td className="is-muted d01-tool">{d.tool}</td>
       <td><span className="d01-dir" data-dir={d.direction}>{d.direction === 'request' ? 'req' : 'res'}</span></td>
-      <td><VerdictChip verdict={d.verdict} /></td>
+      <td><VerdictChip verdict={d.verdict} />{d.degraded && (
+        <span className="chip outline d01-degraded" data-tip="Layer 2 (embeddings) was unavailable: judged by layer 3 if configured, otherwise layers 0 and 1">degraded</span>
+      )}</td>
       <td><Layers layers={d.layers} /></td>
       <td className="num">{rc ? <span className="d01-red">{rc}</span> : <span className="d01-nil">—</span>}</td>
       <td>{d.action ? <span className="chip outline d01-act"><Icon name="box" />{d.action.chain}</span> : <span className="d01-nil">—</span>}</td>

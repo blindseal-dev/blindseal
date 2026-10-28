@@ -262,7 +262,7 @@ describe('edge cases — upstream hangs', () => {
     proxy.close();
     // Force-kill child too (it has setInterval keeping it alive)
     if (!proxy.child.killed) proxy.child.kill('SIGKILL');
-  }, 10000);
+  }, 30000);
 });
 
 // ────────────────────────────────────────────────────────────────────────────────

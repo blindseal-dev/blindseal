@@ -12,6 +12,10 @@ const DEFAULT_THRESHOLD = 0.27;
 
 let extractorPromise: Promise<(text: string, opts: { pooling: 'mean'; normalize: boolean }) => Promise<{ data: Float32Array }>> | null = null;
 let corpus: LoadedCorpus | null = null;
+// After a failed model load, further calls fail fast with the same error for this long before
+// the next load attempt, so an offline proxy does not retry a download on every tool call.
+const LOAD_RETRY_MS = 30_000;
+let lastLoadFailure: { at: number; err: unknown } | null = null;
 
 function readThreshold(): number {
   const raw = process.env.BLINDSEAL_LAYER2_THRESHOLD;
@@ -20,15 +24,44 @@ function readThreshold(): number {
   return Number.isFinite(n) && n > 0 && n < 2 ? n : DEFAULT_THRESHOLD;
 }
 
-async function getExtractor() {
+type Extractor = (text: string, opts: { pooling: 'mean'; normalize: boolean }) => Promise<{ data: Float32Array }>;
+
+/// Model location knobs (all optional):
+///   BLINDSEAL_MODEL_DIR      cache directory for the embedding model (default: the
+///                            transformers.js cache inside its package directory)
+///   BLINDSEAL_MODEL_HOST     base URL to download the model from (a mirror; default: the
+///                            Hugging Face Hub)
+///   BLINDSEAL_MODEL_OFFLINE  1 = never download; the model must already be in the cache
+async function getExtractor(): Promise<Extractor> {
+  if (!extractorPromise && lastLoadFailure && Date.now() - lastLoadFailure.at < LOAD_RETRY_MS) {
+    throw lastLoadFailure.err;
+  }
   if (!extractorPromise) {
-    extractorPromise = (async () => {
+    const p = (async () => {
       const mod = await import('@xenova/transformers');
       // Pin to local cache; don't fetch on every invocation if already cached.
       mod.env.allowLocalModels = true;
+      const dir = process.env.BLINDSEAL_MODEL_DIR;
+      if (dir) {
+        mod.env.cacheDir = dir;
+        mod.env.localModelPath = dir;
+      }
+      const host = process.env.BLINDSEAL_MODEL_HOST;
+      if (host) mod.env.remoteHost = host.endsWith('/') ? host : `${host}/`;
+      const offline = process.env.BLINDSEAL_MODEL_OFFLINE;
+      if (offline === '1' || offline === 'true') mod.env.allowRemoteModels = false;
       const extractor = await mod.pipeline('feature-extraction', MODEL_ID, { quantized: true });
-      return extractor as unknown as (text: string, opts: { pooling: 'mean'; normalize: boolean }) => Promise<{ data: Float32Array }>;
+      return extractor as unknown as Extractor;
     })();
+    extractorPromise = p;
+    // A failed load is retried (e.g. once the network is back), at most every LOAD_RETRY_MS.
+    p.then(
+      () => { lastLoadFailure = null; },
+      (err: unknown) => {
+        lastLoadFailure = { at: Date.now(), err };
+        if (extractorPromise === p) extractorPromise = null;
+      },
+    );
   }
   return extractorPromise;
 }
@@ -114,7 +147,15 @@ export async function runLayer2(text: string): Promise<DetectionResult> {
   };
 }
 
+/// Loads the model and corpus and runs one probe embedding, so a model that loads but cannot
+/// run (corrupt weights, wrong dimension) fails here rather than on the first tool call.
 export async function warmupLayer2(): Promise<void> {
-  await getExtractor();
-  getCorpus();
+  const extractor = await getExtractor();
+  const { meta } = getCorpus();
+  const out = await extractor('blindseal layer-2 warmup probe', { pooling: 'mean', normalize: true });
+  if (!out?.data || out.data.length !== meta.dim) {
+    throw new Error(
+      `embedding model produced ${out?.data?.length ?? 0} dims, corpus expects ${meta.dim}`,
+    );
+  }
 }

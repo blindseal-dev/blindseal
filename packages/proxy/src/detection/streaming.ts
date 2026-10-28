@@ -99,13 +99,12 @@ export async function runStreamingPipeline(
     try {
       l2 = await runLayer2(chunks[i]!);
     } catch (err) {
-      // L2 broke (model load failure, etc.) — fall back to L1 verdict on full text.
-      return {
-        ...l1,
-        layer: 1,
-        reasoning: `${l1.reasoning} (layer-2 unavailable during streaming: ${err instanceof Error ? err.message : String(err)})`,
-        streamingChunks: chunksProcessed,
-      };
+      // L2 broke (model load failure, inference error) — degraded: L3 on the full text if
+      // configured, else the L1 verdict on the full text.
+      const { layer2UnavailableFallback } = await import('./pipeline.js');
+      const { redact } = await import('@blindseal/redactor');
+      const r = await layer2UnavailableFallback(l1, redact(text).redacted, err, context);
+      return { ...r, streamingChunks: chunksProcessed };
     }
     chunksProcessed++;
 

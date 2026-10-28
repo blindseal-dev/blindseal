@@ -6,7 +6,7 @@ import { Layer3Unavailable } from './clients/types.js';
 import type { JudgeContext } from './clients/types.js';
 import type { DetectionResult } from './types.js';
 import { runStreamingPipeline, readStreamThreshold } from './streaming.js';
-import { emitDegradedWarningOnce } from './degraded-state.js';
+import { emitDegradedWarningOnce, emitLayer2UnavailableNotice } from './degraded-state.js';
 import { redact } from '@blindseal/redactor';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
@@ -56,12 +56,7 @@ export async function runPipeline(text: string, context?: JudgeContext): Promise
   try {
     l2 = await runLayer2(redactedText);
   } catch (err) {
-    return {
-      ...l1,
-      layer: 1,
-      reasoning: `${l1.reasoning} (layer-2 unavailable: ${err instanceof Error ? err.message : String(err)})`,
-      l3Status: 'skipped_gate',
-    };
+    return layer2UnavailableFallback(l1, redactedText, err, context);
   }
 
   // Layer 2 is confident this is malicious (near-corpus match) — done. The "suspicious"
@@ -134,6 +129,64 @@ export async function runPipeline(text: string, context?: JudgeContext): Promise
     if (l1.verdict !== 'clean') return { ...l1, layer: 1, l3Status: 'unavailable' };
     return { ...l2, l3Status: 'unavailable' };
   }
+}
+
+/// Layer 2 threw at runtime (model failed to load, inference error). The decision is marked
+/// `degraded: true` and a one-line notice goes to stderr. Layer 3, if configured, judges the
+/// (redacted) text in L2's place; otherwise the Layer 1 verdict stands.
+export async function layer2UnavailableFallback(
+  l1: DetectionResult,
+  redactedText: string,
+  err: unknown,
+  context?: JudgeContext,
+): Promise<DetectionResult> {
+  const why = err instanceof Error ? err.message : String(err);
+  emitLayer2UnavailableNotice(why);
+  try {
+    const l3Result = await runLayer3(redactedText, context);
+    return {
+      ...l3Result,
+      reasoning: `${l3Result.reasoning} (layer-2 unavailable: ${why}; judged by layer-3)`,
+      l3Status: 'ran',
+      degraded: true,
+    };
+  } catch (l3err) {
+    if (!(l3err instanceof Layer3Unavailable)) {
+      process.stderr.write(
+        `blindseal: layer-3 failed (${l3err instanceof Error ? l3err.message : String(l3err)}) — layer-1 verdict stands\n`,
+      );
+    }
+    return {
+      ...l1,
+      layer: 1,
+      reasoning: `${l1.reasoning} (layer-2 unavailable: ${why})`,
+      l3Status: l3err instanceof Layer3Unavailable ? 'unavailable' : 'skipped_gate',
+      degraded: true,
+    };
+  }
+}
+
+/// Outbound screen for tool-call arguments (agent → server): Layer 0 + Layer 1 only, on the raw
+/// text. No model layers: arguments are screened synchronously before forwarding. A lone
+/// `large-base64-blob` hit is ignored here: file uploads and binary payloads are routinely
+/// base64 in arguments, and Layer 0 has already decoded and screened any base64 it found.
+export function runOutboundScreen(text: string): DetectionResult {
+  const clean: DetectionResult = {
+    verdict: 'clean',
+    confidence: 0,
+    reasoning: 'outbound: no layer-0/layer-1 patterns matched',
+    detectedPatterns: [],
+    layer: 1,
+    l3Status: 'skipped_gate',
+  };
+  if (!text) return clean;
+  const isBase64Only = (patterns: string[]) =>
+    patterns.length > 0 && patterns.every((p) => p.endsWith('large-base64-blob'));
+  const l0 = runLayer0(text);
+  if (l0.fired && !isBase64Only(l0.l1Match?.detectedPatterns ?? [])) return makeLayer0Result(l0);
+  const l1 = runLayer1(text);
+  if (l1.verdict === 'clean' || isBase64Only(l1.detectedPatterns)) return clean;
+  return { ...l1, layer: 1, l3Status: 'skipped_gate' };
 }
 
 export { warmupLayer2 } from './layer2-embeddings.js';

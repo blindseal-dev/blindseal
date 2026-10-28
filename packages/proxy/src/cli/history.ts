@@ -129,7 +129,7 @@ export function runHistory(opts: HistoryOptions = {}): number {
   out.write(`${col.bold(`${rows.length} scan${rows.length === 1 ? '' : 's'}`)} ${col.dim(`from ${dbPath}`)}\n\n`);
   for (const r of rows) {
     out.write(`${fmtVerdict(r.verdict, col)} ${col.dim(fmtAge(r.ts))} `);
-    out.write(`${col.cyan(r.toolName)} ${col.dim(`[L${r.layer ?? '?'} conf=${r.confidence.toFixed(2)} server=${r.serverKey}]`)}\n`);
+    out.write(`${col.cyan(r.toolName)} ${col.dim(`[L${r.layer ?? '?'} conf=${r.confidence.toFixed(2)} server=${r.serverKey}]`)}${r.degraded ? ` ${col.yellow('degraded')}` : ''}\n`);
     if (r.contentPreview) {
       out.write(`  ${col.dim(r.contentPreview.replace(/\n+/g, ' ').slice(0, 160))}\n`);
     }
