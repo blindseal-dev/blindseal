@@ -95,7 +95,9 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 - **Policy** is a Merkle root over the committed rule automata; the rules never leave the operator's machine.
 - **Attestation** = proof + six public inputs: `payloadHash`, `policyRoot`, `detectorVersion` (the vkey),
   `actionHash`, `nullifier`, `expirySlot`. Hashing spec: https://blindseal.tech/docs/hashing.
-- **On chain**: the verifier checks the proof, the allowlists and the expiry, and records the nullifier so the
+- **Payload ↔ action**: before hashing, the guest parses the screened tool call and asserts it describes exactly
+  the action the proof binds (program, instruction, source, recipient, mint, amount); otherwise no proof exists.
+- **On chain**: the verifier checks the proof, the allowlists (approved policies on by default) and the expiry, and records the nullifier so the
   attestation cannot be replayed (the exact check order is in the header of `programs/blindseal-verify/src/lib.rs`). Any program can gate an action on it via CPI (see `programs/transfer-gate`).
 - **Audit**: every decision is appended to a hash chain; a disclosure proves a window was clean without exposing
   traffic.

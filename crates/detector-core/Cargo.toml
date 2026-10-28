@@ -15,7 +15,12 @@ regex-automata = "=0.4.9"
 base64 = "=0.22.1"
 percent-encoding = "=2.3.1"
 sha2 = "=0.10.8"
+# Payload → action binding (action_binding.rs): the guest parses the screened tool call. Pinned
+# like the rest; neither feeds policyRoot.
+serde_json = "=1.0.154"
+bs58 = "=0.5.1"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+bs58 = "=0.5.1"

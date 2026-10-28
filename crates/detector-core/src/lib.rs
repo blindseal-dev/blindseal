@@ -11,6 +11,9 @@
 //!  - zero-width density divides by the UTF-16 code-unit count (`encode_utf16().count()`).
 
 use regex_automata::{dfa::regex::Regex, util::syntax, Input};
+
+pub mod action_binding;
+pub use action_binding::{action_from_payload, check_action_binding, BindError};
 use std::sync::OnceLock;
 
 /// JS `\s` (no `u` flag): space, tab, LF, VT, FF, CR, plus the Unicode space set and U+FEFF.

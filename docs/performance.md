@@ -127,6 +127,14 @@ compatible with our 5.0.0). Full guest cycle count (execute): **104,155,812** (d
 ~3.3x). policyRoot still 0x36a9e9… (correct). Proving is proportionally faster; the remaining
 cost is the policyRoot merkle over the DFA byte-blobs.
 
+### 0.7.0 guest (payload → action binding) — execute
+The guest parses the tool call (serde_json) and checks it against the bound action before hashing.
+Full guest cycle count (execute, `scripts/prove-localnet-fixture.sh current --execute`): **104,211,551**
+(+~56k over 104,155,812 — the parse is negligible next to L1 + the policyRoot merkle). A refused
+pairing halts in step 0, before payloadHash. ELF built reproducibly with
+`cargo prove build --docker --tag v5.0.0 --workspace-directory crates` (two builds, identical sha256
+dd3c4934…); vkey **0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967**.
+
 ## M2 — on-chain verify + consume on localnet (2026-10-23, measured)
 
 Source: `tests/m2-metrics.json`, written by the happy-path test in `tests/m2.spec.ts`

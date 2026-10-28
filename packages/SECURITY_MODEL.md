@@ -45,7 +45,11 @@ on the raw text; L2 and L3 run on the redacted text, so an L3 provider never rec
 `blindseal attest` takes a screened tool call that maps to a supported Solana action and produces an
 SP1 proof, wrapped to Groth16, over six public inputs: `payloadHash`, `policyRoot`, `detectorVersion` (the
 SP1 verifying key), `actionHash`, `nullifier` and `expirySlot` (layouts on the
-[hashing page](https://blindseal.tech/docs/hashing)). The guest re-runs the committed L1 automata on the
+[hashing page](https://blindseal.tech/docs/hashing)). Before hashing, the guest parses the payload — the
+tool call — into the on-chain action it describes and asserts that action equals the one the proof binds
+(target program, instruction, source authority, recipient, mint, amount; since 0.7.0): a payload that is
+not an on-chain action, or that describes a different one, cannot be attested. `blindseal attest` applies
+the same rule before it starts the prover. The guest then re-runs the committed L1 automata on the
 payload; a proof cannot exist for a payload L1 flags.
 
 On Solana, `blindseal-verify` (`6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`) is called by CPI from the
@@ -54,8 +58,12 @@ transaction as the action. Its check order is documented in the header of
 `programs/blindseal-verify/src/lib.rs`; in short:
 
 - **Caller binding** — only the program the attestation was produced for can consume it, by direct CPI.
-- **Not paused** — the verifier's config authority can pause it.
-- **Allowlists** — the verifying key must be accepted, and (if enabled) the policy root registered.
+- **Not paused** — the verifier's config authority can pause it. That authority can be handed over with
+  `set_authority`, which the current and the new authority must both sign.
+- **Allowlists** — the verifying key must be accepted, and the policy root registered (approved policies
+  are on by default since 0.7.0). The example gate additionally accepts only the policy roots it lists
+  itself (`EXPECTED_POLICY_ROOTS`, the default root) and refuses any other with `UnexpectedPolicyRoot`;
+  an integrator sets its own list.
 - **Expiry** — `expirySlot` must not have passed.
 - **Action binding** — the verifier recomputes `actionHash` from the fields the calling program is about to
   execute (program, instruction, source authority, recipient, mint, amount). A proof screened for one

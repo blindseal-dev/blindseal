@@ -155,6 +155,61 @@ export type BlindsealVerify = {
       ]
     },
     {
+      "name": "setAuthority",
+      "docs": [
+        "Authority only, and the new authority must co-sign (a typo cannot brick the config).",
+        "`new_authority` must equal the co-signing account."
+      ],
+      "discriminator": [
+        133,
+        250,
+        37,
+        21,
+        110,
+        163,
+        26,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "newAuthority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newAuthority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "setConfig",
       "docs": [
         "Authority only. Each field is optional so a single call can flip just `paused`."
@@ -328,6 +383,19 @@ export type BlindsealVerify = {
   ],
   "events": [
     {
+      "name": "authorityChanged",
+      "discriminator": [
+        31,
+        19,
+        174,
+        152,
+        4,
+        82,
+        215,
+        226
+      ]
+    },
+    {
       "name": "consumed",
       "discriminator": [
         30,
@@ -411,6 +479,11 @@ export type BlindsealVerify = {
       "code": 6013,
       "name": "callerNotTargetProgram",
       "msg": "calling program is not the action's target program"
+    },
+    {
+      "code": 6014,
+      "name": "newAuthorityMismatch",
+      "msg": "new_authority argument does not match the co-signing new authority account"
     }
   ],
   "types": [
@@ -464,6 +537,22 @@ export type BlindsealVerify = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "authorityChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oldAuthority",
+            "type": "pubkey"
+          },
+          {
+            "name": "newAuthority",
+            "type": "pubkey"
           }
         ]
       }

@@ -8,8 +8,15 @@
 //! the instruction discriminator. The private `nonce` is carried in the attestation so the
 //! on-chain program can recompute actionHash; it is not a public value.
 //!
+//! Before anything is set up the payload/action binding the guest asserts (detector-core
+//! `check_action_binding`) is checked here too, so a mismatched pair fails in milliseconds with the
+//! reason instead of panicking inside the zkVM.
+//!
 //! `BLINDSEAL_EXECUTE=1` runs the zkVM executor (cycle count, no proof) for fast iteration.
-use blindseal_detector_core::serialize_l1;
+//! `--policy-variant one-rule-copied` is a TEST-ONLY probe: the default policy with rule 0's DFA
+//! replaced by a copy of rule 1's, so the proof commits a different policyRoot (the localnet
+//! "alternate policy" fixture). Never use it for a real attestation.
+use blindseal_detector_core::{check_action_binding, serialize_l1, ActionFields};
 use sp1_sdk::{utils, HashableKey, Prover, ProverClient, SP1Stdin};
 use std::time::Instant;
 
@@ -18,7 +25,8 @@ const GUEST_ELF: &[u8] = include_bytes!("../../guest/elf/blindseal-guest");
 const USAGE: &str = "blindseal-prover --payload <file> --out <attestation.json>
   --target-program <base58> --source-authority <base58> --recipient <base58>
   [--mint <base58>] --amount <u64> --instruction <16 hex> [--expiry <slot>]
-  [--nonce <64 hex>] [--chain-id <u16>] [--decision-id <id>]";
+  [--nonce <64 hex>] [--chain-id <u16>] [--decision-id <id>]
+  [--policy-variant one-rule-copied]   (test-only alternate policy)";
 
 fn hex_str(b: &[u8]) -> String {
     let mut s = String::from("0x");
@@ -73,6 +81,7 @@ struct Args {
     nonce: [u8; 32],
     chain_id: u16,
     decision_id: Option<String>,
+    policy_variant: Option<String>,
 }
 
 fn parse_args() -> Args {
@@ -105,6 +114,7 @@ fn parse_args() -> Args {
         nonce,
         chain_id: get("--chain-id").map(|c| c.parse().expect("--chain-id u16")).unwrap_or(1),
         decision_id: get("--decision-id"),
+        policy_variant: get("--policy-variant"),
     }
 }
 
@@ -117,13 +127,37 @@ fn getrandom_fill(buf: &mut [u8]) {
 fn main() {
     utils::setup_logger();
     let args = parse_args();
+
+    // The guest's step 0, on the host first: refuse a payload that does not describe this action.
+    let action = ActionFields {
+        chain_id: args.chain_id,
+        target_program: pk32(&args.target_program),
+        source_authority: pk32(&args.source_authority),
+        instruction: args.instruction,
+        recipient: pk32(&args.recipient),
+        mint: pk32(&args.mint),
+        amount: args.amount,
+    };
+    if let Err(e) = check_action_binding(&args.payload, &action) {
+        eprintln!("blindseal-prover: payload/action binding refused: {} — the payload does not describe this action; no proof", e.code());
+        std::process::exit(3);
+    }
+
     let client = ProverClient::builder().cpu().build();
     let (pk, vk) = client.setup(GUEST_ELF);
     let vkey = vk.bytes32();
     let detector_version = hex_to_32(&vkey);
     println!("VKEY {vkey}");
 
-    let dfas = serialize_l1().dfas;
+    let mut dfas = serialize_l1().dfas;
+    match args.policy_variant.as_deref() {
+        None => {}
+        Some("one-rule-copied") => {
+            eprintln!("blindseal-prover: TEST-ONLY policy variant one-rule-copied (rule 0 DFA := rule 1 DFA)");
+            dfas[0] = dfas[1].clone();
+        }
+        Some(v) => panic!("unknown --policy-variant {v}"),
+    }
     let mut stdin = SP1Stdin::new();
     stdin.write(&args.payload);
     stdin.write(&dfas);

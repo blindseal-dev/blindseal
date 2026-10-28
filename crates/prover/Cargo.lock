@@ -407,8 +407,10 @@ name = "blindseal-detector-core"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "bs58",
  "percent-encoding",
  "regex-automata",
+ "serde_json",
  "sha2",
 ]
 

@@ -4,13 +4,16 @@
 ///    code the proxy runs. A non-clean verdict stops here: there is no proof for a blocked call.
 /// 2. Appends the decision to the hash-chained audit log (~/.blindseal/audit.log): content-free,
 ///    just decisionId / verdict / payloadHash. That entry is the decision the attestation names.
-/// 3. Parses the on-chain action from the call (chain/solana.ts) and binds the gated program's
-///    exact transfer: target program, instruction discriminator, source authority, recipient,
-///    native mint, amount.
+/// 3. Derives the on-chain action from the payload (chain/action-binding.ts — the same rule the guest
+///    asserts before hashing, release 0.7.0): target program, instruction discriminator, source
+///    authority, recipient, mint, amount. `--target-program` / `--instruction`, when given, must
+///    equal what the payload describes; a payload that is not an on-chain action, or that describes
+///    a different one, is refused here — before the prover is resolved or started — since the guest
+///    would refuse it anyway.
 /// 4. Runs the local prover (crates/prover) with that payload + action → attestation.json.
 ///
 /// Usage:
-///   blindseal attest <toolcall.json> --out <attestation.json> --target-program <id>
+///   blindseal attest <toolcall.json> --out <attestation.json> [--target-program <id>]
 ///     [--instruction <16 hex>] [--expiry <slot> | --no-expiry] [--prover <path>] [--audit-dir <dir>]
 ///   expiry defaults to the current mainnet slot + 40,000 (≈ 4.4 h, fetched over RPC); the prover binary is
 ///   resolved by src/prover/resolve.ts (--prover, $BLINDSEAL_PROVER, ~/.blindseal/bin, download).
@@ -23,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runLayer0, makeLayer0Result } from '../detection/layer0-decoder.js';
 import { runLayer1 } from '../detection/layer1-heuristics.js';
-import { parseSolanaAction } from '../chain/solana.js';
+import { BindError, GATED_TRANSFER_DISC, TRANSFER_GATE_ID, actionFromPayload, checkActionBinding, type BoundAction } from '../chain/action-binding.js';
 import { openAudit, toChainVerdict } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
 import { ProverUnavailableError, resolveProver } from '../prover/resolve.js';
@@ -32,12 +35,14 @@ import { blindsealHome } from '../paths.js';
 const HELP = `blindseal attest — screen a tool call, record the decision, prove it
 
 Usage:
-  blindseal attest <toolcall.json> --out <attestation.json> --target-program <program id> [flags]
+  blindseal attest <toolcall.json> --out <attestation.json> [flags]
 
 Flags
   --out <file>               where to write attestation.json (default ./attestation.json)
-  --target-program <id>      the gated program the action targets (base58)
-  --instruction <16 hex>     instruction discriminator (default: transfer-gate gated_transfer)
+  --target-program <id>      the gated program the action targets (base58). Optional: the payload
+                             decides it (args.program, else transfer-gate); a different value is refused
+  --instruction <16 hex>     instruction discriminator. Optional: the payload decides it
+                             (args.instruction / args.method, else transfer-gate gated_transfer)
   --expiry <slot>            expirySlot (default: current slot + 40000 ≈ 4.4 h, fetched from the RPC; proving takes hours)
   --no-expiry                write the "no expiry" sentinel (2000000000) instead of fetching a slot
   --prover <path>            prover binary (default: $BLINDSEAL_PROVER, then ~/.blindseal/bin/,
@@ -45,12 +50,14 @@ Flags
   --audit-dir <dir>          audit base dir (default ~/.blindseal)
   --help, -h                 this help
 
+The payload must describe exactly the action the proof binds (the guest checks it before hashing):
+a call that is not an on-chain transfer, or a flag that disagrees with it, is refused before proving.
 Only clean verdicts are attested. The decision is appended to the hash-chained audit log first.
 RPC for the slot: $BLINDSEAL_RPC_URL, else the public mainnet endpoint.
 `;
 
-// sha256("global:gated_transfer")[..8] — transfer-gate's Anchor discriminator.
-const GATED_TRANSFER_DISC = '0x981894646560fc2b';
+/// Native SOL: the binding reports the all-zero key; the prover takes '' for it.
+const NATIVE_MINT_B58 = '11111111111111111111111111111111';
 /// The "no expiry" sentinel the circuit accepts (--no-expiry).
 export const NO_EXPIRY_SLOT = '2000000000';
 /// Default validity window: current slot + this many slots (~10 minutes at 400ms/slot).
@@ -129,7 +136,7 @@ interface Opts {
   file?: string;
   out: string;
   targetProgram?: string;
-  instruction: string;
+  instruction?: string;
   expiry?: string;
   noExpiry: boolean;
   prover?: string;
@@ -138,13 +145,13 @@ interface Opts {
 }
 
 function parse(argv: string[]): Opts {
-  const o: Opts = { out: 'attestation.json', instruction: GATED_TRANSFER_DISC, noExpiry: false, auditDir: path.join(os.homedir(), '.blindseal') };
+  const o: Opts = { out: 'attestation.json', noExpiry: false, auditDir: path.join(os.homedir(), '.blindseal') };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === '--help' || a === '-h') o.help = true;
     else if (a === '--out') o.out = argv[++i]!;
     else if (a === '--target-program') o.targetProgram = argv[++i];
-    else if (a === '--instruction') o.instruction = argv[++i]!;
+    else if (a === '--instruction') o.instruction = argv[++i];
     else if (a === '--expiry') o.expiry = argv[++i]!;
     else if (a === '--no-expiry') o.noExpiry = true;
     else if (a === '--prover') o.prover = argv[++i];
@@ -197,7 +204,41 @@ export async function runAttestCli(argv: string[]): Promise<number> {
   let o: Opts;
   try { o = parse(argv); } catch (e) { process.stderr.write(`blindseal attest: ${(e as Error).message}\n${HELP}`); return 2; }
   if (o.help || !o.file) { process.stdout.write(HELP); return o.help ? 0 : 2; }
-  if (!o.targetProgram) { process.stderr.write('blindseal attest: --target-program is required\n'); return 2; }
+
+  // The payload the proof commits to: the canonical tool-call JSON exactly as screened. Its action is
+  // checked first — the guest refuses a payload that does not describe the action it binds, so a
+  // mismatch is refused here, before the prover is resolved or started.
+  const raw = readFileSync(o.file, 'utf8');
+  const call = JSON.parse(raw) as { toolName: string; args: unknown };
+  const payload = JSON.stringify({ tool: call.toolName, args: call.args });
+  let derived: BoundAction | undefined;
+  let action: BoundAction;
+  try {
+    derived = actionFromPayload(payload);
+    action = checkActionBinding(payload, {
+      ...derived,
+      targetProgram: o.targetProgram ?? derived.targetProgram,
+      instruction: o.instruction ?? derived.instruction,
+    });
+  } catch (e) {
+    if (!(e instanceof BindError)) throw e;
+    const why =
+      e.code === 'not-an-action' ? 'the call is not a recognizable on-chain action'
+      : e.code === 'target-program-mismatch' ? `--target-program ${o.targetProgram} is not the program the call targets (${derived?.targetProgram})`
+      : e.code === 'instruction-mismatch' ? `--instruction ${o.instruction} is not the instruction the call names (${derived?.instruction})`
+      : 'the call does not describe an on-chain action the proof could bind';
+    process.stderr.write(`blindseal attest: refused (${e.code}): ${why}; nothing was proved\n`);
+    return 1;
+  }
+
+  // transfer-gate executes exactly one thing — gated_transfer of native SOL. A call that targets it with
+  // another instruction or a mint would bind, but the gate could never consume the proof: refuse
+  // before hours of proving. (Gate your own program by naming it in the call: args.program.)
+  if (action.targetProgram === TRANSFER_GATE_ID && (action.instruction !== GATED_TRANSFER_DISC || action.mint !== NATIVE_MINT_B58)) {
+    process.stderr.write(`blindseal attest: refused: transfer-gate only executes gated_transfer (${GATED_TRANSFER_DISC}) of native SOL; ` +
+      `this call names instruction ${action.instruction}${action.mint !== NATIVE_MINT_B58 ? ` and mint ${action.mint}` : ''}, so its attestation could never be consumed; nothing was proved\n`);
+    return 1;
+  }
 
   // Resolve the prover and the expiry slot before touching the audit log, so a missing binary or
   // an unreachable RPC leaves no half-done decision behind.
@@ -218,10 +259,6 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     return 1;
   }
 
-  // The payload the proof commits to: the canonical tool-call JSON exactly as screened.
-  const raw = readFileSync(o.file, 'utf8');
-  const call = JSON.parse(raw) as { toolName: string; args: unknown };
-  const payload = JSON.stringify({ tool: call.toolName, args: call.args });
   const payloadHash = '0x' + createHash('sha256').update(payload).digest('hex');
 
   // 1) screen with the proven layers (what the guest re-runs and asserts clean)
@@ -246,22 +283,14 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     return 1;
   }
 
-  // 3) the on-chain action the gated program will execute
-  const action = parseSolanaAction(call.toolName, call.args);
-  if (!action) { process.stderr.write('blindseal attest: the call is not a recognizable on-chain action\n'); return 1; }
-  if (!action.recipient || !action.amount || !action.sourceAuthority) {
-    process.stderr.write('blindseal attest: action needs recipient, amount and source authority\n');
-    return 1;
-  }
-
+  // 3) the on-chain action the gated program will execute: `action`, checked against the payload above
   // 4) prove — the payload goes to the prover through a private temp dir, removed afterwards
-  const targetProgram = o.targetProgram;
   const proverArgs = (payloadFile: string) => [
     '--payload', payloadFile, '--out', o.out, '--decision-id', decisionId,
     '--chain-id', String(action.chainId),
-    '--target-program', targetProgram, '--source-authority', action.sourceAuthority!,
-    '--recipient', action.recipient!, '--mint', action.mint, '--amount', action.amount!,
-    '--instruction', o.instruction, '--expiry', expiry,
+    '--target-program', action.targetProgram, '--source-authority', action.sourceAuthority,
+    '--recipient', action.recipient, '--mint', action.mint === NATIVE_MINT_B58 ? '' : action.mint, '--amount', action.amount,
+    '--instruction', action.instruction, '--expiry', expiry,
   ];
   return withPrivateTempDir(async (tmpDir, track) => {
     const tmpPayload = path.join(tmpDir, 'payload.json');

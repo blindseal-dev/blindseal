@@ -7,6 +7,12 @@
 // so the cases go through the gate. The two fields the gate fixes by construction (mint, target
 // program) are reached through the test-only forwarder (programs/rogue-caller, loaded at the id
 // in ROGUE_CALLER_ID) with the action's target set to the forwarder itself.
+// Release 0.7.0 adds: the config is initialized with BOTH guest vkeys (the fixture's legacy one and the
+// current one) and approved policies on (the SDK default); transfer-gate's own expected-policy-root
+// check (UnexpectedPolicyRoot); and set_authority (current + new authority co-sign). Two optional
+// fixtures, produced by scripts/prove-localnet-fixture.sh (a real ~2 h Groth16 prove each), add the
+// current-vkey happy path and the alternate-policy probe; without them those two cases are reported
+// as pending, never as passed.
 // Namespace imports only: the suite may load as ESM, where named imports from these CJS
 // packages are not guaranteed.
 import * as anchorNs from '@coral-xyz/anchor';
@@ -27,8 +33,11 @@ const { expect } = cjs(chaiNs) as typeof chaiNs;
 // Admin instructions come from the SDK's hand-encoded builders: the Anchor TS coder crashes on
 // `Option<Vec<[u8;32]>>` (set_config with allowed_vkeys = None), and the builders are what the
 // mainnet init script uses — so the suite exercises the real client path.
-import { buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, buildGatedTransferIx, decodeConfig, decodeNullifier } from '../packages/sdk/src/ix';
-import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, buildGatedTransferIx, buildSetAuthorityIx, decodeConfig, decodeNullifier,
+  CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT,
+} from '../packages/sdk/src/ix';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 
@@ -47,6 +56,14 @@ const VKEY = hex(att.detectorVersion);
 const POLICY_ROOT = hex(att.policyRoot);
 const NULLIFIER = hex(att.nullifier);
 const DISC = hex(att.action.instruction); // sha256("global:gated_transfer")[..8]
+
+// Optional real proofs (scripts/prove-localnet-fixture.sh): the current guest, and the alternate policy.
+const optionalFixture = (name: string) => {
+  const p = join(ROOT, 'tests/fixtures', name);
+  return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : undefined;
+};
+const ATT_CURRENT = optionalFixture('attestation-test-current.json');
+const ATT_ALT_POLICY = optionalFixture('attestation-test-altpolicy.json');
 
 const source = seeded('source-authority');
 const recipient = seeded('recipient');
@@ -102,16 +119,19 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
 
   const send = async (ixs: TransactionInstruction[], signers: Keypair[]): Promise<string> => {
     const attempt = () => provider.sendAndConfirm(new Transaction().add(cu, ...ixs), signers, { commitment: 'confirmed' });
-    try { return await attempt(); } catch (e: any) {
-      if (/Blockhash not found/.test(String(e.message))) { await new Promise((r) => setTimeout(r, 800)); return attempt(); }
-      throw e;
+    // a fresh localnet intermittently answers "Blockhash not found" for a just-fetched blockhash: retry
+    for (let i = 0; ; i++) {
+      try { return await attempt(); } catch (e: any) {
+        if (i < 4 && /Blockhash not found/.test(String(e.message))) { await new Promise((r) => setTimeout(r, 800)); continue; }
+        throw e;
+      }
     }
   };
 
   // Map a failed send to the Anchor error NAME. Logs live on e.logs (older web3) or
   // e.transactionLogs (web3 1.9x); when neither carries the "AnchorError" line, map the custom
   // error number from the message through the IDL (6000 + index), plus Anchor's framework codes.
-  const FRAMEWORK: Record<number, string> = { 3008: 'InvalidProgramId', 2001: 'ConstraintHasOne', 2003: 'ConstraintRaw' };
+  const FRAMEWORK: Record<number, string> = { 3008: 'InvalidProgramId', 3010: 'AccountNotSigner', 2001: 'ConstraintHasOne', 2003: 'ConstraintRaw' };
   const errorName = (e: any): string | undefined => {
     const logs: string[] = e.logs ?? e.transactionLogs ?? e.error?.logs ?? [];
     try { const p = AnchorError.parse(logs); if (p?.error?.errorCode?.code) return p.error.errorCode.code; } catch { /* no anchor line */ }
@@ -120,6 +140,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     const m = /custom program error: 0x([0-9a-f]+)/i.exec(text);
     if (m) {
       const n = parseInt(m[1], 16);
+      if (n >= 7000) return (gate.idl as any).errors?.find((x: any) => x.code === n)?.name; // transfer-gate (offset 7000)
       if (n >= 6000) return (verify.idl as any).errors?.[n - 6000]?.name;
       if (FRAMEWORK[n]) return FRAMEWORK[n];
     }
@@ -167,11 +188,14 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     // the recipient must end the transfer rent-exempt; a fresh 0-lamport account receiving
     // exactly `amount` can fail the runtime's rent check — give it a floor first
     await conn.confirmTransaction(await conn.requestAirdrop(recipient.publicKey, LAMPORTS_PER_SOL / 100), 'confirmed');
-    await send([buildInitializeIx(authority.publicKey, [VKEY], false, verify.programId)], [authority]);
+    // the SDK's default initialisation: current + legacy vkeys, approved policies ON
+    await send([buildInitializeIx(authority.publicKey, undefined, undefined, verify.programId)], [authority]);
     const cfg = decodeConfig((await conn.getAccountInfo(configPda, 'confirmed'))!.data);
     expect(cfg.paused).to.equal(false);
-    expect(cfg.allowlistPolicies).to.equal(false);
-    expect(cfg.allowedVkeys).to.deep.equal([att.detectorVersion]);
+    expect(cfg.allowlistPolicies).to.equal(true);
+    expect(cfg.allowedVkeys).to.deep.equal([CURRENT_VKEY, ...LEGACY_VKEYS]);
+    expect(cfg.allowedVkeys, 'the localnet fixture vkey stays recognised').to.include(att.detectorVersion);
+    expect(att.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
   });
 
   it('paused: verify_and_consume is refused while paused', async () => {
@@ -198,6 +222,42 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     expect(reg, 'PolicyRoot PDA exists').to.not.equal(null);
     expect(reg!.data.subarray(8, 40)).to.deep.equal(POLICY_ROOT);
     // allowlist stays ON for the remaining cases: the happy path proves a registered root passes.
+  });
+
+  it('transfer-gate refuses a policy root outside its expected set (UnexpectedPolicyRoot), even one the verifier has registered', async () => {
+    const blob = Buffer.from(BLOB);
+    blob[32] ^= 0x01; // the committed policyRoot
+    const altRoot = Buffer.from(blob.subarray(32, 64));
+    await send([buildRegisterPolicyRootIx(authority.publicKey, altRoot, verify.programId)], [authority]);
+    const ix = await gate.methods
+      .gatedTransfer(PROOF, blob, Array.from(NONCE), AMOUNT)
+      .accounts({
+        source: source.publicKey, recipient: recipient.publicKey, config: configPda, policyRoot: policyPda(altRoot),
+        nullifier: nullifierPda(NULLIFIER), verifyProgram: verify.programId, systemProgram: SystemProgram.programId,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+      })
+      .instruction();
+    let err: any = null;
+    try { await send([ix], [source]); } catch (e) { err = e; }
+    expect(err, 'the gate must refuse').to.not.equal(null);
+    expect(errorName(err)).to.equal('UnexpectedPolicyRoot');
+    // gate errors are numbered from 7000 (no collision with the verifier's 6000+)
+    const text = [...(err.logs ?? err.transactionLogs ?? []), String(err.message)].join('\n');
+    expect(text, 'error number 7000 (0x1b58)').to.match(/Error Number: 7000|custom program error: 0x1b58/);
+    expect(await conn.getAccountInfo(nullifierPda(NULLIFIER))).to.equal(null);
+  });
+
+  it('alternate-policy proof ("one rule copied": a different root) is refused on chain', async function () {
+    if (!ATT_ALT_POLICY) {
+      console.log('      PENDING: tests/fixtures/attestation-test-altpolicy.json not present (scripts/prove-localnet-fixture.sh altpolicy)');
+      return this.skip();
+    }
+    expect(ATT_ALT_POLICY.policyRoot).to.not.equal(DEFAULT_POLICY_ROOT);
+    // not registered with the verifier, and not in the gate's expected set: the gate refuses first
+    await expectError(send([buildGatedTransferIx(ATT_ALT_POLICY, { source: source.publicKey, recipient: recipient.publicKey })], [source]), 'UnexpectedPolicyRoot');
+    // registered with the verifier, the gate's own set still refuses it
+    await send([buildRegisterPolicyRootIx(authority.publicKey, hex(ATT_ALT_POLICY.policyRoot), verify.programId)], [authority]);
+    await expectError(send([buildGatedTransferIx(ATT_ALT_POLICY, { source: source.publicKey, recipient: recipient.publicKey })], [source]), 'UnexpectedPolicyRoot');
   });
 
   it('expired: expirySlot < current slot', async () => {
@@ -343,5 +403,72 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
 
   it('replayed nullifier: the same attestation is refused', async () => {
     await expectError(send([await gatedIx()], [source]), 'NullifierAlreadyConsumed');
+  });
+
+  it('current-vkey attestation (0.7.0 guest, payload bound to the action) executes through the gate', async function () {
+    if (!ATT_CURRENT) {
+      console.log('      PENDING: tests/fixtures/attestation-test-current.json not present (scripts/prove-localnet-fixture.sh current)');
+      return this.skip();
+    }
+    expect(ATT_CURRENT.detectorVersion).to.equal(CURRENT_VKEY);
+    expect(ATT_CURRENT.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
+    if ((await conn.getBalance(source.publicKey, 'confirmed')) < LAMPORTS_PER_SOL) {
+      await send([SystemProgram.transfer({ fromPubkey: authority.publicKey, toPubkey: source.publicKey, lamports: 2 * LAMPORTS_PER_SOL })], [authority]);
+    }
+    const before = await conn.getBalance(recipient.publicKey, 'confirmed');
+    const tx = new Transaction().add(cu, buildGatedTransferIx(ATT_CURRENT, { source: source.publicKey, recipient: recipient.publicKey }));
+    tx.feePayer = source.publicKey;
+    tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
+    tx.sign(source);
+    const sig = await conn.sendRawTransaction(tx.serialize());
+    await conn.confirmTransaction(sig, 'confirmed');
+    expect((await conn.getBalance(recipient.publicKey, 'confirmed')) - before).to.equal(Number(ATT_CURRENT.action.amount));
+    const rec = decodeNullifier((await conn.getAccountInfo(nullifierPda(hex(ATT_CURRENT.nullifier)), 'confirmed'))!.data);
+    expect(rec.consumerProgram.toBase58()).to.equal(gate.programId.toBase58());
+  });
+
+  // ---- config-authority handover (0.7.0). Last: it moves the authority away from the provider wallet.
+  describe('set_authority', () => {
+    const next = Keypair.generate();
+    const cfgAuthority = async () => decodeConfig((await conn.getAccountInfo(configPda, 'confirmed'))!.data).authority;
+
+    it('a non-authority cannot hand the config over (Unauthorized)', async () => {
+      const stranger = Keypair.generate();
+      await expectError(send([buildSetAuthorityIx(stranger.publicKey, next.publicKey, verify.programId)], [stranger, next]), 'Unauthorized');
+      expect(await cfgAuthority()).to.equal(authority.publicKey.toBase58());
+    });
+
+    it('the new authority must co-sign (AccountNotSigner)', async () => {
+      const ix = buildSetAuthorityIx(authority.publicKey, next.publicKey, verify.programId);
+      ix.keys[2]!.isSigner = false; // a mistyped / unowned key cannot sign
+      await expectError(send([ix], [authority]), 'AccountNotSigner');
+      expect(await cfgAuthority()).to.equal(authority.publicKey.toBase58());
+    });
+
+    it('the new_authority argument must be the co-signer (NewAuthorityMismatch)', async () => {
+      const ix = buildSetAuthorityIx(authority.publicKey, next.publicKey, verify.programId);
+      ix.data = Buffer.concat([ix.data.subarray(0, 8), Keypair.generate().publicKey.toBuffer()]);
+      await expectError(send([ix], [authority, next]), 'NewAuthorityMismatch');
+      expect(await cfgAuthority()).to.equal(authority.publicKey.toBase58());
+    });
+
+    it('handover: emits AuthorityChanged; the new authority controls set_config, the old one cannot', async () => {
+      const sig = await send([buildSetAuthorityIx(authority.publicKey, next.publicKey, verify.programId)], [authority, next]);
+      expect(await cfgAuthority()).to.equal(next.publicKey.toBase58());
+      const t = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
+      const parser = new anchor.EventParser(verify.programId, new anchor.BorshCoder(verify.idl));
+      const ev = [...parser.parseLogs(t!.meta!.logMessages!)].find((e) => e.name === 'authorityChanged');
+      expect(ev, 'AuthorityChanged event').to.not.equal(undefined);
+      expect((ev!.data.oldAuthority as PublicKey).toBase58()).to.equal(authority.publicKey.toBase58());
+      expect((ev!.data.newAuthority as PublicKey).toBase58()).to.equal(next.publicKey.toBase58());
+
+      await expectError(send([buildSetConfigIx(authority.publicKey, { paused: true }, verify.programId)], [authority]), 'Unauthorized');
+      await expectError(send([buildRegisterPolicyRootIx(authority.publicKey, Buffer.alloc(32, 7), verify.programId)], [authority]), 'Unauthorized');
+      await send([buildSetConfigIx(next.publicKey, { paused: true }, verify.programId)], [next]);
+      expect(decodeConfig((await conn.getAccountInfo(configPda, 'confirmed'))!.data).paused).to.equal(true);
+      await send([buildSetConfigIx(next.publicKey, { paused: false }, verify.programId)], [next]);
+      // and the old authority cannot take it back
+      await expectError(send([buildSetAuthorityIx(authority.publicKey, authority.publicKey, verify.programId)], [authority]), 'Unauthorized');
+    });
   });
 });
