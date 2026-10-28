@@ -237,7 +237,13 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .instruction();
-    await expectError(send([ix], [source]), 'UnexpectedPolicyRoot');
+    let err: any = null;
+    try { await send([ix], [source]); } catch (e) { err = e; }
+    expect(err, 'the gate must refuse').to.not.equal(null);
+    expect(errorName(err)).to.equal('UnexpectedPolicyRoot');
+    // gate errors are numbered from 7000 (no collision with the verifier's 6000+)
+    const text = [...(err.logs ?? err.transactionLogs ?? []), String(err.message)].join('\n');
+    expect(text, 'error number 7000 (0x1b58)').to.match(/Error Number: 7000|custom program error: 0x1b58/);
     expect(await conn.getAccountInfo(nullifierPda(NULLIFIER))).to.equal(null);
   });
 

@@ -92,6 +92,20 @@ describe('blindseal attest refuses a mismatched payload before proving', () => {
     expect(r.ran, 'prover must not run').toBe(false);
   });
 
+  it('a transfer-gate call naming another instruction or a mint (never consumable by the gate)', async () => {
+    expect((await run({ ...transfer, instruction: 'transfer' }, [])).ran, 'prover must not run (instruction)').toBe(false);
+    const r = await run({ ...transfer, mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' }, []);
+    expect(r.code).toBe(1);
+    expect(r.ran, 'prover must not run (mint)').toBe(false);
+  });
+
+  it('a call naming its own program reaches the prover with that program (another integrator\'s gate)', async () => {
+    const r = await run({ ...transfer, program: OTHER, instruction: 'pay_out' }, []);
+    expect(r.code).toBe(0);
+    const flag = (k: string) => r.argv[r.argv.indexOf(k) + 1];
+    expect(flag('--target-program')).toBe(OTHER);
+  });
+
   it('a matching call reaches the prover with exactly the payload-derived action', async () => {
     const r = await run(transfer, ['--target-program', TRANSFER_GATE_ID]);
     expect(r.code).toBe(0);

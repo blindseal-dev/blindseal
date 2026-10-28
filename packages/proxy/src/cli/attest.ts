@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runLayer0, makeLayer0Result } from '../detection/layer0-decoder.js';
 import { runLayer1 } from '../detection/layer1-heuristics.js';
-import { BindError, actionFromPayload, checkActionBinding, type BoundAction } from '../chain/action-binding.js';
+import { BindError, GATED_TRANSFER_DISC, TRANSFER_GATE_ID, actionFromPayload, checkActionBinding, type BoundAction } from '../chain/action-binding.js';
 import { openAudit } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
 import { ProverUnavailableError, resolveProver } from '../prover/resolve.js';
@@ -178,6 +178,15 @@ export async function runAttestCli(argv: string[]): Promise<number> {
       : e.code === 'instruction-mismatch' ? `--instruction ${o.instruction} is not the instruction the call names (${derived?.instruction})`
       : 'the call does not describe an on-chain action the proof could bind';
     process.stderr.write(`blindseal attest: refused (${e.code}): ${why}; nothing was proved\n`);
+    return 1;
+  }
+
+  // transfer-gate executes exactly one thing — gated_transfer of native SOL. A call that targets it with
+  // another instruction or a mint would bind, but the gate could never consume the proof: refuse
+  // before hours of proving. (Gate your own program by naming it in the call: args.program.)
+  if (action.targetProgram === TRANSFER_GATE_ID && (action.instruction !== GATED_TRANSFER_DISC || action.mint !== NATIVE_MINT_B58)) {
+    process.stderr.write(`blindseal attest: refused: transfer-gate only executes gated_transfer (${GATED_TRANSFER_DISC}) of native SOL; ` +
+      `this call names instruction ${action.instruction}${action.mint !== NATIVE_MINT_B58 ? ` and mint ${action.mint}` : ''}, so its attestation could never be consumed; nothing was proved\n`);
     return 1;
   }
 

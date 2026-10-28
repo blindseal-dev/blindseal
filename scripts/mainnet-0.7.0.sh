@@ -10,7 +10,10 @@
 #   b    register_policy_root(default policy root 0x36a9e9…)        (no-op if already registered)
 #   a    set_config(allowlist_policies = true)                        (refuses unless the default root is registered)
 #   c1   set_config(allowed_vkeys += CURRENT_VKEY 0x00cdf40c…)        (keeps the old vkey 0x006a0d1e…)
-#   c2   LATER, after a new-vkey sample has landed on mainnet: set_config(allowed_vkeys −= old vkey)
+#   c2   LATER: set_config(allowed_vkeys −= old vkey). Preconditions (the step checks both): a 0.7.0
+#        prover release is published and packages/proxy/src/prover/manifest.json points at it (until
+#        then `blindseal attest` downloads prover 0.5.1 — old guest, old vkey — whose proofs c2 makes
+#        unconsumable), and a new-vkey sample has landed on mainnet:
 #          scripts/mainnet-0.7.0.sh c2 --new-sample <attestation.json>
 #   d    optional: set_authority(<Ledger pubkey>) — the config authority moves to the Ledger; both sign
 #          scripts/mainnet-0.7.0.sh d --ledger-pubkey <pubkey of usb://ledger?key=0>
@@ -79,9 +82,20 @@ case "$STEP" in
       cur=$(solana program show "$id" --url "$RPC" | awk '/^Authority:/ {print $2}')
       [ "$cur" = "$UPGRADE_PK" ] || { echo "upgrade authority of $id is $cur, not $UPGRADE_PK (set BLINDSEAL_UPGRADE_AUTHORITY)"; exit 1; }
     done
+    # the new binaries are larger (verifier ≈ +6 KB, gate ≈ +1.5 KB): `program deploy` must extend the
+    # ProgramData account, which this CLI does by default (--no-auto-extend exists) — else stop.
+    solana program deploy --help 2>/dev/null | grep -q -- --no-auto-extend || {
+      echo "this solana CLI does not auto-extend program data on upgrade; extend first:"
+      echo "   solana program extend <program id> <additional bytes> -k $AUTH --url $RPC"; exit 1; }
     for lib in transfer_gate blindseal_verify; do
       run bash -c "cd programs && solana-verify build -b $BUILD_IMAGE --library-name $lib"
       [ -n "$DRY" ] || echo "   local executable hash $lib: $(solana-verify get-executable-hash "programs/target/deploy/$lib.so")"
+    done
+    for pair in "transfer_gate:$GATE_ID" "blindseal_verify:$VERIFY_ID"; do
+      lib="${pair%%:*}"; id="${pair##*:}"
+      have=$(solana program show "$id" --url "$RPC" | awk '/^Data Length:/ {print $3}')
+      new=$( [ -f "programs/target/deploy/$lib.so" ] && wc -c < "programs/target/deploy/$lib.so" | tr -d ' ' || echo '? (not built yet)')
+      echo "   $lib: ProgramData holds ${have:-?} bytes, new binary ${new} bytes (auto-extended on deploy if larger; rent from $AUTH_PK)"
     done
     for pair in "transfer_gate:$GATE_ID" "blindseal_verify:$VERIFY_ID"; do
       lib="${pair%%:*}"; id="${pair##*:}"
@@ -107,6 +121,12 @@ case "$STEP" in
       d)  what="hand the config authority to the Ledger" ;;
     esac
     echo "→ step $STEP: $what"
+    if [ "$STEP" = c2 ]; then
+      pv=$(node -p 'require("./packages/proxy/src/prover/manifest.json").version')
+      node -e 'const [a,b]=process.argv[1].split(".").map(Number); process.exit(a>0||b>=7?0:1)' "$pv" || {
+        echo "c2: the proxy's prover manifest is $pv — publish prover 0.7.0 (new guest) and update packages/proxy/src/prover/manifest.json first"; exit 1; }
+      echo "   prover manifest $pv (≥ 0.7.0)"
+    fi
     if [ "$STEP" = d ] && [ -z "$DRY" ]; then
       want=""; for ((i = 0; i < ${#EXTRA[@]}; i++)); do [ "${EXTRA[$i]}" = --ledger-pubkey ] && want="${EXTRA[$((i + 1))]}"; done
       [ -n "$want" ] || { echo "d needs --ledger-pubkey <pubkey>"; exit 1; }
