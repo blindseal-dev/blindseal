@@ -8,8 +8,14 @@ import { loadConfig } from './config.js';
 import { preflightLayer2 } from './detection/layer2-preflight.js';
 import { layer3StartupLine } from './detection/clients/factory.js';
 
-const HELP = `blindseal — a local MCP proxy that screens every tool call, keeps a hash-chained audit
-log, and produces zero-knowledge attestations verifiable on Solana.
+const HELP = `blindseal — a local MCP proxy that screens every tool call's arguments and every tool reply
+(batches included), keeps a hash-chained audit log (fingerprints and verdicts; content encrypted locally),
+and produces zero-knowledge attestations verifiable on Solana.
+
+First start downloads the layer-2 embedding model; block mode refuses to start without it (exit 4)
+unless --allow-degraded. The AI judge (layer 3) is off unless BLINDSEAL_LAYER3_PROVIDER is set; a remote
+provider then receives the redacted tool output. Redaction is best effort (listed secret keys in JSON,
+key/token/secret shapes, e-mail/phone/card/SSN).
 
 Usage
   blindseal init                                    set up ~/.blindseal (identity key, default policy, dashboard token)
@@ -22,7 +28,7 @@ Usage
   blindseal -- <command> [args...]                  wrap a stdio MCP server
   blindseal --transport http --upstream <url>       proxy a remote MCP server over HTTP
   blindseal --transport scan-http [--port <n>]      stand-alone POST /scan endpoint
-  blindseal attest <toolcall.json> --target-program <id> [--out <file>] [--expiry <slot> | --no-expiry]
+  blindseal attest <toolcall.json> [--target-program <id>] [--out <file>] [--expiry <slot> | --no-expiry]
   blindseal submit <attestation.json> --wallet <kp> perform the gated transfer on Solana mainnet (verify + consume + transfer)
   blindseal verify <attestation.json | disclosure.json>
   blindseal audit verify | disclose --from <i> --to <j>

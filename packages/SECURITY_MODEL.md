@@ -6,16 +6,24 @@ specific detection gaps, with red-team evidence, are in [`LIMITATIONS.md`](./LIM
 
 > Blindseal proves that a specific call was screened under a committed policy by a specific detector
 > version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the
-> proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned).
+> proof yet; the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off
+> unless you turn it on (a TEE mode is planned).
 > Blindseal does not prove an agent is safe, and does not cover traffic that doesn't pass through the proxy.
 
 ## What Blindseal is
 
 A local MCP proxy. It runs on the operator's machine between an AI agent and its tools
 (`blindseal -- <mcp-server-command>`, or `blindseal init --wrap` to route existing MCP configs through
-it) and checks every request sent through it before passing it on. In `block` mode a request or tool
-response that fails the checks is replaced with a `[BLINDSEAL_BLOCKED]` error; `warn` and `log` modes let
-traffic through and only record the verdict.
+it). It checks both directions: the arguments of every tool call before the server receives them (L0 and
+L1), and every agent-visible part of every tool reply before the agent reads it — text, embedded resources
+and structured results (all four layers). Each call and reply inside a JSON-RPC batch is checked on its own.
+In `block` mode a tool call that fails is not forwarded (the agent gets a `[BLINDSEAL_BLOCKED]` error) and a
+reply that fails is replaced with a `[BLINDSEAL_BLOCKED]` notice; if screening itself fails, the reply is
+withheld. `warn` and `log` modes let traffic through and only record the verdict.
+
+The first start downloads the layer-2 embedding model. In `block` mode the proxy refuses to start (exit
+code 4) if that model cannot load, unless `--allow-degraded` is passed; decisions made without layer 2 are
+marked degraded in the audit log and the dashboard.
 
 For supported on-chain actions that pass, the operator's machine can produce a zero-knowledge proof that
 the pattern checks passed, and a Solana program can require that proof before it executes the action.
@@ -27,7 +35,7 @@ the pattern checks passed, and a Solana program can require that proof before it
 | **L0** | Decode-then-L1: base64, hex, URL-percent and HTML-entity encodings are decoded and the result is re-run through L1. | the proxy | not yet (the next increment; it will change the detector version) |
 | **L1** | Deterministic rules: instruction overrides, unicode-tag smuggling, bidi controls, zero-width density, HTML-entity runs, markdown-link exfiltration and similar. Compiled to DFAs (`crates/detector-core`) that the SP1 guest runs; byte-for-byte parity with the TypeScript rules is enforced against `evals/vectors/parity.json`. | the proxy and the SP1 guest | **yes** |
 | **L2** | Embedding similarity (`bge-small-en-v1.5`, run locally) against the public red-team corpus. | the proxy | no — attested |
-| **L3** | An LLM judge (Anthropic, OpenAI-compatible, or a local Ollama model); off without a key or host. | the proxy, or the provider you configure | no — attested |
+| **L3** | An LLM judge. **Off by default**; it runs only when `BLINDSEAL_LAYER3_PROVIDER` is set (`ollama` for a local model; `anthropic`, `openai` or `custom` for a remote one). A provider API key in the environment never enables it. | this machine (local model), or the remote provider you chose | no — attested |
 
 Two optional gates run alongside the layers: the **capability firewall** (`BLINDSEAL_CAPABILITY=1`), which
 blocks tokens that flowed out of a tool response from reaching a sensitive tool call, and **manifest
@@ -36,9 +44,13 @@ removes or changes a tool between sessions.
 
 ## Redaction
 
-Before the model-based layers see anything, the redactor (`packages/redactor`) strips secrets and PII
-(API keys, JWTs, private keys, seed phrases, high-entropy strings, e-mail addresses, phone, card and SSN numbers) from the text. L0 and L1 run
-on the raw text; L2 and L3 run on the redacted text, so an L3 provider never receives raw credentials.
+Before the model-based layers see anything, the redactor (`packages/redactor`) replaces, on a best-effort
+basis: values under listed secret keys in JSON, including JSON nested in strings (`password`, `token`,
+`api_key`, `secret`, `authorization`, `cookie`, `mnemonic`, `private_key` and similar); key/token/secret value
+shapes (API keys, JWTs, private keys, seed phrases, high-entropy strings); and some personal data (e-mail
+addresses, phone, card and SSN numbers). L0 and L1 run on the raw text; L2 and L3 run on the redacted text.
+Redaction does not find every secret: a credential in a shape or under a key it does not know reaches L2,
+and a remote L3 provider if you chose one. What the audit store keeps is redacted the same way.
 
 ## The proof and what the chain checks
 
@@ -78,9 +90,11 @@ verify page). That checks the proof only; expiry, allowlists and the nullifier a
 
 ## The audit log
 
-Every attested decision is appended to a local hash-chained audit log under `~/.blindseal`. Entries are
-content-free by construction (ids, verdict, payload hash, the previous entry's hash); the decision content
-lives in a separate encrypted store. Changing or removing an earlier entry breaks the chain, which
+Every decision the proxy makes — tool-call arguments, tool replies, capability checks, manifest checks,
+screening errors — and every `blindseal attest` decision is appended to a local hash-chained audit log under
+`~/.blindseal`. Entries are content-free by construction (decision id, verdict `pass` / `flag` / `block` /
+`error`, payload hash, the previous entry's hash); what the decision was about is kept, redacted, in a separate
+store encrypted with a local key. The local dashboard (`blindseal run`) reads both. Changing or removing an earlier entry breaks the chain, which
 `blindseal audit verify` detects, and `blindseal audit disclose` produces a signed disclosure that proves a
 window of entries is consistent without exposing traffic. The chain proves integrity and order, not that an
 operator ran every call through the proxy.
@@ -96,8 +110,8 @@ Proven (zero-knowledge, verifiable by anyone):
 
 Attested, not proven:
 
-- L2 and L3 verdicts. They run locally (L3 at the provider you configure) and are recorded, but their output
-  is not inside the proof.
+- L2 and L3 verdicts. L2 runs locally; L3 is off unless configured, and runs on a local model or at the
+  remote provider you chose. Both are recorded, but their output is not inside the proof.
 - The audit log's content.
 
 Run but not proven yet:
@@ -133,8 +147,8 @@ Each item references the section of `LIMITATIONS.md` with details and red-team e
 
 1. **The operator's machine is not compromised.** An attacker with code execution on the host can kill the
    proxy, swap the embedding model, read the L3 key, or rewrite local files.
-2. **The L3 provider is trusted** for its verdicts when L3 is enabled. A local Ollama model keeps L3 on the
-   machine.
+2. **The L3 provider is trusted** for its verdicts, and with the redacted text it receives, when you enable a
+   remote one. A local Ollama model keeps L3 on the machine.
 3. **The L2 inputs are trusted.** The attack corpus and its embeddings ship in the npm package; the embedding
    model (`Xenova/bge-small-en-v1.5`) is downloaded from Hugging Face on first use and cached locally. The trust
    boundary is the npm install plus that one download.
@@ -157,7 +171,9 @@ least one of the following:
 - **Land the attack inside the upstream-normalization gap** (§15).
 
 To get a gated Solana action approved, an attacker additionally needs a proof for that exact action under an
-accepted verifying key and policy root, before it expires, that has not been used — which requires the
-payload to pass the committed L1 rules on the operator's machine.
+accepted verifying key and an approved policy root (and, for the example gate, a root on the gate's own list),
+before it expires, that has not been used — which requires the payload to describe that action and to pass the
+committed L1 rules on the operator's machine. Since 0.7.0 the guest that does this has a new verifying key
+(`0x00cdf40c…2967`); proofs from the earlier guest did not check that the payload describes the action.
 
 Blindseal raises the cost of a prompt-injection attack; it does not eliminate the attack class.

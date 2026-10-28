@@ -52,7 +52,9 @@ Flags
 
 The payload must describe exactly the action the proof binds (the guest checks it before hashing):
 a call that is not an on-chain transfer, or a flag that disagrees with it, is refused before proving.
-Only clean verdicts are attested. The decision is appended to the hash-chained audit log first.
+Only clean verdicts are attested. The decision is appended to the hash-chained audit log first (the call
+itself is kept redacted + encrypted locally); the attestation is also copied to <audit dir>/attestations/,
+where \`blindseal run\` (the dashboard) lists it.
 RPC for the slot: $BLINDSEAL_RPC_URL, else the public mainnet endpoint.
 `;
 

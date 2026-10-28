@@ -9,14 +9,24 @@ The local dashboard, ported from the mockups in [`design/mockups/`](../../design
   grammar, hash component, verdict colours, the five-state rule and the never-write scan from
   `design/mockups/` verbatim; keep the mockup's drawn figures (no backend SVG).
 
-## Mock mode
+## Live data
 
-The proxy serves the local API contract in **mock mode** from `fixtures/` — build the whole dashboard
-against it, no real backend required:
+`blindseal run` serves this dashboard over the decisions recorded on the machine: the hash-chained audit
+log plus the encrypted content store (decrypted locally), `~/.blindseal/policy.json` (shown read-only) and
+the attestations `blindseal attest` wrote. An empty audit log is an empty list, never sample data.
 
 ```
-BLINDSEAL_MOCK=1 pnpm -C packages/proxy dev run --mock --port 4831
+pnpm -C packages/proxy dev run --port 4831
 # open with the token the proxy prints:  #token=<token>
+```
+
+## Mock mode (sample data)
+
+For UI work and demos, `--mock` serves the same API contract from `fixtures/`; every page then shows a
+"Sample data" banner:
+
+```
+pnpm -C packages/proxy dev run --mock --port 4831
 ```
 
 - Endpoints + WebSocket `/events` match `docs/FRONTEND-CONTRACT.md`.

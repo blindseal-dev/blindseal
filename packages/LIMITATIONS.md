@@ -43,7 +43,9 @@ enough from any corpus entry to pass L2. They rely on an LLM to recognize the
 intent.
 
 **Status:** Open without L3. L3 (when available) is the layer designed to catch
-this. Operators who care about this class MUST configure `ANTHROPIC_API_KEY`.
+this. L3 is off by default; operators who care about this class MUST enable it with
+`BLINDSEAL_LAYER3_PROVIDER` (a local `ollama` model, or a remote provider — which then receives the
+redacted tool output).
 
 **Self red-team evidence:** rt-026 (authority framing), rt-027 (politeness
 escalation) both bypassed L1+L2.
@@ -188,8 +190,10 @@ inputs reaching the agent; it does not bound what the agent can do once
 provoked. Pair Blindseal with capability-restricted tool servers.
 
 ### 9. L3 cost / latency
-L3 calls Anthropic Haiku 4.5. Without L3 (no API key), TPR is meaningfully
-lower. With L3, expect ~$0.001 per call and ~200ms additional latency on
+L3 calls the judge you select with `BLINDSEAL_LAYER3_PROVIDER` (default models:
+Anthropic Haiku 4.5 for `anthropic`, gpt-4o-mini for `openai`, llama3.2:3b for
+`ollama`). It is off by default, and without it TPR is meaningfully lower. With
+the Anthropic judge, expect ~$0.001 per call and ~200ms additional latency on
 suspicious-but-not-malicious content. We invoke L3 only on suspicious or
 borderline L2 results to keep costs bounded.
 
@@ -199,9 +203,9 @@ that land at distance > 0.35 from every entry. Our corpus is intentionally
 public for auditability — that publication is a deliberate trade-off. The
 defense for this class is L3, not L2.
 
-### 11. Offline mode (no L3) — production unsupported
+### 11. Running without L3 (L1+L2 only) — production unsupported
 
-Without an LLM API key, Blindseal cannot reliably distinguish protocol-encoded data
+Without L3, Blindseal cannot reliably distinguish protocol-encoded data
 (base64-wrapped JSON, binary blobs, encrypted payloads) from encoded injection
 attacks. Our measurements:
 
@@ -223,20 +227,23 @@ With L3 enabled, all 40% of protocol-data false positives correctly resolve to
 clean, and TPR rises to 100% on the structural eval (80-entry holdout-v2,
 2026-05-21).
 
-**L3 options** — any of the following enables L3:
-- `ANTHROPIC_API_KEY` — Anthropic Haiku (recommended, ~$0.04/hr at 100 req/hr)
-- `OPENAI_API_KEY` — OpenAI gpt-4o-mini or compatible
-- `OLLAMA_HOST=http://localhost:11434` — local Ollama instance (air-gapped deployments)
+**L3 options** — L3 runs only when `BLINDSEAL_LAYER3_PROVIDER` is set; a provider API key
+in the environment never enables it on its own:
+- `BLINDSEAL_LAYER3_PROVIDER=anthropic` (+ `ANTHROPIC_API_KEY` or `BLINDSEAL_LAYER3_API_KEY`) —
+  Anthropic Haiku (~$0.04/hr at 100 req/hr); the redacted tool output goes to Anthropic
+- `BLINDSEAL_LAYER3_PROVIDER=openai` (+ `OPENAI_API_KEY`) — gpt-4o-mini or compatible; same caveat
+- `BLINDSEAL_LAYER3_PROVIDER=ollama` (+ `OLLAMA_HOST`, default `http://localhost:11434`) — a local
+  model; nothing leaves the machine (air-gapped deployments)
 
-Ollama support (`BLINDSEAL_LAYER3_PROVIDER=ollama`) uses `llama3.2:3b` by default.
+Ollama uses `llama3.2:3b` by default.
 Override with `BLINDSEAL_LAYER3_MODEL` and `BLINDSEAL_LAYER3_BASE_URL`. Note: local model
 quality varies; TPR with a quantized 3B model is not independently measured.
 
-Offline mode (L1+L2 only) is supported for:
+Running without L3 (L1+L2 only) is supported for:
 - Development environments and CI testing
 - Local agents with natural-language tool responses only
 
-Offline mode is **not** supported for:
+Running without L3 is **not** supported for:
 - Production MCP servers with protocol-encoded traffic (Pub/Sub, SQS, S3,
   webhooks with base64 fields)
 - Binary content or encrypted payloads
@@ -263,7 +270,8 @@ pnpm install
 pnpm --filter blindseal build
 pnpm --filter @blindseal/eval exec tsx red-team/run-bypasses.ts
 pnpm --filter @blindseal/eval exec tsx src/run.ts --set both --no-l3
-# (set ANTHROPIC_API_KEY in env to include L3)
+# (set BLINDSEAL_LAYER3_PROVIDER=anthropic and ANTHROPIC_API_KEY to include L3; run.ts refuses
+#  to start without a provider unless --allow-degraded)
 ```
 
 Output goes to `packages/eval/red-team/attempts/<date>.md` and

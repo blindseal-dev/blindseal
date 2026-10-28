@@ -18,9 +18,12 @@ In scope:
   `programs/blindseal-verify/src/lib.rs`, nullifier (replay) protection, the
   policy-root and vkey allowlists, upgrade/pause authority handling.
 - The SP1 guest and prover (`crates/`): anything that lets an attestation be produced for a call the
-  committed policy would not pass, or that leaks the payload through the public inputs.
-- The proxy and its local API: prompt-injection bypasses of L0/L1 in `block` mode, redaction failures
-  (secrets or PII reaching L2/L3), audit-chain or disclosure forgery, dashboard token handling.
+  committed policy would not pass, or for a payload that does not describe the action the proof binds, or
+  that leaks the payload through the public inputs.
+- The proxy and its local API: prompt-injection bypasses of L0/L1 in `block` mode (on tool replies or
+  tool-call arguments, including batches), redaction failures for the listed secret and PII types (they
+  reach L2/L3 unredacted), content reaching the audit log or scan history in plaintext, audit-chain or
+  disclosure forgery, dashboard token handling.
 - The SDK and the wasm verifier: accepting an invalid attestation or disclosure.
 
 Out of scope:
@@ -37,7 +40,8 @@ The most recent release on npm and the programs currently deployed at the ids ab
 
 Blindseal proves that a specific call was screened under a committed policy by a specific detector version,
 and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the
-model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove
+model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on
+(a TEE mode is planned). Blindseal does not prove
 an agent is safe, and does not cover traffic that doesn't pass through the proxy. Details:
 `packages/SECURITY_MODEL.md` and `packages/LIMITATIONS.md`.
 

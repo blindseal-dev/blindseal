@@ -88,7 +88,7 @@ export default function HowItWorks() {
           <p className="hiw-mast__eyebrow">How it works</p>
           <h1 className="hiw-mast__title" id="hiw-title">Your agent acts. Blindseal checks.</h1>
           <p className="hiw-caption hiw-caption--mast">A screening layer that can prove it ran.</p>
-          <p className="hiw-mast__lede">Blindseal sits between your AI agent and its tools. Each request sent through it is checked before it goes through.</p>
+          <p className="hiw-mast__lede">Blindseal sits between your AI agent and its tools. Each tool call is checked before the tool gets it, and each reply before your agent reads it.</p>
         </div>
       </header>
 
@@ -131,13 +131,13 @@ export default function HowItWorks() {
               <div className="hiw-art">
                 <p className="hiw-art__eyebrow">The path</p>
                 <h3 className="hiw-art__title">Every call goes through 127.0.0.1</h3>
-                <p className="hiw-art__body">The agent&apos;s connection to its tools (MCP) goes to the proxy — software on your computer that sits between the agent and its tools — instead of straight to the server. The proxy screens each call, forwards what passes to the upstream server, and writes the decision to the local log either way.</p>
+                <p className="hiw-art__body">The agent&apos;s connection to its tools (MCP) goes to the proxy — software on your computer that sits between the agent and its tools — instead of straight to the server. The proxy screens each call&apos;s arguments and each reply, including every item of a batch, forwards what passes, and writes the decision to the local log either way.</p>
                 <p className="hiw-route"><span>Agent</span><span aria-hidden>→</span><span>Proxy <span className="hiw-route__port" data-port="" /></span><span aria-hidden>→</span><strong data-upstreams="">Tools</strong></p>
               </div>
               <div className="hiw-art">
                 <p className="hiw-art__eyebrow">What stays on the machine</p>
                 <h3 className="hiw-art__title">Only a proof crosses the line</h3>
-                <p className="hiw-art__body">The prompt, the tool arguments, the operator&apos;s rules and every model score stay on the machine. A proof and its five public inputs leave it, and only when something downstream asks for one.</p>
+                <p className="hiw-art__body">The prompt, the tool arguments, the operator&apos;s rules and every model score stay on the machine, unless you choose an online AI judge, which receives the redacted replies it checks. A proof and its five public inputs leave it, and only when something downstream asks for one.</p>
                 <p className="hiw-route"><span>Decision</span><span aria-hidden>→</span><span>Prover</span><span aria-hidden>→</span><strong>Solana verifier</strong></p>
               </div>
             </div>
@@ -157,7 +157,7 @@ export default function HowItWorks() {
                 <li><span className="hiw-flows__k"><b>L0</b>Decode</span><span className="hiw-flows__v">Decodes base64, hex, URL and HTML-entity encodings, nested, and re-screens the result. Runs in the proxy; not in the proof yet. <span data-count="L0" /></span><span className="chip neutral">Not in proof yet</span></li>
                 <li><span className="hiw-flows__k"><b>L1</b>Patterns</span><span className="hiw-flows__v">Expressions for override phrasing, prompt extraction, hidden unicode, role tags and exfiltration links. <span data-count="L1" /></span><span className="chip outline">Proven</span></li>
                 <li><span className="hiw-flows__k"><b>L2</b>Similarity</span><span className="hiw-flows__v">Scores the redacted payload against known injections, from 0 to 1. Runs locally; TEE mode planned.</span><span className="chip neutral">Attested</span></li>
-                <li><span className="hiw-flows__k"><b>L3</b>Judge</span><span className="hiw-flows__v">Reads the redacted payload when L2 or a rule raises a doubt, and can clear an L2 flag. Runs locally; TEE mode planned.</span><span className="chip neutral">Attested</span></li>
+                <li><span className="hiw-flows__k"><b>L3</b>Judge</span><span className="hiw-flows__v">Reads the redacted payload when L2 or a rule raises a doubt, and can clear an L2 flag. Off until you turn it on: runs on a local model, or at an AI provider you choose, which then receives the redacted payload. TEE mode planned.</span><span className="chip neutral">Attested</span></li>
               </ul>
             </div>
             <div className="hiw-example reveal" data-example="">
@@ -176,7 +176,7 @@ export default function HowItWorks() {
             <div className="hiw-head reveal">
               <div className="section-head">
                 <div className="section-head__lead"><p className="section-head__eyebrow"><b>03</b> / Redaction before the judge</p><h2 className="section-head__title" id="h-redaction">Hide private details before deeper checks</h2><p className="hiw-caption">The judge sees less than the agent sent.</p></div>
-                <p className="section-head__body">Secrets and personal details are removed before the AI-based checks examine the request.</p>
+                <p className="section-head__body">Before the AI-based checks look at the text, Blindseal removes the secrets and personal details it recognizes: values under names like password or token, key and token shapes, and common personal details such as e-mail addresses and card numbers. It is best effort, not a guarantee.</p>
               </div>
             </div>
             <div className="hiw-redact reveal" data-redact="">
@@ -211,7 +211,7 @@ export default function HowItWorks() {
               </div>
             </div>
             <figure className="hiw-fig" id="fig-lifecycle" data-fig="lifecycle" data-fig-n="3" />
-            <p className="hiw-cols reveal">When something downstream needs proof — an escrow contract, a counterparty, an auditor — Blindseal produces a zero-knowledge attestation that a specific tool call passed a committed policy. The attestation binds to the action itself: target program, recipient, amount, policy root, and expiry are hashed into it, so it is worthless for any other call. It is single-use. The proof is generated locally and verified with one Solana instruction, so any program can gate agent actions without seeing the prompt, the arguments, the operator&apos;s rules, or which agent was screened.</p>
+            <p className="hiw-cols reveal">When something downstream needs proof — an escrow contract, a counterparty, an auditor — Blindseal produces a zero-knowledge attestation that a specific tool call passed a committed policy. The attestation binds to the action itself: target program, recipient, amount, policy root, and expiry are hashed into it, so it is worthless for any other call, and Blindseal will not start a proof for a call that does not describe that action. It is single-use. The proof is generated locally and verified with one Solana instruction, so any program can gate agent actions without seeing the prompt, the arguments, the operator&apos;s rules, or which agent was screened.</p>
             <div className="hiw-panel reveal">
               <p className="hiw-panel__k">The attestation in the figure</p>
               <div className="kv hiw-kv" style={kv5} data-att-kv="" />
@@ -253,7 +253,7 @@ export default function HowItWorks() {
               <div className="hiw-art">
                 <p className="hiw-art__eyebrow">Hash-chained</p>
                 <h3 className="hiw-art__title">Change one entry, break every hash after it</h3>
-                <p className="hiw-art__body">Each entry stores the hash of the one before it, its decision id, its payload hash and its verdict. Anyone holding the head can walk the chain back and recompute every link.</p>
+                <p className="hiw-art__body">Each entry stores the hash of the one before it, its decision id, its payload hash and its verdict, for every call and reply checked. What a decision was about stays on the machine, encrypted. Anyone holding the head can walk the chain back and recompute every link.</p>
                 <ul className="checklist hiw-walk" data-walk="" />
                 <div><button type="button" className="btn secondary sm" data-walk-btn=""><i data-lucide="link" /><span>Walk the chain</span></button></div>
               </div>
@@ -276,7 +276,7 @@ export default function HowItWorks() {
             </div>
             <div className="hiw-claim reveal cascade">
               <div className="site-panel hiw-claim__panel">
-                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers run locally and are attested, not proven (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p></div>
+                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p></div>
               </div>
               <figure className="hiw-table" aria-label="Hidden versus public">
                 <table>

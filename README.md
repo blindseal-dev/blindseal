@@ -6,8 +6,10 @@ Blindseal checks your agent's requests for hidden threats, right on your compute
 issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security
 rules stay private.
 
-It runs on your computer between the AI agent and its tools, as a local MCP proxy, and checks every request sent
-through it before passing it on; requests that fail the checks can be blocked. For supported actions that pass, your
+It runs on your computer between the AI agent and its tools, as a local MCP proxy. It checks both directions: the
+arguments of every tool call your agent sends, and every reply a tool sends back (text, embedded resources and
+structured results, single calls and batches), before passing them on; in block mode, anything that fails the checks
+is blocked. For supported actions that pass, your
 computer can create a zero-knowledge proof that the pattern checks passed, tied to the exact action and the rule set
 used. A Solana program verifies the proof and records it, so it can be used only once.
 
@@ -24,7 +26,8 @@ The proof covers **L1 today** — the committed deterministic rule automata. It 
 screened by this detector version under the policy with this root, the committed L1 rules found it clean, and the
 screening is bound to one on-chain action, one expiry and one nonce — usable once.* **L0** (decode-then-L1) runs in
 the proxy but is **not inside the proof yet**; it is the next increment and will change the detector version. The
-model-based layers **L2/L3** (embeddings, LLM judge) run locally and are **attested, not proven** (a TEE mode is planned).
+model-based layers **L2/L3** (embeddings, LLM judge) are **attested, not proven**: embeddings run locally, and the judge
+is off unless you turn it on (locally, or at a provider you choose); a TEE mode is planned.
 Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.
 Proving takes hours on CPU: the sample attestation took 2 h 16 min on an Apple M1 Max (32 GB). The honest numbers
 are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is proven" page.
@@ -32,13 +35,25 @@ are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is
 ## Quickstart
 
 Node ≥ 20; no Rust or Solana toolchain needed (the verifier ships as WebAssembly). Three unscoped packages on npm:
-`blindseal` (proxy + CLI) and `blindseal-sdk` at 0.6.0, `blindseal-verifier-wasm` at 0.5.2.
+`blindseal` (proxy + CLI) and `blindseal-sdk` at 0.7.0, `blindseal-verifier-wasm` at 0.5.2.
 
 ```sh
 npm i -g blindseal                 # or prefix every command with npx: npx blindseal …
 blindseal init                     # scaffolds ~/.blindseal: identity keys, the default policy, the dashboard token
-blindseal run --mock               # local API + dashboard on http://127.0.0.1:7777 over sample traffic (the token is printed)
+blindseal run                      # local API + dashboard on http://127.0.0.1:7777 over YOUR decisions (the token is printed)
+blindseal run --mock               # the same dashboard over bundled sample data, for a look before you wrap anything
 ```
+
+What to expect on first run:
+
+- The first start downloads the embedding model used by layer 2 (from Hugging Face; `BLINDSEAL_MODEL_HOST` /
+  `BLINDSEAL_MODEL_DIR` for a mirror or an offline cache). In the default `block` mode the proxy refuses to start
+  (exit code 4) if that model cannot load, unless you pass `--allow-degraded`; decisions made without it are marked
+  degraded.
+- The AI judge (layer 3) is **off by default**. It runs only if you set `BLINDSEAL_LAYER3_PROVIDER`: point it at a local
+  model (`ollama`) and nothing leaves your machine; choose a remote provider (`anthropic`, `openai`, `custom`) and the
+  redacted tool output is sent to that provider. An API key in your environment never turns it on by itself. The proxy
+  prints which judge is active at startup (`layer-3 judge: off | local | remote:<provider>`).
 
 Put the proxy in front of a real MCP server (wrapping needs the `--`; `blindseal init --wrap` rewrites the MCP
 configs it finds):
@@ -47,7 +62,7 @@ configs it finds):
 blindseal -- <your-mcp-server-command>
 ```
 
-Attest a screened action and verify it anywhere. `call.json` is the tool call to screen — for the transfer gate: `{ "toolName": "transfer_sol", "args": { "from": "<source authority>", "to": "<recipient>", "lamports": 1000000 } }` (proving takes hours on CPU; the prover downloads on first use):
+Attest a screened action and verify it anywhere. `call.json` is the tool call to screen — for the transfer gate: `{ "toolName": "transfer_sol", "args": { "from": "<source authority>", "to": "<recipient>", "lamports": 1000000 } }` (proving takes hours on CPU; the prover downloads on first use). `attest` refuses, before proving, a call that does not describe exactly the action the proof would approve:
 
 ```sh
 blindseal attest call.json --target-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa --out attestation.json
@@ -59,14 +74,15 @@ blindseal submit attestation.json --check                # has this nullifier be
 ```
 
 Or drop `attestation.json` on the site's verify page — the same verifier runs in your browser and uploads nothing.
-`blindseal audit verify` checks the local audit chain; `blindseal dashboard` reopens the dashboard.
+`blindseal audit verify` checks the local audit chain; `blindseal dashboard` opens the dashboard (starting `blindseal run`
+if nothing is listening).
 
 ### From source
 
 ```sh
 git clone https://github.com/blindseal-dev/blindseal && cd blindseal
 ./scripts/quickstart.sh          # pnpm install, build the dashboard, verify the sample attestation (real Groth16) and reject a tampered copy
-BLINDSEAL_MOCK=1 pnpm -C packages/proxy exec tsx src/index.ts run --mock
+pnpm -C packages/proxy exec tsx src/index.ts run        # the dashboard over your local decisions (add --mock for sample data)
 ```
 
 Rust / Solana / Anchor toolchains are needed only for these:
@@ -84,11 +100,12 @@ The docs page "From source" (`/docs/source`) walks through each step.
 ```
 agent ──► proxy (127.0.0.1) ──► upstream MCP server
              │
+             ├─ checks tool-call arguments (L0 + L1) and tool replies (all four layers)
              ├─ L1 rules (committed DFAs — PROVEN)
              ├─ L0 decode-then-L1 (deterministic; in the proxy, not in the proof yet)
-             ├─ redaction of secrets / PII
-             ├─ L2 embeddings + L3 judge (ATTESTED; local; TEE planned)
-             ├─ hash-chained audit log (content-free; signed disclosures)
+             ├─ best-effort redaction (listed secret keys, key/token shapes, common PII)
+             ├─ L2 embeddings (local) + L3 judge (off unless BLINDSEAL_LAYER3_PROVIDER is set) — ATTESTED
+             ├─ hash-chained audit log (fingerprints + verdicts; content encrypted locally; signed disclosures)
              └─ on demand: SP1 → Groth16 attestation ──► Solana verifier ──► gated program
 ```
 
@@ -99,8 +116,13 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
   the action the proof binds (program, instruction, source, recipient, mint, amount); otherwise no proof exists.
 - **On chain**: the verifier checks the proof, the allowlists (approved policies on by default) and the expiry, and records the nullifier so the
   attestation cannot be replayed (the exact check order is in the header of `programs/blindseal-verify/src/lib.rs`). Any program can gate an action on it via CPI (see `programs/transfer-gate`).
-- **Audit**: every decision is appended to a hash chain; a disclosure proves a window was clean without exposing
-  traffic.
+- **Redaction** is best effort: before L2/L3 see a reply, values under listed secret keys in JSON (`password`,
+  `token`, `api_key`, `secret`, `mnemonic`, …), key/token/secret value shapes (API keys, JWTs, private keys, seed
+  phrases, high-entropy strings) and some PII (e-mail, phone, card and SSN numbers) are replaced. It does not find
+  every secret.
+- **Audit**: every decision (tool calls, replies, capability checks, errors) is appended to a hash chain that holds
+  only fingerprints and verdicts; what a decision was about is kept redacted and encrypted on your machine. A
+  disclosure proves a window was clean without exposing traffic. The dashboard (`blindseal run`) reads this chain.
 
 ## Repository
 

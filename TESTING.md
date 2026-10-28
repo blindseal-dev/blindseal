@@ -1,6 +1,7 @@
 # Testing Blindseal
 
-Blindseal is a local MCP proxy that checks every request sent through it for prompt injection and, for
+Blindseal is a local MCP proxy that checks the tool calls your agent sends and the replies tools send back for
+prompt injection and, for
 supported Solana actions, can produce a one-time zero-knowledge proof that the pattern checks passed.
 Nothing to clone or build — the package is public on npm, so a tester needs only these commands.
 
@@ -9,11 +10,13 @@ Nothing to clone or build — the package is public on npm, so a tester needs on
 ```bash
 # 1. Watch the detection layers run against canned attacks
 npx blindseal@latest demo
-#    optional: export ANTHROPIC_API_KEY=sk-ant-...   # or OLLAMA_HOST=http://localhost:11434 — enables the L3 judge
+#    optional: BLINDSEAL_LAYER3_PROVIDER=ollama (a local model) enables the L3 judge; a remote provider
+#    (anthropic | openai | custom, with its key) sends redacted tool output to that provider. A key alone does nothing.
 
-# 2. Set up ~/.blindseal and open the dashboard over sample traffic
+# 2. Set up ~/.blindseal and open the dashboard
 npx blindseal@latest init
-npx blindseal@latest run --mock        # prints the dashboard URL with its token
+npx blindseal@latest run               # your own decisions (empty until step 3); prints the URL with its token
+#    npx blindseal@latest run --mock   # the same dashboard over bundled sample data
 
 # 3. Put Blindseal in front of any MCP server your agent uses
 npx blindseal@latest -- npx -y @modelcontextprotocol/server-filesystem /data
@@ -26,10 +29,10 @@ npx blindseal@latest -- npx -y @modelcontextprotocol/server-filesystem /data
 
 | Capability | Works locally? | Needs |
 |---|---|---|
-| Four-layer detection (`demo`, wrapping any MCP server) | yes | L0–L1: nothing; L2: a one-time download of the embedding model; L3: an LLM key or local Ollama |
-| Redaction of secrets / PII before the model-based layers | yes | nothing |
+| Four-layer detection (`demo`, wrapping any MCP server) | yes | L0–L1: nothing; L2: a one-time download of the embedding model (block mode will not start without it unless `--allow-degraded`); L3: `BLINDSEAL_LAYER3_PROVIDER` (a local Ollama model, or a remote provider and its key) |
+| Best-effort redaction before the model-based layers (listed secret keys, key/token shapes, common PII) | yes | nothing |
 | Capability firewall, manifest-drift check, local scan history | yes | nothing |
-| Hash-chained audit log, `blindseal audit verify` / `disclose` | yes | nothing |
+| Hash-chained audit log, `blindseal audit verify` / `disclose`, the live dashboard (`blindseal run`) | yes | nothing |
 | Off-chain proof verification (`blindseal verify`, the verify page) | yes | nothing |
 | Producing a proof (`blindseal attest`) | yes | hours of CPU time; the prover downloads on first use |
 | On-chain verification (`blindseal submit --wallet`) | Solana mainnet | a funded wallet and a fresh attestation |
@@ -49,9 +52,10 @@ npx blindseal@latest -- npx -y @modelcontextprotocol/server-filesystem /data
 
 ## Good to know
 
-- **No API key?** Blindseal runs L0–L2 only. Detection of novel attacks drops sharply without L3 — this is
-  documented in `packages/LIMITATIONS.md`, not hidden.
-- **It's a transparent proxy.** Your agent talks to Blindseal instead of the server; every tool response is
-  checked before your agent reads it. Nothing is sent to Blindseal's website.
+- **No L3?** L3 is off unless you set `BLINDSEAL_LAYER3_PROVIDER`; Blindseal then runs L0–L2 only. Detection of
+  novel attacks drops sharply without L3 — this is documented in `packages/LIMITATIONS.md`, not hidden.
+- **It's a transparent proxy.** Your agent talks to Blindseal instead of the server; every tool call's arguments
+  are checked before the server gets them, and every tool reply before your agent reads it. Nothing is sent to
+  Blindseal's website.
 - **What the proof covers:** the committed L1 rules only, bound to one action and usable once. See
   `packages/SECURITY_MODEL.md`.

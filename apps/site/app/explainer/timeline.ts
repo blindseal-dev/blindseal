@@ -21,7 +21,7 @@ export const CHAPTERS: Chapter[] = [
     text: 'Blindseal checks each request sent through it before passing it on. Blocked before the tool runs. No proof is created.',
     scene: 'The request moves into Blindseal. The pattern checks run first and catch the hidden line: it lifts out of the invoice text and is underlined. The recipient does not match the invoice. The verdict is BLOCKED, so the meaning checks are skipped. The Solana side stays dark: no proof, no action.' },
   { n: 3, start: 7.5, still: 10.3, title: 'A real request.',
-    text: 'A clean payment passes the checks. Secrets and personal details are removed before the AI-based checks examine the request.',
+    text: 'A clean payment passes the checks. Recognized secrets and personal details are removed before the AI-based checks examine the request.',
     scene: 'The same invoice, without the hidden line. The pattern checks pass. The two wallet addresses in the request become [REDACTED:high_entropy:1] and [REDACTED:high_entropy:2] before the meaning check reads it. The meaning check passes, the second look is not needed, and the verdict is PASS.' },
   { n: 4, start: 10.5, still: 13.8, title: 'Proof is made on your machine.',
     text: 'For supported actions that pass, your computer can create proof that the pattern checks passed. Creating a proof can take hours.',

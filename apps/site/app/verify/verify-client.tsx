@@ -35,7 +35,7 @@ const DSTEPS: Step[] = [
   { n: 1, title: 'Schema valid', idle: 'A disclosure window: head, entries, signer and signature present.' },
   { n: 2, title: 'Signature verifies', idle: 'ed25519 over the canonical window, by the stated proxy identity.' },
   { n: 3, title: 'Entries recomputed', idle: 'Every entry hash reproduces from its six fields and links to the previous one.' },
-  { n: 4, title: 'Clean window', idle: 'Every disclosed decision passed.' },
+  { n: 4, title: 'Clean window', idle: 'Every disclosed decision has the verdict pass.' },
 ];
 const HIDDEN: [string, string][] = [
   ['Prompt', 'What the agent was asked.'],
@@ -279,7 +279,7 @@ export function VerifyClient() {
       await hold(220);
       if (stale(tok)) return;
       const nonPass = d.entries.filter((e) => e.verdict !== CLEAN_VERDICT).length;
-      if (v.clean) setCheck(3, 'pass', { detail: 'Every disclosed decision passed.' });
+      if (v.clean) setCheck(3, 'pass', { detail: 'Every disclosed decision has the verdict pass.' });
       else setCheck(3, 'fail', { detail: 'The disclosure is valid, but the window is not clean.', reason: nonPass + ' non-pass verdict' + (nonPass === 1 ? '' : 's') + ' in the window' });
       running = false; hasResult = true;
       btnVerify.removeAttribute('aria-busy'); syncGate();

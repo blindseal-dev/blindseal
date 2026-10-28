@@ -9,12 +9,13 @@ import { CopyButton } from './copy';
 const INSTALL = 'npx blindseal init';
 
 const FAQ: [string, React.ReactNode][] = [
-  ['What does Blindseal actually do?', <p key="a">It checks the requests your AI agent sends through it to tools. For supported actions, it can create a private, one-time proof that the pattern checks passed. An app on Solana can check that proof for itself.</p>],
+  ['What does Blindseal actually do?', <p key="a">It checks the tool calls your AI agent makes and the replies those tools send back, on your computer. For supported actions, it can create a private, one-time proof that the pattern checks passed. An app on Solana can check that proof for itself.</p>],
   ['Does Blindseal hold or move my crypto?', <p key="a">No. Blindseal doesn&apos;t hold, route, or mix funds. The receiving app decides whether to accept an action after checking the proof.</p>],
   ['Why does the blockchain need proof?', <p key="a">Because an app shouldn&apos;t have to rely only on an agent saying it was checked. It can verify a proof tied to that exact action.</p>],
-  ['Can Blindseal see my prompts or security rules?', <><p key="a">Blindseal checks the requests on your computer. The proof checker receives the proof and its public details, not your private instructions or security-rule text. Blindseal&apos;s website does not receive that raw screening data.</p><p key="b">Your agent and its tools may have their own data-sharing settings. Blindseal does not make those separate services private.</p></>],
+  ['Can Blindseal see my prompts or security rules?', <><p key="a">Blindseal checks tool calls and replies on your computer. Its log keeps only fingerprints and results; the details are stored encrypted on your computer. The proof checker receives the proof and its public details, not your private instructions or security-rule text. Blindseal&apos;s website does not receive that raw screening data.</p><p key="b">Your agent and its tools may have their own data-sharing settings. Blindseal does not make those separate services private.</p></>],
+  ['Does anything leave my computer?', <><p key="a">Not by default. The first run downloads the model Blindseal uses to compare text with known attacks; after that, the checks run on your computer.</p><p key="b">The AI judge, an extra check, is off until you turn it on. Point it at a model on your computer and nothing leaves. Choose an online AI provider instead and the tool replies it checks are sent to that provider, after Blindseal removes the secrets and personal details it recognizes, such as passwords, keys, tokens and e-mail addresses. That removal is best effort: it will not catch every secret.</p></>],
   ['Does a valid proof mean the action is completely safe?', <p key="a">No. It proves that the rules currently covered by the proof passed. Other checks may catch more attacks, but their results are not yet proven inside the proof. Unknown attacks may still get through.</p>],
-  ['Can an attacker create proof using weaker rules?', <p key="a">An app can choose which rule sets and checking-software versions it accepts. It can reject a proof made with rules it has not approved. The app still needs to choose its rules carefully and enforce those limits.</p>],
+  ['Can an attacker create proof using weaker rules?', <p key="a">By default, Blindseal&apos;s checker on Solana only accepts approved rule sets and checking-software versions, and the example payment app also checks the rule set against its own list. An app can choose which rule sets and versions it accepts, and reject a proof made with anything else. It still needs to choose those carefully.</p>],
   ['How long does it take?', <p key="a">Creating a proof took about 2 hours and 16 minutes in the product&apos;s Apple M1 Max test. Checking it in a browser took about 0.6 seconds. Today&apos;s version is for actions prepared ahead of time, rather than actions that need a new proof right away.</p>],
 ];
 
@@ -29,7 +30,7 @@ export default function Home() {
         <div className="hero__shade" aria-hidden />
         <div className="hero__content"><div className="hero__col">
           <h1 className="hero__title">AI agents can be tricked. <br /><em>Blindseal helps stop them.</em></h1>
-          <p className="hero__sub">Blindseal checks your agent&apos;s requests for hidden threats, right on your computer. For supported actions, it can issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security rules stay private.</p>
+          <p className="hero__sub">Blindseal checks your agent&apos;s tool calls, and the replies they bring back, for hidden threats, right on your computer. For supported actions, it can issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security rules stay private.</p>
           <p className="hero__note">Today&apos;s proof covers checks for known attack patterns. It does not guarantee that an action is safe.</p>
           <div className="hero__actions">
             <Link prefetch={false} className="btn primary hero__primary" href="/how-it-works">See how it works<i data-lucide="arrow-right" /></Link>
@@ -59,8 +60,8 @@ export default function Home() {
           <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / How it works</p><h2 className="section-head__title" id="how-h">Three steps. One private proof.</h2></div>
         </div>
         <ol className="s01-cols hm-steps reveal cascade" aria-label="The three steps">
-          <li className="s01-col"><span className="s01-col__k">1 · We check the action</span><p className="s01-col__p">Blindseal runs on your computer between the AI agent and its tools. It checks each request sent through it before passing it on. Requests that fail the checks can be blocked.</p></li>
-          <li className="s01-col"><span className="s01-col__k">2 · We create proof</span><p className="s01-col__p">For supported actions that pass, your computer can create proof that the pattern checks passed. The proof is tied to the exact action and the set of rules used to check it.</p></li>
+          <li className="s01-col"><span className="s01-col__k">1 · We check the action</span><p className="s01-col__p">Blindseal runs on your computer between the AI agent and its tools. It checks each tool call before the tool gets it, and each reply before your agent reads it. Anything that fails the checks can be blocked.</p></li>
+          <li className="s01-col"><span className="s01-col__k">2 · We create proof</span><p className="s01-col__p">For supported actions that pass, your computer can create proof that the pattern checks passed. The proof is tied to the exact action and the set of rules used to check it. If the checked request does not describe that action, no proof is made.</p></li>
           <li className="s01-col"><span className="s01-col__k">3 · The blockchain verifies it</span><p className="s01-col__p">An app on Solana can require that proof before accepting the action. Once the proof has been used to approve the action, it cannot be used again.</p></li>
         </ol>
         <p className="hm-note">Creating a proof can take hours. Checking it is fast. Today&apos;s version is built for actions prepared ahead of time, such as scheduled payments.</p>
@@ -96,7 +97,7 @@ export default function Home() {
           <div className="section-head__lead"><p className="section-head__eyebrow">Who is it for?</p><h2 className="section-head__title" id="who-h">For people using AI agents and teams building apps.</h2></div>
         </div>
         <div className="s01-hp">
-          <section className="site-panel hm-who"><p className="site-panel__n">Using an AI agent?</p><p className="site-panel__body">You don&apos;t need to have built it yourself. Connect Blindseal between your agent and its tools to check the requests sent through it, right on your computer. Your private instructions and security rules aren&apos;t sent to Blindseal&apos;s website.</p></section>
+          <section className="site-panel hm-who"><p className="site-panel__n">Using an AI agent?</p><p className="site-panel__body">You don&apos;t need to have built it yourself. Connect Blindseal between your agent and its tools to check the calls and replies that pass through it, right on your computer. Your private instructions and security rules aren&apos;t sent to Blindseal&apos;s website.</p></section>
           <section className="site-panel hm-who"><p className="site-panel__n">Building an app on Solana?</p><p className="site-panel__body">Add Blindseal so your app can require proof that an agent&apos;s action passed your approved pattern checks before accepting it.</p></section>
         </div>
         <p className="hm-note">Blindseal works with agents that use tools to carry out tasks. It needs to be connected to those tools; it does not automatically protect every AI chat or app.</p>
