@@ -89,7 +89,7 @@ blindseal (LIVE): local API on http://127.0.0.1:7777/api
       ] },
       { id: 'agent', heading: 'Point an agent', blocks: [
         p('Put `blindseal --` in front of the MCP server command. Everything after the `--` is the upstream server. Every tool call\'s arguments are checked (L0 and L1) before the server gets them, and every result — text, embedded resources and structured content — passes the detection layers before the agent sees it. Calls and results inside a JSON-RPC batch are checked one by one.'),
-        p('The AI judge (L3) is off by default. Set `BLINDSEAL_LAYER3_PROVIDER=ollama` to run it on a local model; set `anthropic`, `openai` or `custom` (with that provider\'s key) to use a remote one, which then receives the redacted tool output. An API key in your environment never turns it on by itself. Redaction is best effort: values under listed secret keys in JSON (`password`, `token`, `api_key`, `secret`, `mnemonic`, …), key and token shapes (API keys, JWTs, private keys, seed phrases, high-entropy strings) and some personal data (e-mail, phone, card and SSN numbers).'),
+        p('The AI judge (L3) is off by default. Set `BLINDSEAL_LAYER3_PROVIDER=ollama` to run it on a local model; set `anthropic`, `openai` or `custom` (with that provider\'s key) to use a remote one, which then receives the redacted tool output. An API key in your environment never turns it on by itself. Redaction is best effort: values under listed secret keys in JSON (`password`, `token`, `api_key`, `secret`, `mnemonic`, …), key and token shapes (API keys, JWTs, private keys, seed phrases, high-entropy strings), values under personal-data keys in JSON (`name`, `address`, `phone`, `dob`, `iban`, …) and some personal data by shape (e-mail, phone, card and SSN numbers). Names and addresses written as free text are not covered.'),
         code(`$ blindseal -- github-mcp --stdio    # the proxy launches the server and sits in the middle`, 'shell'),
         p('Or let `blindseal init --wrap` rewrite the MCP configs it finds so every server is launched through the proxy. By hand, the config entry looks like this:'),
         code(`"mcpServers": {
@@ -240,7 +240,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
     sections: [
       { id: 'plain', heading: 'In plain words', blocks: [
         { kind: 'callout', title: 'What we prove today', body: 'A specific request was checked under a specific set of rules and software version. Its pattern checks passed, and the proof is tied to one exact action.' },
-        { kind: 'callout', title: 'What we do not prove yet', body: 'That all four layers passed inside the proof, that every agent action went through Blindseal, or that an action is risk-free. Blindseal does not cover requests that bypass it or protect against a compromised computer.', muted: true },
+        { kind: 'callout', title: 'What we do not prove yet', body: 'That all four layers passed inside the proof, that every agent action went through Blindseal, or that an action is risk-free. Blindseal does not cover requests that bypass it or protect against a compromised computer. Removing private details before the AI-based checks is best effort for recognised types: names and addresses written as free text, outside a labelled field, are not removed.', muted: true },
       ] },
       { id: 'proven', heading: 'Proven (zero-knowledge, verifiable by anyone)', blocks: [
         list([

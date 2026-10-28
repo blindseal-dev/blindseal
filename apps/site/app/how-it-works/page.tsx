@@ -176,7 +176,7 @@ export default function HowItWorks() {
             <div className="hiw-head reveal">
               <div className="section-head">
                 <div className="section-head__lead"><p className="section-head__eyebrow"><b>03</b> / Redaction before the judge</p><h2 className="section-head__title" id="h-redaction">Hide private details before deeper checks</h2><p className="hiw-caption">The judge sees less than the agent sent.</p></div>
-                <p className="section-head__body">Before the AI-based checks look at the text, Blindseal removes the secrets and personal details it recognizes: values under names like password or token, key and token shapes, and common personal details such as e-mail addresses and card numbers. It is best effort, not a guarantee.</p>
+                <p className="section-head__body">Before the AI-based checks look at the text, Blindseal removes the secrets and personal details it recognizes: values under names like password or token, values under names like name, address or phone, key and token shapes, and common personal details such as e-mail addresses and card numbers. It is best effort, not a guarantee: names and addresses written as plain sentences are not caught.</p>
               </div>
             </div>
             <div className="hiw-redact reveal" data-redact="">

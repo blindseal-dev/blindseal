@@ -42,5 +42,9 @@ calls other than the ones listed below.
 
 Redaction is best effort: it replaces values under listed secret keys in JSON (`password`, `token`,
 `api_key`, `secret`, `mnemonic`, …), key/token/secret value shapes (API keys, JWTs, private keys,
-seed phrases, high-entropy strings) and some personal data (e-mail addresses, phone, card and SSN
-numbers). It does not find every secret, so keep the judge local if your tool output is sensitive.
+seed phrases, high-entropy strings), values under personal-data keys in JSON (`name`, `address`,
+`phone`, `dob`, `ssn`, `passport`, `iban`, `account_number`, …) and some personal data by shape
+(e-mail addresses, phone, card and SSN numbers). It does not find every secret, and names or
+addresses written as free text (outside a JSON field) are not covered, so keep the judge local if
+your tool output is sensitive. Redaction only changes what the model layers see: the payload a
+proof hashes and the action it binds always come from the original tool call.

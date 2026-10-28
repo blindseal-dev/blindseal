@@ -15,7 +15,8 @@ and produces zero-knowledge attestations verifiable on Solana.
 First start downloads the layer-2 embedding model; block mode refuses to start without it (exit 4)
 unless --allow-degraded. The AI judge (layer 3) is off unless BLINDSEAL_LAYER3_PROVIDER is set; a remote
 provider then receives the redacted tool output. Redaction is best effort (listed secret keys in JSON,
-key/token/secret shapes, e-mail/phone/card/SSN).
+key/token/secret shapes, personal-data keys in JSON such as name/address/phone, e-mail/phone/card/SSN;
+not free-text names or addresses).
 
 Usage
   blindseal init                                    set up ~/.blindseal (identity key, default policy, dashboard token)

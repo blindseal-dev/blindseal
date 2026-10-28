@@ -118,8 +118,10 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
   attestation cannot be replayed (the exact check order is in the header of `programs/blindseal-verify/src/lib.rs`). Any program can gate an action on it via CPI (see `programs/transfer-gate`).
 - **Redaction** is best effort: before L2/L3 see a reply, values under listed secret keys in JSON (`password`,
   `token`, `api_key`, `secret`, `mnemonic`, …), key/token/secret value shapes (API keys, JWTs, private keys, seed
-  phrases, high-entropy strings) and some PII (e-mail, phone, card and SSN numbers) are replaced. It does not find
-  every secret.
+  phrases, high-entropy strings), values under personal-data keys in JSON (`name`, `address`, `phone`, `dob`,
+  `ssn`, `passport`, `iban`, `account_number`, …) and some PII shapes (e-mail, phone, card and SSN numbers) are
+  replaced. It does not find every secret, and names or addresses written as free text (outside a JSON field) are
+  not covered.
 - **Audit**: every decision (tool calls, replies, capability checks, errors) is appended to a hash chain that holds
   only fingerprints and verdicts; what a decision was about is kept redacted and encrypted on your machine. A
   disclosure proves a window was clean without exposing traffic. The dashboard (`blindseal run`) reads this chain.

@@ -9,6 +9,8 @@
 ///     is parsed and every value under a sensitive key (SENSITIVE_KEYS, case-insensitive, with
 ///     `-`, `_`, `.` and spaces ignored) is replaced whole, whatever its length or type. JSON
 ///     that does not parse (truncated, embedded in prose) is covered by a quoted-key rule.
+///     Keys naming personal data (PERSONAL_KEYS: name, address, phone, dob, iban, …) are
+///     replaced the same way, as `personal_field`.
 ///  2. By VALUE pattern. Rules run specific -> general so `high_entropy` is a last-resort
 ///     catch-all.
 
@@ -23,7 +25,9 @@ export type RedactionKind =
   | 'ssn'
   | 'high_entropy'
   /// A value redacted because of its KEY (e.g. {"token":"abc"}), not its shape.
-  | 'secret_field';
+  | 'secret_field'
+  /// A value redacted because its KEY names personal data ({"name":…}, {"address":…}).
+  | 'personal_field';
 
 export interface RedactionCount {
   kind: RedactionKind;
@@ -135,7 +139,25 @@ export const SENSITIVE_KEY_SUFFIXES: readonly string[] = [
   'password', 'passwd', 'passphrase', 'secret', 'token', 'apikey', 'accesskey', 'privatekey', 'privkey', 'mnemonic', 'seedphrase',
 ];
 
+/// Keys naming personal data. Exact matches after normaliseKey(), plus the explicit compound
+/// forms below — deliberately no generic `name`/`address` suffix, so `tool_name`, `filename` or
+/// `ip_address` stay readable. Applies only to what L2/L3 (and the encrypted store) see: payload
+/// hashing, action parsing and the guest's binding check always use the original payload.
+/// Free-text names and addresses outside structured fields are NOT covered.
+export const PERSONAL_KEYS: readonly string[] = [
+  'name', 'firstname', 'lastname', 'fullname', 'givenname', 'familyname', 'surname', 'middlename',
+  'customername', 'contactname', 'legalname',
+  'address', 'streetaddress', 'homeaddress', 'billingaddress', 'shippingaddress', 'mailingaddress',
+  'postaladdress', 'addressline1', 'addressline2', 'street', 'city',
+  'postcode', 'postalcode', 'zip', 'zipcode',
+  'phone', 'phonenumber', 'mobile', 'mobilenumber', 'telephone',
+  'dob', 'dateofbirth', 'birthdate',
+  'ssn', 'socialsecuritynumber', 'passport', 'passportnumber',
+  'iban', 'accountnumber', 'bankaccount', 'bankaccountnumber',
+];
+
 const KEY_SET = new Set(SENSITIVE_KEYS);
+const PERSONAL_SET = new Set(PERSONAL_KEYS);
 
 /// Lowercase and drop `-`, `_`, `.` and whitespace: `API-Key`, `api_key`, `apiKey` → `apikey`.
 export function normaliseKey(key: string): string {
@@ -148,6 +170,18 @@ export function isSensitiveKey(key: string): boolean {
   if (k.length === 0) return false;
   if (KEY_SET.has(k)) return true;
   return SENSITIVE_KEY_SUFFIXES.some((s) => k.length > s.length && k.endsWith(s));
+}
+
+/// True when a JSON/object key names personal data (see PERSONAL_KEYS).
+export function isPersonalKey(key: string): boolean {
+  return PERSONAL_SET.has(normaliseKey(key));
+}
+
+/// The redaction kind a key forces on its value, or null when the key is not sensitive.
+function keyKind(key: string): RedactionKind | null {
+  if (isSensitiveKey(key)) return 'secret_field';
+  if (isPersonalKey(key)) return 'personal_field';
+  return null;
 }
 
 type Counter = Map<RedactionKind, number>;
@@ -163,9 +197,10 @@ function mark(ctx: Counter, kind: RedactionKind): string {
 const QUOTED_KEY_RE = /"((?:[^"\\]|\\.){1,128})"(\s*:\s*)("(?:[^"\\]|\\.)*"|-?\d[\d.eE+-]*|true|false)/g;
 
 function redactText(text: string, ctx: Counter): string {
-  let out = text.replace(QUOTED_KEY_RE, (m, key: string, sep: string) =>
-    isSensitiveKey(key) ? `"${key}"${sep}"${mark(ctx, 'secret_field')}"` : m,
-  );
+  let out = text.replace(QUOTED_KEY_RE, (m, key: string, sep: string) => {
+    const kind = keyKind(key);
+    return kind ? `"${key}"${sep}"${mark(ctx, kind)}"` : m;
+  });
   for (const rule of RULES) {
     out = out.replace(rule.re, (match) => {
       if (rule.keep && !rule.keep(match)) return match;
@@ -185,7 +220,8 @@ function walk(v: unknown, ctx: Counter, depth: number): unknown {
     // hiding it from L2/L3.
     const out: Record<string, unknown> = Object.create(null);
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      if (isSensitiveKey(k) && val !== null && val !== '') out[k] = mark(ctx, 'secret_field');
+      const kind = keyKind(k);
+      if (kind && val !== null && val !== '') out[k] = mark(ctx, kind);
       else out[k] = walk(val, ctx, depth);
     }
     return out;
