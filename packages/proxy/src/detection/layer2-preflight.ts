@@ -28,7 +28,7 @@ export async function preflightLayer2(opts: {
     await (opts.warmup ?? warmupLayer2)();
     return { ok: true };
   } catch (err) {
-    const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, ' ').slice(0, 300);
+    const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, ' ').slice(0, 300).replace(/\.+$/, '');
     if (opts.mode === 'block' && !opts.allowDegraded) {
       write(
         `blindseal: refusing to start — layer 2 (embedding model) failed to load: ${msg}\n` +

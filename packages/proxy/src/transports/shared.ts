@@ -59,8 +59,28 @@ export function stableStringify(value: unknown): string {
   return JSON.stringify(norm(value)) ?? '';
 }
 
+/// Every string in a JSON value (object keys and string leaves), in stable key order, joined
+/// with '\n'. Scanned alongside the stringified form: JSON escaping turns a real newline or tab
+/// inside a value into a literal backslash sequence, which whitespace-based patterns miss.
+export function jsonStringLeaves(value: unknown): string {
+  const out: string[] = [];
+  const seen = new WeakSet<object>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') { out.push(v); return; }
+    if (v === null || typeof v !== 'object' || seen.has(v as object)) return;
+    seen.add(v as object);
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+      out.push(k);
+      walk((v as Record<string, unknown>)[k]);
+    }
+  };
+  walk(value);
+  return out.join('\n');
+}
+
 export interface ResponseSurface {
-  kind: 'text' | 'resource' | 'structured';
+  kind: 'text' | 'resource' | 'structured' | 'structured-strings';
   text: string;
 }
 
@@ -80,14 +100,20 @@ export function collectResponseSurfaces(result: ToolCallResult): ResponseSurface
     }
   }
   if (result.structuredContent !== undefined && result.structuredContent !== null) {
-    out.push({ kind: 'structured', text: stableStringify(result.structuredContent) });
+    const json = stableStringify(result.structuredContent);
+    out.push({ kind: 'structured', text: json });
+    const leaves = jsonStringLeaves(result.structuredContent);
+    if (leaves && leaves !== json) out.push({ kind: 'structured-strings', text: leaves });
   }
   return out;
 }
 
 /// All agent-visible text of a result joined with '\n' — for previews, persistence and taint.
 export function responseText(result: ToolCallResult): string {
-  return collectResponseSurfaces(result).map((s) => s.text).join('\n');
+  return collectResponseSurfaces(result)
+    .filter((s) => s.kind !== 'structured-strings')
+    .map((s) => s.text)
+    .join('\n');
 }
 
 export function sha256Hex(s: string): string {
@@ -185,7 +211,7 @@ export async function inspectToolCallResponse(
     }
   }
 
-  const scannedText = surfaces.map((s) => s.text).join('\n');
+  const scannedText = surfaces.filter((s) => s.kind !== 'structured-strings').map((s) => s.text).join('\n');
   const contentHash = sha256Hex(scannedText);
   const base = { contentHash, scannedText, degraded };
 
@@ -221,8 +247,9 @@ export interface OutboundOutcome {
   action: 'forward' | 'block';
 }
 
-/// Runs L0 + L1 over the stable-stringified tool-call arguments. Block mode refuses any
-/// non-clean verdict; warn and log modes forward (the caller flags on stderr / audit).
+/// Runs L0 + L1 over the stable-stringified tool-call arguments and over their string leaves
+/// (see jsonStringLeaves); the worse verdict wins. Block mode refuses any non-clean verdict;
+/// warn and log modes forward (the caller flags on stderr / audit).
 export function inspectToolCallArguments(
   toolName: string,
   args: unknown,
@@ -230,7 +257,12 @@ export function inspectToolCallArguments(
 ): OutboundOutcome {
   const scannedText = args === undefined ? '' : stableStringify(args);
   const argsHash = sha256Hex(scannedText);
-  const r = runOutboundScreen(scannedText);
+  let r = runOutboundScreen(scannedText);
+  const leaves = args === undefined ? '' : jsonStringLeaves(args);
+  if (leaves && leaves !== scannedText) {
+    const rl = runOutboundScreen(leaves);
+    if (rankVerdict(rl.verdict) > rankVerdict(r.verdict)) r = rl;
+  }
   if (r.verdict === 'clean') {
     return { verdict: 'clean', result: null, scannedText, argsHash, action: 'forward' };
   }
