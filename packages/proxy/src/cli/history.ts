@@ -3,11 +3,35 @@
 
 import { createScanStore, defaultDbPath, type ScanFilter, type ScanRecord } from '../persistence/index.js';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { ContentStore } from '@blindseal/audit';
+
+/// The redacted text of a decision, decrypted from the encrypted content store (scans.db holds
+/// none). Opens the store only if its key already exists — reading history never creates one.
+function contentReader(auditDir: string): (decisionId: string | null) => string | null {
+  const storePath = path.join(auditDir, 'content.json');
+  const keyPath = path.join(auditDir, 'content.key');
+  if (!existsSync(storePath) || !existsSync(keyPath)) return () => null;
+  let store: ContentStore;
+  try { store = new ContentStore(storePath, keyPath); } catch { return () => null; }
+  return (id) => {
+    if (!id) return null;
+    try {
+      const rec = store.get<{ text?: unknown }>(id);
+      return rec && typeof rec.text === 'string' ? rec.text : null;
+    } catch {
+      return null;
+    }
+  };
+}
 
 export interface HistoryOptions {
   out?: { write(s: string): void };
   noColor?: boolean;
   dbPath?: string;
+  /// Encrypted content store dir (default $BLINDSEAL_AUDIT_DIR or ~/.blindseal).
+  auditDir?: string;
   filter?: ScanFilter;
   json?: boolean;
 }
@@ -28,6 +52,8 @@ Flags
 
 Notes
   Local-only. Reads ~/.blindseal/scans.db written when the proxy ran with BLINDSEAL_PERSIST=1.
+  scans.db holds metadata only; the redacted text shown under each row is decrypted from the
+  encrypted content store ($BLINDSEAL_AUDIT_DIR, default ~/.blindseal) with the local key.
 `;
 
 function parseSince(raw: string): number {
@@ -126,12 +152,14 @@ export function runHistory(opts: HistoryOptions = {}): number {
     return 0;
   }
 
+  const readContent = contentReader(opts.auditDir ?? process.env.BLINDSEAL_AUDIT_DIR ?? path.join(os.homedir(), '.blindseal'));
   out.write(`${col.bold(`${rows.length} scan${rows.length === 1 ? '' : 's'}`)} ${col.dim(`from ${dbPath}`)}\n\n`);
   for (const r of rows) {
     out.write(`${fmtVerdict(r.verdict, col)} ${col.dim(fmtAge(r.ts))} `);
     out.write(`${col.cyan(r.toolName)} ${col.dim(`[L${r.layer ?? '?'} conf=${r.confidence.toFixed(2)} server=${r.serverKey}]`)}${r.degraded ? ` ${col.yellow('degraded')}` : ''}\n`);
-    if (r.contentPreview) {
-      out.write(`  ${col.dim(r.contentPreview.replace(/\n+/g, ' ').slice(0, 160))}\n`);
+    const text = readContent(r.decisionId);
+    if (text) {
+      out.write(`  ${col.dim(text.replace(/\n+/g, ' ').slice(0, 160))}\n`);
     }
   }
 

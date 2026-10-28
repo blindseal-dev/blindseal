@@ -13,7 +13,7 @@ const dbFile = () => { const d = mkdtempSync(path.join(os.tmpdir(), 'bs-scans-')
 
 const input = (degraded: boolean) => ({
   serverKey: 'stdio:node:fixture', transport: 'stdio' as const, toolName: 'read_file', verdict: 'clean' as const,
-  layer: 1, confidence: 0, patterns: [], contentHash: 'ab', rawText: 'hello', reasoning: null, mode: 'block', mutated: false, degraded,
+  layer: 1, confidence: 0, patterns: [], contentHash: 'ab', decisionId: null, mode: 'block', mutated: false, degraded,
 });
 
 describe('scan history: degraded flag', () => {

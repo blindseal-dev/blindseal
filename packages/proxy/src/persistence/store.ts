@@ -1,12 +1,16 @@
 /// SQLite-backed local scan history. Opt-in via BLINDSEAL_PERSIST=1.
-/// Privacy-by-default: this module is loaded only when persistence is enabled.
-/// All content previews are run through `redact()` before they hit disk.
+/// Content-free: a row holds decision METADATA only (tool, verdict, layer, confidence, pattern
+/// ids, content hash, mode, flags) plus the audit decisionId. What the decision was about — the
+/// redacted response text and the judge's reasoning — is retained only in the encrypted content
+/// store (<audit dir>/content.json), keyed by that decisionId; `blindseal history` decrypts it
+/// locally. Databases written by earlier versions (content_preview / reasoning columns) are
+/// scrubbed on open: the columns are dropped and the file vacuumed so no plaintext survives in
+/// free pages or the WAL.
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import Database, { type Database as Db, type Statement } from 'better-sqlite3';
-import { redactedPreview } from './redact.js';
 
 export interface ScanRecord {
   id?: number;
@@ -19,8 +23,8 @@ export interface ScanRecord {
   confidence: number;
   patterns: string[];
   contentHash: string;
-  contentPreview: string;
-  reasoning: string | null;
+  /** The audit-chain decisionId: key of the redacted text + reasoning in the encrypted store. */
+  decisionId: string | null;
   mode: string;
   mutated: boolean;
   /** Layer 2 was unavailable for this decision. */
@@ -36,9 +40,8 @@ export interface ScanInput {
   confidence: number;
   patterns: readonly string[];
   contentHash: string;
-  /** Raw text — will be redacted before storing. */
-  rawText: string;
-  reasoning?: string | null;
+  /** The audit-chain decisionId (content lives in the encrypted store under this id). */
+  decisionId?: string | null;
   mode: string;
   mutated: boolean;
   degraded?: boolean;
@@ -114,6 +117,8 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
     return NOOP;
   }
 
+  // Deleted rows are overwritten, not just unlinked (no plaintext left in free pages).
+  db.pragma('secure_delete = ON');
   db.exec(`
     CREATE TABLE IF NOT EXISTS scans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,8 +131,7 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
       confidence REAL NOT NULL,
       patterns TEXT NOT NULL,
       content_hash TEXT NOT NULL,
-      content_preview TEXT NOT NULL,
-      reasoning TEXT,
+      decision_id TEXT,
       mode TEXT NOT NULL,
       mutated INTEGER NOT NULL DEFAULT 0,
       degraded INTEGER NOT NULL DEFAULT 0
@@ -137,17 +141,28 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
     CREATE INDEX IF NOT EXISTS idx_scans_verdict ON scans(verdict);
   `);
 
-  // Databases created before the degraded column existed: add it in place.
+  // Databases from earlier versions: add the new columns, and remove the plaintext ones.
   const cols = db.prepare('PRAGMA table_info(scans)').all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === 'degraded')) {
-    db.exec('ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0');
+  const has = (c: string) => cols.some((x) => x.name === c);
+  if (!has('degraded')) db.exec('ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0');
+  if (!has('decision_id')) db.exec('ALTER TABLE scans ADD COLUMN decision_id TEXT');
+  if (has('content_preview') || has('reasoning')) {
+    // Overwrite first (secure_delete covers the pages the drop frees), then drop the columns,
+    // checkpoint the WAL and vacuum so the old plaintext is gone from every file.
+    if (has('content_preview')) db.exec("UPDATE scans SET content_preview = ''");
+    if (has('reasoning')) db.exec('UPDATE scans SET reasoning = NULL');
+    if (has('content_preview')) db.exec('ALTER TABLE scans DROP COLUMN content_preview');
+    if (has('reasoning')) db.exec('ALTER TABLE scans DROP COLUMN reasoning');
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.exec('VACUUM');
+    db.pragma('wal_checkpoint(TRUNCATE)');
   }
 
   const insertStmt: Statement = db.prepare(`
     INSERT INTO scans
       (ts, server_key, transport, tool_name, verdict, layer, confidence,
-       patterns, content_hash, content_preview, reasoning, mode, mutated, degraded)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       patterns, content_hash, decision_id, mode, mutated, degraded)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const purgeStmt: Statement = db.prepare('DELETE FROM scans WHERE ts < ?');
@@ -171,8 +186,7 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
       confidence: row.confidence as number,
       patterns: JSON.parse((row.patterns as string) || '[]') as string[],
       contentHash: row.content_hash as string,
-      contentPreview: row.content_preview as string,
-      reasoning: (row.reasoning as string | null) ?? null,
+      decisionId: (row.decision_id as string | null) ?? null,
       mode: row.mode as string,
       mutated: !!row.mutated,
       degraded: !!row.degraded,
@@ -193,8 +207,7 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
         input.confidence,
         JSON.stringify(input.patterns ?? []),
         input.contentHash,
-        redactedPreview(input.rawText),
-        input.reasoning ?? null,
+        input.decisionId ?? null,
         input.mode,
         input.mutated ? 1 : 0,
         input.degraded ? 1 : 0,

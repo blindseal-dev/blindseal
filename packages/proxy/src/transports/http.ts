@@ -20,7 +20,7 @@ import {
   type InitializeResult,
   type ToolsListResult,
 } from '../manifest/index.js';
-import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger } from '../audit/index.js';
+import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger, type RecordedDecision } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
@@ -187,8 +187,9 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         `blindseal[${transport === 'sse' ? 'http/sse' : 'http'}]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${scannedTool}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
       );
     }
+    let recorded: RecordedDecision | null = null;
     if (audit.enabled) {
-      audit.log({
+      recorded = audit.log({
         ...(outcome.degraded ? { degraded: true } : {}),
         type: 'detection',
         toolName: scannedTool,
@@ -207,7 +208,6 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       });
     }
     if (scanStore.enabled) {
-      const rawText = responseText(scannedMsg.result);
       try {
         scanStore.insert({
           serverKey: upstreamUrl,
@@ -218,8 +218,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           confidence: outcome.result?.confidence ?? 0,
           patterns: outcome.result?.detectedPatterns ?? [],
           contentHash: outcome.contentHash,
-          rawText,
-          reasoning: outcome.result?.reasoning ?? null,
+          decisionId: recorded?.decisionId ?? null,
           mode: config.mode,
           mutated: outcome.mutated,
           degraded: outcome.degraded,

@@ -17,7 +17,7 @@ import {
   type ManifestVerdict,
   type ToolsListResult,
 } from '../manifest/index.js';
-import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger } from '../audit/index.js';
+import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger, type RecordedDecision } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
@@ -307,8 +307,9 @@ export function startProxy(cmd: string, args: string[]): void {
         `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
       );
     }
+    let recorded: RecordedDecision | null = null;
     if (audit.enabled) {
-      audit.log({
+      recorded = audit.log({
         ...(outcome.degraded ? { degraded: true } : {}),
         type: 'detection',
         toolName,
@@ -327,7 +328,6 @@ export function startProxy(cmd: string, args: string[]): void {
       });
     }
     if (scanStore.enabled) {
-      const rawText = responseText(msg.result);
       try {
         scanStore.insert({
           serverKey: serverIdentifier,
@@ -338,8 +338,7 @@ export function startProxy(cmd: string, args: string[]): void {
           confidence: outcome.result?.confidence ?? 0,
           patterns: outcome.result?.detectedPatterns ?? [],
           contentHash: outcome.contentHash,
-          rawText,
-          reasoning: outcome.result?.reasoning ?? null,
+          decisionId: recorded?.decisionId ?? null,
           mode: config.mode,
           mutated: outcome.mutated,
           degraded: outcome.degraded,

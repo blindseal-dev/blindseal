@@ -27,8 +27,7 @@ const sampleInput = (overrides: Partial<Parameters<ScanStore['insert']>[0]> = {}
   confidence: 0.42,
   patterns: [],
   contentHash: 'deadbeef',
-  rawText: 'hello world',
-  reasoning: null,
+  decisionId: null,
   mode: 'block',
   mutated: false,
   ...overrides,
@@ -116,21 +115,13 @@ describe('persistence — retention', () => {
   });
 });
 
-describe('persistence — content preview redaction', () => {
-  it('redacts the preview before storage', () => {
-    store.insert(sampleInput({
-      rawText: 'Use this key: sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA to authenticate',
-    }));
+describe('persistence — content-free rows', () => {
+  it('stores the audit decisionId and no text or reasoning columns', () => {
+    store.insert(sampleInput({ decisionId: 'd_0123456789abcdef' }));
     const r = store.list()[0]!;
-    expect(r.contentPreview).not.toContain('sk-ant-api03-');
-    expect(r.contentPreview).toContain('[REDACTED');
-  });
-
-  it('truncates long previews', () => {
-    const big = 'a'.repeat(2000);
-    store.insert(sampleInput({ rawText: big }));
-    const r = store.list()[0]!;
-    expect(r.contentPreview.length).toBeLessThan(250);
+    expect(r.decisionId).toBe('d_0123456789abcdef');
+    expect(Object.keys(r)).not.toContain('contentPreview');
+    expect(Object.keys(r)).not.toContain('reasoning');
   });
 });
 

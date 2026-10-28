@@ -78,7 +78,8 @@ Audit (env) — every decision is appended to the content-free hash chain (alway
   BLINDSEAL_AUDIT_LOG                  optional plaintext JSONL of decision metadata (no args/content)
 
 Local scan history (env, default off)
-  BLINDSEAL_PERSIST                    1 to record every scan to ~/.blindseal/scans.db
+  BLINDSEAL_PERSIST                    1 to record scan METADATA to ~/.blindseal/scans.db (no text; the
+                                       redacted text stays in the encrypted audit store)
   BLINDSEAL_PERSIST_PATH               override DB path (default ~/.blindseal/scans.db)
   BLINDSEAL_RETENTION_DAYS             rolling retention (default 30, purged on open)
 
