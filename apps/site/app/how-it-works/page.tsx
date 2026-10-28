@@ -301,12 +301,12 @@ export default function HowItWorks() {
               </div>
             </div>
             <div className="hiw-next reveal cascade">
-              <Link className="site-panel card--interactive hiw-next__card" href="/verify">
+              <Link prefetch={false} className="site-panel card--interactive hiw-next__card" href="/verify">
                 <span className="site-panel__n">Verify</span>
                 <span className="hiw-next__title">Verify an attestation <i data-lucide="arrow-right" /></span>
                 <span className="site-panel__body">Paste or drop attestation.json. The proof is checked in your browser; nothing is uploaded.</span>
               </Link>
-              <Link className="site-panel card--interactive hiw-next__card" href="/docs">
+              <Link prefetch={false} className="site-panel card--interactive hiw-next__card" href="/docs">
                 <span className="site-panel__n">Docs</span>
                 <span className="hiw-next__title">Read the docs <i data-lucide="arrow-right" /></span>
                 <span className="site-panel__body">Install the proxy, point an agent at it, write policy rules, and read the local API.</span>

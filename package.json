@@ -12,11 +12,17 @@
       "esbuild",
       "protobufjs",
       "better-sqlite3"
-    ]
+    ],
+    "overrides": {
+      "onnx-proto>protobufjs": "^7.6.3",
+      "@xenova/transformers>sharp": "^0.35.5",
+      "@types/node-fetch>form-data": "^4.0.6",
+      "next>postcss": "^8.5.32"
+    }
   },
   "devDependencies": {
     "@coral-xyz/anchor": "0.31.1",
-    "@solana/web3.js": "1.98.0",
+    "@solana/web3.js": "1.98.4",
     "mocha": "10.8.2",
     "chai": "4.5.0",
     "ts-mocha": "10.0.0",
@@ -31,6 +37,6 @@
     "pngjs": "7.0.0",
     "@types/pngjs": "6.0.5",
     "@types/pixelmatch": "5.2.6",
-    "playwright": "1.48.2"
+    "playwright": "1.55.1"
   }
 }

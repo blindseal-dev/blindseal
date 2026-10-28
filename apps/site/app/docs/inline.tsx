@@ -17,7 +17,7 @@ export function inline(text: string): ReactNode[] {
     else if (m[3]) out.push(<em key={k++}>{t.slice(1, -1)}</em>);
     else if (m[4]) {
       const mm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(t)!;
-      out.push(mm[2].startsWith('/') ? <Link key={k++} className="link" href={mm[2]}>{mm[1]}</Link> : <a key={k++} className="link" href={mm[2]}>{mm[1]}</a>);
+      out.push(mm[2].startsWith('/') ? <Link prefetch={false} key={k++} className="link" href={mm[2]}>{mm[1]}</Link> : <a key={k++} className="link" href={mm[2]}>{mm[1]}</a>);
     }
     last = RE.lastIndex;
   }
