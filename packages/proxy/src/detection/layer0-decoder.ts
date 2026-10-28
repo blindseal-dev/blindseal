@@ -167,17 +167,31 @@ export function decodeInvisible(content: string): DecodedResult[] {
   return [{ decoder: 'zero-width-strip', decoded: content.replace(INVISIBLE_RE, ''), depth: 1 }];
 }
 
+/// Layer 0, the PROVEN layer: decode, then Layer 1 on each candidate; the first candidate Layer 1
+/// flags decides. Must equal the Rust detector-core's result (evals/parity), so it adds nothing
+/// the guest does not have.
 export function runLayer0(content: string, budget?: ScanBudget): L0Result {
-  if (!budget) return layer0(content);
+  return withBudget(budget, () => layer0(content, budget, false));
+}
+
+/// Layer 0 as the proxy screens with it: every candidate is checked (a base64-only hit, e.g. a
+/// decoy blob, does not end the search), and the text is also read with invisible characters
+/// removed. Only ever stricter than runLayer0.
+export function screenLayer0(content: string, budget?: ScanBudget): L0Result {
+  return withBudget(budget, () => layer0(content, budget, true));
+}
+
+function withBudget<T>(budget: ScanBudget | undefined, fn: () => T): T {
+  if (!budget) return fn();
   budget.enter();
   try {
-    return layer0(content, budget);
+    return fn();
   } finally {
     budget.leave();
   }
 }
 
-function layer0(content: string, budget?: ScanBudget): L0Result {
+function layer0(content: string, budget: ScanBudget | undefined, extended: boolean): L0Result {
   if (budget?.expired()) return { fired: true, decoder: 'budget', l1Match: budget.result() };
   const candidates: DecodedResult[] = [
     ...decodeBase64(content),
@@ -187,17 +201,18 @@ function layer0(content: string, budget?: ScanBudget): L0Result {
     ...decodeNested(content),
   ];
 
-  // Every candidate is checked: one that trips only the base64-blob heuristic (a decoy blob
-  // nested in base64) must not end the search before a later candidate that holds the injection.
+  // screenLayer0 checks every candidate: one that trips only the base64-blob heuristic (a decoy
+  // blob nested in base64) must not end the search before a later candidate holding the injection.
   let base64Only: L0Result | null = null;
   for (const c of candidates) {
     const l1 = runLayer1(c.decoded, budget);
     if (isBudgetResult(l1)) return { fired: true, decoder: 'budget', l1Match: l1 };
     if (l1.verdict === 'clean') continue;
     const hit = { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
-    if (l1.detectedPatterns.some((p) => p !== 'large-base64-blob')) return hit;
+    if (!extended || l1.detectedPatterns.some((p) => p !== 'large-base64-blob')) return hit;
     base64Only ??= hit;
   }
+  if (!extended) return { fired: false };
   for (const c of decodeInvisible(content)) {
     const l1 = runLayer1(c.decoded, budget);
     if (isBudgetResult(l1)) return { fired: true, decoder: 'budget', l1Match: l1 };

@@ -3,7 +3,7 @@
 /// pass over one message shares a time allowance; an exhausted allowance is a non-clean result
 /// (blocked in block mode), never a partial clean.
 import { describe, it, expect, afterEach } from 'vitest';
-import { runLayer1, base64Spans } from '../src/detection/layer1-heuristics.js';
+import { runLayer1, screenLayer1, base64Spans } from '../src/detection/layer1-heuristics.js';
 import { runLayer0 } from '../src/detection/layer0-decoder.js';
 import { runOutboundScreen, runPipeline } from '../src/detection/pipeline.js';
 import { ScanBudget, scanChunks, BUDGET_PATTERN, SCAN_CHUNK, SCAN_OVERLAP } from '../src/detection/scan-budget.js';
@@ -217,6 +217,8 @@ describe('review of 7a7f96f', () => {
 
   it('a dense zero-width-space cluster in a long text is still flagged', () => {
     const t = prose(K64) + ' ' + 'a​b​c​d​'.repeat(40) + ' ' + prose(2000);
-    expect(runLayer1(t).detectedPatterns).toContain('zero-width-density');
+    expect(screenLayer1(t).detectedPatterns).toContain('zero-width-density');
+    // The proven layer keeps the guest's whole-text rule only (evals/parity).
+    expect(runLayer1(t).detectedPatterns).not.toContain('zero-width-density');
   });
 });

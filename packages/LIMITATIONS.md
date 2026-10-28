@@ -166,6 +166,9 @@ runs that made the old regexes quadratic. Every L0/L1 pass over one message shar
 time allowance (`BLINDSEAL_SCAN_BUDGET_MS`, default 2000); a message not fully scanned
 within it is blocked in block mode and forwarded with a warning in warn mode. Layer 0
 also reads text with zero-width characters removed, so a split phrase is caught at any length.
+That decoder, the search past a base64-only decoy, and per-chunk zero-width density are
+proxy screening only: the proven L0/L1 (`blindseal attest`, the zk guest) keep the Rust
+detector-core's rules, which the parity gate checks byte for byte.
 
 ### 12. False positives when Blindseal scans its own source repo (or similar)
 Self-referential FPs: a Blindseal-protected agent that browses Blindseal's own commit

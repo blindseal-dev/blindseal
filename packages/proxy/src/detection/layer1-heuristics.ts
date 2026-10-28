@@ -140,7 +140,7 @@ function hasMarkdownLinkAnchor(text: string): boolean {
   return false;
 }
 
-/// Per-chunk density (texts longer than one chunk) counts only characters with no use in running
+/// screenLayer1 only. Per-chunk density (texts longer than one chunk) counts only characters with no use in running
 /// text: zero-width space, BOM, word joiner. A dense cluster is then not diluted by padding. The
 /// joiners U+200C/U+200D (emoji sequences, Persian and Indic scripts) and the soft hyphen
 /// (hyphenated HTML) are common in ordinary text and are left to the whole-text rule.
@@ -192,20 +192,33 @@ const SEVERITY: Array<[string, Verdict, number]> = [
   ['task-reassignment-directive', 'suspicious', 0.8], // Perez §3 + Greshake §4.2: goal hijacking
 ];
 
-/// Layer 1 over text of any length. The bounded-span checks run per chunk (scanChunks); the three
-/// unbounded ones run once over the whole text in linear time. With a budget, the allowance is
-/// checked before each chunk and an exhausted budget returns its non-clean result.
+/// Layer 1 over text of any length: the PROVEN layer. Its verdict and patterns must equal the Rust
+/// detector-core's (the zk guest re-runs it; evals/parity checks it byte for byte), so it adds
+/// nothing the guest does not have. The bounded-span checks run per chunk (scanChunks); the
+/// unbounded ones once over the whole text in linear time. With a budget, the allowance is checked
+/// before each chunk and an exhausted budget returns its non-clean result.
 export function runLayer1(text: string, budget?: ScanBudget): DetectionResult {
-  if (!budget) return layer1(text);
+  return withBudget(budget, () => layer1(text, budget, false));
+}
+
+/// Layer 1 as the proxy screens with it: runLayer1 plus checks the proven layer does not have
+/// (per-chunk zero-width density in long text, so a dense cluster is not diluted by padding).
+/// Only ever stricter than runLayer1.
+export function screenLayer1(text: string, budget?: ScanBudget): DetectionResult {
+  return withBudget(budget, () => layer1(text, budget, true));
+}
+
+function withBudget<T>(budget: ScanBudget | undefined, fn: () => T): T {
+  if (!budget) return fn();
   budget.enter();
   try {
-    return layer1(text, budget);
+    return fn();
   } finally {
     budget.leave();
   }
 }
 
-function layer1(text: string, budget?: ScanBudget): DetectionResult {
+function layer1(text: string, budget: ScanBudget | undefined, extended: boolean): DetectionResult {
   if (budget?.expired()) return budget.result();
   const hits = new Set<string>();
   if (hasHtmlCommentInstruction(text)) hits.add('html-comment-injection');
@@ -219,7 +232,7 @@ function layer1(text: string, budget?: ScanBudget): DetectionResult {
   // fixed token ('&#' / "include") and each start scans only its own run: linear.
   if (HTML_ENTITY_RUN_RE.test(text)) hits.add('html-entity-encoded-run');
   if (RECURSIVE_OUTPUT_RE.test(text)) hits.add('recursive-output-injection');
-  const long = text.length > SCAN_CHUNK;
+  const long = extended && text.length > SCAN_CHUNK;
   for (const chunk of scanChunks(text)) {
     if (budget?.expired()) return budget.result();
     for (const c of CHUNK_CHECKS) if (!hits.has(c.name) && c.test(chunk)) hits.add(c.name);
