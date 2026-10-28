@@ -159,12 +159,13 @@ is on the v2 roadmap; it would help latency *and* the dilution issue from §3.
 
 Layer 0/1 are not part of this cost and skip nothing for length (0.7.0). They scan any
 text in bounded 4 KB chunks (512 B overlap, whitespace runs collapsed first), and the
-checks whose match has no length bound (base64 runs, HTML comments, markdown link text)
-are linear scans of the whole text: ~100 ms per MB on any input, including long uniform
+checks whose match has no length bound (base64 runs, HTML comments, markdown link text,
+numeric-entity runs, "include … verbatim", zero-width density) are linear scans of the
+whole text: ~100 ms per MB on any input, including long uniform
 runs that made the old regexes quadratic. Every L0/L1 pass over one message shares a
 time allowance (`BLINDSEAL_SCAN_BUDGET_MS`, default 2000); a message not fully scanned
-within it is blocked in block mode and forwarded with a warning in warn mode. Matches
-longer than the overlap are only found for the three linear checks.
+within it is blocked in block mode and forwarded with a warning in warn mode. Layer 0
+also reads text with zero-width characters removed, so a split phrase is caught at any length.
 
 ### 12. False positives when Blindseal scans its own source repo (or similar)
 Self-referential FPs: a Blindseal-protected agent that browses Blindseal's own commit

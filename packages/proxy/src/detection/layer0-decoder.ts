@@ -187,12 +187,16 @@ function layer0(content: string, budget?: ScanBudget): L0Result {
     ...decodeNested(content),
   ];
 
+  // Every candidate is checked: one that trips only the base64-blob heuristic (a decoy blob
+  // nested in base64) must not end the search before a later candidate that holds the injection.
+  let base64Only: L0Result | null = null;
   for (const c of candidates) {
     const l1 = runLayer1(c.decoded, budget);
     if (isBudgetResult(l1)) return { fired: true, decoder: 'budget', l1Match: l1 };
-    if (l1.verdict !== 'clean') {
-      return { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
-    }
+    if (l1.verdict === 'clean') continue;
+    const hit = { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
+    if (l1.detectedPatterns.some((p) => p !== 'large-base64-blob')) return hit;
+    base64Only ??= hit;
   }
   for (const c of decodeInvisible(content)) {
     const l1 = runLayer1(c.decoded, budget);
@@ -202,6 +206,7 @@ function layer0(content: string, budget?: ScanBudget): L0Result {
       return { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
     }
   }
+  if (base64Only) return base64Only;
   return { fired: false };
 }
 

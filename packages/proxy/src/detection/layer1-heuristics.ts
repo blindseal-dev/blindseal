@@ -1,6 +1,6 @@
 import type { DetectionResult, Verdict } from './types.js';
 import { rankVerdict } from './types.js';
-import { scanChunks, type ScanBudget } from './scan-budget.js';
+import { scanChunks, SCAN_CHUNK, type ScanBudget } from './scan-budget.js';
 
 const INSTRUCTION_PREFIXES: Array<{ name: string; re: RegExp }> = [
   { name: 'ignore-previous', re: /ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?/i },
@@ -140,6 +140,16 @@ function hasMarkdownLinkAnchor(text: string): boolean {
   return false;
 }
 
+/// Per-chunk density (texts longer than one chunk) counts only characters with no use in running
+/// text: zero-width space, BOM, word joiner. A dense cluster is then not diluted by padding. The
+/// joiners U+200C/U+200D (emoji sequences, Persian and Indic scripts) and the soft hyphen
+/// (hyphenated HTML) are common in ordinary text and are left to the whole-text rule.
+const SPLITTER_RE = /[\u200B\uFEFF\u2060]/g;
+function splitterDense(t: string): boolean {
+  const n = t.match(SPLITTER_RE);
+  return !!n && n.length / t.length > 0.02;
+}
+
 function zeroWidthDense(t: string): boolean {
   const zw = t.match(ZERO_WIDTH_RE);
   return !!zw && t.length > 0 && zw.length / t.length > 0.02;
@@ -149,15 +159,12 @@ function zeroWidthDense(t: string): boolean {
 const CHUNK_CHECKS: Array<{ name: string; test: (t: string) => boolean }> = [
   { name: 'unicode-tag-smuggling', test: (t) => UNICODE_TAG_RE.test(t) },
   { name: 'bidi-override-smuggling', test: (t) => BIDI_OVERRIDE_RE.test(t) },
-  { name: 'html-entity-encoded-run', test: (t) => HTML_ENTITY_RUN_RE.test(t) },
   ...INSTRUCTION_PREFIXES.map(({ name, re }) => ({ name: `instruction-prefix:${name}`, test: (t: string) => re.test(t) })),
-  { name: 'zero-width-density', test: zeroWidthDense },
   { name: 'bracket-ai-directive', test: (t) => BRACKET_AI_DIRECTIVE_RE.test(t) },
   { name: 'refusal-suppression-directive', test: (t) => REFUSAL_SUPPRESSION_RE.test(t) },
   { name: 'memory-store-injection', test: (t) => MEMORY_STORE_INJECTION_RE.test(t) },
   { name: 'pipeline-authority-claim', test: (t) => PIPELINE_AUTHORITY_RE.test(t) },
   { name: 'sleeper-trigger-setup', test: (t) => SLEEPER_TRIGGER_RE.test(t) },
-  { name: 'recursive-output-injection', test: (t) => RECURSIVE_OUTPUT_RE.test(t) },
   { name: 'dan-dual-label', test: (t) => DAN_DUAL_LABEL_RE.test(t) },
   { name: 'affirmative-prefix-elicitation', test: (t) => AFFIRMATIVE_PREFIX_RE.test(t) },
   { name: 'task-reassignment-directive', test: (t) => TASK_REASSIGNMENT_RE.test(t) },
@@ -207,9 +214,16 @@ function layer1(text: string, budget?: ScanBudget): DetectionResult {
   // Zero-width density over the whole text as well as per chunk: the whole-text ratio is the
   // original rule, and a chunk catches a dense cluster that the whole text would dilute.
   if (zeroWidthDense(text)) hits.add('zero-width-density');
+  // Whole text too: these two have a quantifier with no length bound (`[0-9a-f]+` in an entity,
+  // `(?:\w+\s+)?` before "verbatim"), so a match may be longer than any chunk. Both start at a
+  // fixed token ('&#' / "include") and each start scans only its own run: linear.
+  if (HTML_ENTITY_RUN_RE.test(text)) hits.add('html-entity-encoded-run');
+  if (RECURSIVE_OUTPUT_RE.test(text)) hits.add('recursive-output-injection');
+  const long = text.length > SCAN_CHUNK;
   for (const chunk of scanChunks(text)) {
     if (budget?.expired()) return budget.result();
     for (const c of CHUNK_CHECKS) if (!hits.has(c.name) && c.test(chunk)) hits.add(c.name);
+    if (long && splitterDense(chunk)) hits.add('zero-width-density');
   }
 
   const patterns: string[] = [];
