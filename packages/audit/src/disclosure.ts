@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { canonicalJson, hashEntry, type EntryCore } from './hash.js';
 import type { AuditEntry, AuditHead } from './chain.js';
+import { CLEAN_VERDICT } from './verdict.js';
 
 export interface Disclosure {
   from: number;
@@ -104,7 +105,7 @@ export function verifyDisclosure(d: Disclosure): DisclosureVerdict {
   return { ok: true };
 }
 
-/// A clean window: every disclosed entry has the clean verdict (default "pass").
-export function isCleanWindow(d: Disclosure, cleanVerdict = 'pass'): boolean {
+/// A clean window: every disclosed entry has the canonical clean verdict (CLEAN_VERDICT).
+export function isCleanWindow(d: Disclosure, cleanVerdict: string = CLEAN_VERDICT): boolean {
   return d.entries.every((e) => e.verdict === cleanVerdict);
 }

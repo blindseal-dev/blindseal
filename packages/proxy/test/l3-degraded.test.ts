@@ -101,7 +101,7 @@ describe('L3 degraded-mode detection', () => {
         .map((c) => String(c[0]))
         .filter((s) => s.includes('Layer 3 (LLM judge) is unavailable'));
       expect(warnings.length).toBeGreaterThanOrEqual(1);
-      expect(warnings[0]).toContain('ANTHROPIC_API_KEY');
+      expect(warnings[0]).toContain('BLINDSEAL_LAYER3_PROVIDER');
       expect(warnings[0]).toContain('DEGRADED MODE');
     } finally {
       stderrSpy.mockRestore();

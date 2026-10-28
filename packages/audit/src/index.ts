@@ -12,6 +12,15 @@ export {
   type DisclosureVerdict,
 } from './disclosure.js';
 export { canonicalJson, hashEntry, genesisPrevHash } from './hash.js';
+export {
+  CLEAN_VERDICT,
+  FLAG_VERDICT,
+  BLOCK_VERDICT,
+  ERROR_VERDICT,
+  CHAIN_VERDICTS,
+  toChainVerdict,
+  type ChainVerdict,
+} from './verdict.js';
 
 import path from 'node:path';
 import os from 'node:os';

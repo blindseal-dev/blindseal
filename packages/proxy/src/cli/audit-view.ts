@@ -1,4 +1,6 @@
-/// blindseal-audit — pretty-print and filter the JSONL audit log emitted by BLINDSEAL_AUDIT_LOG.
+/// blindseal-audit — pretty-print and filter the metadata JSONL emitted by BLINDSEAL_AUDIT_LOG.
+/// The log is content-free (no arguments, response text or reasoning — those live only in the
+/// encrypted store); each row carries the decisionId and audit-chain index it was recorded as.
 /// Lets operators eyeball what would have been blocked when running in `BLINDSEAL_MODE=log`
 /// before flipping enforcement on.
 ///
@@ -13,7 +15,13 @@ import { readFileSync, existsSync } from 'node:fs';
 
 interface AuditRow {
   ts: number;
-  type: 'detection' | 'capability' | 'manifest';
+  type: 'detection' | 'capability' | 'manifest' | 'error';
+  decisionId?: string;
+  auditIndex?: number;
+  chainVerdict?: string;
+  l3Status?: string;
+  stage?: string;
+  changeCount?: number;
   // detection
   toolName?: string;
   verdict?: 'clean' | 'suspicious' | 'malicious';
@@ -22,19 +30,14 @@ interface AuditRow {
   patterns?: string[];
   mode?: string;
   mutated?: boolean;
-  reasoning?: string;
-  contentPreview?: string;
   // capability
   action?: 'allow' | 'block' | 'warn';
   matchedPattern?: string;
   taintSources?: string[];
-  reason?: string;
-  argsPreview?: string;
   // manifest
   serverKey?: string;
   fingerprint?: string;
   status?: 'first-seen' | 'unchanged' | 'drift';
-  changes?: string[];
 }
 
 interface Filter {
@@ -181,6 +184,10 @@ function fmtTs(ts: number): string {
 
 // ---- rendering -----------------------------------------------------------
 
+function chainRef(row: AuditRow): string {
+  return row.auditIndex != null ? dim(`  #${row.auditIndex} ${row.decisionId ?? ''}`) : '';
+}
+
 function renderRow(row: AuditRow, raw: boolean): string {
   if (raw) return JSON.stringify(row);
 
@@ -191,24 +198,24 @@ function renderRow(row: AuditRow, raw: boolean): string {
     const L = row.layer != null ? `L${row.layer}` : 'L?';
     const m = row.mutated ? red('mut') : dim('-');
     const tool = cyan(row.toolName ?? '?');
-    const preview = (row.contentPreview ?? '').slice(0, 80).replace(/\n/g, ' ');
     const patterns = row.patterns && row.patterns.length > 0 ? dim(` [${row.patterns.slice(0, 3).join(',')}]`) : '';
-    return `${t}  ${dim('det')}  ${L}  ${v}  ${tool}  mode=${row.mode ?? '?'}  ${m}${patterns}\n         ${dim('└')} ${preview}`;
+    const degraded = row.l3Status === 'unavailable' ? yellow(' L3-unavailable') : '';
+    return `${t}  ${dim('det')}  ${L}  ${v}  ${tool}  mode=${row.mode ?? '?'}  ${m}${patterns}${degraded}${chainRef(row)}`;
   }
   if (row.type === 'capability') {
     const a = actionPaint(row.action);
     const tool = cyan(row.toolName ?? '?');
     const sources = row.taintSources && row.taintSources.length > 0 ? dim(` ← ${row.taintSources.slice(0, 3).join(',')}`) : '';
-    const args = (row.argsPreview ?? '').slice(0, 80).replace(/\n/g, ' ');
-    return `${t}  ${dim('cap')}  --  ${a}      ${tool}${sources}\n         ${dim('└')} ${args}`;
+    return `${t}  ${dim('cap')}  --  ${a}      ${tool}${sources}${chainRef(row)}`;
   }
   if (row.type === 'manifest') {
     const s = statusPaint(row.status);
     const fp = dim((row.fingerprint ?? '').slice(0, 12));
-    const changes = row.changes && row.changes.length > 0
-      ? '\n         ' + row.changes.map((c) => dim('└ ') + yellow(c)).join('\n         ')
-      : '';
-    return `${t}  ${dim('mfs')}  --  ${s}  ${fp}${changes}`;
+    const changes = row.changeCount ? yellow(` ${row.changeCount} change${row.changeCount === 1 ? '' : 's'}`) : '';
+    return `${t}  ${dim('mfs')}  --  ${s}  ${fp}${changes}${chainRef(row)}`;
+  }
+  if (row.type === 'error') {
+    return `${t}  ${dim('err')}  --  ${red('error')}  ${cyan(row.toolName ?? '?')}  stage=${row.stage ?? '?'}${chainRef(row)}`;
   }
   return JSON.stringify(row);
 }

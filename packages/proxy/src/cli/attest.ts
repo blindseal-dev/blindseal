@@ -16,14 +16,14 @@
 ///   resolved by src/prover/resolve.ts (--prover, $BLINDSEAL_PROVER, ~/.blindseal/bin, download).
 ///   toolcall.json: { "toolName": "transfer_sol", "args": { "to": "...", "lamports": 1000000, "from": "..." } }
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, chmodSync, rmSync } from 'node:fs';
+import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { runLayer0, makeLayer0Result } from '../detection/layer0-decoder.js';
 import { runLayer1 } from '../detection/layer1-heuristics.js';
 import { parseSolanaAction } from '../chain/solana.js';
-import { openAudit } from '@blindseal/audit';
+import { openAudit, toChainVerdict } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
 import { ProverUnavailableError, resolveProver } from '../prover/resolve.js';
 import { blindsealHome } from '../paths.js';
@@ -73,6 +73,55 @@ export function expiryWarning(lastSeconds: number | undefined, windowSlots: numb
   const h = (x: number) => (x / 3600).toFixed(1) + ' h';
   return `blindseal attest: your last proof on this machine took ${h(lastSeconds)}; the default expiry window is ${h(windowSeconds)}. ` +
     `If proving runs long the attestation may expire before you can submit it — pass --expiry <slot> for a later slot, or --no-expiry.`;
+}
+
+/// A private scratch dir for the prover's input: mkdtemp under os.tmpdir() (mode 0700), files
+/// written 0600, removed in `finally` — and on SIGINT/SIGTERM, where the handler kills the
+/// prover, removes the dir, then re-raises the signal so the exit status is unchanged. The
+/// payload is the screened tool call verbatim, so it must not outlive the run or be readable
+/// by other local users.
+export async function withPrivateTempDir<T>(
+  fn: (dir: string, track: (child: ChildProcess) => void) => Promise<T>,
+): Promise<T> {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'blindseal-attest-'));
+  chmodSync(dir, 0o700);
+  const children = new Set<ChildProcess>();
+  const cleanup = () => { try { rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ } };
+  const handlers = new Map<NodeJS.Signals, () => void>();
+  const unhook = () => { for (const [sig, h] of handlers) process.removeListener(sig, h); handlers.clear(); };
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    const h = () => {
+      for (const c of children) { try { c.kill(sig); } catch { /* already gone */ } }
+      cleanup();
+      unhook();
+      process.kill(process.pid, sig); // re-raise: default action now that our handler is gone
+    };
+    handlers.set(sig, h);
+    process.on(sig, h);
+  }
+  try {
+    return await fn(dir, (c) => { children.add(c); c.once('exit', () => children.delete(c)); });
+  } finally {
+    cleanup();
+    unhook();
+  }
+}
+
+/// Write a file readable only by this user (0600) inside a withPrivateTempDir dir.
+export function writePrivateFile(file: string, data: string): void {
+  writeFileSync(file, data, { mode: 0o600, flag: 'wx' });
+  chmodSync(file, 0o600); // the umask could only narrow it, but be explicit
+}
+
+/// Run the prover asynchronously (a blocking spawnSync would keep signal handlers from running
+/// for the hours a CPU proof takes). Resolves with the exit code; rejects if it cannot start.
+function runProver(prover: string, args: string[], track: (c: ChildProcess) => void): Promise<number | null> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(prover, args, { stdio: 'inherit' });
+    track(child);
+    child.once('error', reject);
+    child.once('exit', (code) => resolve(code));
+  });
 }
 
 interface Opts {
@@ -182,8 +231,10 @@ export async function runAttestCli(argv: string[]): Promise<number> {
   // 2) record the decision in the hash-chained audit log, clean or not
   const decisionId = 'd_' + randomBytes(8).toString('hex');
   const audit = openAudit(o.auditDir);
-  const entry = audit.chain.append({ decisionId, verdict, payloadHash });
-  process.stdout.write(`decision ${decisionId}: ${verdict} (audit #${entry.index} ${entry.hash.slice(0, 18)}…)\n`);
+  // The chain records the canonical verdict (CLEAN_VERDICT = "pass" for a clean call), the same
+  // vocabulary `blindseal verify` and the browser verifier test a clean window against.
+  const entry = audit.chain.append({ decisionId, verdict: toChainVerdict(verdict), payloadHash });
+  process.stdout.write(`decision ${decisionId}: ${verdict} → ${entry.verdict} (audit #${entry.index} ${entry.hash.slice(0, 18)}…)\n`);
   if (verdict !== 'clean') {
     process.stderr.write(`blindseal attest: verdict is ${verdict} (${result.detectedPatterns.join(', ')}); no attestation for a non-clean call\n`);
     return 1;
@@ -197,21 +248,24 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     return 1;
   }
 
-  // 4) prove
-  const tmpPayload = path.join(os.tmpdir(), `blindseal-payload-${decisionId}.json`);
-  writeFileSync(tmpPayload, payload);
-  const args = [
-    '--payload', tmpPayload, '--out', o.out, '--decision-id', decisionId,
+  // 4) prove — the payload goes to the prover through a private temp dir, removed afterwards
+  const targetProgram = o.targetProgram;
+  const proverArgs = (payloadFile: string) => [
+    '--payload', payloadFile, '--out', o.out, '--decision-id', decisionId,
     '--chain-id', String(action.chainId),
-    '--target-program', o.targetProgram, '--source-authority', action.sourceAuthority,
-    '--recipient', action.recipient, '--mint', action.mint, '--amount', action.amount,
+    '--target-program', targetProgram, '--source-authority', action.sourceAuthority!,
+    '--recipient', action.recipient!, '--mint', action.mint, '--amount', action.amount!,
     '--instruction', o.instruction, '--expiry', expiry,
   ];
-  process.stdout.write(`proving (this takes a while on CPU)…\n`);
-  const t0 = Date.now();
-  const r = spawnSync(prover, args, { stdio: 'inherit' });
-  if (r.status !== 0) { process.stderr.write(`blindseal attest: prover exited ${r.status}\n`); return 1; }
-  recordProofSeconds((Date.now() - t0) / 1000);
-  process.stdout.write(`attestation written: ${o.out} (decision ${decisionId}, payloadHash ${payloadHash}, expirySlot ${expiry}${expiry === NO_EXPIRY_SLOT ? ' = no expiry' : ''})\n`);
-  return 0;
+  return withPrivateTempDir(async (tmpDir, track) => {
+    const tmpPayload = path.join(tmpDir, 'payload.json');
+    writePrivateFile(tmpPayload, payload);
+    process.stdout.write(`proving (this takes a while on CPU)…\n`);
+    const t0 = Date.now();
+    const status = await runProver(prover, proverArgs(tmpPayload), track);
+    if (status !== 0) { process.stderr.write(`blindseal attest: prover exited ${status}\n`); return 1; }
+    recordProofSeconds((Date.now() - t0) / 1000);
+    process.stdout.write(`attestation written: ${o.out} (decision ${decisionId}, payloadHash ${payloadHash}, expirySlot ${expiry}${expiry === NO_EXPIRY_SLOT ? ' = no expiry' : ''})\n`);
+    return 0;
+  });
 }

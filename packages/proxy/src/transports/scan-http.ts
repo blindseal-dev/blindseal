@@ -4,10 +4,11 @@
 /// an MCP transport — it is a back-end service for external callers (e.g. a demo site)
 /// that want a verdict on free-form text.
 ///
-/// Detection logic is reused verbatim. Capability gating, taint tracking, manifest
-/// checking, audit logging, and local scan persistence are intentionally not wired
-/// here — they all require MCP-protocol context (tool calls, server identifiers,
-/// session boundaries) that a free-form scan endpoint doesn't have.
+/// Detection logic is reused verbatim. Every scan verdict (and every pipeline failure) is a
+/// decision and is appended to the audit hash chain like the MCP transports' decisions.
+/// Capability gating, taint tracking, manifest checking and local scan persistence are not
+/// wired here — they require MCP-protocol context (tool calls, server identifiers, session
+/// boundaries) that a free-form scan endpoint doesn't have.
 
 import {
   createServer,
@@ -18,6 +19,7 @@ import {
 import { loadConfig } from '../config.js';
 import { runPipeline } from '../detection/pipeline.js';
 import { sha256Hex } from './shared.js';
+import { createAuditLogger } from '../audit/index.js';
 
 export interface ScanHttpOptions {
   listenPort: number;
@@ -87,7 +89,8 @@ function parseRequestBody(raw: string): ScanRequestBody | { error: string } {
 }
 
 export function startScanHttp(opts: ScanHttpOptions): Server {
-  loadConfig(); // same env validation as the MCP transports
+  const config = loadConfig(); // same env validation as the MCP transports
+  const audit = createAuditLogger(config.audit);
 
   const defaultServerUrl = opts.defaultServerUrl ?? 'scan-http:blindseal';
 
@@ -132,9 +135,28 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       process.stderr.write(
         `blindseal[scan-http]: pipeline failed: ${err instanceof Error ? err.message : String(err)}\n`,
       );
+      audit.log({ type: 'error', toolName, stage: 'scan', error: err instanceof Error ? err.message : String(err), contentHash, text: parsed.text });
       sendJson(res, 500, { error: 'pipeline failed' });
       return;
     }
+
+    audit.log({
+      type: 'detection',
+      toolName,
+      layer: result.layer ?? null,
+      verdict: result.verdict,
+      confidence: result.confidence,
+      patterns: result.detectedPatterns,
+      mode: 'scan',
+      mutated: false,
+      reasoning: result.reasoning,
+      contentHash,
+      text: parsed.text,
+      l3Status: result.l3Status,
+      transport: 'scan-http',
+      serverKey: serverUrl,
+      ...(result.degraded ? { degraded: true } : {}),
+    });
 
     if (result.verdict !== 'clean') {
       process.stderr.write(
@@ -165,6 +187,7 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
 
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
+      void audit.shutdown();
       server.close(() => process.exit(0));
     });
   }

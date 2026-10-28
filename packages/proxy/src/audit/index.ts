@@ -1,6 +1,9 @@
 export {
   createAuditLogger,
-  preview,
+  screeningErrorEntry,
+  screeningErrorResponse,
+  toolCallPayloadHash,
+  RETAIN_MAX,
   type AuditConfig,
   type AuditEntry,
   type AuditEntryInput,
@@ -8,4 +11,5 @@ export {
   type CapabilityAuditEntry,
   type DetectionAuditEntry,
   type ManifestAuditEntry,
+  type RecordedDecision,
 } from './log.js';

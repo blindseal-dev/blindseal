@@ -416,7 +416,10 @@ describe('edge cases — 10k small responses', () => {
     const proxy = spawnProxy({ fixturePath });
 
     proxy.send({ jsonrpc: '2.0', id: 0, method: 'initialize', params: {} });
-    await proxy.next(10000);
+    // Readiness, not throughput: the proxy loads the layer-2 model before it spawns the server,
+    // which under a loaded test run can take well over 10s. Wait for the round-trip generously;
+    // the assertions below measure only what happens after the proxy is up.
+    await proxy.next(90000);
 
     // Warm RSS — first 50 requests
     for (let i = 1; i <= 50; i++) {
@@ -447,7 +450,7 @@ describe('edge cases — 10k small responses', () => {
     expect(elapsed).toBeLessThan(60000);
 
     proxy.close();
-  }, 90000);
+  }, 180000);
 });
 
 // ────────────────────────────────────────────────────────────────────────────────

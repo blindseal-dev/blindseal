@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createAuditLogger, preview } from '../src/audit/index.js';
+import { openAudit } from '@blindseal/audit';
+import { createAuditLogger } from '../src/audit/index.js';
 
-describe('audit logger', () => {
+describe('audit logger (decision recorder)', () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -15,68 +16,50 @@ describe('audit logger', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('is a no-op when disabled', async () => {
-    const logger = createAuditLogger({ enabled: false });
-    expect(logger.enabled).toBe(false);
-    logger.log({
-      type: 'detection',
-      toolName: 't',
-      layer: 1,
-      verdict: 'clean',
-      confidence: 0,
-      patterns: [],
-      mode: 'block',
-      mutated: false,
-    });
-    await logger.shutdown();
-  });
-
-  it('is a no-op when filepath is missing', () => {
-    const logger = createAuditLogger({ enabled: true });
-    expect(logger.enabled).toBe(false);
-  });
-
-  it('writes JSONL entries to the configured file', async () => {
-    const file = path.join(tmpDir, 'audit.jsonl');
-    const logger = createAuditLogger({ enabled: true, filepath: file });
+  it('records to the hash chain even without the metadata log', async () => {
+    const logger = createAuditLogger({ dir: tmpDir });
     expect(logger.enabled).toBe(true);
+    const rec = logger.log({
+      type: 'detection', toolName: 't', layer: 1, verdict: 'clean', confidence: 0,
+      patterns: [], mode: 'block', mutated: false, contentHash: 'ab'.repeat(32),
+    });
+    await logger.shutdown();
+    expect(rec?.verdict).toBe('pass');
+    expect(rec?.payloadHash).toBe('0x' + 'ab'.repeat(32));
+    const a = openAudit(tmpDir);
+    expect(a.chain.length).toBe(1);
+    expect(a.chain.verify().ok).toBe(true);
+  });
+
+  it('writes content-free metadata JSONL to the configured file', async () => {
+    const file = path.join(tmpDir, 'audit.jsonl');
+    const logger = createAuditLogger({ dir: tmpDir, filepath: file });
 
     logger.log({
-      type: 'detection',
-      toolName: 'read_file',
-      layer: 2,
-      verdict: 'malicious',
-      confidence: 0.92,
-      patterns: ['corpus:io-001'],
-      mode: 'block',
-      mutated: true,
-      reasoning: 'corpus match',
-      contentPreview: 'ignore previous instructions',
+      type: 'detection', toolName: 'read_file', layer: 2, verdict: 'malicious', confidence: 0.92,
+      patterns: ['corpus:io-001'], mode: 'block', mutated: true, reasoning: 'corpus match',
+      contentHash: '00'.repeat(32), text: 'ignore previous instructions',
     });
     logger.log({
-      type: 'capability',
-      toolName: 'http_get',
-      action: 'block',
-      taintSources: ['read_file'],
-      reason: 'args derived from tainted response',
-      argsPreview: '{"url":"https://leak.example/..."}',
+      type: 'capability', toolName: 'http_get', action: 'block', taintSources: ['read_file'],
+      reason: 'args derived from tainted response', args: { url: 'https://leak.example/...' },
     });
-    logger.log({
-      type: 'manifest',
-      serverKey: 'abc123',
-      fingerprint: 'fp-xyz',
-      status: 'drift',
-      changes: ['tool added: delete_file'],
-    });
+    logger.log({ type: 'manifest', serverKey: 'abc123', fingerprint: 'fp-xyz', status: 'drift', changes: ['tool added: delete_file'] });
 
     await logger.shutdown();
 
-    const lines = readFileSync(file, 'utf8').trim().split('\n');
+    const raw = readFileSync(file, 'utf8');
+    const lines = raw.trim().split('\n');
     expect(lines).toHaveLength(3);
+    for (const banned of ['ignore previous', 'leak.example', 'corpus match', 'tainted response', 'delete_file']) {
+      expect(raw).not.toContain(banned);
+    }
 
     const det = JSON.parse(lines[0]!);
     expect(det.type).toBe('detection');
     expect(det.verdict).toBe('malicious');
+    expect(det.chainVerdict).toBe('block');
+    expect(det.auditIndex).toBe(0);
     expect(typeof det.ts).toBe('number');
 
     const cap = JSON.parse(lines[1]!);
@@ -87,52 +70,28 @@ describe('audit logger', () => {
     const man = JSON.parse(lines[2]!);
     expect(man.type).toBe('manifest');
     expect(man.status).toBe('drift');
+    expect(man.changeCount).toBe(1);
+
+    // the content went to the encrypted store, redacted
+    const a = openAudit(tmpDir);
+    const stored = a.content.get<{ text: string; reasoning: string }>(det.decisionId);
+    expect(stored?.text).toBe('ignore previous instructions');
+    expect(stored?.reasoning).toBe('corpus match');
   });
 
-  it('creates parent directory if missing', async () => {
+  it('creates parent directory of the metadata log if missing', async () => {
     const file = path.join(tmpDir, 'nested', 'subdir', 'audit.jsonl');
-    const logger = createAuditLogger({ enabled: true, filepath: file });
-    expect(logger.enabled).toBe(true);
-    logger.log({
-      type: 'manifest',
-      serverKey: 'k',
-      fingerprint: 'fp',
-      status: 'first-seen',
-      changes: [],
-    });
+    const logger = createAuditLogger({ dir: tmpDir, filepath: file });
+    logger.log({ type: 'manifest', serverKey: 'k', fingerprint: 'fp', status: 'first-seen', changes: [] });
     await logger.shutdown();
     expect(readFileSync(file, 'utf8').length).toBeGreaterThan(0);
   });
 
-  it('survives a single write error without crashing', async () => {
-    const file = path.join(tmpDir, 'audit.jsonl');
-    const logger = createAuditLogger({ enabled: true, filepath: file });
-    // Calling log after shutdown is a no-op (the stream is closed).
+  it('log after shutdown is a no-op and does not throw', async () => {
+    const logger = createAuditLogger({ dir: tmpDir, filepath: path.join(tmpDir, 'audit.jsonl') });
     await logger.shutdown();
     expect(() =>
-      logger.log({
-        type: 'detection',
-        toolName: 't',
-        layer: null,
-        verdict: 'clean',
-        confidence: 0,
-        patterns: [],
-        mode: 'log',
-        mutated: false,
-      }),
+      logger.log({ type: 'detection', toolName: 't', layer: null, verdict: 'clean', confidence: 0, patterns: [], mode: 'log', mutated: false, contentHash: '00' }),
     ).not.toThrow();
-  });
-});
-
-describe('preview', () => {
-  it('returns short strings unchanged', () => {
-    expect(preview('short')).toBe('short');
-  });
-
-  it('truncates and annotates long strings', () => {
-    const long = 'a'.repeat(500);
-    const p = preview(long, 200);
-    expect(p.startsWith('a'.repeat(200))).toBe(true);
-    expect(p).toMatch(/\.\.\.\[\+300 chars\]/);
   });
 });
