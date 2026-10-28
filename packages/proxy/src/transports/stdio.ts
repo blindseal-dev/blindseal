@@ -17,11 +17,7 @@ import {
   type ManifestVerdict,
   type ToolsListResult,
 } from '../manifest/index.js';
-import {
-  createAuditLogger,
-  preview,
-  type AuditLogger,
-} from '../audit/index.js';
+import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
@@ -165,7 +161,7 @@ export function startProxy(cmd: string, args: string[]): void {
             matchedPattern: decision.matchedPattern,
             taintSources: (decision.taintSources ?? []).map((s) => s.toolName),
             reason: decision.reason,
-            argsPreview: preview(JSON.stringify(params?.arguments ?? null)),
+            args: params?.arguments,
           });
         }
         if (decision.action === 'warn') {
@@ -237,7 +233,15 @@ export function startProxy(cmd: string, args: string[]): void {
           (msg.id != null ? toolNameById.get(msg.id) : undefined) ?? 'unknown';
         if (msg.id != null) toolNameById.delete(msg.id);
 
-        const outcome = await inspectToolCallResponse(msg, toolName, config.mode);
+        let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
+        try {
+          outcome = await inspectToolCallResponse(msg, toolName, config.mode);
+        } catch (err) {
+          // Screening failed: record it and fail closed (the response is withheld).
+          audit.log(screeningErrorEntry(msg, toolName, 'detection', err));
+          process.stdout.write(JSON.stringify(screeningErrorResponse(msg.id ?? null)) + '\n');
+          return;
+        }
         if (outcome.verdict !== 'clean') {
           process.stderr.write(
             `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
@@ -257,7 +261,9 @@ export function startProxy(cmd: string, args: string[]): void {
             mode: config.mode,
             mutated: outcome.mutated,
             reasoning: outcome.result?.reasoning,
-            contentPreview: preview(previewText),
+            contentHash: outcome.contentHash,
+            text: previewText,
+            l3Status: outcome.result?.l3Status,
           });
         }
         if (scanStore.enabled) {

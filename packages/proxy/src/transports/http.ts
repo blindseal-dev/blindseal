@@ -20,7 +20,7 @@ import {
   type InitializeResult,
   type ToolsListResult,
 } from '../manifest/index.js';
-import { createAuditLogger, preview, type AuditLogger } from '../audit/index.js';
+import { createAuditLogger, screeningErrorEntry, screeningErrorResponse, type AuditLogger } from '../audit/index.js';
 import { createScanStore, type ScanStore } from '../persistence/index.js';
 import {
   buildCapabilityBlockedResponse,
@@ -146,7 +146,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
             matchedPattern: decision.matchedPattern,
             taintSources: (decision.taintSources ?? []).map((s) => s.toolName),
             reason: decision.reason,
-            argsPreview: preview(JSON.stringify(toolArgs ?? null)),
+            args: toolArgs,
           });
         }
         if (decision.action === 'block') {
@@ -222,7 +222,9 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
                   mode: config.mode,
                   mutated: outcome.mutated,
                   reasoning: outcome.result?.reasoning,
-                  contentPreview: preview(previewText),
+                  contentHash: outcome.contentHash,
+                  text: previewText,
+                  l3Status: outcome.result?.l3Status,
                 });
               }
               if (scanStore.enabled) {
@@ -263,6 +265,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         );
       } catch (err) {
         process.stderr.write(`blindseal[http/sse]: stream scan failed: ${err}\n`);
+        audit.log({ type: 'error', toolName: toolName ?? 'unknown', stage: 'sse', error: err instanceof Error ? err.message : String(err) });
       }
       res.end();
       return;
@@ -318,7 +321,15 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     }
 
     if (isToolCallResponse(respMsg) && toolName) {
-      const outcome = await inspectToolCallResponse(respMsg, toolName, config.mode);
+      let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
+      try {
+        outcome = await inspectToolCallResponse(respMsg, toolName, config.mode);
+      } catch (err) {
+        // Screening failed: record it and fail closed (the response is withheld).
+        audit.log(screeningErrorEntry(respMsg, toolName, 'detection', err));
+        sendJson(res, 200, screeningErrorResponse(respMsg.id ?? null));
+        return;
+      }
       if (outcome.verdict !== 'clean') {
         process.stderr.write(
           `blindseal[http]: ${outcome.verdict} (L${outcome.layer ?? '?'}) from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''})\n`,
@@ -338,7 +349,9 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
           mode: config.mode,
           mutated: outcome.mutated,
           reasoning: outcome.result?.reasoning,
-          contentPreview: preview(previewText),
+          contentHash: outcome.contentHash,
+          text: previewText,
+          l3Status: outcome.result?.l3Status,
         });
       }
       if (scanStore.enabled) {

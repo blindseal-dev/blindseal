@@ -2,6 +2,7 @@ import type { CapabilityConfig, CapabilityMode, TradePolicyConfig } from './capa
 import type { ManifestConfig, ManifestMode } from './manifest/index.js';
 import type { AuditConfig } from './audit/index.js';
 import { loadScanStoreConfig, type ScanStoreConfig } from './persistence/index.js';
+import { blindsealHome } from './paths.js';
 
 export type BlindsealMode = 'block' | 'warn' | 'log';
 
@@ -28,8 +29,10 @@ export function loadConfig(): BlindsealConfig {
 }
 
 function loadAuditConfig(): AuditConfig {
-  const filepath = process.env.BLINDSEAL_AUDIT_LOG;
-  return { enabled: !!filepath, filepath };
+  // The hash chain + encrypted store are always on; BLINDSEAL_AUDIT_DIR moves them (default
+  // ~/.blindseal). BLINDSEAL_AUDIT_LOG adds the optional plaintext metadata JSONL.
+  const dir = process.env.BLINDSEAL_AUDIT_DIR || blindsealHome();
+  return { dir, filepath: process.env.BLINDSEAL_AUDIT_LOG || undefined };
 }
 
 function loadManifestConfig(): ManifestConfig {

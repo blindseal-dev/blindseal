@@ -65,8 +65,9 @@ Manifest verification (env)
   BLINDSEAL_MANIFEST_CHECK             on (default) | off | strict
   BLINDSEAL_MANIFEST_CACHE_DIR         override \$XDG_CACHE_HOME/blindseal/manifests
 
-Audit log (env, default off)
-  BLINDSEAL_AUDIT_LOG                  path to append-only JSONL of every decision
+Audit (env) — every decision is appended to the content-free hash chain (always on)
+  BLINDSEAL_AUDIT_DIR                  chain + encrypted content store dir (default ~/.blindseal)
+  BLINDSEAL_AUDIT_LOG                  optional plaintext JSONL of decision metadata (no args/content)
 
 Local scan history (env, default off)
   BLINDSEAL_PERSIST                    1 to record every scan to ~/.blindseal/scans.db

@@ -3,6 +3,8 @@
 /// crude best-effort filter — not a PII engine. Operators who care about strong
 /// privacy guarantees should leave persistence off (the default).
 
+import { redact as redactFull } from '@blindseal/redactor';
+
 type Replacement = string | ((match: string) => string);
 
 const RULES: ReadonlyArray<{ pattern: RegExp; replacement: Replacement }> = [
@@ -39,8 +41,10 @@ export function redact(text: string): string {
   return out;
 }
 
+/// The preview stored in the opt-in scan DB: the full @blindseal/redactor pass (secrets by
+/// JSON key and by value shape, PII) and then the local rules above (home-directory paths).
 export function redactedPreview(text: string, max = 200): string {
-  const r = redact(text);
+  const r = redact(redactFull(text).redacted);
   if (r.length <= max) return r;
   return r.slice(0, max) + `...[+${r.length - max} chars]`;
 }
