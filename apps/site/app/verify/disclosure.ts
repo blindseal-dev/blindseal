@@ -2,6 +2,7 @@
 // verifyDisclosure: canonical (sorted-key) JSON, sha256 domain-separated entry hashes, in-window
 // prevHash links, and an ed25519 signature over the canonical window by the stated signer.
 // WebCrypto only; nothing is uploaded. Ed25519 in WebCrypto needs a current browser.
+import { CLEAN_VERDICT } from './verdict';
 export interface DisclosureEntry { index: number; hash: string; prevHash: string; ts: string; verdict: string; decisionId: string; payloadHash: string; }
 export interface Disclosure { from: number; to: number; head: unknown; entries: DisclosureEntry[]; signerPubkey: string; signature: string; }
 export interface DisclosureVerdict { ok: boolean; reason?: string; }
@@ -61,4 +62,4 @@ export async function verifyDisclosure(d: Disclosure): Promise<DisclosureVerdict
   return { ok: true };
 }
 
-export const isCleanWindow = (d: Disclosure, cleanVerdict = 'pass') => d.entries.every((e) => e.verdict === cleanVerdict);
+export const isCleanWindow = (d: Disclosure, cleanVerdict: string = CLEAN_VERDICT) => d.entries.every((e) => e.verdict === cleanVerdict);

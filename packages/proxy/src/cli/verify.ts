@@ -2,7 +2,7 @@
 /// attestation.json (real Groth16 verify via the wasm verifier, same code as the verify page) or a
 /// disclosure.json (ed25519 signature + in-window hash-chain consistency). Exit 0 iff valid.
 import { readFileSync } from 'node:fs';
-import { verifyDisclosure, isCleanWindow, type Disclosure } from '@blindseal/audit';
+import { verifyDisclosure, isCleanWindow, CLEAN_VERDICT, type Disclosure } from '@blindseal/audit';
 import { verifyOffchain, decodePublicInputs, type Attestation, type VerifyResult } from 'blindseal-sdk';
 
 const HELP = `blindseal verify — verify an attestation.json or a disclosure.json offline
@@ -79,7 +79,7 @@ export async function runVerifyCli(argv: string[]): Promise<number> {
     const d = doc as unknown as Disclosure;
     const v = verifyDisclosure(d);
     process.stdout.write(`disclosure ${file}: ${v.ok ? 'VALID' : `INVALID — ${v.reason}`}\n`);
-    if (v.ok) process.stdout.write(`  window #${d.from}–#${d.to}, ${d.entries.length} entries, signer ${d.signerPubkey.slice(0, 16)}…, clean window: ${isCleanWindow(d) ? 'yes' : 'no'}\n`);
+    if (v.ok) process.stdout.write(`  window #${d.from}–#${d.to}, ${d.entries.length} entries, signer ${d.signerPubkey.slice(0, 16)}…, clean window: ${isCleanWindow(d) ? 'yes' : 'no'} (clean = every verdict "${CLEAN_VERDICT}")\n`);
     return v.ok ? 0 : 1;
   }
   if (doc.proof && Array.isArray(doc.publicInputs)) {

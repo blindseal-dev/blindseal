@@ -23,7 +23,7 @@ import path from 'node:path';
 import { runLayer0, makeLayer0Result } from '../detection/layer0-decoder.js';
 import { runLayer1 } from '../detection/layer1-heuristics.js';
 import { parseSolanaAction } from '../chain/solana.js';
-import { openAudit } from '@blindseal/audit';
+import { openAudit, toChainVerdict } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
 import { ProverUnavailableError, resolveProver } from '../prover/resolve.js';
 import { blindsealHome } from '../paths.js';
@@ -182,8 +182,10 @@ export async function runAttestCli(argv: string[]): Promise<number> {
   // 2) record the decision in the hash-chained audit log, clean or not
   const decisionId = 'd_' + randomBytes(8).toString('hex');
   const audit = openAudit(o.auditDir);
-  const entry = audit.chain.append({ decisionId, verdict, payloadHash });
-  process.stdout.write(`decision ${decisionId}: ${verdict} (audit #${entry.index} ${entry.hash.slice(0, 18)}…)\n`);
+  // The chain records the canonical verdict (CLEAN_VERDICT = "pass" for a clean call), the same
+  // vocabulary `blindseal verify` and the browser verifier test a clean window against.
+  const entry = audit.chain.append({ decisionId, verdict: toChainVerdict(verdict), payloadHash });
+  process.stdout.write(`decision ${decisionId}: ${verdict} → ${entry.verdict} (audit #${entry.index} ${entry.hash.slice(0, 18)}…)\n`);
   if (verdict !== 'clean') {
     process.stderr.write(`blindseal attest: verdict is ${verdict} (${result.detectedPatterns.join(', ')}); no attestation for a non-clean call\n`);
     return 1;

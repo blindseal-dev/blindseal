@@ -2,6 +2,7 @@
 import { usePageKit, type BSAny } from '../use-page-kit';
 import { schemaCheck, verifyProof, decodePublicInputs, verifyDisclosureSteps, tamper, type AttestationDoc, type Decoded } from './verifier';
 import type { Disclosure } from './disclosure';
+import { CLEAN_VERDICT } from './verdict';
 import { isDirectConsumer } from '@blindseal/chain-reads/consumers';
 import sample from './sample.json';
 
@@ -277,7 +278,7 @@ export function VerifyClient() {
       setBanner('running', 'Verifying in this tab', 'Step 4 of 4 · Clean window', '');
       await hold(220);
       if (stale(tok)) return;
-      const nonPass = d.entries.filter((e) => e.verdict !== 'pass').length;
+      const nonPass = d.entries.filter((e) => e.verdict !== CLEAN_VERDICT).length;
       if (v.clean) setCheck(3, 'pass', { detail: 'Every disclosed decision passed.' });
       else setCheck(3, 'fail', { detail: 'The disclosure is valid, but the window is not clean.', reason: nonPass + ' non-pass verdict' + (nonPass === 1 ? '' : 's') + ' in the window' });
       running = false; hasResult = true;
