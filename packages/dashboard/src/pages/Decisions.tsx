@@ -267,7 +267,7 @@ function Unauthorized() {
           <p className="eyebrow">Blindseal · local dashboard</p>
           <h1 className="d01-auth__title" id="d01-auth-title">Dashboard token required</h1>
           <p className="d01-auth__body">The token is printed when the proxy starts and lives at <span className="d01-mono">~/.blindseal/dashboard.token</span>. Open the dashboard with it in the URL fragment:</p>
-          <div className="d01-auth__url"><span className="d01-mono">http://127.0.0.1:7777/#token=…</span></div>
+          <div className="d01-auth__url"><span className="d01-mono">{typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:7777'}/#token=…</span></div>
           <form className="d01-auth__form" onSubmit={(e) => { e.preventDefault(); if (!/^[0-9a-f]{48}$/i.test(tok.trim())) setErr('A dashboard token is 48 hex characters.'); else setErr(''); }}>
             <div className="field">
               <label htmlFor="d01-token">Paste token</label>

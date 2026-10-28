@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { SampleDataBanner } from '../src/components/SampleDataBanner';
 import { Policy } from '../src/pages/Policy';
+import { Settings } from '../src/pages/Settings';
 
 const STATUS = { version: '0.7.0', connection: 'live', upstreams: [], policyRoot: '0x1', detectorVersion: '0x2', audit: { index: 3, hash: '0x1', ts: '' }, prover: { available: false }, l3: { mode: 'off' } };
 const POLICY = { root: '0x36a9', version: 2, updatedAt: '', detectorVersion: '0x72', leafCount: 1, parameters: {}, l0Decoders: [], rules: [{ id: 'r1', layer: 'L1', kind: 'regex', name: 'instruction_override', severity: 'Malicious', verdict: 'block', enabled: true }] };
@@ -41,4 +42,12 @@ it('live policy: labelled read-only, no Save, toggles disabled', async () => {
   await waitFor(() => expect(screen.getByTestId('policy-readonly').textContent).toMatch(/Read-only/));
   expect(screen.queryByText(/Save — recompute root/)).toBeNull();
   expect((screen.getByLabelText('toggle instruction_override') as HTMLInputElement).disabled).toBe(true);
+});
+
+it('live settings: no "(mock)" prover label, no client-side fake token rotation', async () => {
+  mockFetch((u) => (u.includes('/status') ? { ...STATUS, mock: false } : { mode: 'none' }));
+  renderWith(<Settings />);
+  await waitFor(() => expect(screen.getByTestId('token-rotate-howto')).toBeTruthy());
+  expect(document.body.textContent).not.toMatch(/\(mock\)|MOCK|synthetic/);
+  expect(screen.queryByText(/Rotate token/)).toBeNull();
 });

@@ -110,6 +110,12 @@ describe('live local API (blindseal run)', () => {
     expect(body[0].status).toBe('generated');
   });
 
+  it('the Verify page sample is served (and is not one of this machine\'s attestations)', async () => {
+    const { status, body } = await get('/attestations/sample');
+    expect(status).toBe(200);
+    expect(body.proof).toBeTruthy();
+  });
+
   it('an empty audit dir is an empty list, not sample data', async () => {
     const empty = mkdtempSync(path.join(os.tmpdir(), 'bs-live-empty-'));
     const e = await startLiveApi({ port: 0, home: empty, auditDir: empty, token: 't' });

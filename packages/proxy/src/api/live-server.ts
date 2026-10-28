@@ -23,7 +23,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { openAudit, genesisPrevHash, loadIdentity, type AuditEntry } from '@blindseal/audit';
 import { getNullifierStatus } from '@blindseal/chain-reads';
-import { blindsealHome, packageVersion, resolveDashboardToken } from '../paths.js';
+import { blindsealHome, nearestFixturesDir, packageVersion, resolveDashboardToken, shippedFixturesDir } from '../paths.js';
 import { describeLayer3 } from '../detection/clients/factory.js';
 import { serveDashboard, sendJson, sendErr, bearerOk, readBody, wsAccept, wsFrame } from './http-common.js';
 
@@ -339,6 +339,14 @@ export function startLiveApi(opts: LiveApiOptions = {}): Promise<LiveApiHandle> 
         }
         if (method === 'POST' && seg.length === 1) {
           return sendErr(res, 501, 'CLI_ONLY', 'generate attestations with `blindseal attest <toolcall.json> --target-program <id>`');
+        }
+        // The Verify page's "Load sample" / "Load tampered": the shipped sample attestation, which
+        // is labelled as a sample there and is not listed among this machine's attestations.
+        if (method === 'GET' && seg[1] === 'sample' && seg.length === 2) {
+          const dir = shippedFixturesDir() ?? nearestFixturesDir();
+          const sample = dir ? readJson<unknown>(path.join(dir, 'attestation-sample.json')) : null;
+          if (!sample) return sendErr(res, 404, 'NOT_FOUND', 'no sample attestation in this install');
+          return sendJson(res, 200, sample);
         }
         if (seg.length >= 2) {
           const file = `${seg[1]}.json`;

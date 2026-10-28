@@ -37,10 +37,10 @@ export function Settings() {
       <section className="panel d06-l3 reveal">
         <header className="panel__head"><h2 className="panel__title">Detection</h2></header>
         <dl className="kv">
-          <div><dt>L3 mode</dt><dd>{status?.l3?.mode ?? '—'}</dd></div>
+          <div><dt>L3 mode</dt><dd>{status?.l3?.label ?? status?.l3?.mode ?? '—'}{status && !status.mock ? <span className="is-faint"> · as configured for this <span className="mono">blindseal run</span> process</span> : null}</dd></div>
           {tee?.mode === 'tee' && <div><dt>TEE quote</dt><dd><Hash value={tee.quoteHash} label="TEE quote hash" /></dd></div>}
           <div><dt>Prover</dt><dd>
-            {status?.prover?.available ? 'available' : 'unavailable (mock)'}{' '}
+            {status?.prover?.available ? 'available' : status?.mock ? 'unavailable (mock)' : 'not installed locally (blindseal attest downloads it on first use)'}{' '}
             <button type="button" className="btn link sm" onClick={() => setTest(status?.prover?.available ? 'Prover answered OK.' : 'Prover not running.')}>Test</button>
             {test && <span className="is-faint"> · {test}</span>}
           </dd></div>
@@ -50,12 +50,17 @@ export function Settings() {
       </section>
 
       <section className="panel d06-token reveal">
+        {status?.mock ? <>
         <header className="panel__head"><h2 className="panel__title">Dashboard token</h2><p className="sub">rotating invalidates the current token; the new one is shown once, then masked</p></header>
         <div className="d06-token__row">
           <button type="button" className="btn secondary" onClick={rotate}><Icon name="refresh-cw" />Rotate token</button>
           {rotated && <span className="mono" style={{ color: masked ? 'var(--faint)' : 'var(--ink)' }}>{masked ? '•'.repeat(24) : rotated}</span>}
           {rotated && !masked && <button type="button" className="btn link sm" onClick={() => setMasked(true)}>mask</button>}
         </div>
+        </> : <>
+        <header className="panel__head"><h2 className="panel__title">Dashboard token</h2></header>
+        <p className="is-muted" data-testid="token-rotate-howto">To rotate it, delete <span className="mono">~/.blindseal/dashboard.token</span> and restart <span className="mono">blindseal run</span>; a new token is printed.</p>
+        </>}
       </section>
 
       <section className="panel d06-about reveal">
