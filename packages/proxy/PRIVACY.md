@@ -9,6 +9,11 @@ calls other than the ones listed below.
   audit log (`~/.blindseal/audit.log`) holds only fingerprints (hashes), ids and verdicts.
 - What a decision was about (the tool-call arguments or the reply text) is kept only in an encrypted
   store (`~/.blindseal/content.json`, key in `~/.blindseal/content.key`), after best-effort redaction.
+  So is the detectors' reasoning (an AI judge's explanation can quote the text it read). The agent
+  only ever gets a fixed notice: tool, direction, verdict, layer and pattern ids.
+- Binary image and audio content (an image or audio item that is a valid file of its declared type)
+  is passed to the agent without being screened. Every other embedded file is decoded and its text
+  screened like any other text.
 - Scan history (`BLINDSEAL_PERSIST=1`, `~/.blindseal/scans.db`) is local, opt-in and holds metadata
   only (tool, verdict, layer, fingerprint) — no text.
 - The audit chain and scan history name the wrapped server by an identifier that holds no

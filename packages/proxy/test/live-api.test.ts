@@ -28,7 +28,7 @@ const get = async (p: string, init: RequestInit = {}) => {
 };
 
 /// A temp ~/.blindseal with real chain entries written by the proxy's own recorder.
-function seed(): void {
+async function seed(): Promise<void> {
   root = mkdtempSync(path.join(os.tmpdir(), 'bs-live-'));
   home = path.join(root, '.blindseal');
   auditDir = home;
@@ -44,10 +44,11 @@ function seed(): void {
   const att = log.log({ type: 'detection', toolName: 'get_quote', layer: 2, verdict: 'clean', confidence: 0.1, patterns: [], mode: 'block', mutated: false, contentHash: 'cd'.repeat(32), text: 'price 12', serverKey: 'http://up' });
   mkdirSync(path.join(auditDir, 'attestations'), { recursive: true });
   writeFileSync(path.join(auditDir, 'attestations', `${att!.decisionId}.json`), JSON.stringify({ version: 1, decisionId: att!.decisionId, nullifier: '0x' + '11'.repeat(32), publicInputs: ['0x00'], proof: { protocol: 'groth16', curve: 'bn254', bytes: '0x' } }));
+  await log.settled(); // the redacted records are written once their redaction (in the scan worker) is done
 }
 
 beforeAll(async () => {
-  seed();
+  await seed();
   api = await startLiveApi({ port: 0, home, auditDir, token: 'live-test-token', pollMs: 50 });
 });
 afterAll(async () => {

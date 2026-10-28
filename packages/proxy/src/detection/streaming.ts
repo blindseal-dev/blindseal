@@ -22,7 +22,6 @@
 ///   OVERLAP_BYTES = 512   — sliding window, catches patterns that straddle chunk boundaries
 ///   THRESHOLD_BYTES = 8192 (env: BLINDSEAL_STREAM_THRESHOLD) — below this we just call runPipeline
 
-import { screenLayer1 } from './layer1-heuristics.js';
 import { runLayer2 } from './layer2-embeddings.js';
 import { runLayer3 } from './layer3-judge.js';
 import { Layer3Unavailable } from './clients/types.js';
@@ -30,8 +29,8 @@ import type { JudgeContext } from './clients/types.js';
 import type { DetectionResult } from './types.js';
 import type { PipelineOptions } from './pipeline.js';
 import { emitDegradedWarningOnce } from './degraded-state.js';
-import { redact } from '@blindseal/redactor';
-import { screenLayer0, makeLayer0Result } from './layer0-decoder.js';
+import { makeLayer0Result } from './layer0-decoder.js';
+import { scanText, redactText } from './scan-pool.js';
 import { ScanBudget, isBudgetResult } from './scan-budget.js';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
@@ -91,9 +90,9 @@ export async function runStreamingPipeline(
   // Layer 0 and Layer 1 on the full text (both scan it in bounded chunks under the budget), exactly
   // as the whole-text pipeline does: a long text is never exempt from either.
   const budget = opts?.budget ?? new ScanBudget();
-  const l0 = screenLayer0(text, budget);
+  const { l0, l1: l1OrNull } = await scanText(text, budget); // in a scan worker
   if (l0.fired) return makeLayer0Result(l0);
-  const l1 = screenLayer1(text, budget);
+  const l1 = l1OrNull!;
   if (isBudgetResult(l1)) return l1;
   if (l1.verdict === 'malicious' && l1.confidence >= L1_MALICIOUS_SHORT_CIRCUIT) {
     return { ...l1, layer: 1 };
@@ -101,7 +100,7 @@ export async function runStreamingPipeline(
 
   // Redact before the model layers, exactly as the whole-text pipeline does: L2 chunks and L3
   // see the redacted text; L1 above ran on the raw text.
-  const redactedText = redact(opts?.modelText ?? text).redacted;
+  const redactedText = await redactText(opts?.modelText ?? text);
   const chunks = chunkText(redactedText);
   let worstSuspicious: (DetectionResult & { chunkIndex: number }) | null = null;
   let chunksProcessed = 0;

@@ -11,6 +11,9 @@ export default defineConfig({
     index: 'src/index.ts',
     'audit-view': 'src/cli/audit-view.ts',
     decide: 'src/cli/decide.ts',
+    // Worker threads, loaded by worker-pool.ts as new URL('./<name>.js', import.meta.url).
+    'scan-worker': 'src/detection/scan-worker.ts',
+    'layer2-worker': 'src/detection/layer2-worker.ts',
   },
   format: ['esm'],
   target: 'node20',

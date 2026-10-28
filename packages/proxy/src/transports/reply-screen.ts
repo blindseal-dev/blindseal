@@ -15,114 +15,20 @@
 /// agent only ever receives bytes produced from the screened, parsed value.
 
 import { createHash } from 'node:crypto';
-import { redactStructure } from '@blindseal/redactor';
-import { runPipeline, runOutboundScreen } from '../detection/pipeline.js';
+import { runPipeline } from '../detection/pipeline.js';
+import { screenEach, modelForms, decodeBlobInWorker } from '../detection/scan-pool.js';
+import { readMaxBlobBytes, type BlobDecode } from './blob-decode.js';
+import { noticeText, detectionNotice } from './notice.js';
 import { ScanBudget } from '../detection/scan-budget.js';
 import { inDecisionScope } from '../detection/degraded-state.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 
 export type BlindsealMode = 'block' | 'warn' | 'log';
-type Obj = Record<string, unknown>;
 
-// ---------------------------------------------------------------------------------------------
-// Parsing and serialising without prototype surprises.
-
-export function isPlainObject(v: unknown): v is Obj {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-/// JSON.parse into null-prototype objects. JSON.parse itself keeps a literal "__proto__" key as an
-/// own property, but any later copy into a `{}` (assignment, Object.assign) turns it into a
-/// prototype change and the key disappears from Object.keys. Null-prototype objects have no
-/// `__proto__` accessor, so the key stays an ordinary property everywhere downstream.
-export function parseJson(text: string): unknown {
-  return toNullPrototype(JSON.parse(text));
-}
-
-/// JSON-RPC messages are shallow; anything nested deeper than this is refused at parse time (the
-/// caller treats it as unparseable: never forwarded), so no later recursive step — redaction,
-/// serialisation — can overflow the stack and take the proxy down.
-export const MAX_JSON_DEPTH = 256;
-
-/// Rebuilds every plain object of a parsed value with a null prototype. Iterative: a deeply nested
-/// message must not overflow the stack here (a reviver recursed, threw at ~3000 levels, and the
-/// caller then treated the line as "not JSON").
-function toNullPrototype(root: unknown): unknown {
-  const convert = (v: unknown): unknown => {
-    if (!isPlainObject(v)) return v;
-    const o = Object.create(null) as Obj;
-    for (const k of Object.keys(v)) Object.defineProperty(o, k, { value: v[k], enumerable: true, writable: true, configurable: true });
-    return o;
-  };
-  const top = convert(root);
-  const stack: Array<[unknown, number]> = [[top, 1]];
-  while (stack.length > 0) {
-    const [v, depth] = stack.pop()!;
-    if (v === null || typeof v !== 'object') continue;
-    if (depth > MAX_JSON_DEPTH) throw new RangeError(`JSON nested deeper than ${MAX_JSON_DEPTH} levels`);
-    if (Array.isArray(v)) {
-      for (let i = 0; i < v.length; i++) { v[i] = convert(v[i]); stack.push([v[i], depth + 1]); }
-    } else {
-      for (const k of Object.keys(v as Obj)) { (v as Obj)[k] = convert((v as Obj)[k]); stack.push([(v as Obj)[k], depth + 1]); }
-    }
-  }
-  return top;
-}
-
-/// Deterministic JSON: object keys sorted recursively. Builds the string directly (no
-/// intermediate object), so a "__proto__" key is serialised like any other key.
-export function stableStringify(value: unknown): string {
-  const seen = new WeakSet<object>();
-  const enc = (v: unknown): string | undefined => {
-    if (v === null) return 'null';
-    if (typeof v === 'bigint') return JSON.stringify(v.toString());
-    if (typeof v !== 'object') return JSON.stringify(v);
-    if (seen.has(v)) return JSON.stringify('[circular]');
-    seen.add(v);
-    let out: string;
-    if (Array.isArray(v)) {
-      out = '[' + v.map((x) => enc(x) ?? 'null').join(',') + ']';
-    } else {
-      const parts: string[] = [];
-      for (const k of Object.keys(v).sort()) {
-        const s = enc((v as Obj)[k]);
-        if (s !== undefined) parts.push(JSON.stringify(k) + ':' + s);
-      }
-      out = '{' + parts.join(',') + '}';
-    }
-    seen.delete(v);
-    return out;
-  };
-  return enc(value) ?? '';
-}
-
-/// Every string in a JSON value — object keys and string leaves — in stable key order. Iterative,
-/// so a deeply nested reply cannot overflow the stack.
-export function stringLeaves(value: unknown, order: 'sorted' | 'as-sent' = 'sorted', keys = true): string[] {
-  const out: string[] = [];
-  const stack: unknown[] = [value];
-  while (stack.length > 0) {
-    const v = stack.pop();
-    if (typeof v === 'string') { out.push(v); continue; }
-    if (v === null || typeof v !== 'object') continue;
-    if (Array.isArray(v)) {
-      for (let i = v.length - 1; i >= 0; i--) stack.push(v[i]);
-      continue;
-    }
-    const names = order === 'sorted' ? Object.keys(v).sort() : Object.keys(v);
-    for (let i = names.length - 1; i >= 0; i--) {
-      stack.push((v as Obj)[names[i]!]);
-      if (keys) stack.push(names[i]!); // the key is visited before its value
-    }
-  }
-  return out;
-}
-
-/// Leaves joined with '\n'. Scanned alongside the stable JSON: JSON escaping turns a real newline
-/// or tab inside a value into a literal backslash sequence, which whitespace-based patterns miss.
-export function jsonStringLeaves(value: unknown): string {
-  return stringLeaves(value).join('\n');
-}
+// Parsing and serialising without prototype surprises: json-tools.ts (shared with the scan worker,
+// which must not load this module's model-layer imports).
+export { isPlainObject, parseJson, MAX_JSON_DEPTH, stableStringify, stringLeaves, jsonStringLeaves } from './json-tools.js';
+import { isPlainObject, stableStringify, stringLeaves, withoutScreened, type Obj } from './json-tools.js';
 
 // ---------------------------------------------------------------------------------------------
 // Request/reply correlation.
@@ -226,41 +132,83 @@ export interface ScreenOutcome {
   degraded: boolean;
 }
 
-/// Binary payloads by PROTOCOL position (never by value, and never by how the characters look): `data` of an image or
-/// audio content item and `blob` of an embedded resource (MCP's base64 fields). The agent's model
-/// receives these as media, not as text, so they are not text-screened at all: embedding base64
-/// tells L2 nothing and it trips the large-base64-blob heuristic. (The skip is by position only;
-/// no string anywhere is skipped for its length.)
-/// (A character-ratio test was tried and both let prose through and rejected real PCM audio.)
-function stripMedia(body: Obj): Obj {
-  const result = body.result;
-  if (!isPlainObject(result) || !Array.isArray(result.content)) return body;
-  const marker = (v: string) => `[media: ${v.length} chars]`;
-  const content = result.content.map((item) => {
-    if (!isPlainObject(item)) return item;
-    let out = item;
-    const copy = () => (out === item ? (out = Object.assign(Object.create(null) as Obj, item)) : out);
-    if ((item.type === 'image' || item.type === 'audio') && typeof item.data === 'string') copy().data = marker(item.data);
-    if (isPlainObject(item.resource) && typeof item.resource.blob === 'string') {
-      copy().resource = Object.assign(Object.create(null) as Obj, item.resource, { blob: marker(item.resource.blob) });
-    }
-    return out;
-  });
-  const r = Object.assign(Object.create(null) as Obj, result, { content });
-  return Object.assign(Object.create(null) as Obj, body, { result: r });
+// ---------------------------------------------------------------------------------------------
+// Embedded binary (blob-decode.ts): `data` of image/audio items and every `blob` field.
+
+const SEPARATE = '[screened separately]';
+
+interface BlobSite {
+  value: string;
+  media?: { type: 'image' | 'audio'; mimeType: unknown };
 }
 
-/// The body with strings already screened on their own (text items) replaced by a short marker,
-/// structure kept.
-function withoutScreened(v: unknown, skip: Set<string>): unknown {
-  if (typeof v === 'string') return skip.has(v) ? '[screened separately]' : v;
-  if (Array.isArray(v)) return v.map((x) => withoutScreened(x, skip));
-  if (isPlainObject(v)) {
-    const o = Object.create(null) as Obj;
-    for (const k of Object.keys(v)) o[k] = withoutScreened(v[k], skip);
-    return o;
+const siteKey = (site: BlobSite) => (site.media ? `${site.media.type}|${String(site.media.mimeType)}` : 'blob') + '\u0000' + site.value;
+
+/// Calls `visit` for each embedded-binary site: the `data` string of any object whose `type` is
+/// "image" or "audio", and the string under any `blob` key. `visit` returns the replacement.
+function mapBlobSites(v: unknown, visit: (site: BlobSite) => string, depth = 0): unknown {
+  if (Array.isArray(v)) return v.map((x) => mapBlobSites(x, visit, depth + 1));
+  if (!isPlainObject(v)) return v;
+  const isMedia = (v.type === 'image' || v.type === 'audio') && typeof v.data === 'string';
+  const o = Object.create(null) as Obj;
+  for (const k of Object.keys(v)) {
+    const val = v[k];
+    if (k === 'blob' && typeof val === 'string') o[k] = visit({ value: val });
+    else if (k === 'data' && isMedia) o[k] = visit({ value: val as string, media: { type: v.type as 'image' | 'audio', mimeType: v.mimeType } });
+    else o[k] = mapBlobSites(val, visit, depth + 1);
   }
-  return v;
+  return o;
+}
+
+interface BlobScreen {
+  /// The body with each site replaced: validated media by a size marker, decoded blobs by
+  /// SEPARATE (their text is screened on its own), oversized blobs by SEPARATE. A blob that is
+  /// not base64 keeps its raw value, so the string passes still read it.
+  body: Obj;
+  /// Decoded text of every non-media blob.
+  texts: string[];
+  /// One result per invalid blob (not base64 / oversized): non-clean, blocked in block mode.
+  problems: DetectionResult[];
+}
+
+async function screenBlobs(body: Obj): Promise<BlobScreen> {
+  const sites = new Map<string, BlobSite>();
+  mapBlobSites(body, (site) => { sites.set(siteKey(site), site); return site.value; });
+  const decoded = new Map<string, BlobDecode>();
+  const max = readMaxBlobBytes();
+  await Promise.all([...sites].map(async ([key, site]) => {
+    // Size first, without copying a huge string to the worker.
+    const d: BlobDecode = Math.floor((site.value.length * 3) / 4) > max
+      ? { kind: 'invalid', reason: 'oversized' }
+      : await decodeBlobInWorker(site.value, site.media);
+    decoded.set(key, d);
+  }));
+  const texts: string[] = [];
+  const problems: DetectionResult[] = [];
+  for (const d of decoded.values()) {
+    if (d.kind === 'text' || d.kind === 'binary') texts.push(d.text);
+    if (d.kind === 'invalid') problems.push(blobProblem(d.reason));
+  }
+  const out = mapBlobSites(body, (site) => {
+    const d = decoded.get(siteKey(site))!;
+    if (d.kind === 'media') return `[media: ${site.value.length} chars]`;
+    if (d.kind === 'invalid' && d.reason === 'not-base64') return site.value;
+    return SEPARATE;
+  }) as Obj;
+  return { body: out, texts, problems };
+}
+
+function blobProblem(reason: 'not-base64' | 'oversized'): DetectionResult {
+  return {
+    verdict: 'suspicious',
+    confidence: 0.5,
+    reasoning: reason === 'oversized'
+      ? `an embedded blob is larger than the ${readMaxBlobBytes()}-byte limit (BLINDSEAL_MAX_BLOB_BYTES) and was not screened`
+      : 'an embedded blob or media item is not valid base64, so its content cannot be screened',
+    detectedPatterns: [reason === 'oversized' ? 'blob-oversized' : 'blob-not-base64'],
+    layer: 0,
+    l3Status: 'skipped_gate',
+  };
 }
 
 /// Protocol vocabulary: a body whose remaining strings are all from here carries no free text
@@ -290,14 +238,15 @@ export function messageBody(msg: Obj): Obj {
   return body;
 }
 
-/// Screens every string of one message. Text items of a tool result run the full pipeline on
-/// their own; every other string gets L0/L1 on its own; the rest of the body runs the full
-/// pipeline as stable JSON and as joined leaves, with L2/L3 seeing the key-redacted form.
+/// Screens every string of one message, in two phases:
+///   1. Layer 0/1 (in the scan worker): text items, the decoded text of every blob, every other
+///      string on its own, and all strings joined in the order the agent receives them.
+///   2. Unless phase 1 already found it malicious, the model layers: the full pipeline on each
+///      text item and decoded blob, then on the rest of the body (stable JSON and joined leaves)
+///      with L2/L3 seeing its key-redacted form.
+/// Validated binary media (blob-decode.ts) is the only content not screened.
 export async function screenMessage(msg: Obj, toolName: string, mcpMethod: string): Promise<ScreenOutcome> {
   const body = messageBody(msg);
-  const texts = textSurfaces(body.result);
-  const skip = new Set(texts);
-  const noMedia = stripMedia(body);
   let worst: DetectionResult | null = null;
   let degraded = false;
   const consider = (r: DetectionResult) => {
@@ -305,33 +254,40 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
     if (r.verdict !== 'clean' && (!worst || rankVerdict(r.verdict) > rankVerdict(worst.verdict))) worst = r;
   };
   const ctx = { toolName, mcpMethod };
-  // One Layer 0/1 time allowance for every pass below: a message that cannot be fully scanned in time
-  // gets the non-clean budget result (blocked in block mode), never a partial clean.
+  // One Layer 0/1 time allowance for every pass below: a message that cannot be fully scanned in
+  // time gets the non-clean budget result (blocked in block mode), never a partial clean.
   const budget = new ScanBudget();
 
   await inDecisionScope(async () => {
+    const blobs = await screenBlobs(body);
+    blobs.problems.forEach(consider);
+    const noMedia = blobs.body;
+    const items = textSurfaces(noMedia.result);
+    const texts = [...items, ...blobs.texts];
+    const skip = new Set(items);
+
+    // Phase 1. Each text, and every other string on its own (keys included): an injection is
+    // never diluted by, or split across, its neighbours. Then the string values, and values with
+    // keys, joined in the order the agent receives them: a phrase split across neighbouring
+    // fields must not slip between two leaves.
+    consider(await screenEach(texts, budget));
+    consider(await screenEach(stringLeaves(noMedia).filter((s) => !skip.has(s) && s.length >= 8), budget));
+    consider(await screenEach([
+      stringLeaves(noMedia, 'as-sent', false).join('\n'),
+      stringLeaves(noMedia, 'as-sent', true).join('\n'),
+    ], budget));
+    if ((worst as DetectionResult | null)?.verdict === 'malicious') return; // the model layers cannot change that
+
+    // Phase 2.
     for (const t of texts) consider(await runPipeline(t, ctx, { budget }));
-
-    // L0/L1 on every other string on its own (keys included): an injection is never diluted
-    // by, or split across, its neighbours.
-    for (const s of stringLeaves(noMedia)) {
-      if (skip.has(s) || s.length < 8) continue;
-      consider(runOutboundScreen(s, budget));
-    }
-    // And L0/L1 over the string VALUES joined in the order the agent receives them (the passes
-    // below sort keys and interleave them): a phrase split across neighbouring fields must not
-    // slip between two leaves.
-    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', false).join('\n'), budget));
-    consider(runOutboundScreen(stringLeaves(noMedia, 'as-sent', true).join('\n'), budget)); // keys too: a phrase split around a key
-
     const rest = withoutScreened(noMedia, skip);
     const leaves = stringLeaves(rest);
     if (leaves.every((s) => STRUCTURAL.has(s))) return;
-    const redacted = withoutScreened(redactStructure(noMedia).value, skip);
     const json = stableStringify(rest);
-    consider(await runPipeline(json, ctx, { modelText: stableStringify(redacted), budget }));
+    const forms = await modelForms(stableStringify(noMedia), [...skip]);
+    consider(await runPipeline(json, ctx, { modelText: forms.json, budget }));
     const joined = leaves.join('\n');
-    if (joined && joined !== json) consider(await runPipeline(joined, ctx, { modelText: jsonStringLeaves(redacted), budget }));
+    if (joined && joined !== json) consider(await runPipeline(joined, ctx, { modelText: forms.leaves, budget }));
   });
 
   const scannedText = stableStringify(body);
@@ -352,17 +308,6 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
 /// JSON-RPC error code for content Blindseal withheld (server-defined range -32000..-32099).
 export const BLOCKED_CODE = -32001;
 
-export function blockedNotice(toolName: string, reason: string): string {
-  return (
-    `[BLINDSEAL_BLOCKED] Response from tool '${toolName}' was flagged as potential prompt injection. ` +
-    `${reason}. Original content withheld. To override, set BLINDSEAL_MODE=warn.`
-  );
-}
-
-export function detectionReason(r: DetectionResult): string {
-  return `Verdict: ${r.verdict}. Reasoning: ${r.reasoning}`;
-}
-
 /// The whole reply the agent gets in place of a blocked one. For tools/call it is a tool result
 /// (`content` = the notice, `isError: true`); a reply to any other method becomes a JSON-RPC
 /// error, since a tool-result shape would be invalid there. Only `jsonrpc`, the id of the
@@ -375,10 +320,7 @@ export function buildBlockedReply(pending: PendingEntry, text: string): Obj {
 }
 
 export function buildWarningItem(toolName: string, r: DetectionResult): { type: 'text'; text: string } {
-  return {
-    type: 'text',
-    text: `[BLINDSEAL_WARNING] Tool '${toolName}' response flagged (${r.verdict}). Reasoning: ${r.reasoning}. Original content follows.`,
-  };
+  return { type: 'text', text: detectionNotice('BLINDSEAL_WARNING', 'response', toolName, r) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -481,7 +423,8 @@ export async function screenServerMessage(
   if (problem) {
     return {
       kind: 'reply', pending, label, problem, mutated: true,
-      forward: buildBlockedReply(pending, blockedNotice(label, `The reply was malformed (${problem})`)),
+      // The problem description stays on stderr and in the audit log: the notice is the template.
+      forward: buildBlockedReply(pending, noticeText('BLINDSEAL_BLOCKED', { direction: 'response', tool: label, verdict: 'malformed', layer: null, patterns: ['reply-shape'] })),
     };
   }
   let outcome: ScreenOutcome;
@@ -502,6 +445,6 @@ export async function screenServerMessage(
   }
   return {
     kind: 'reply', pending, label, outcome, mutated: true,
-    forward: buildBlockedReply(pending, blockedNotice(label, detectionReason(outcome.result))),
+    forward: buildBlockedReply(pending, detectionNotice('BLINDSEAL_BLOCKED', 'response', label, outcome.result)),
   };
 }

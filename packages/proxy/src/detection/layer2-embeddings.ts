@@ -1,5 +1,34 @@
 import { loadCorpus, type LoadedCorpus } from '@blindseal/corpus';
 import type { DetectionResult } from './types.js';
+import { WorkerPool } from './worker-pool.js';
+
+/// Layer 2 runs in its own worker thread (layer2-worker.ts): the embedding model's inference and
+/// tokenisation would otherwise block the event loop for seconds on long or concurrent text. One
+/// worker, so the model is loaded once. `runLayer2`/`warmupLayer2` are the entry points; the
+/// *Here functions run inside the worker (or inline if no worker can start).
+export type Layer2Op = { op: 'run'; text: string; threshold: number } | { op: 'warmup' };
+export type Layer2Result = { result: DetectionResult } | { warmed: true };
+
+const pool = new WorkerPool<Layer2Op, Layer2Result>('layer-2', 'layer2-worker', () => 1, runLayer2Op);
+
+export async function runLayer2Op(req: Layer2Op): Promise<Layer2Result> {
+  if (req.op === 'warmup') {
+    await warmupLayer2Here();
+    return { warmed: true };
+  }
+  return { result: await runLayer2Here(req.text, req.threshold) };
+}
+
+export async function runLayer2(text: string): Promise<DetectionResult> {
+  if (!text || text.length === 0) {
+    return { verdict: 'clean', confidence: 0, reasoning: 'empty text', detectedPatterns: [], layer: 2 };
+  }
+  // No deadline: Layer 2 is not part of the Layer 0/1 budget, and the first call may be loading
+  // (or downloading) the model. The threshold is read here, where the operator set it.
+  const r = await pool.submit({ op: 'run', text, threshold: readThreshold() }, Infinity);
+  if (!('result' in r)) throw new Error('layer-2 worker: wrong reply');
+  return r.result;
+}
 
 const MODEL_ID = 'Xenova/bge-small-en-v1.5';
 // Threshold tuned for 200-entry corpus (Day 2 sprint).
@@ -84,7 +113,7 @@ function cosineDistanceNormalized(
   return 1 - dot;
 }
 
-export async function runLayer2(text: string): Promise<DetectionResult> {
+async function runLayer2Here(text: string, threshold: number): Promise<DetectionResult> {
   if (!text || text.length === 0) {
     return { verdict: 'clean', confidence: 0, reasoning: 'empty text', detectedPatterns: [], layer: 2 };
   }
@@ -105,8 +134,6 @@ export async function runLayer2(text: string): Promise<DetectionResult> {
       bestIdx = i;
     }
   }
-
-  const threshold = readThreshold();
 
   if (bestIdx < 0) {
     return { verdict: 'clean', confidence: 0, reasoning: 'empty corpus', detectedPatterns: [], layer: 2 };
@@ -147,9 +174,14 @@ export async function runLayer2(text: string): Promise<DetectionResult> {
   };
 }
 
-/// Loads the model and corpus and runs one probe embedding, so a model that loads but cannot
-/// run (corrupt weights, wrong dimension) fails here rather than on the first tool call.
+/// Loads the model and corpus (in the Layer 2 worker) and runs one probe embedding, so a model
+/// that loads but cannot run (corrupt weights, wrong dimension) fails here rather than on the
+/// first tool call.
 export async function warmupLayer2(): Promise<void> {
+  await pool.submit({ op: 'warmup' }, Infinity);
+}
+
+async function warmupLayer2Here(): Promise<void> {
   const extractor = await getExtractor();
   const { meta } = getCorpus();
   const out = await extractor('blindseal layer-2 warmup probe', { pooling: 'mean', normalize: true });

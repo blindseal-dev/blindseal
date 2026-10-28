@@ -1,6 +1,7 @@
 /// Shared scanning + mutation logic used by both stdio and http transports.
 
-import { runOutboundScreen } from '../detection/pipeline.js';
+import { screenEach } from '../detection/scan-pool.js';
+import { noticeText, detectionNotice, noticePatterns } from './notice.js';
 import { ScanBudget } from '../detection/scan-budget.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 import { createHash } from 'node:crypto';
@@ -75,10 +76,12 @@ export function isToolCallResponse(
   return Array.isArray(r.content) || ('structuredContent' in r && r.structuredContent !== undefined);
 }
 
+/// The capability gate's refusal. The gate's reason (which can quote the arguments) goes to the
+/// encrypted audit store only; the agent gets the notice template with the matched rule's id.
 export function buildCapabilityBlockedResponse(
   id: string | number,
   toolName: string,
-  reason: string,
+  matchedPattern: string | undefined,
   sourceTools: string[],
 ): JsonRpcMessage {
   return {
@@ -89,10 +92,9 @@ export function buildCapabilityBlockedResponse(
       content: [
         {
           type: 'text',
-          text:
-            `[BLINDSEAL_CAPABILITY_BLOCKED] Refused to invoke '${toolName}'. ${reason}. ` +
-            `Taint source(s): ${sourceTools.join(', ') || 'unknown'}. ` +
-            `To override, set BLINDSEAL_CAPABILITY_MODE=warn or unset BLINDSEAL_CAPABILITY.`,
+          text: noticeText('BLINDSEAL_CAPABILITY_BLOCKED', {
+            direction: 'request', tool: toolName, verdict: 'blocked', layer: null, patterns: [matchedPattern ?? 'capability-policy'], sources: sourceTools,
+          }),
         },
       ],
     },
@@ -148,20 +150,17 @@ export interface OutboundOutcome {
 /// Runs L0 + L1 over the stable-stringified tool-call arguments and over their string leaves
 /// (see jsonStringLeaves); the worse verdict wins. Block mode refuses any non-clean verdict;
 /// warn and log modes forward (the caller flags on stderr / audit).
-export function inspectToolCallArguments(
+export async function inspectToolCallArguments(
   toolName: string,
   args: unknown,
   mode: BlindsealMode,
-): OutboundOutcome {
+): Promise<OutboundOutcome> {
   const scannedText = args === undefined ? '' : stableStringify(args);
   const argsHash = sha256Hex(scannedText);
   const budget = new ScanBudget(); // one allowance for both passes over this call
-  let r = runOutboundScreen(scannedText, budget);
   const leaves = args === undefined ? '' : jsonStringLeaves(args);
-  if (leaves && leaves !== scannedText) {
-    const rl = runOutboundScreen(leaves, budget);
-    if (rankVerdict(rl.verdict) > rankVerdict(r.verdict)) r = rl;
-  }
+  // Both passes in one scan-worker round trip, off the event loop.
+  const r = await screenEach(leaves && leaves !== scannedText ? [scannedText, leaves] : [scannedText], budget);
   if (r.verdict === 'clean') {
     return { verdict: 'clean', result: null, scannedText, argsHash, action: 'forward' };
   }
@@ -189,11 +188,8 @@ export function buildOutboundBlockedResponse(
     id,
     error: {
       code: OUTBOUND_BLOCKED_CODE,
-      message:
-        `[BLINDSEAL_BLOCKED] Call to tool '${toolName}' was not sent: its arguments were flagged as ` +
-        `potential prompt injection (L${r.layer ?? '?'}, ${r.verdict}). Reasoning: ${r.reasoning}. ` +
-        `To override, set BLINDSEAL_MODE=warn.`,
-      data: { blindseal: { direction: 'request', verdict: r.verdict, layer: r.layer ?? null, patterns: r.detectedPatterns } },
+      message: detectionNotice('BLINDSEAL_BLOCKED', 'request', toolName, r),
+      data: { blindseal: { direction: 'request', verdict: r.verdict, layer: r.layer ?? null, patterns: noticePatterns(r) } },
     },
   };
 }

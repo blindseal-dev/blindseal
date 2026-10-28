@@ -164,7 +164,9 @@ numeric-entity runs, "include … verbatim", zero-width density) are linear scan
 whole text: ~100 ms per MB on any input, including long uniform
 runs that made the old regexes quadratic. Every L0/L1 pass over one message shares a
 time allowance (`BLINDSEAL_SCAN_BUDGET_MS`, default 2000); a message not fully scanned
-within it is blocked in block mode and forwarded with a warning in warn mode. Layer 0
+within it is blocked in block mode and forwarded with a warning in warn mode. L0/L1, redaction
+and blob decoding run in scan worker threads (`BLINDSEAL_SCAN_WORKERS`), so a slow message never
+stalls the event loop, other messages or `/health`. Layer 0
 also reads text with zero-width characters removed, so a split phrase is caught at any length.
 That decoder, the search past a base64-only decoy, and per-chunk zero-width density are
 proxy screening only: the proven L0/L1 (`blindseal attest`, the zk guest) keep the Rust
@@ -289,3 +291,16 @@ pnpm --filter @blindseal/eval exec tsx src/run.ts --set both --no-l3
 
 Output goes to `packages/eval/red-team/attempts/<date>.md` and
 `packages/eval/results/eval-<timestamp>.md` respectively.
+
+### 15. Binary image and audio content is not screened
+An `image` or `audio` content item whose `data` is strict base64 of a file of its declared type
+(magic bytes match the mimeType: PNG, JPEG, GIF, WebP, BMP, TIFF, AVIF/HEIC, ICO; WAV, MP3, Ogg/Opus,
+FLAC, MP4/M4A, AAC, WebM, AIFF) and is not valid UTF-8 is forwarded without screening what the
+picture or sound contains: text drawn in an image, metadata chunks, or speech in audio. Everything
+else is decoded and its text screened: resource blobs, `resources/read` contents, SVG (XML text),
+media of an unknown subtype, and media whose bytes do not match the declared type. A blob that is
+not base64, or decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default 10 MiB), is blocked in block
+mode.
+
+**Status:** By design for 0.7.0. OCR / speech-to-text screening of media is not planned for v1.
+

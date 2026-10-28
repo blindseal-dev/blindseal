@@ -182,8 +182,8 @@ function withinMarketHours(now: number, mh: { startMin: number; endMin: number }
   return minOfDay >= mh.startMin && minOfDay < mh.endMin;
 }
 
-function block(mode: 'block' | 'warn', kind: TradeKind, reason: string, taintSources?: GateDecision['taintSources']): GateDecision {
-  return { action: mode, reason: `trade-policy: ${reason}`, matchedPattern: `trade:${kind}`, taintSources };
+function block(mode: 'block' | 'warn', kind: TradeKind, reason: string, taintSources?: GateDecision['taintSources'], rule?: string): GateDecision {
+  return { action: mode, reason: `trade-policy: ${reason}`, matchedPattern: rule ? `trade:${kind}:${rule}` : `trade:${kind}`, taintSources };
 }
 
 /// Decide whether a trading tool call may proceed. Returns `allow` for anything that
@@ -207,7 +207,7 @@ export function decideTradePolicy(
   // 1. Circuit breaker — highest priority. Once open, halt everything until it cools
   //    down. Does not update state (so the cooldown can actually elapse).
   if (config.breakerThreshold !== null && rate && rate.breakerOpen(config.breakerThreshold, now, config.windowMs)) {
-    return block(config.mode, kind, `circuit breaker open (>= ${config.breakerThreshold} consecutive blocked trades) — trading halted for the window`);
+    return block(config.mode, kind, `circuit breaker open (>= ${config.breakerThreshold} consecutive blocked trades) — trading halted for the window`, undefined, 'circuit-breaker');
   }
 
   // 1b. Graduated escalation. Below the breaker but above the elevated threshold, the guard

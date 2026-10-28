@@ -56,6 +56,27 @@ export class ScanBudget {
     return this.spent;
   }
 
+  /// Milliseconds used so far.
+  usedMs(): number {
+    return this.depth > 0 ? this.used + performance.now() - this.since : this.used;
+  }
+
+  /// Milliseconds left (0 once spent). The scan worker gets this as its own allowance.
+  remainingMs(): number {
+    return this.expired() ? 0 : Math.max(0, this.ms - this.used);
+  }
+
+  /// Counts time spent on this message's Layer 0/1 work elsewhere (in the scan worker).
+  charge(ms: number): void {
+    this.used += ms;
+    this.expired();
+  }
+
+  /// Marks the allowance as used up (the worker overran it and was stopped).
+  exhaust(): void {
+    this.spent = true;
+  }
+
   result(): DetectionResult {
     return {
       verdict: 'suspicious',

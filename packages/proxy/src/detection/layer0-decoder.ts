@@ -8,7 +8,7 @@ export interface DecodedResult {
   depth: number;
 }
 
-interface L0Result {
+export interface L0Result {
   fired: boolean;
   decoded?: string;
   decoder?: string;

@@ -88,7 +88,7 @@ blindseal (LIVE): local API on http://127.0.0.1:7777/api
         { kind: 'links', links: [{ href: 'https://www.npmjs.com/package/blindseal', label: 'blindseal on npm', icon: 'arrow-up-right', external: true }] },
       ] },
       { id: 'agent', heading: 'Point an agent', blocks: [
-        p('Put `blindseal --` in front of the MCP server command. Everything after the `--` is the upstream server. Every tool call\'s arguments are checked (L0 and L1) before the server gets them, and every message the server sends back passes the detection layers before the agent sees it: every string in it, keys and values at any depth. A reply that answers no request, or is malformed, never reaches the agent; a blocked reply is replaced by a notice that keeps nothing from the original. Calls and results inside a JSON-RPC batch are checked one by one.'),
+        p('Put `blindseal --` in front of the MCP server command. Everything after the `--` is the upstream server. Every tool call\'s arguments are checked (L0 and L1) before the server gets them, and every message the server sends back passes the detection layers before the agent sees it: every string in it, keys and values at any depth. A reply that answers no request, or is malformed, never reaches the agent; a blocked reply is replaced by a fixed notice (tool, verdict, layer and pattern ids) that keeps nothing from the original and no detector reasoning, which goes to your local audit log instead. Embedded files (resource blobs, base64 data) are decoded and their text checked; binary image and audio content (a valid file of the declared type) is not screened. Calls and results inside a JSON-RPC batch are checked one by one.'),
         p('The AI judge (L3) is off by default. Set `BLINDSEAL_LAYER3_PROVIDER=ollama` to run it on a local model; set `anthropic`, `openai` or `custom` (with that provider\'s key) to use a remote one, which then receives the redacted tool output. An API key in your environment never turns it on by itself. Redaction is best effort: values under listed secret keys in JSON (`password`, `token`, `api_key`, `secret`, `mnemonic`, …), key and token shapes (API keys, JWTs, private keys, seed phrases, high-entropy strings), values under personal-data keys in JSON (`name`, `address`, `phone`, `dob`, `iban`, …) and some personal data by shape (e-mail, phone, card and SSN numbers). Names and addresses written as free text are not covered.'),
         code(`$ blindseal -- github-mcp --stdio    # the proxy launches the server and sits in the middle`, 'shell'),
         p('Or let `blindseal init --wrap` rewrite the MCP configs it finds so every server is launched through the proxy. By hand, the config entry looks like this:'),
@@ -251,6 +251,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
         ]),
       ] },
       { id: 'attested', heading: 'Attested, not proven', blocks: [
+        p('The proxy runs more checks than the proof covers. Only the committed L1 rules are in the proof. Everything else the proxy does is extra screening whose result is recorded in the audit log but not proven: L0 decoding and its hardening (decoding base64, hex, URL and HTML-entity payloads; reading text with zero-width characters removed; looking past decoy blobs), decoding embedded files to check their text, and the model layers L2 and L3.'),
         list([
           'L2 (embeddings, local) and L3 (model judge, off unless you turn it on) verdicts. They are recorded in the audit log and can be run in a TEE (planned); their output is not inside the proof.',
           'The content of the audit log itself. The chain proves integrity and order of entries, not that an operator ran every call through the proxy.',
@@ -262,6 +263,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
           'Novel attacks the committed rules miss. On the published red-team corpus the proven layer alone catches roughly a third of attacks and little of the novel holdout set; detection in practice leans on L2/L3, which are attested rather than proven. The numbers are in `packages/LIMITATIONS.md` and are updated with every corpus change.',
           'The correctness of the gated program beyond the fields it forwards. Blindseal checks that the forwarded action equals the screened one; it does not audit the program.',
           'L0 (decode-then-L1) is run by the proxy but is not inside the proof yet; the proof covers L1 on the payload as received. L0 inside the proof is the next increment and will change the detector version.',
+          'Binary image and audio content. An image or audio item whose data is a valid file of its declared type is passed through without screening what the picture or sound contains. Every other embedded file is decoded and its text checked.',
         ]),
       ] },
       { id: 'privacy', heading: 'What is public', blocks: [

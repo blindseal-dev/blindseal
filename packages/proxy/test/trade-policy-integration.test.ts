@@ -132,6 +132,6 @@ describe('trade guard — end-to-end through the proxy', () => {
     swap(3, GOOD);
     const halted = await proxy.next();
     expect(halted.result.isError).toBe(true);
-    expect(halted.result.content[0].text).toMatch(/circuit breaker open/);
+    expect(halted.result.content[0].text).toMatch(/patterns=trade:swap:circuit-breaker/);
   }, 30000);
 });

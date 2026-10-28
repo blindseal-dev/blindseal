@@ -58,9 +58,11 @@ export function serializeSseEvent(preLines: string[], data: string | null): stri
 }
 
 /// SSE fields an agent's client acts on besides `data`. Comments and unknown fields are dropped,
-/// and so is a kept field whose value does not pass L0/L1.
+/// and so is a kept field longer than MAX_FIELD (an event name, an id or a retry delay is short;
+/// a long one is not scanned on the event loop, it is dropped) or whose value does not pass L0/L1.
 const KEPT_FIELDS = /^(event|id|retry):/;
-const keepField = (l: string) => KEPT_FIELDS.test(l) && runOutboundScreen(l).verdict === 'clean';
+const MAX_FIELD = 256;
+const keepField = (l: string) => KEPT_FIELDS.test(l) && l.length <= MAX_FIELD && runOutboundScreen(l).verdict === 'clean';
 
 /// Process one fully-assembled SSE event block. Returns the bytes to forward ('' = nothing).
 /// A data event is always re-serialised from the screened JSON value: the original bytes never

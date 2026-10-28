@@ -17,7 +17,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs';
 import path from 'node:path';
 import { openAudit, toChainVerdict, ERROR_VERDICT, type ChainVerdict } from '@blindseal/audit';
-import { redact, redactValue } from '@blindseal/redactor';
+import { redactText, redactValueText } from '../detection/scan-pool.js';
 
 export interface AuditConfig {
   /// Directory holding audit.log, content.json, content.key, identity.key (default ~/.blindseal,
@@ -130,6 +130,10 @@ export interface AuditLogger {
   readonly enabled: boolean;
   log(entry: AuditEntryInput): RecordedDecision | null;
   shutdown(): Promise<void>;
+  /// Resolves once every record logged so far is in the encrypted store (its redaction runs in
+  /// the scan worker). Transports await it before answering, so a decision's record exists by
+  /// the time anyone can see its effect.
+  settled(): Promise<void>;
 }
 
 /// Retained (encrypted) text is capped at this many characters.
@@ -164,21 +168,22 @@ function payloadHashOf(e: AuditEntryInput): string {
 }
 
 /// What goes to the encrypted store: the full decision record, with arguments and text redacted.
-function retainedOf(e: AuditEntryInput): Record<string, unknown> {
+/// Redaction runs in the scan worker (scan-pool.ts), off the event loop.
+async function retainedOf(e: AuditEntryInput): Promise<Record<string, unknown>> {
   switch (e.type) {
     case 'detection': {
       const { text, ...rest } = e;
-      return { ...rest, ...(text !== undefined ? { text: cap(redact(text).redacted) } : {}) };
+      return { ...rest, ...(text !== undefined ? { text: cap(await redactText(text)) } : {}) };
     }
     case 'capability': {
       const { args, ...rest } = e;
-      return { ...rest, ...(args !== undefined ? { args: cap(redactValue(args).redacted) } : {}) };
+      return { ...rest, ...(args !== undefined ? { args: cap(await redactValueText(args)) } : {}) };
     }
     case 'manifest':
       return { ...e };
     case 'error': {
       const { text, ...rest } = e;
-      return { ...rest, error: cap(redact(e.error).redacted), ...(text !== undefined ? { text: cap(redact(text).redacted) } : {}) };
+      return { ...rest, error: cap(await redactText(e.error)), ...(text !== undefined ? { text: cap(await redactText(text)) } : {}) };
     }
   }
 }
@@ -198,7 +203,7 @@ function metadataOf(e: AuditEntryInput, rec: RecordedDecision): AuditEntry {
   }
 }
 
-const NOOP: AuditLogger = { enabled: false, log: () => null, async shutdown() {} };
+const NOOP: AuditLogger = { enabled: false, log: () => null, async shutdown() {}, async settled() {} };
 
 export function createAuditLogger(config: AuditConfig): AuditLogger {
   let audit: ReturnType<typeof openAudit>;
@@ -226,6 +231,7 @@ export function createAuditLogger(config: AuditConfig): AuditLogger {
 
   let closed = false;
   let warned = false;
+  const pendingPuts = new Set<Promise<unknown>>();
   return {
     enabled: true,
     log(entry: AuditEntryInput): RecordedDecision | null {
@@ -235,7 +241,12 @@ export function createAuditLogger(config: AuditConfig): AuditLogger {
         const verdict = chainVerdictOf(entry);
         const payloadHash = payloadHashOf(entry);
         const e = audit.chain.append({ decisionId, verdict, payloadHash });
-        audit.content.put(decisionId, retainedOf(entry));
+        // The chain entry is appended now; the redacted record follows (shutdown waits for it).
+        const put = retainedOf(entry)
+          .then((r) => audit.content.put(decisionId, r))
+          .catch((err) => process.stderr.write(`blindseal: WARNING audit content write failed (${err instanceof Error ? err.message : String(err)})\n`));
+        pendingPuts.add(put);
+        void put.finally(() => pendingPuts.delete(put));
         const rec: RecordedDecision = { decisionId, index: e.index, verdict, payloadHash };
         if (stream) stream.write(JSON.stringify(metadataOf(entry, rec)) + '\n');
         return rec;
@@ -247,12 +258,16 @@ export function createAuditLogger(config: AuditConfig): AuditLogger {
         return null;
       }
     },
-    shutdown() {
-      if (closed) return Promise.resolve();
+    async settled() {
+      await Promise.all([...pendingPuts]);
+    },
+    async shutdown() {
+      if (closed) return;
       closed = true;
-      if (!stream) return Promise.resolve();
+      await Promise.all([...pendingPuts]);
+      if (!stream) return;
       const s = stream;
-      return new Promise<void>((resolve) => s.end(() => resolve()));
+      await new Promise<void>((resolve) => s.end(() => resolve()));
     },
   };
 }

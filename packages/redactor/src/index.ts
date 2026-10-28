@@ -46,6 +46,9 @@ interface Rule {
   re: RegExp;
   /// Optional predicate: redact only if it returns true (used for high_entropy).
   keep?: (match: string) => boolean;
+  /// Linear-time matcher used instead of `re` (whose regex form, kept in the comment beside the
+  /// rule, backtracks quadratically on some inputs).
+  spans?: (text: string) => Array<[number, number]>;
 }
 
 /// Shannon entropy (bits/char) of a string — used to gate the high_entropy catch-all so it
@@ -92,10 +95,10 @@ const MNEMONIC_WORD = '(?!(?:the|and|for|your|with|from|are|was|not|but)\\b)[a-z
 
 const RULES: Rule[] = [
   // PEM blocks and raw 32-byte keys (eth-style 0x + 64 hex).
-  {
-    kind: 'private_key',
-    re: /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g,
-  },
+  // /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g,
+  // matched in linear time by pemSpans (the lazy body rescans to the end for every BEGIN that
+  // has no END after it).
+  { kind: 'private_key', re: /(?:)/g, spans: (t) => pemSpans(t) },
   { kind: 'private_key', re: /\b0x[0-9a-fA-F]{64}\b/g },
   // JWT: three base64url segments.
   { kind: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g },
@@ -112,8 +115,9 @@ const RULES: Rule[] = [
   // prose, and is left for L2/L3 to read.
   // Greedy: the whole run of 12+ such words, so a mnemonic is never cut short by where the match began.
   { kind: 'seed_phrase', re: new RegExp(`\\b(?:${MNEMONIC_WORD}\\s+){11,}${MNEMONIC_WORD}\\b`, 'g') },
-  // Email.
-  { kind: 'email', re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g },
+  // Email: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, matched in linear time by
+  // replaceEmails (the regex rescans a long local-part run from every start: quadratic).
+  { kind: 'email', re: /(?:)/g, spans: (t) => emailSpans(t) },
   // US SSN (before card, so the 9-digit dashed form isn't eaten as a card).
   { kind: 'ssn', re: /\b\d{3}-\d{2}-\d{4}\b/g },
   // Phone (international + common separated forms), before card.
@@ -212,12 +216,17 @@ const QUOTED_KEY_OPEN_RE = /"((?:[^"\\]|\\.){1,128})"\s*:\s*(?=[[{])/g;
 function redactCompositeValues(text: string, ctx: Counter): string {
   let out = '';
   let last = 0;
+  // Total bracket-scanning work per call: each value that never closes scans to the end of the
+  // text, so many of them would be quadratic. Past the allowance a value is treated as unclosed
+  // (left in place, as an unclosed value always is).
+  let scanLeft = 4 * text.length + 65536;
   QUOTED_KEY_OPEN_RE.lastIndex = 0;
   for (let m = QUOTED_KEY_OPEN_RE.exec(text); m; m = QUOTED_KEY_OPEN_RE.exec(text)) {
     const kind = keyKind(m[1]!);
     const start = m.index + m[0].length;
-    if (!kind || start < last) continue;
-    const end = matchingBracket(text, start);
+    if (!kind || start < last || scanLeft <= 0) continue;
+    const end = matchingBracket(text, start, start + scanLeft);
+    scanLeft -= (end < 0 ? text.length : end) - start;
     // Only a value that actually closes is replaced: an unbalanced '"token": [' must not redact
     // the rest of the text (that would hide whatever follows from L2/L3).
     if (end < 0) continue;
@@ -229,11 +238,12 @@ function redactCompositeValues(text: string, ctx: Counter): string {
 }
 
 /// Index just past the bracket that closes the one at `start` (ignoring brackets inside JSON
-/// strings), or -1 when it never closes.
-function matchingBracket(text: string, start: number): number {
+/// strings), or -1 when it does not close before `limit`.
+function matchingBracket(text: string, start: number, limit = text.length): number {
   let depth = 0;
   let inStr = false;
-  for (let i = start; i < text.length; i++) {
+  const stop = Math.min(limit, text.length);
+  for (let i = start; i < stop; i++) {
     const c = text[i];
     if (inStr) {
       if (c === '\\') i++;
@@ -250,12 +260,79 @@ function matchingBracket(text: string, start: number): number {
   return -1;
 }
 
+const LOCAL_CHAR = /[A-Za-z0-9._%+\-]/;
+const WORD_CHAR = /[A-Za-z0-9_]/;
+const EMAIL_DOMAIN_RE = /[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/y;
+
+/// The matches of /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, in linear time. A match
+/// holds exactly one '@' and its local part ends right at it, so each '@' is tried once: the
+/// local part starts at the leftmost word boundary in the run of local-part characters before
+/// it (not before the end of the previous match), and the domain part does not depend on where
+/// the local part starts.
+export function emailSpans(text: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  const isWord = (i: number) => i >= 0 && i < text.length && WORD_CHAR.test(text[i]!);
+  let cursor = 0;
+  for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', at + 1)) {
+    if (at < cursor) continue; // inside the previous match
+    let r0 = at;
+    while (r0 > cursor && LOCAL_CHAR.test(text[r0 - 1]!)) r0--;
+    let start = -1;
+    for (let s = r0; s < at; s++) {
+      if (isWord(s - 1) !== isWord(s)) { start = s; break; }
+    }
+    if (start === -1) continue;
+    EMAIL_DOMAIN_RE.lastIndex = at + 1;
+    const d = EMAIL_DOMAIN_RE.exec(text);
+    if (!d) continue;
+    const end = at + 1 + d[0].length;
+    out.push([start, end]);
+    cursor = end;
+  }
+  return out;
+}
+
+const PEM_BEGIN_RE = /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g;
+const PEM_END_RE = /-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g;
+
+/// The matches of the PEM private-key rule: each BEGIN header (at or after the previous match)
+/// runs to the first END footer after it, as the lazy body does. With no END after a header,
+/// no later header has one either.
+export function pemSpans(text: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  PEM_BEGIN_RE.lastIndex = 0;
+  for (let b = PEM_BEGIN_RE.exec(text); b; b = PEM_BEGIN_RE.exec(text)) {
+    PEM_END_RE.lastIndex = b.index + b[0].length;
+    const e = PEM_END_RE.exec(text);
+    if (!e) break;
+    const end = e.index + e[0].length;
+    out.push([b.index, end]);
+    PEM_BEGIN_RE.lastIndex = end;
+  }
+  return out;
+}
+
+function replaceSpans(text: string, spans: Array<[number, number]>, sub: () => string): string {
+  if (spans.length === 0) return text;
+  let out = '';
+  let last = 0;
+  for (const [a, b] of spans) {
+    out += text.slice(last, a) + sub();
+    last = b;
+  }
+  return out + text.slice(last);
+}
+
 function redactText(text: string, ctx: Counter): string {
   let out = redactCompositeValues(text, ctx).replace(QUOTED_KEY_RE, (m, key: string, sep: string, value: string) => {
     const kind = keyKind(key);
     return kind && !value.startsWith('"[REDACTED:') ? `"${key}"${sep}"${mark(ctx, kind)}"` : m;
   });
   for (const rule of RULES) {
+    if (rule.spans) {
+      out = replaceSpans(out, rule.spans(out), () => mark(ctx, rule.kind));
+      continue;
+    }
     out = out.replace(rule.re, (match) => {
       if (rule.keep && !rule.keep(match)) return match;
       return mark(ctx, rule.kind);

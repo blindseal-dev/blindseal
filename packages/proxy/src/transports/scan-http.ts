@@ -165,6 +165,7 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
       );
     }
 
+    await audit.settled();
     sendJson(res, 200, {
       verdict: result.verdict,
       confidence: result.confidence,

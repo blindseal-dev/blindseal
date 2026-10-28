@@ -112,9 +112,9 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
   /// forwarded, null when it may go upstream.
   /// An id-less tools/call (a notification) is gated the same way; blocked, it is dropped
   /// ('drop': there is no id to answer).
-  function gateToolCall(msg: JsonRpcMessage, toolName: string, toolArgs: unknown): JsonRpcMessage | 'drop' | null {
+  async function gateToolCall(msg: JsonRpcMessage, toolName: string, toolArgs: unknown): Promise<JsonRpcMessage | 'drop' | null> {
     const id = msg.id;
-    const outbound = inspectToolCallArguments(toolName, toolArgs, config.mode);
+    const outbound = await inspectToolCallArguments(toolName, toolArgs, config.mode);
     if (outbound.verdict !== 'clean') {
       process.stderr.write(
         `blindseal[http]: ${outbound.verdict} (L${outbound.layer ?? '?'}) arguments to '${toolName}' (mode=${config.mode}, ${outbound.action === 'block' ? 'not forwarded' : 'forwarded'})\n`,
@@ -165,7 +165,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       return buildCapabilityBlockedResponse(
         id,
         toolName,
-        decision.reason ?? 'tainted args',
+        decision.matchedPattern,
         (decision.taintSources ?? []).map((s) => s.toolName),
       );
     }
@@ -206,7 +206,13 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
   /// Server → agent for ONE JSON-RPC element (JSON body or SSE event): matched to the request it
   /// answers, validated and screened (reply-screen.ts), then audit, persistence and taint.
   /// Returns what the agent may receive, or null to drop it.
-  async function screenServerElement(
+  /// Screens one server element; the decision's audit record is stored before it is answered.
+  async function screenServerElement(...args: Parameters<typeof screenElement>): ReturnType<typeof screenElement> {
+    const out = await screenElement(...args);
+    await audit.settled();
+    return out;
+  }
+  async function screenElement(
     el: unknown,
     pending: PendingRequests,
     transport: 'http' | 'sse',
@@ -348,7 +354,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         if (params && typeof params.name === 'string') {
           let reply: JsonRpcMessage | 'drop' | null;
           try {
-            reply = gateToolCall(m, params.name, params.arguments);
+            reply = await gateToolCall(m, params.name, params.arguments);
           } catch (err) {
             // Fail closed: arguments the gate cannot serialise (e.g. nested too deeply) are not forwarded.
             process.stderr.write(`blindseal[http]: request screening failed (${err instanceof Error ? err.message : String(err)}); not forwarded\n`);
@@ -362,6 +368,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       forwarded.push(el);
     }
 
+    await audit.settled(); // decisions are on record before anything is answered or forwarded
     // Everything was answered by the proxy: nothing goes upstream.
     if (elements.length > 0 && forwarded.length === 0) {
       if (synthetic.length === 0) { res.writeHead(202); res.end(); return; } // only dropped notifications

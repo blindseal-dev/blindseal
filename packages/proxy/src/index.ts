@@ -58,6 +58,8 @@ Detection (env)
   BLINDSEAL_LAYER2_THRESHOLD     cosine distance cutoff for L2 (default 0.35)
   BLINDSEAL_SCAN_BUDGET_MS       L0/L1 time allowance per message (default 2000); a message not fully
                                  scanned within it is blocked in block mode, flagged in warn mode
+  BLINDSEAL_SCAN_WORKERS         scan worker threads (default: CPUs - 1, between 2 and 4)
+  BLINDSEAL_MAX_BLOB_BYTES       largest embedded file screened (default 10485760); larger is blocked
   BLINDSEAL_LAYER3_PROVIDER      ollama | anthropic | openai | custom  (default: off — L3 runs only when set;
                                  provider API keys in the environment never enable it)
   BLINDSEAL_LAYER3_MODEL         model id override

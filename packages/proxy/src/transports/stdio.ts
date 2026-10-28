@@ -126,13 +126,13 @@ export function startProxy(cmd: string, args: string[]): void {
   /// Gate ONE tools/call element. Returns the synthetic reply when it must not be forwarded.
   /// An id-less tools/call (a notification) is screened and gated the same way; when blocked it
   /// is dropped ('drop': nothing to reply to) instead of answered.
-  function gateToolCall(msg: JsonRpcMessage): JsonRpcMessage | 'drop' | null {
+  async function gateToolCall(msg: JsonRpcMessage): Promise<JsonRpcMessage | 'drop' | null> {
     if (msg.method !== 'tools/call') return null;
     const params = msg.params as { name?: unknown; arguments?: unknown } | undefined;
     const name = params && typeof params.name === 'string' ? params.name : null;
     if (!name) return null;
     // Outbound screen (L0 + L1) on the arguments before anything else sees them.
-    const outbound = inspectToolCallArguments(name, params?.arguments, config.mode);
+    const outbound = await inspectToolCallArguments(name, params?.arguments, config.mode);
     if (outbound.verdict !== 'clean') {
       process.stderr.write(
         `blindseal: ${outbound.verdict} (L${outbound.layer ?? '?'}) arguments to '${name}' (mode=${config.mode}, ${outbound.action === 'block' ? 'not forwarded' : 'forwarded'})\n`,
@@ -187,7 +187,7 @@ export function startProxy(cmd: string, args: string[]): void {
       return buildCapabilityBlockedResponse(
         msg.id,
         name,
-        decision.reason ?? 'tainted args',
+        decision.matchedPattern,
         (decision.taintSources ?? []).map((s) => s.toolName),
       ); // do NOT forward the original call to the child
     }
@@ -199,7 +199,14 @@ export function startProxy(cmd: string, args: string[]): void {
   // the server. What is forwarded is re-serialised from the parsed value the gate screened, so a
   // server that resolves duplicate keys differently cannot see arguments the gate did not.
   const inRl = createInterface({ input: process.stdin });
+  // Lines are handled one at a time, in order (screening is async: it runs in the scan worker).
+  let inChain: Promise<void> = Promise.resolve();
   inRl.on('line', (line) => {
+    inChain = inChain.then(() => handleAgentLine(line)).catch((err) => {
+      process.stderr.write(`blindseal: agent message handling failed (${err instanceof Error ? err.message : String(err)}); not forwarded\n`);
+    });
+  });
+  async function handleAgentLine(line: string): Promise<void> {
     if (!line.trim()) return;
     let parsed: unknown;
     try { parsed = parseJson(line); } catch { parsed = undefined; }
@@ -211,7 +218,7 @@ export function startProxy(cmd: string, args: string[]): void {
     }
     /// Gate one element; a gate that throws (e.g. arguments nested too deeply to serialise)
     /// fails closed: the call is answered with an error and never forwarded.
-    const gate = (el: unknown): JsonRpcMessage | 'drop' | null => {
+    const gate = async (el: unknown): Promise<JsonRpcMessage | 'drop' | null> => {
       const problem = inboundProblem(el);
       if (problem) {
         process.stderr.write(`blindseal: refused an agent message (${problem}); not forwarded\n`);
@@ -219,7 +226,7 @@ export function startProxy(cmd: string, args: string[]): void {
         return isPlainObject(el) && !('id' in el) ? 'drop' : (invalidRequestReply(id, problem) as JsonRpcMessage);
       }
       try {
-        return gateToolCall(el as JsonRpcMessage);
+        return await gateToolCall(el as JsonRpcMessage);
       } catch (err) {
         process.stderr.write(`blindseal: request screening failed (${err instanceof Error ? err.message : String(err)}); not forwarded\n`);
         const id = (el as JsonRpcMessage).id;
@@ -230,15 +237,17 @@ export function startProxy(cmd: string, args: string[]): void {
       const replies: JsonRpcMessage[] = [];
       const forward: unknown[] = [];
       for (const el of parsed) {
-        const reply = gate(el);
+        const reply = await gate(el);
         if (reply === 'drop') continue;
         if (reply) replies.push(reply); else { pending.track(el); forward.push(el); }
       }
+      await audit.settled(); // decisions are on record before anything is answered or forwarded
       if (replies.length > 0) process.stdout.write(JSON.stringify(replies) + '\n');
       if (forward.length > 0) childStdin.write(JSON.stringify(forward) + '\n');
       return;
     }
-    const reply = gate(parsed);
+    const reply = await gate(parsed);
+    await audit.settled();
     if (reply === 'drop') return;
     if (reply) {
       process.stdout.write(JSON.stringify(reply) + '\n');
@@ -246,9 +255,10 @@ export function startProxy(cmd: string, args: string[]): void {
     }
     pending.track(parsed);
     childStdin.write(JSON.stringify(parsed) + '\n');
-  });
+  }
   inRl.on('close', () => {
-    childStdin.end();
+    // After the lines still being screened have been forwarded.
+    void inChain.then(() => childStdin.end());
   });
 
   // server → agent. Every message the server writes is parsed, matched to the agent request it
@@ -275,7 +285,13 @@ export function startProxy(cmd: string, args: string[]): void {
   }
 
   /// One server → agent element. Returns what to send to the agent, or null to drop it.
-  async function screenServerElement(el: unknown): Promise<Record<string, unknown> | null> {
+  /// Screens one server element; the decision's audit record is stored before it is answered.
+  async function screenServerElement(...args: Parameters<typeof screenElement>): ReturnType<typeof screenElement> {
+    const out = await screenElement(...args);
+    await audit.settled();
+    return out;
+  }
+  async function screenElement(el: unknown): Promise<Record<string, unknown> | null> {
     const s = await screenServerMessage(el, pending, config.mode);
     if (s.error !== undefined) {
       audit.log(screeningErrorEntry(isPlainObject(el) ? el : {}, s.label, 'detection', s.error));

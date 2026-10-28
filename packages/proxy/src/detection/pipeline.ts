@@ -7,8 +7,9 @@ import type { JudgeContext } from './clients/types.js';
 import type { DetectionResult } from './types.js';
 import { runStreamingPipeline, readStreamThreshold } from './streaming.js';
 import { emitDegradedWarningOnce, emitLayer2UnavailableNotice } from './degraded-state.js';
-import { redact } from '@blindseal/redactor';
 import { ScanBudget, isBudgetResult } from './scan-budget.js';
+import { scanText, redactText } from './scan-pool.js';
+import { outboundVerdict, outboundClean } from './scan-ops.js';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
 const L2_DEFAULT_THRESHOLD = 0.35;
@@ -49,10 +50,10 @@ export async function runPipeline(text: string, context?: JudgeContext, opts?: P
   // Layer 0: deterministic decode-then-L1. Catches encoded-payload attacks before L1
   // sees the raw text. Only fires when decoded content trips L1 — not on mere presence
   // of base64 or hex (which is common in benign tool responses).
-  const l0 = screenLayer0(text, budget);
+  // Both run in a scan worker (scan-pool.ts), off the event loop.
+  const { l0, l1: l1OrNull } = await scanText(text, budget);
   if (l0.fired) return makeLayer0Result(l0);
-
-  const l1 = screenLayer1(text, budget);
+  const l1 = l1OrNull!; // Layer 0 did not fire, so Layer 1 ran
   // Not fully scanned within the budget: never handed to the model layers to be cleared.
   if (isBudgetResult(l1)) return l1;
 
@@ -64,7 +65,7 @@ export async function runPipeline(text: string, context?: JudgeContext, opts?: P
   // Redactor: strip secrets/PII before the model layers see the text, so
   // L2 (embeddings) and L3 (the LLM judge, possibly in a TEE or remote) never observe raw
   // credentials. L0/L1 above run on the raw text; L2/L3 below run on the redacted text.
-  const redactedText = redact(opts?.modelText ?? text).redacted;
+  const redactedText = await redactText(opts?.modelText ?? text);
 
   // Layer 2.
   let l2: DetectionResult;
@@ -181,27 +182,21 @@ export async function layer2UnavailableFallback(
   }
 }
 
-/// Outbound screen for tool-call arguments (agent → server): Layer 0 + Layer 1 only, on the raw
-/// text. No model layers: arguments are screened synchronously before forwarding. A lone
-/// `large-base64-blob` hit is ignored here: file uploads and binary payloads are routinely
-/// base64 in arguments, and Layer 0 has already decoded and screened any base64 it found.
+/// Outbound screen (agent → server arguments, and every string of a server message): Layer 0 +
+/// Layer 1 only, on the raw text, in a scan worker. No model layers. A lone `large-base64-blob`
+/// hit is ignored: file uploads and binary payloads are routinely base64, and Layer 0 has already
+/// decoded and screened any base64 it found.
+export async function screenOutbound(text: string, budget = new ScanBudget()): Promise<DetectionResult> {
+  if (!text) return outboundClean();
+  const { l0, l1 } = await scanText(text, budget);
+  return outboundVerdict(l0, () => l1!);
+}
+
+/// runOutboundScreen on the calling thread: for short fixed-size inputs (SSE field lines) and
+/// tests. Everything that screens message content uses screenOutbound.
 export function runOutboundScreen(text: string, budget = new ScanBudget()): DetectionResult {
-  const clean: DetectionResult = {
-    verdict: 'clean',
-    confidence: 0,
-    reasoning: 'outbound: no layer-0/layer-1 patterns matched',
-    detectedPatterns: [],
-    layer: 1,
-    l3Status: 'skipped_gate',
-  };
-  if (!text) return clean;
-  const isBase64Only = (patterns: string[]) =>
-    patterns.length > 0 && patterns.every((p) => p.endsWith('large-base64-blob'));
-  const l0 = screenLayer0(text, budget);
-  if (l0.fired && !isBase64Only(l0.l1Match?.detectedPatterns ?? [])) return makeLayer0Result(l0);
-  const l1 = screenLayer1(text, budget);
-  if (l1.verdict === 'clean' || isBase64Only(l1.detectedPatterns)) return clean;
-  return { ...l1, layer: 1, l3Status: 'skipped_gate' };
+  if (!text) return outboundClean();
+  return outboundVerdict(screenLayer0(text, budget), () => screenLayer1(text, budget));
 }
 
 export { warmupLayer2 } from './layer2-embeddings.js';

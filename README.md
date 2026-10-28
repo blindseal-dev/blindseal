@@ -10,7 +10,9 @@ It runs on your computer between the AI agent and its tools, as a local MCP prox
 arguments of every tool call your agent sends, and every message the server sends back — every string in it, keys
 and values at any depth, single messages and batches — before passing it on. A reply that answers no request the
 agent made, or does not have the shape the protocol requires, never reaches the agent. In block mode, anything that
-fails the checks is replaced by a notice built by Blindseal; nothing from the original survives. For supported actions that pass, your
+fails the checks is replaced by a fixed notice built by Blindseal (tool, verdict, layer and pattern ids; no detector
+reasoning and nothing from the original). Embedded files are decoded and their text checked; binary image and audio
+content (a valid image or sound file of its declared type) is not screened. For supported actions that pass, your
 computer can create a zero-knowledge proof that the pattern checks passed, tied to the exact action and the rule set
 used. A Solana program verifies the proof and records it, so it can be used only once.
 
