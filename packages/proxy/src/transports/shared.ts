@@ -4,6 +4,7 @@ import { runPipeline, runOutboundScreen } from '../detection/pipeline.js';
 import { inDecisionScope } from '../detection/degraded-state.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 import { createHash } from 'node:crypto';
+import { redactStructure } from '@blindseal/redactor';
 
 export interface JsonRpcMessage {
   jsonrpc?: '2.0';
@@ -81,13 +82,22 @@ export function jsonStringLeaves(value: unknown): string {
 }
 
 export interface ResponseSurface {
-  kind: 'text' | 'resource' | 'structured' | 'structured-strings';
+  kind: 'text' | 'resource' | 'structured' | 'structured-strings' | 'extra' | 'extra-strings';
   text: string;
+  /// What L2/L3 see instead of `text` (still redacted by the pipeline). Set on the *-strings
+  /// surfaces: their newline-joined keys and values have lost the JSON key/value shape the
+  /// key-based redactor needs, so the model text is built from a key-redacted copy instead.
+  modelText?: string;
 }
 
+/// Result fields the protocol defines and the scanner handles explicitly; every other top-level
+/// field (vendor extensions, `_meta`, a server's own keys) is scanned as the 'extra' surface.
+const KNOWN_RESULT_FIELDS = new Set(['content', 'structuredContent', 'isError']);
+
 /// Every text surface of a tool-call result that reaches the agent:
-///   content[].text (type "text"), content[].resource.text (embedded resources), and
-///   structuredContent (stable-stringified).
+///   content[].text (type "text"), content[].resource.text (embedded resources),
+///   structuredContent, and any other top-level result field (stable-stringified).
+/// A JSON surface is scanned twice: as stable JSON, and as its string leaves (see jsonStringLeaves).
 export function collectResponseSurfaces(result: ToolCallResult): ResponseSurface[] {
   const out: ResponseSurface[] = [];
   for (const item of Array.isArray(result.content) ? result.content : []) {
@@ -101,18 +111,31 @@ export function collectResponseSurfaces(result: ToolCallResult): ResponseSurface
     }
   }
   if (result.structuredContent !== undefined && result.structuredContent !== null) {
-    const json = stableStringify(result.structuredContent);
-    out.push({ kind: 'structured', text: json });
-    const leaves = jsonStringLeaves(result.structuredContent);
-    if (leaves && leaves !== json) out.push({ kind: 'structured-strings', text: leaves });
+    pushJsonSurfaces(out, 'structured', result.structuredContent);
   }
+  const extra: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(result)) {
+    if (!KNOWN_RESULT_FIELDS.has(k) && v !== undefined && v !== null) extra[k] = v;
+  }
+  if (Object.keys(extra).length > 0) pushJsonSurfaces(out, 'extra', extra);
   return out;
 }
+
+function pushJsonSurfaces(out: ResponseSurface[], kind: 'structured' | 'extra', value: unknown): void {
+  const json = stableStringify(value);
+  out.push({ kind, text: json });
+  const leaves = jsonStringLeaves(value);
+  if (leaves && leaves !== json) {
+    out.push({ kind: `${kind}-strings`, text: leaves, modelText: jsonStringLeaves(redactStructure(value).value) });
+  }
+}
+
+const isLeavesSurface = (s: ResponseSurface) => s.kind === 'structured-strings' || s.kind === 'extra-strings';
 
 /// All agent-visible text of a result joined with '\n' — for previews, persistence and taint.
 export function responseText(result: ToolCallResult): string {
   return collectResponseSurfaces(result)
-    .filter((s) => s.kind !== 'structured-strings')
+    .filter((s) => !isLeavesSurface(s))
     .map((s) => s.text)
     .join('\n');
 }
@@ -188,7 +211,7 @@ export function buildCapabilityBlockedResponse(
 }
 
 /// Inspects a tool-call response: runs the detection pipeline on every agent-visible text
-/// surface (text items, embedded-resource text, structuredContent), mutates the message
+/// surface (text items, embedded-resource text, structuredContent, other result fields), mutates the message
 /// in-place based on the worst verdict + the configured mode, and returns a structured outcome
 /// the caller can use for audit/persistence. On block the whole result is replaced by the
 /// block notice, so no resource or structured payload reaches the agent.
@@ -206,7 +229,7 @@ export async function inspectToolCallResponse(
   // One decision, however many surfaces: the layer-2-unavailable notice prints at most once.
   await inDecisionScope(async () => {
     for (const surface of surfaces) {
-      const r = await runPipeline(surface.text, { toolName, mcpMethod: 'tools/call' });
+      const r = await runPipeline(surface.text, { toolName, mcpMethod: 'tools/call' }, { modelText: surface.modelText });
       if (r.degraded) degraded = true;
       if (rankVerdict(r.verdict) > rankVerdict(worst)) {
         worst = r.verdict;
@@ -215,7 +238,7 @@ export async function inspectToolCallResponse(
     }
   });
 
-  const scannedText = surfaces.filter((s) => s.kind !== 'structured-strings').map((s) => s.text).join('\n');
+  const scannedText = surfaces.filter((s) => !isLeavesSurface(s)).map((s) => s.text).join('\n');
   const contentHash = sha256Hex(scannedText);
   const base = { contentHash, scannedText, degraded };
 

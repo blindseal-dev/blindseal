@@ -7,8 +7,8 @@ issue a proof that lets Solana apps confirm specific security checks passed. You
 rules stay private.
 
 It runs on your computer between the AI agent and its tools, as a local MCP proxy. It checks both directions: the
-arguments of every tool call your agent sends, and every reply a tool sends back (text, embedded resources and
-structured results, single calls and batches), before passing them on; in block mode, anything that fails the checks
+arguments of every tool call your agent sends, and every reply a tool sends back (text, embedded resources,
+structured results and any other field of the reply, single calls and batches), before passing them on; in block mode, anything that fails the checks
 is blocked. For supported actions that pass, your
 computer can create a zero-knowledge proof that the pattern checks passed, tied to the exact action and the rule set
 used. A Solana program verifies the proof and records it, so it can be used only once.

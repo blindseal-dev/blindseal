@@ -25,12 +25,20 @@ function readL2Threshold(): number {
   return Number.isFinite(n) && n > 0 && n < 2 ? n : L2_DEFAULT_THRESHOLD;
 }
 
-export async function runPipeline(text: string, context?: JudgeContext): Promise<DetectionResult> {
+/// `modelText`: the text L2/L3 should see in place of `text`, when the caller can build a better
+/// one before redaction. For structured content it is derived from an already key-redacted
+/// object, since flattened key/value lines lose the JSON shape the key-based redactor needs.
+/// L0/L1 always run on `text`; the model text is still passed through redact().
+export interface PipelineOptions {
+  modelText?: string;
+}
+
+export async function runPipeline(text: string, context?: JudgeContext, opts?: PipelineOptions): Promise<DetectionResult> {
   // Large payloads → streaming pipeline (chunked L2 with short-circuit). The streaming
   // function recursively calls back to runPipeline for sub-threshold inputs, so it's
   // safe to gate here.
   if (text.length >= readStreamThreshold()) {
-    return runStreamingPipeline(text, context);
+    return runStreamingPipeline(text, context, undefined, opts);
   }
 
   // Layer 0: deterministic decode-then-L1. Catches encoded-payload attacks before L1
@@ -49,7 +57,7 @@ export async function runPipeline(text: string, context?: JudgeContext): Promise
   // Redactor: strip secrets/PII before the model layers see the text, so
   // L2 (embeddings) and L3 (the LLM judge, possibly in a TEE or remote) never observe raw
   // credentials. L0/L1 above run on the raw text; L2/L3 below run on the redacted text.
-  const redactedText = redact(text).redacted;
+  const redactedText = redact(opts?.modelText ?? text).redacted;
 
   // Layer 2.
   let l2: DetectionResult;

@@ -11,6 +11,10 @@ calls other than the ones listed below.
   store (`~/.blindseal/content.json`, key in `~/.blindseal/content.key`), after best-effort redaction.
 - Scan history (`BLINDSEAL_PERSIST=1`, `~/.blindseal/scans.db`) is local, opt-in and holds metadata
   only (tool, verdict, layer, fingerprint) — no text.
+- The manifest check (on by default) keeps a fingerprint of each wrapped server's `initialize` and
+  `tools/list` replies under `$XDG_CACHE_HOME/blindseal/manifests/` (default `~/.cache`; 0700
+  directory, 0600 files). It stores a hash of the server's command line, never the command, its
+  arguments or an upstream URL, so a credential passed as a flag is not kept on disk.
 - The dashboard (`blindseal run`) is served by the proxy itself on `127.0.0.1` behind a token in
   `~/.blindseal/dashboard.token`; it reads the local audit log and decrypts the store on this machine,
   and it never loads anything from the network.

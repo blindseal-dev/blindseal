@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -159,5 +160,63 @@ describe('blindseal run (CLI, no --mock)', () => {
     const r = await fetch(url + '/decisions', { headers: { authorization: `Bearer ${token}` } });
     const body = await r.json() as any;
     expect(body.items.map((d: any) => d.tool)).toContain('read_inbox');
+  }, 90000);
+});
+
+/// 0.7.0 re-audit (P2): the dashboard is served BEFORE bearer auth, so a malformed path from any
+/// local process must get an error reply, never end the server. On 2ea9196 `GET /%ZZ` threw a
+/// URIError out of the request handler and `blindseal run` exited 1.
+describe('blindseal run survives malformed unauthenticated requests', () => {
+  let child: ChildProcess | undefined;
+  let dist: string;
+  afterAll(() => {
+    child?.kill('SIGKILL');
+    if (dist) rmSync(dist, { recursive: true, force: true });
+  });
+
+  /// Raw request: fetch() would normalise or reject these paths before sending them.
+  const rawBody = (base: string, p: string) => new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const u = new URL(base);
+    const req = http.request({ host: u.hostname, port: u.port, path: p, method: 'GET' }, (res) => {
+      let body = '';
+      res.on('data', (d) => { body += String(d); });
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+  const raw = async (base: string, p: string) => (await rawBody(base, p)).status;
+
+  it('answers 400 to bad paths and directories, then still serves an authorized request', async () => {
+    dist = mkdtempSync(path.join(os.tmpdir(), 'bs-dist-'));
+    writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>d</title>');
+    mkdirSync(path.join(dist, 'assets'));
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: root, BLINDSEAL_AUDIT_DIR: auditDir };
+    delete env.BLINDSEAL_MOCK;
+    child = spawn(process.execPath, ['--import', 'tsx', path.join(here, '../src/index.ts'), 'run', '--port', '0', '--dashboard', dist], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    child.stderr!.on('data', (d) => { err += String(d); });
+    const ready = new Promise<{ url: string; token: string }>((resolve) => {
+      child!.stdout!.on('data', (d) => {
+        out += String(d);
+        const u = /local API on (http:\/\/[^\s]+\/api)/.exec(out);
+        const t = /token: (\S+)/.exec(out);
+        if (u && t) resolve({ url: u[1]!, token: t[1]! });
+      });
+    });
+    const { url, token } = await ready;
+    const base = url.replace(/\/api$/, '');
+
+    expect(await raw(base, '/%ZZ')).toBe(400);
+    expect(await raw(base, '/%E0%A4%A')).toBe(400);
+    expect(await raw(base, '//[')).toBe(400);
+    expect(await raw(base, '/assets')).toBe(200); // a directory falls back to index.html, no EISDIR
+    // Dot segments resolve inside the dashboard dir (URL normalisation), so this is the SPA page.
+    expect((await rawBody(base, '/%2e%2e/%2e%2e/etc/passwd')).body).toBe('<!doctype html><title>d</title>');
+    expect(child.exitCode, `run exited: ${err}`).toBeNull();
+    const r = await fetch(url + '/status', { headers: { authorization: `Bearer ${token}` } });
+    expect(r.status).toBe(200);
+    expect(((await r.json()) as any).mock).toBe(false);
   }, 90000);
 });

@@ -25,7 +25,7 @@ import { openAudit, genesisPrevHash, loadIdentity, type AuditEntry } from '@blin
 import { getNullifierStatus } from '@blindseal/chain-reads';
 import { blindsealHome, nearestFixturesDir, packageVersion, resolveDashboardToken, shippedFixturesDir } from '../paths.js';
 import { describeLayer3 } from '../detection/clients/factory.js';
-import { serveDashboard, sendJson, sendErr, bearerOk, readBody, wsAccept, wsFrame } from './http-common.js';
+import { guarded, serveDashboard, sendJson, sendErr, bearerOk, readBody, wsAccept, wsFrame } from './http-common.js';
 
 export interface LiveApiOptions {
   port?: number;
@@ -218,7 +218,7 @@ export function startLiveApi(opts: LiveApiOptions = {}): Promise<LiveApiHandle> 
     for (const s of wsClients) if (!s.destroyed) s.write(frame);
   };
 
-  const server: Server = createServer(async (req, res) => {
+  const server: Server = createServer(guarded(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${host}:${port}`);
     const p = url.pathname;
     const method = req.method ?? 'GET';
@@ -380,10 +380,16 @@ export function startLiveApi(opts: LiveApiOptions = {}): Promise<LiveApiHandle> 
     } catch (e) {
       return sendErr(res, 500, 'INTERNAL', (e as Error).message);
     }
-  });
+  }));
 
   server.on('upgrade', (req, socket: Socket) => {
-    const url = new URL(req.url ?? '/', `http://${host}:${port}`);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? '/', `http://${host}:${port}`);
+    } catch {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      return socket.destroy();
+    }
     const isEvents = url.pathname === '/api/events' || url.pathname === '/events';
     if (!isEvents || !bearerOk(req, token, url)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');

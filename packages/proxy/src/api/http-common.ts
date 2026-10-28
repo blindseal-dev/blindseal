@@ -3,7 +3,7 @@
 /// minimal server→client WebSocket.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHash } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const MIME: Record<string, string> = {
@@ -20,12 +20,27 @@ const DASHBOARD_CSP = [
 ].join('; ');
 
 export function serveDashboard(res: ServerResponse, dist: string, pathname: string): boolean {
-  const rel = pathname === '/' ? '/index.html' : decodeURIComponent(pathname);
+  // Runs before bearer auth, so nothing here may throw: a bad percent-encoding is a 400 and a
+  // file-system error a 404, never an exception out of the request handler.
+  let rel: string;
+  try {
+    rel = pathname === '/' ? '/index.html' : decodeURIComponent(pathname);
+  } catch {
+    res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('bad request: malformed path encoding');
+    return true;
+  }
+  if (rel.includes('\0')) return false;
   let file = path.normalize(path.join(dist, rel));
   if (!file.startsWith(path.normalize(dist + path.sep)) && file !== path.normalize(dist)) return false;
-  if (!existsSync(file)) file = path.join(dist, 'index.html'); // SPA (HashRouter) fallback
-  if (!existsSync(file)) return false;
-  const body = readFileSync(file);
+  let body: Buffer;
+  try {
+    if (!isFile(file)) file = path.join(dist, 'index.html'); // SPA (HashRouter) fallback; also directories
+    if (!isFile(file)) return false;
+    body = readFileSync(file);
+  } catch {
+    return false;
+  }
   const type = MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
   res.writeHead(200, {
     'content-type': type, 'content-length': body.length, 'content-security-policy': DASHBOARD_CSP,
@@ -36,6 +51,32 @@ export function serveDashboard(res: ServerResponse, dist: string, pathname: stri
   return true;
 }
 
+function isFile(file: string): boolean {
+  try {
+    return statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/// Wraps a request handler so nothing it throws can take the server down: these servers answer
+/// some paths before bearer auth, so an unauthenticated local request must never end the process.
+export function guarded(
+  handler: (req: IncomingMessage, res: ServerResponse) => Promise<unknown> | unknown,
+): (req: IncomingMessage, res: ServerResponse) => void {
+  return (req, res) => {
+    const fail = (e: unknown) => {
+      if (res.headersSent) return void res.destroy();
+      const bad = e instanceof URIError || (e as { code?: string })?.code === 'ERR_INVALID_URL';
+      sendErr(res, bad ? 400 : 500, bad ? 'BAD_REQUEST' : 'INTERNAL', bad ? 'malformed request path' : 'internal error');
+    };
+    try {
+      Promise.resolve(handler(req, res)).catch(fail);
+    } catch (e) {
+      fail(e);
+    }
+  };
+}
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const buf = Buffer.from(JSON.stringify(body));

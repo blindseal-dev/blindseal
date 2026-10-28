@@ -121,6 +121,25 @@ describe('response surfaces: inspectToolCallResponse (block mode)', () => {
     expect(ot.contentHash).not.toBe(oa.contentHash);
   });
 
+  // Found while rerunning the audit for 0.7.0: an injection in a field the protocol does not
+  // define (`result.meta_note`) reached the agent unscreened in 0.6.0 and on 2ea9196.
+  it('blocks and strips an injection carried only in a non-standard top-level result field', async () => {
+    const m = msg({ content: [{ type: 'text', text: 'Here are your notes.' }], meta_note: { hint: INJ } });
+    const out = await inspectToolCallResponse(m, 'notes', 'block');
+    expect(out.verdict).not.toBe('clean');
+    expectFullyStripped(m.result);
+  });
+
+  it('screens _meta and vendor fields too, and leaves a clean one untouched', async () => {
+    const bad = msg({ content: [{ type: 'text', text: 'ok' }], _meta: { vendor: { banner: INJ } } });
+    expect((await inspectToolCallResponse(bad, 'notes', 'block')).verdict).not.toBe('clean');
+    expectFullyStripped(bad.result);
+    const good = msg({ content: [{ type: 'text', text: 'ok' }], _meta: { requestId: 'r-1' }, isError: false });
+    const before = JSON.stringify(good);
+    expect((await inspectToolCallResponse(good, 'notes', 'block')).verdict).toBe('clean');
+    expect(JSON.stringify(good)).toBe(before);
+  });
+
   it('isToolCallResponse still ignores non-tool results', () => {
     expect(isToolCallResponse(tryParse('{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}')!)).toBe(false);
     expect(isToolCallResponse(tryParse('{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{}}}')!)).toBe(false);

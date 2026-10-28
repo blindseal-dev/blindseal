@@ -1,7 +1,9 @@
 /// On-disk store for manifest fingerprints. One JSON file per server key under the cache dir.
-/// Tests inject a temp directory via the `cacheDir` option.
+/// Tests inject a temp directory via the `cacheDir` option. The directory is 0700 and each file
+/// 0600; a record holds only a hash of the server's command line, never the command or its args.
 
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -13,8 +15,7 @@ import type { ManifestFingerprint } from './fingerprint.js';
 
 export interface StoredManifest {
   serverKey: string;
-  command: string;
-  args: string[];
+  commandHash: string;
   firstSeen: string;
   lastSeen: string;
   fingerprint: ManifestFingerprint;
@@ -48,7 +49,13 @@ export class ManifestStore {
   }
 
   save(record: StoredManifest): void {
-    mkdirSync(this.dir, { recursive: true });
-    writeFileSync(this.pathFor(record.serverKey), JSON.stringify(record, null, 2) + '\n');
+    mkdirSync(this.dir, { recursive: true, mode: 0o700 });
+    chmodSync(this.dir, 0o700);
+    const file = this.pathFor(record.serverKey);
+    // A fixed field list, so nothing else on the record reaches disk. Each save overwrites the
+    // file, which also drops the raw command/args an older cache kept.
+    const { serverKey, commandHash, firstSeen, lastSeen, fingerprint } = record;
+    writeFileSync(file, JSON.stringify({ serverKey, commandHash, firstSeen, lastSeen, fingerprint }, null, 2) + '\n', { mode: 0o600 });
+    chmodSync(file, 0o600); // writeFileSync's mode only applies when the file is created
   }
 }

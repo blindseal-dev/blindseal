@@ -93,7 +93,13 @@ export function computeFingerprint(
 /// Identifies an MCP server by the command + args used to spawn it. Two invocations
 /// with the same command line address the same stored manifest snapshot.
 export function serverKey(cmd: string, args: string[]): string {
-  return sha256(`${cmd}\u0000${args.join('\u0000')}`).slice(0, 16);
+  return commandLineHash(cmd, args).slice(0, 16);
+}
+
+/// Full sha256 of the command line. The cache keeps only this, never the command or its
+/// arguments: those can carry credentials (`--api-key …`, an upstream URL with a token).
+export function commandLineHash(cmd: string, args: string[]): string {
+  return sha256(`${cmd}\u0000${args.join('\u0000')}`);
 }
 
 /// Returns a human-readable diff summary between two fingerprints. Empty array if identical.

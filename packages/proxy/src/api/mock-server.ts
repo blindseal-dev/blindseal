@@ -3,7 +3,7 @@
 /// No prover, policy engine, or audit chain is involved: this reads static JSON.
 /// The real API (backed by the M1 engine) replaces the handlers, not the contract.
 import { createServer, type Server } from 'node:http';
-import { serveDashboard, sendJson, sendErr, bearerOk, readBody, wsAccept, wsFrame } from './http-common.js';
+import { guarded, serveDashboard, sendJson, sendErr, bearerOk, readBody, wsAccept, wsFrame } from './http-common.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Socket } from 'node:net';
@@ -104,7 +104,7 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
   const createdAttestations = new Map<string, any>();
   const liveDecisions = new Map<string, any>();
 
-  const server: Server = createServer(async (req, res) => {
+  const server: Server = createServer(guarded(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${host}:${port}`);
     const p = url.pathname;
     const method = req.method ?? 'GET';
@@ -298,11 +298,17 @@ export function startMockApi(opts: MockApiOptions): Promise<MockApiHandle> {
     } catch (e) {
       return sendErr(res, 500, 'VALIDATION', (e as Error).message);
     }
-  });
+  }));
 
   // WS /events — minimal server->client stream
   server.on('upgrade', (req, socket: Socket) => {
-    const url = new URL(req.url ?? '/', `http://${host}:${port}`);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? '/', `http://${host}:${port}`);
+    } catch {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      return socket.destroy();
+    }
     // canonical path is /api/events (same base as REST); /events accepted as an alias
     const isEvents = url.pathname === '/api/events' || url.pathname === '/events';
     if (!isEvents || !bearerOk(req, token, url)) {

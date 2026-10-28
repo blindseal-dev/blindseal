@@ -5,6 +5,7 @@ import {
   computeFingerprint,
   diffFingerprints,
   serverKey,
+  commandLineHash,
   type InitializeResult,
   type ManifestFingerprint,
   type ToolsListResult,
@@ -78,8 +79,7 @@ export class ManifestChecker {
 
     const record: StoredManifest = {
       serverKey: this.key,
-      command: this.cmd,
-      args: this.args,
+      commandHash: commandLineHash(this.cmd, this.args),
       firstSeen: previous?.firstSeen ?? nowIso,
       lastSeen: nowIso,
       fingerprint: current,

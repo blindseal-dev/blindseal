@@ -28,6 +28,7 @@ import { runLayer3 } from './layer3-judge.js';
 import { Layer3Unavailable } from './clients/types.js';
 import type { JudgeContext } from './clients/types.js';
 import type { DetectionResult } from './types.js';
+import type { PipelineOptions } from './pipeline.js';
 import { emitDegradedWarningOnce } from './degraded-state.js';
 import { redact } from '@blindseal/redactor';
 
@@ -75,13 +76,14 @@ export async function runStreamingPipeline(
   text: string,
   context?: JudgeContext,
   threshold = readStreamThreshold(),
+  opts?: PipelineOptions,
 ): Promise<DetectionResult & { streamingChunks?: number }> {
   if (text.length < threshold) {
     // Below threshold — non-streaming pipeline is more accurate (L1 + L2 on full text +
     // L3 logic). The streaming path is purely a perf / short-circuit optimization for
     // larger payloads.
     const { runPipeline } = await import('./pipeline.js');
-    return runPipeline(text, context);
+    return runPipeline(text, context, opts);
   }
 
   // Layer 1 on full text — cheap and catches patterns that may straddle chunk boundaries
@@ -93,7 +95,7 @@ export async function runStreamingPipeline(
 
   // Redact before the model layers, exactly as the whole-text pipeline does: L2 chunks and L3
   // see the redacted text; L1 above ran on the raw text.
-  const redactedText = redact(text).redacted;
+  const redactedText = redact(opts?.modelText ?? text).redacted;
   const chunks = chunkText(redactedText);
   let worstSuspicious: (DetectionResult & { chunkIndex: number }) | null = null;
   let chunksProcessed = 0;

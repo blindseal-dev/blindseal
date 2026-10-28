@@ -265,6 +265,14 @@ export function redactValue(value: unknown): RedactionResult {
   return { redacted: JSON.stringify(walked) ?? 'null', counts: [...ctx].map(([kind, count]) => ({ kind, count })) };
 }
 
+/// Redact a structured value by key and value and return the redacted VALUE (not serialised),
+/// for callers that derive further text from it (e.g. a list of its string leaves).
+export function redactStructure(value: unknown): { value: unknown; counts: RedactionCount[] } {
+  const ctx: Counter = new Map();
+  const walked = walk(value, ctx, 0);
+  return { value: walked, counts: [...ctx].map(([kind, count]) => ({ kind, count })) };
+}
+
 /// Total number of redactions across all kinds.
 export function redactionTotal(result: RedactionResult): number {
   return result.counts.reduce((a, c) => a + c.count, 0);
