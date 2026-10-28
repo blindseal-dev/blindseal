@@ -88,7 +88,7 @@ function normalizeOutput(out: JudgeOutput): JudgeOutput {
 
 export async function runLayer3(content: string, context?: JudgeContext): Promise<DetectionResult> {
   const client = getClient();
-  if (!client) throw new Layer3Unavailable('no API key configured (set ANTHROPIC_API_KEY or OPENAI_API_KEY)');
+  if (!client) throw new Layer3Unavailable('layer-3 is off (set BLINDSEAL_LAYER3_PROVIDER)');
 
   const timeoutMs = readTimeoutMs();
   const t0 = Date.now();

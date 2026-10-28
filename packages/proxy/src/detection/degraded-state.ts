@@ -6,8 +6,10 @@ const REPEAT_EVERY = 100; // re-emit every N L3 misses so the warning stays visi
 
 const DEGRADED_MSG =
   `blindseal WARNING: Layer 3 (LLM judge) is unavailable — Blindseal is running in DEGRADED MODE.\n` +
-  `  Detection rate drops significantly without L3. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY)\n` +
-  `  to enable full detection. Suspicious verdicts are kept as-is (not demoted to clean).\n` +
+  `  Detection rate drops significantly without L3. Set BLINDSEAL_LAYER3_PROVIDER (ollama for a\n` +
+  `  local judge; anthropic | openai | custom send redacted text to that provider) to enable it.\n` +
+  `  Provider API keys in the environment never enable L3 on their own.\n` +
+  `  Suspicious verdicts are kept as-is (not demoted to clean).\n` +
   `  Set BLINDSEAL_L3_FP_SAFE=1 to revert to the old FP-safe behaviour (demote suspicious→clean).\n`;
 
 export function emitDegradedWarningOnce(): void {

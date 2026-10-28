@@ -2,7 +2,15 @@
 /// BEFORE it reaches L2 (embeddings) and L3 (the LLM judge), so neither the local model nor
 /// a TEE/remote judge ever sees raw credentials. Replaces each hit with `[REDACTED:<kind>:<n>]`
 /// (n is a per-kind 1-based counter). Counts are returned for the Decision; originals are
-/// never retained. Rules run specific -> general so `high_entropy` is a last-resort catch-all.
+/// never retained.
+///
+/// Two passes:
+///  1. Structured, by KEY. If the text is JSON (or a JSON string value nested inside JSON), it
+///     is parsed and every value under a sensitive key (SENSITIVE_KEYS, case-insensitive, with
+///     `-`, `_`, `.` and spaces ignored) is replaced whole, whatever its length or type. JSON
+///     that does not parse (truncated, embedded in prose) is covered by a quoted-key rule.
+///  2. By VALUE pattern. Rules run specific -> general so `high_entropy` is a last-resort
+///     catch-all.
 
 export type RedactionKind =
   | 'api_key'
@@ -13,7 +21,9 @@ export type RedactionKind =
   | 'phone'
   | 'card'
   | 'ssn'
-  | 'high_entropy';
+  | 'high_entropy'
+  /// A value redacted because of its KEY (e.g. {"token":"abc"}), not its shape.
+  | 'secret_field';
 
 export interface RedactionCount {
   kind: RedactionKind;
@@ -85,7 +95,7 @@ const RULES: Rule[] = [
   { kind: 'api_key', re: /\bAKIA[0-9A-Z]{16}\b/g },
   {
     kind: 'api_key',
-    re: /\b(?:api[_-]?key|secret|password|passwd|token|authorization|bearer)\s*[:=]\s*["']?[A-Za-z0-9._\-+/=]{8,}["']?/gi,
+    re: /\b(?:api[_-]?key|client[_-]?secret|access[_-]?key|private[_-]?key|privkey|secret|password|passwd|passphrase|mnemonic|token|authorization|bearer)\s*[:=]\s*["']?[A-Za-z0-9._\-+/=]{8,}["']?/gi,
   },
   // BIP39-style mnemonic: 12 or 24 space-separated lowercase words.
   { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){23}[a-z]{3,8}\b/g },
@@ -107,20 +117,113 @@ const RULES: Rule[] = [
   },
 ];
 
-/// Redact secrets/PII from `text`. Pure: returns the redacted text and per-kind counts;
-/// retains no originals.
-export function redact(text: string): RedactionResult {
-  const counts = new Map<RedactionKind, number>();
-  let redacted = text;
+/// Keys whose VALUE is always redacted, compared after normaliseKey(). Exact matches.
+export const SENSITIVE_KEYS: readonly string[] = [
+  'password', 'passwd', 'pwd', 'passphrase',
+  'secret', 'clientsecret', 'secretkey', 'secretaccesskey',
+  'token', 'accesstoken', 'refreshtoken', 'idtoken', 'authtoken', 'sessiontoken', 'bearer',
+  'apikey', 'xapikey', 'accesskey', 'accesskeyid',
+  'authorization', 'proxyauthorization', 'auth', 'credential', 'credentials',
+  'privatekey', 'privkey', 'signingkey', 'secretphrase',
+  'seed', 'seedphrase', 'mnemonic',
+  'cookie', 'setcookie', 'session', 'sessionid', 'sid',
+];
+/// Suffixes that also mark a key sensitive (`db_password`, `githubToken`, `stripe_api_key`, …).
+/// Deliberately not `auth`, `seed`, `session` or `cookie`: those only match exactly, so
+/// `author`, `seeds` or `session_count` stay readable.
+export const SENSITIVE_KEY_SUFFIXES: readonly string[] = [
+  'password', 'passwd', 'passphrase', 'secret', 'token', 'apikey', 'accesskey', 'privatekey', 'privkey', 'mnemonic', 'seedphrase',
+];
+
+const KEY_SET = new Set(SENSITIVE_KEYS);
+
+/// Lowercase and drop `-`, `_`, `.` and whitespace: `API-Key`, `api_key`, `apiKey` → `apikey`.
+export function normaliseKey(key: string): string {
+  return key.toLowerCase().replace(/[-_.\s]/g, '');
+}
+
+/// True when a JSON/object key names a secret whose value must be redacted regardless of shape.
+export function isSensitiveKey(key: string): boolean {
+  const k = normaliseKey(key);
+  if (k.length === 0) return false;
+  if (KEY_SET.has(k)) return true;
+  return SENSITIVE_KEY_SUFFIXES.some((s) => k.length > s.length && k.endsWith(s));
+}
+
+type Counter = Map<RedactionKind, number>;
+
+function mark(ctx: Counter, kind: RedactionKind): string {
+  const n = (ctx.get(kind) ?? 0) + 1;
+  ctx.set(kind, n);
+  return `[REDACTED:${kind}:${n}]`;
+}
+
+/// `"key": value` pairs in text that is not (fully) parseable JSON — truncated output, JSON
+/// embedded in prose or logs. The value is a JSON string, number, or literal.
+const QUOTED_KEY_RE = /"((?:[^"\\]|\\.){1,128})"(\s*:\s*)("(?:[^"\\]|\\.)*"|-?\d[\d.eE+-]*|true|false)/g;
+
+function redactText(text: string, ctx: Counter): string {
+  let out = text.replace(QUOTED_KEY_RE, (m, key: string, sep: string) =>
+    isSensitiveKey(key) ? `"${key}"${sep}"${mark(ctx, 'secret_field')}"` : m,
+  );
   for (const rule of RULES) {
-    redacted = redacted.replace(rule.re, (match) => {
+    out = out.replace(rule.re, (match) => {
       if (rule.keep && !rule.keep(match)) return match;
-      const n = (counts.get(rule.kind) ?? 0) + 1;
-      counts.set(rule.kind, n);
-      return `[REDACTED:${rule.kind}:${n}]`;
+      return mark(ctx, rule.kind);
     });
   }
-  return { redacted, counts: [...counts].map(([kind, count]) => ({ kind, count })) };
+  return out;
+}
+
+const MAX_JSON_DEPTH = 4; // JSON nested inside JSON strings (MCP content text) is re-parsed this deep
+
+function walk(v: unknown, ctx: Counter, depth: number): unknown {
+  if (Array.isArray(v)) return v.map((x) => walk(x, ctx, depth));
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (isSensitiveKey(k) && val !== null && val !== '') out[k] = mark(ctx, 'secret_field');
+      else out[k] = walk(val, ctx, depth);
+    }
+    return out;
+  }
+  if (typeof v === 'string') return redactAny(v, ctx, depth + 1);
+  return v;
+}
+
+function redactAny(text: string, ctx: Counter, depth: number): string {
+  const t = text.trim();
+  if (depth <= MAX_JSON_DEPTH && (t.startsWith('{') || t.startsWith('['))) {
+    let parsed: unknown;
+    let ok = false;
+    try {
+      parsed = JSON.parse(t);
+      ok = true;
+    } catch {
+      /* not JSON: fall through to the text rules */
+    }
+    if (ok && parsed !== null && typeof parsed === 'object') {
+      const walked = walk(parsed, ctx, depth);
+      return JSON.stringify(walked, null, t.includes('\n') ? 2 : undefined);
+    }
+  }
+  return redactText(text, ctx);
+}
+
+/// Redact secrets/PII from `text`. Pure: returns the redacted text and per-kind counts;
+/// retains no originals. JSON input is parsed, redacted by key and value, and re-serialised.
+export function redact(text: string): RedactionResult {
+  const ctx: Counter = new Map();
+  const redacted = redactAny(text, ctx, 0);
+  return { redacted, counts: [...ctx].map(([kind, count]) => ({ kind, count })) };
+}
+
+/// Redact a structured value (tool-call arguments, a JSON-RPC result) by key and value, then
+/// serialise it. Use this instead of JSON.stringify-then-redact when the object is at hand.
+export function redactValue(value: unknown): RedactionResult {
+  const ctx: Counter = new Map();
+  const walked = walk(value, ctx, 0);
+  return { redacted: JSON.stringify(walked) ?? 'null', counts: [...ctx].map(([kind, count]) => ({ kind, count })) };
 }
 
 /// Total number of redactions across all kinds.

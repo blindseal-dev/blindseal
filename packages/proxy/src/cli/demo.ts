@@ -4,7 +4,7 @@
 ///
 /// Usage:
 ///   npx blindseal demo
-///   ANTHROPIC_API_KEY=... npx blindseal demo   # enables L3
+///   BLINDSEAL_LAYER3_PROVIDER=ollama npx blindseal demo   # enables L3 (local)
 
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
@@ -278,7 +278,7 @@ export async function runDemo(opts?: DemoOptions): Promise<void> {
   if (!hasL3) {
     write(
       `  ${col.yellow('⚠')} Running in degraded mode. L0+L1+L2 only.\n` +
-        `    Set ANTHROPIC_API_KEY or OLLAMA_HOST to enable full detection.\n`,
+        `    Set BLINDSEAL_LAYER3_PROVIDER (ollama for a local judge) to enable full detection.\n`,
     );
   }
   write(`${SEP}\n\n`);
@@ -348,7 +348,7 @@ export async function runDemo(opts?: DemoOptions): Promise<void> {
     if (scenario.corpus_id === 'rh-017' && !hasL3 && result.verdict !== 'malicious') {
       write(
         `\n  ${col.dim('Note:')} with L3 enabled this would typically be flagged MALICIOUS.\n` +
-          `  ${col.dim('Set ANTHROPIC_API_KEY or OLLAMA_HOST for full detection.')}\n`,
+          `  ${col.dim('Set BLINDSEAL_LAYER3_PROVIDER for full detection.')}\n`,
       );
     }
 
@@ -374,7 +374,7 @@ export async function runDemo(opts?: DemoOptions): Promise<void> {
   if (!hasL3) {
     write(
       `\n  ${col.yellow('Want better detection on subtle attacks?')}\n` +
-        `  Set ANTHROPIC_API_KEY or run Ollama locally — see README.\n`,
+        `  Set BLINDSEAL_LAYER3_PROVIDER=ollama for a local judge (or a remote provider) — see README.\n`,
     );
   }
 

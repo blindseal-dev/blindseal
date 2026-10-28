@@ -132,7 +132,7 @@ describe('blindseal demo — runDemo offline (no API key, no Ollama)', () => {
     const buf = makeBuffer();
     await runDemo({ out: buf, pauseMs: 0, noColor: true });
     expect(buf.content).toContain('degraded mode');
-    expect(buf.content).toContain('ANTHROPIC_API_KEY');
+    expect(buf.content).toContain('BLINDSEAL_LAYER3_PROVIDER');
   });
 
   it('outputs CLEAN verdict for the benign scan', async () => {
@@ -191,7 +191,7 @@ describe('blindseal demo — runDemo offline (no API key, no Ollama)', () => {
     const buf = makeBuffer();
     await runDemo({ out: buf, pauseMs: 0, noColor: true });
     const summary = buf.content.slice(buf.content.lastIndexOf('Summary'));
-    expect(summary).toMatch(/ANTHROPIC_API_KEY|OLLAMA_HOST/);
+    expect(summary).toMatch(/BLINDSEAL_LAYER3_PROVIDER/);
   });
 });
 

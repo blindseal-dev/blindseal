@@ -154,7 +154,8 @@ describe('layer3 factory', () => {
     expect(createClientFromEnv()).toBeNull();
   });
 
-  it('builds an AnthropicJudge from ANTHROPIC_API_KEY', () => {
+  it('builds an AnthropicJudge when BLINDSEAL_LAYER3_PROVIDER=anthropic (key from ANTHROPIC_API_KEY)', () => {
+    process.env.BLINDSEAL_LAYER3_PROVIDER = 'anthropic';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     const c = createClientFromEnv();
     expect(c).toBeInstanceOf(AnthropicJudge);
@@ -162,7 +163,8 @@ describe('layer3 factory', () => {
     expect(c?.modelName).toBe('claude-haiku-4-5-20251001');
   });
 
-  it('builds an OpenAICompatibleJudge from OPENAI_API_KEY', () => {
+  it('builds an OpenAICompatibleJudge when BLINDSEAL_LAYER3_PROVIDER=openai (key from OPENAI_API_KEY)', () => {
+    process.env.BLINDSEAL_LAYER3_PROVIDER = 'openai';
     process.env.OPENAI_API_KEY = 'sk-test';
     const c = createClientFromEnv();
     expect(c).toBeInstanceOf(OpenAICompatibleJudge);
@@ -189,13 +191,15 @@ describe('layer3 factory', () => {
   });
 
   it('BLINDSEAL_LAYER3_MODEL overrides the default model', () => {
+    process.env.BLINDSEAL_LAYER3_PROVIDER = 'anthropic';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.BLINDSEAL_LAYER3_MODEL = 'claude-opus-4-7';
     const c = createClientFromEnv();
     expect(c?.modelName).toBe('claude-opus-4-7');
   });
 
-  it('builds an OllamaJudge from OLLAMA_HOST', () => {
+  it('builds an OllamaJudge from BLINDSEAL_LAYER3_PROVIDER=ollama + OLLAMA_HOST', () => {
+    process.env.BLINDSEAL_LAYER3_PROVIDER = 'ollama';
     process.env.OLLAMA_HOST = 'http://localhost:11434';
     const c = createClientFromEnv();
     expect(c).toBeInstanceOf(OllamaJudge);
@@ -219,10 +223,9 @@ describe('layer3 factory', () => {
     expect(c?.modelName).toBe('mistral:7b');
   });
 
-  it('prefers ANTHROPIC over OLLAMA_HOST when explicit provider not set', () => {
+  it('ambient ANTHROPIC_API_KEY / OLLAMA_HOST without an explicit provider select nothing', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.OLLAMA_HOST = 'http://localhost:11434';
-    const c = createClientFromEnv();
-    expect(c).toBeInstanceOf(AnthropicJudge);
+    expect(createClientFromEnv()).toBeNull();
   });
 });

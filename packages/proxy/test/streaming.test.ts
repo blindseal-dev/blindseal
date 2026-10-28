@@ -157,7 +157,7 @@ describe('runStreamingPipeline — chunked L2 path', () => {
     // This documents (with a test) the mean-pooling dilution problem. A 150-char attack
     // inside a 4KB benign chunk has distance ~0.45 — above the 0.35 threshold. L1 doesn't
     // catch the paraphrased wording either. Without L3, the streaming pipeline returns clean.
-    // Operators concerned about this case should configure ANTHROPIC_API_KEY (L3).
+    // Operators concerned about this case should configure L3 (BLINDSEAL_LAYER3_PROVIDER).
     const payload = makePayload(850_000, { at: 800_000, text: L2_ONLY_ATTACK });
     const r = await runStreamingPipeline(payload);
     // Documenting the current behavior — NOT claiming it's desirable.

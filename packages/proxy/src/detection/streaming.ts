@@ -13,8 +13,8 @@
 /// signal averaged with the filler — distance to the corpus rises above threshold and L2
 /// returns clean. L1 (regex) still catches explicit injections at any size, and L3 (if
 /// configured) still runs on the full payload when any chunk was borderline. For maximum
-/// recall on paraphrased attacks in noisy contexts, operators should configure L3 (set
-/// ANTHROPIC_API_KEY) or set BLINDSEAL_STREAM_THRESHOLD very high to keep using the whole-text
+/// recall on paraphrased attacks in noisy contexts, operators should configure L3
+/// (BLINDSEAL_LAYER3_PROVIDER) or set BLINDSEAL_STREAM_THRESHOLD very high to keep using the whole-text
 /// pipeline. Sentence-level chunking is on the v2 roadmap.
 ///
 /// Sizes are tuned against the embedder context (bge-small ~512 tokens ≈ 2KB English):
@@ -29,6 +29,7 @@ import { Layer3Unavailable } from './clients/types.js';
 import type { JudgeContext } from './clients/types.js';
 import type { DetectionResult } from './types.js';
 import { emitDegradedWarningOnce } from './degraded-state.js';
+import { redact } from '@blindseal/redactor';
 
 const L1_MALICIOUS_SHORT_CIRCUIT = 0.85;
 export const DEFAULT_STREAM_THRESHOLD = 8 * 1024;
@@ -90,7 +91,10 @@ export async function runStreamingPipeline(
     return { ...l1, layer: 1 };
   }
 
-  const chunks = chunkText(text);
+  // Redact before the model layers, exactly as the whole-text pipeline does: L2 chunks and L3
+  // see the redacted text; L1 above ran on the raw text.
+  const redactedText = redact(text).redacted;
+  const chunks = chunkText(redactedText);
   let worstSuspicious: (DetectionResult & { chunkIndex: number }) | null = null;
   let chunksProcessed = 0;
 
@@ -132,7 +136,7 @@ export async function runStreamingPipeline(
   // the full text. Otherwise the whole thing is clean.
   if (worstSuspicious) {
     try {
-      const l3 = await runLayer3(text, context);
+      const l3 = await runLayer3(redactedText, context);
       return { ...l3, l3Status: 'ran', streamingChunks: chunksProcessed };
     } catch (err) {
       if (!(err instanceof Layer3Unavailable)) {

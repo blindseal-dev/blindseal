@@ -4,6 +4,7 @@ import { startScanHttp } from './transports/scan-http.js';
 import { runDemo } from './cli/demo.js';
 import { runHistoryCli } from './cli/history.js';
 import { packageVersion } from './paths.js';
+import { layer3StartupLine } from './detection/clients/factory.js';
 
 const HELP = `blindseal — a local MCP proxy that screens every tool call, keeps a hash-chained audit
 log, and produces zero-knowledge attestations verifiable on Solana.
@@ -42,14 +43,16 @@ Proxy flags
 Detection (env)
   BLINDSEAL_MODE                 block (default) | warn | log
   BLINDSEAL_LAYER2_THRESHOLD     cosine distance cutoff for L2 (default 0.35)
-  BLINDSEAL_LAYER3_PROVIDER      anthropic | openai | ollama | custom  (default: auto-detect from key)
+  BLINDSEAL_LAYER3_PROVIDER      ollama | anthropic | openai | custom  (default: off — L3 runs only when set;
+                                 provider API keys in the environment never enable it)
   BLINDSEAL_LAYER3_MODEL         model id override
   BLINDSEAL_LAYER3_BASE_URL      base URL override (ollama or custom endpoint)
   BLINDSEAL_LAYER3_TIMEOUT_MS    judge call hard timeout (default 15000)
   BLINDSEAL_L3_FP_SAFE           1 = demote suspicious→clean when L3 unavailable
-  ANTHROPIC_API_KEY              BYO key for Layer 3 (Anthropic)  ← strongly recommended
-  OPENAI_API_KEY                 BYO key for Layer 3 (OpenAI / compat)
-  OLLAMA_HOST                    Ollama base URL (default: http://localhost:11434); set to enable offline L3
+  BLINDSEAL_LAYER3_API_KEY       key for the chosen provider (anthropic/openai also read ANTHROPIC_API_KEY /
+                                 OPENAI_API_KEY, but only once the provider is chosen explicitly)
+  OLLAMA_HOST                    Ollama base URL when BLINDSEAL_LAYER3_PROVIDER=ollama (default http://localhost:11434)
+  The active judge is printed at startup: layer-3 judge: local | remote:<provider> | off
 
 Capability firewall (env, default off)
   BLINDSEAL_CAPABILITY                 1 to enable taint-tracking + gate
@@ -217,6 +220,7 @@ function main(): void {
     process.exit(2);
   }
 
+  process.stderr.write(layer3StartupLine());
   if (parsed.transport === 'http') {
     startHttpProxy({ upstream: parsed.upstream!, listenPort: parsed.port!, listenHost: parsed.host });
     return;
