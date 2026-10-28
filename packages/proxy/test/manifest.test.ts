@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {
   ManifestChecker,
   ManifestStore,
+  openManifestChecker,
   computeFingerprint,
   diffFingerprints,
   serverKey,
@@ -175,7 +176,7 @@ describe('ManifestStore', () => {
     );
     store.save({
       serverKey: 'k1',
-      commandHash: 'h',
+      commandHash: 'a'.repeat(64),
       firstSeen: '2026-01-01T00:00:00.000Z',
       lastSeen: '2026-01-01T00:00:00.000Z',
       fingerprint: fp,
@@ -326,5 +327,107 @@ describe('manifest cache keeps no command-line credentials', () => {
     expect(readFileSync(old, 'utf8')).not.toContain('old-canary-999');
     expect(statSync(old).mode & 0o777).toBe(0o600);
     expect(statSync(tmpDir).mode & 0o777).toBe(0o700);
+  });
+});
+
+/// 0.7.0 re-audit (P2): legacy records were only sanitised when that exact server ran again and
+/// completed tools/list. Opening the cache now migrates every record first.
+describe('manifest cache migration on open', () => {
+  let root: string;
+  let dir: string;
+  const prevUmask = process.umask(0o022);
+  beforeEach(() => {
+    root = mkdtempSync(path.join(os.tmpdir(), 'blindseal-migrate-'));
+    dir = path.join(root, 'manifests');
+    mkdirSync(dir, { recursive: true, mode: 0o755 });
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+  afterAll(() => { process.umask(prevUmask); });
+
+  /// A record exactly as 0.6.0 wrote it: raw command and args, 0644.
+  function legacy(cmd: string, args: string[]): string {
+    const key = serverKey(cmd, args);
+    const file = path.join(dir, `${key}.json`);
+    writeFileSync(file, JSON.stringify({
+      serverKey: key, command: cmd, args, firstSeen: '2026-10-01T00:00:00.000Z', lastSeen: '2026-10-01T00:00:00.000Z',
+      fingerprint: { fingerprint: 'f'.repeat(64), serverName: 'old', tools: [] },
+    }, null, 2), { mode: 0o644 });
+    return file;
+  }
+  const everything = () => readdirSync(dir).map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n');
+  function expectClean(secret: string) {
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+    expect(everything()).not.toContain(secret);
+    for (const f of readdirSync(dir)) {
+      expect(statSync(path.join(dir, f)).mode & 0o777).toBe(0o600);
+      const rec = JSON.parse(readFileSync(path.join(dir, f), 'utf8'));
+      expect(Object.keys(rec).sort()).toEqual(['commandHash', 'fingerprint', 'firstSeen', 'lastSeen', 'serverKey']);
+      expect(rec.commandHash).toMatch(/^[0-9a-f]{64}$/);
+    }
+  }
+
+  it('rotated credential: the record for the OLD key is purged although that command line never runs again', () => {
+    const old = legacy('node', ['srv.mjs', '--api-key', 'rotated-away-canary']);
+    const c = new ManifestChecker('node', ['srv.mjs', '--api-key', 'the-new-key'], { mode: 'on', cacheDir: dir });
+    c.observeInitialize({ serverInfo: { name: 'srv', version: '1' } });
+    c.observeToolsList({ tools: [{ name: 't', inputSchema: {} }] });
+    c.finalizeIfReady();
+    expect(readFileSync(old, 'utf8')).not.toContain('rotated-away-canary');
+    expectClean('rotated-away-canary');
+    expectClean('the-new-key');
+  });
+
+  it('retired server: a record for a server that is never started again is migrated', () => {
+    legacy('python', ['-m', 'retired_srv', '--token', 'retired-secret-canary']);
+    legacy('http', ['https://mcp.example/sse?token=url-canary-42']);
+    new ManifestStore(dir); // opening the cache is enough
+    expectClean('retired-secret-canary');
+    expectClean('url-canary-42');
+    expect(readdirSync(dir)).toHaveLength(2); // migrated, not merely deleted: drift detection keeps working
+  });
+
+  it('startup with no completed tools/list still migrates (the check never finalises)', () => {
+    legacy('node', ['srv.mjs', '--password', 'never-listed-canary']);
+    const c = new ManifestChecker('node', ['srv.mjs', '--password', 'never-listed-canary'], { mode: 'on', cacheDir: dir });
+    c.observeInitialize({ serverInfo: { name: 'srv', version: '1' } }); // no tools/list ever arrives
+    expect(c.finalizeIfReady()).toBeNull();
+    expectClean('never-listed-canary');
+  });
+
+  it('with the manifest check off, opening the transport still migrates the cache', () => {
+    legacy('node', ['srv.mjs', '--api-key', 'check-off-canary']);
+    expect(openManifestChecker('node', ['x'], { mode: 'off', cacheDir: dir })).toBeNull();
+    expectClean('check-off-canary');
+  });
+
+  it('a migrated legacy record keeps its identity: same command line → unchanged', () => {
+    const args = ['srv.mjs', '--api-key', 'k'];
+    legacy('node', args);
+    const c = new ManifestChecker('node', args, { mode: 'on', cacheDir: dir });
+    c.observeInitialize({ serverInfo: { name: 'srv', version: '1' } });
+    c.observeToolsList({ tools: [] });
+    expect(c.finalizeIfReady()?.status).toBe('drift'); // the legacy fingerprint differs; the record was found
+  });
+
+  it('unreadable records, stray files and symlinks are deleted, never followed', () => {
+    const outside = path.join(root, 'outside.json');
+    writeFileSync(outside, 'keep me', { mode: 0o644 });
+    writeFileSync(path.join(dir, '0123456789abcdef.json'), '{"command":"node","args":["--api-key","garbage-canary"', { mode: 0o644 });
+    writeFileSync(path.join(dir, 'notes.txt'), 'stray-canary');
+    symlinkSync(outside, path.join(dir, 'fedcba9876543210.json'));
+    new ManifestStore(dir);
+    expect(readdirSync(dir)).toEqual([]);
+    expect(readFileSync(outside, 'utf8')).toBe('keep me');
+    expect(statSync(outside).mode & 0o777).toBe(0o644);
+  });
+
+  it('a cache path that is a symlink is refused, not chmod-ed through', () => {
+    const real = path.join(root, 'real');
+    mkdirSync(real, { mode: 0o755 });
+    const link = path.join(root, 'link');
+    symlinkSync(real, link);
+    const store = new ManifestStore(link);
+    expect(store.refused).toBeTruthy();
+    expect(statSync(real).mode & 0o777).toBe(0o755);
   });
 });
