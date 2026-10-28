@@ -1,6 +1,6 @@
 /// `blindseal dashboard` — open the local dashboard. If a proxy is already listening on the
 /// local API port, print its URL (with the shared token in the fragment) and open the browser;
-/// otherwise start `blindseal run --mock` first and open that.
+/// otherwise start `blindseal run` (live data from this machine) first and open that.
 import { spawn } from 'node:child_process';
 import { dashboardTokenPath, resolveDashboardToken } from '../paths.js';
 import { runRun } from './run.js';
@@ -14,13 +14,15 @@ Flags
   --port <n>          local API port (default 7777)
   --host <addr>       local API host (default 127.0.0.1)
   --no-open           print the URL only, do not launch a browser
+  --mock              if nothing is listening, start the sample-data server instead of live data
   --help, -h          this help
 
-If nothing is listening, \`blindseal run --mock\` is started for you (Ctrl-C to stop it).
+If nothing is listening, \`blindseal run\` is started for you over the decisions recorded on this
+machine (Ctrl-C to stop it); with --mock, \`blindseal run --mock\` (sample data) instead.
 The URL carries the token from ${'~/.blindseal/dashboard.token'} in its fragment; it never leaves this machine.
 `;
 
-export interface DashboardOptions { port: number; host: string; open: boolean; help?: boolean }
+export interface DashboardOptions { port: number; host: string; open: boolean; mock?: boolean; help?: boolean }
 
 export function parseDashboardArgs(argv: string[]): DashboardOptions {
   const out: DashboardOptions = { port: 7777, host: '127.0.0.1', open: true };
@@ -30,6 +32,7 @@ export function parseDashboardArgs(argv: string[]): DashboardOptions {
     else if (a === '--port') out.port = Number.parseInt(argv[++i] ?? '', 10);
     else if (a === '--host') out.host = argv[++i] ?? out.host;
     else if (a === '--no-open') out.open = false;
+    else if (a === '--mock') out.mock = true;
     else if (a && a.startsWith('--')) throw new Error(`unknown flag: ${a}`);
   }
   if (!Number.isFinite(out.port) || out.port <= 0) throw new Error('--port must be a positive integer');
@@ -80,8 +83,9 @@ export async function runDashboardCli(argv: string[]): Promise<number> {
     return 0;
   }
 
-  process.stdout.write(`blindseal dashboard: nothing listening on ${o.host}:${o.port} — starting \`blindseal run --mock\`\n`);
-  const running = runRun(['--mock', '--port', String(o.port), '--host', o.host]);
+  const runArgs = [...(o.mock ? ['--mock'] : []), '--port', String(o.port), '--host', o.host];
+  process.stdout.write(`blindseal dashboard: nothing listening on ${o.host}:${o.port} — starting \`blindseal run${o.mock ? ' --mock' : ''}\`\n`);
+  const running = runRun(runArgs);
   // wait (briefly) for the server, then open
   for (let i = 0; i < 20; i++) {
     if (await isListening(o.host, o.port, 500)) {

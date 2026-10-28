@@ -137,7 +137,7 @@ export function Decisions() {
         </div>
       )}
 
-      {empty ? <Onboard upstreams={status?.upstreams ?? []} /> : (
+      {empty ? <Onboard upstreams={status?.upstreams ?? []} mock={status?.mock} auditDir={status?.dataSource?.auditDir} /> : (
         <>
           <section className="panel d01-filters reveal" aria-label="Filters">
             <div className="filter-bar">
@@ -232,22 +232,25 @@ function Row({ d, onOpen }: { d: Decision; onOpen: () => void }) {
   );
 }
 
-function Onboard({ upstreams }: { upstreams: { name: string; transport: string; healthy: boolean }[] }) {
+function Onboard({ upstreams, mock, auditDir }: { upstreams: { name: string; transport: string; healthy: boolean }[]; mock?: boolean; auditDir?: string }) {
   return (
     <section className="panel d01-onboard reveal" aria-labelledby="d01-onboard-title">
       <div className="d01-onboard__lead">
-        <p className="eyebrow">Fresh install</p>
+        <p className="eyebrow">{mock ? 'Sample data' : 'Nothing recorded yet'}</p>
         <h2 className="d01-onboard__title" id="d01-onboard-title">No decisions yet.</h2>
-        <p className="d01-onboard__body">Point an agent at the proxy and every tool call appears here as it is screened.</p>
-        <p className="d01-listen"><span className="live-dot" aria-hidden />Listening on <span className="d01-mono">127.0.0.1:7777</span><span className="d01-listen__sep">·</span>audit #0</p>
+        <p className="d01-onboard__body">Every tool call a wrapped MCP server handles is screened and recorded in the local audit chain; it appears here as soon as it is recorded.</p>
+        <p className="d01-listen"><span className="live-dot" aria-hidden />Reading <span className="d01-mono">{auditDir ?? '~/.blindseal'}</span></p>
       </div>
       <ol className="d01-steps">
-        <li className="d01-step"><span className="d01-step__n">01</span><div className="d01-step__main"><p className="d01-step__t">Route an MCP server through the proxy</p>
-          <p className="d01-step__d">Launch the server with <span className="d01-mono">blindseal run</span> in front of it.</p></div></li>
-        <li className="d01-step"><span className="d01-step__n">02</span><div className="d01-step__main"><p className="d01-step__t">Upstreams detected <span className="num">{upstreams.length}</span></p>
-          <ul className="d01-ups">{upstreams.map((u) => <li key={u.name} className="d01-up" data-healthy={u.healthy}><Icon name={u.transport === 'http' ? 'radio' : 'terminal'} /><span className="d01-up__name">{u.name}</span><span className="d01-up__t">{u.transport}</span></li>)}</ul></div></li>
-        <li className="d01-step"><span className="d01-step__n">03</span><div className="d01-step__main"><p className="d01-step__t">Or run mock mode</p>
-          <div className="d01-mockline"><code className="code">$ BLINDSEAL_MOCK=1 blindseal run</code></div></div></li>
+        <li className="d01-step"><span className="d01-step__n">01</span><div className="d01-step__main"><p className="d01-step__t">Route your MCP servers through the proxy</p>
+          <div className="d01-mockline"><code className="code">$ blindseal init --wrap</code></div>
+          <p className="d01-step__d">or wrap one by hand: <span className="d01-mono">blindseal -- &lt;server command&gt;</span></p></div></li>
+        {upstreams.length > 0 && (
+          <li className="d01-step"><span className="d01-step__n">02</span><div className="d01-step__main"><p className="d01-step__t">Upstreams detected <span className="num">{upstreams.length}</span></p>
+            <ul className="d01-ups">{upstreams.map((u) => <li key={u.name} className="d01-up" data-healthy={u.healthy}><Icon name={u.transport === 'http' ? 'radio' : 'terminal'} /><span className="d01-up__name">{u.name}</span><span className="d01-up__t">{u.transport}</span></li>)}</ul></div></li>
+        )}
+        <li className="d01-step"><span className="d01-step__n">{upstreams.length > 0 ? '03' : '02'}</span><div className="d01-step__main"><p className="d01-step__t">Just exploring? Sample data</p>
+          <div className="d01-mockline"><code className="code">$ blindseal run --mock</code></div></div></li>
       </ol>
     </section>
   );

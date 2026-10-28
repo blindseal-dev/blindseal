@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useStatus, useEventStream } from '../api/hooks';
+import { SampleDataBanner } from './SampleDataBanner';
 
 // The dashboard frame is the kit's shell.js (BS.mountShell): sidebar with the sliding pill, glass
 // top bar with the title/actions/connection pill, status bar, route cover. React owns only
@@ -82,6 +83,7 @@ export function Shell({ actions, children }: { actions?: ReactNode; children: Re
   // adopts it into .bs-work. The actions slot is the shell's [data-actions] (a portal).
   return (
     <>
+      <SampleDataBanner />
       {children}
       {shell && actions ? createPortal(actions, shell.refs.actions) : null}
     </>

@@ -15,6 +15,9 @@ export default defineConfig({
     // (streaming tests + integration tests both hammer the WASM runtime).
     testTimeout: 20000,
     hookTimeout: 60000,
+    // test/edge-cases.test.ts holds the CPU-bound load scenarios (a 500 KB streaming scan,
+    // 1000 back-to-back calls through L2); `pnpm test` runs it on its own after the rest so its
+    // timing budgets measure the proxy, not contention with other files.
     // Many files spawn real proxies (each loads the layer-2 model at startup and runs a child
     // MCP server). Running one file per core starves those children of CPU and turns readiness
     // into a race against fixed timeouts; half the cores keeps the suite deterministic.

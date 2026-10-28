@@ -23,7 +23,8 @@ Usage:
 --wrap flags: --yes (skip confirmation), --dry-run (preview only), --config <path> (one file)
 
 Next steps after init:
-  blindseal run --mock                 local API + dashboard over sample data
+  blindseal run                        local API + dashboard over the decisions recorded here
+  blindseal run --mock                 the same over sample data
   blindseal -- <server command>        wrap a stdio MCP server
 `;
 
@@ -108,7 +109,8 @@ export async function runInit(argv: string[]): Promise<number> {
   }
   lines.push('');
   lines.push('Next:');
-  lines.push('  blindseal run --mock             local API + dashboard over sample data');
+  lines.push('  blindseal run                    local API + dashboard over the decisions recorded here');
+  lines.push('  blindseal run --mock             the same over sample data (for demos)');
   lines.push('  blindseal -- <server command>    wrap a stdio MCP server (e.g. blindseal -- npx -y @modelcontextprotocol/server-filesystem /tmp)');
   lines.push('  blindseal init --wrap            rewrite your Claude MCP configs to go through blindseal');
   process.stdout.write(lines.join('\n') + '\n');

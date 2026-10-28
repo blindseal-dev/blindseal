@@ -17,6 +17,7 @@
 ///   toolcall.json: { "toolName": "transfer_sol", "args": { "to": "...", "lamports": 1000000, "from": "..." } }
 import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, chmodSync, rmSync } from 'node:fs';
+import { redactValue } from '@blindseal/redactor';
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -234,6 +235,11 @@ export async function runAttestCli(argv: string[]): Promise<number> {
   // The chain records the canonical verdict (CLEAN_VERDICT = "pass" for a clean call), the same
   // vocabulary `blindseal verify` and the browser verifier test a clean window against.
   const entry = audit.chain.append({ decisionId, verdict: toChainVerdict(verdict), payloadHash });
+  // What the decision was about, for the local dashboard: redacted, encrypted (like the proxy's).
+  audit.content.put(decisionId, {
+    type: 'attest', direction: 'request', toolName: call.toolName, verdict, patterns: result.detectedPatterns,
+    args: redactValue(call.args ?? null).redacted,
+  });
   process.stdout.write(`decision ${decisionId}: ${verdict} → ${entry.verdict} (audit #${entry.index} ${entry.hash.slice(0, 18)}…)\n`);
   if (verdict !== 'clean') {
     process.stderr.write(`blindseal attest: verdict is ${verdict} (${result.detectedPatterns.join(', ')}); no attestation for a non-clean call\n`);
@@ -265,6 +271,12 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     const status = await runProver(prover, proverArgs(tmpPayload), track);
     if (status !== 0) { process.stderr.write(`blindseal attest: prover exited ${status}\n`); return 1; }
     recordProofSeconds((Date.now() - t0) / 1000);
+    // A copy beside the audit chain, where `blindseal run` (the local dashboard) lists attestations.
+    try {
+      const dir = path.join(o.auditDir, 'attestations');
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      writeFileSync(path.join(dir, `${decisionId}.json`), readFileSync(o.out), { mode: 0o600 });
+    } catch { /* best effort: the attestation at --out is the deliverable */ }
     process.stdout.write(`attestation written: ${o.out} (decision ${decisionId}, payloadHash ${payloadHash}, expirySlot ${expiry}${expiry === NO_EXPIRY_SLOT ? ' = no expiry' : ''})\n`);
     return 0;
   });

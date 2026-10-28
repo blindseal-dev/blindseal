@@ -16,8 +16,9 @@ Usage
   blindseal init --wrap [--yes --dry-run --config <path>]
                                                     route the MCP servers in your Claude configs through blindseal
   blindseal init --unwrap                           restore those configs from their backups
-  blindseal run --mock                              local API + dashboard over bundled sample data
-  blindseal dashboard                               open the dashboard (starts run --mock if nothing is listening)
+  blindseal run                                     local API + dashboard over the decisions recorded on this machine
+  blindseal run --mock                              the same over bundled sample data (dashboard shows "Sample data")
+  blindseal dashboard                               open the dashboard (starts \`run\` if nothing is listening)
   blindseal -- <command> [args...]                  wrap a stdio MCP server
   blindseal --transport http --upstream <url>       proxy a remote MCP server over HTTP
   blindseal --transport scan-http [--port <n>]      stand-alone POST /scan endpoint
@@ -192,7 +193,7 @@ function main(): void {
         return; // the server keeps the process alive
       case 'dashboard':
         import('./cli/dashboard.js').then((m) => m.runDashboardCli(rest)).then((code) => { if (code !== 0) process.exit(code); }).catch((e) => fail('blindseal dashboard', e));
-        return; // may keep a `run --mock` alive
+        return; // may keep a `run` alive
       case 'demo':
         runDemo().then(() => process.exit(0)).catch((e) => fail('blindseal demo', e));
         return;

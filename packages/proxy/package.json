@@ -26,7 +26,7 @@
     "build": "tsup && node scripts/bundle-assets.mjs",
     "dev": "tsx src/index.ts",
     "view-audit": "tsx src/cli/audit-view.ts",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/edge-cases.test.ts && vitest run test/edge-cases.test.ts",
     "typecheck": "tsc --noEmit",
     "bench:l3": "tsx bench/layer3-floor.ts",
     "prepack": "pnpm build"

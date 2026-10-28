@@ -51,6 +51,10 @@ export interface Decision {
   attestationId?: string;
   /** Layer 2 (embeddings) was unavailable for this decision: judged by L3 if configured, else L0/L1. */
   degraded?: boolean;
+  /** Live mode: the chain entry was a screening error (response withheld, fail closed). */
+  error?: boolean;
+  /** Live mode: what kind of decision (detection | capability | manifest | error | attest). */
+  kind?: string;
 }
 
 export interface DecisionPage {
@@ -69,6 +73,10 @@ export interface PolicyRule {
 }
 
 export interface Policy {
+  /** Live mode: the policy file is shown, not edited (the engine does not load toggles from it). */
+  readOnly?: boolean;
+  /** Live mode: where the policy was read from. */
+  source?: string;
   root: string;
   version: number;
   updatedAt: string;
@@ -148,8 +156,11 @@ export interface Status {
   detectorVersion: string;
   audit: AuditHead;
   prover: { available: boolean };
-  l3: { mode: 'local' | 'tee' | 'off' };
+  l3: { mode: 'local' | 'tee' | 'off' | 'remote'; label?: string };
+  /** true = bundled sample data (`blindseal run --mock`), not this machine's decisions. */
   mock: boolean;
+  /** Live mode: where the data is read from. */
+  dataSource?: { auditDir: string; policyPath: string; attestationsDir: string };
 }
 
 // WebSocket /events frames: mock-server broadcasts `{ type, data }`.
