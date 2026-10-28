@@ -156,8 +156,10 @@ export function startProxy(cmd: string, args: string[]): void {
   // a tainted source get rewritten into a synthetic [BLINDSEAL_CAPABILITY_BLOCKED] response
   // and never reach the server.
   /// Gate ONE tools/call element. Returns the synthetic reply when it must not be forwarded.
-  function gateToolCall(msg: JsonRpcMessage): JsonRpcMessage | null {
-    if (msg.method !== 'tools/call' || msg.id == null) return null;
+  /// An id-less tools/call (a notification) is screened and gated the same way; when blocked it
+  /// is dropped ('drop': nothing to reply to) instead of answered.
+  function gateToolCall(msg: JsonRpcMessage): JsonRpcMessage | 'drop' | null {
+    if (msg.method !== 'tools/call') return null;
     const params = msg.params as { name?: unknown; arguments?: unknown } | undefined;
     const name = params && typeof params.name === 'string' ? params.name : null;
     if (!name) return null;
@@ -186,11 +188,11 @@ export function startProxy(cmd: string, args: string[]): void {
         });
       }
       if (outbound.action === 'block' && outbound.result) {
-        return buildOutboundBlockedResponse(msg.id, name, outbound.result); // never forwarded
+        return msg.id == null ? 'drop' : buildOutboundBlockedResponse(msg.id, name, outbound.result); // never forwarded
       }
     }
 
-    toolNameById.set(msg.id, name);
+    if (msg.id != null) toolNameById.set(msg.id, name);
 
     const decision = mergeDecisions(
       decideCapability(name, params?.arguments, taint, config.capability),
@@ -215,6 +217,7 @@ export function startProxy(cmd: string, args: string[]): void {
       process.stderr.write(
         `blindseal: capability-block tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
       );
+      if (msg.id == null) return 'drop';
       toolNameById.delete(msg.id);
       return buildCapabilityBlockedResponse(
         msg.id,
@@ -238,14 +241,16 @@ export function startProxy(cmd: string, args: string[]): void {
       const forward: unknown[] = [];
       for (const el of parsed) {
         const reply = el && typeof el === 'object' && !Array.isArray(el) ? gateToolCall(el as JsonRpcMessage) : null;
+        if (reply === 'drop') continue;
         if (reply) replies.push(reply); else forward.push(el);
       }
       if (replies.length > 0) process.stdout.write(JSON.stringify(replies) + '\n');
-      if (forward.length > 0) childStdin.write((replies.length > 0 ? JSON.stringify(forward) : line) + '\n');
+      if (forward.length > 0) childStdin.write((forward.length !== parsed.length ? JSON.stringify(forward) : line) + '\n');
       return;
     }
     if (parsed && typeof parsed === 'object') {
       const reply = gateToolCall(parsed as JsonRpcMessage);
+      if (reply === 'drop') return;
       if (reply) {
         process.stdout.write(JSON.stringify(reply) + '\n');
         return;

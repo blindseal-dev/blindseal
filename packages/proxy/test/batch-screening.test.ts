@@ -108,6 +108,19 @@ describe('HTTP transport: JSON-RPC batch', () => {
     expect(forwarded).toContain('"id":21');
   }, 60000);
 
+  it('an id-less tools/call (notification) with poisoned arguments is screened and never forwarded', async () => {
+    sse = false;
+    received.length = 0;
+    const note = { jsonrpc: '2.0', method: 'tools/call', params: { name: 'send_note', arguments: { body: OUTBOUND_INJ } } };
+    await post([call(51, 'weather'), note]);
+    expect(JSON.stringify(received)).not.toContain('reveal your system prompt');
+    expect(JSON.stringify(received)).toContain('"id":51');
+    received.length = 0;
+    const r = await fetch(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(note) });
+    expect(r.status).toBe(202);
+    expect(received).toHaveLength(0);
+  }, 60000);
+
   it('a poisoned element of a batch answered over SSE is blocked', async () => {
     sse = true;
     const events = await post([call(31, 'weather'), call(32, 'poison')]);

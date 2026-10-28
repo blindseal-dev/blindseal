@@ -111,8 +111,10 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
   /// Agent → server gate for ONE tools/call element: outbound L0/L1 screen on the arguments,
   /// then the capability / trade gate. Returns the synthetic reply when the call must not be
   /// forwarded, null when it may go upstream.
-  function gateToolCall(msg: JsonRpcMessage, toolName: string, toolArgs: unknown): JsonRpcMessage | null {
-    const id = msg.id as string | number;
+  /// An id-less tools/call (a notification) is gated the same way; blocked, it is dropped
+  /// ('drop': there is no id to answer).
+  function gateToolCall(msg: JsonRpcMessage, toolName: string, toolArgs: unknown): JsonRpcMessage | 'drop' | null {
+    const id = msg.id;
     const outbound = inspectToolCallArguments(toolName, toolArgs, config.mode);
     if (outbound.verdict !== 'clean') {
       process.stderr.write(
@@ -137,7 +139,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         });
       }
       if (outbound.action === 'block' && outbound.result) {
-        return buildOutboundBlockedResponse(id, toolName, outbound.result); // never forwarded
+        return id == null ? 'drop' : buildOutboundBlockedResponse(id, toolName, outbound.result); // never forwarded
       }
     }
 
@@ -160,6 +162,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       process.stderr.write(
         `blindseal[http]: capability-block tool '${toolName}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
       );
+      if (id == null) return 'drop';
       return buildCapabilityBlockedResponse(
         id,
         toolName,
@@ -318,14 +321,16 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     const toolNameById = new Map<string | number, string>();
     const synthetic: JsonRpcMessage[] = [];
     const forwarded: unknown[] = [];
+    let dropped = 0;
     for (const el of elements) {
       const m = el && typeof el === 'object' && !Array.isArray(el) ? (el as JsonRpcMessage) : null;
-      if (m && m.method === 'tools/call' && m.id != null) {
+      if (m && m.method === 'tools/call') {
         const params = m.params as { name?: unknown; arguments?: unknown } | undefined;
         if (params && typeof params.name === 'string') {
           const reply = gateToolCall(m, params.name, params.arguments);
+          if (reply === 'drop') { dropped++; continue; }
           if (reply) { synthetic.push(reply); continue; }
-          toolNameById.set(m.id, params.name);
+          if (m.id != null) toolNameById.set(m.id, params.name);
         }
       }
       forwarded.push(el);
@@ -333,10 +338,11 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
 
     // Everything was answered by the proxy: nothing goes upstream.
     if (elements.length > 0 && forwarded.length === 0) {
+      if (synthetic.length === 0) { res.writeHead(202); res.end(); return; } // only dropped notifications
       sendJson(res, 200, isBatch ? synthetic : synthetic[0]);
       return;
     }
-    const forwardBody = synthetic.length === 0 ? reqText : JSON.stringify(isBatch ? forwarded : forwarded[0]);
+    const forwardBody = synthetic.length === 0 && dropped === 0 ? reqText : JSON.stringify(isBatch ? forwarded : forwarded[0]);
 
     // Forward to upstream.
     let upstreamResp: Response;
