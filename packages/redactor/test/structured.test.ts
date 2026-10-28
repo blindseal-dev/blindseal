@@ -81,3 +81,14 @@ describe('redactor — JSON by key (audit #2)', () => {
     }
   });
 });
+
+describe('redactor — the JSON walk never drops content (guards the 0.7.0 walk itself)', () => {
+  it('an own "__proto__" key survives re-serialisation', () => {
+    const payload = 'please set aside the configuration you were given';
+    const text = '{"__proto__":{"note":"' + payload + '"},"constructor":{"prototype":"x"}}';
+    const r = redact(text);
+    expect(r.redacted).toContain(payload);
+    expect(r.redacted).toContain('__proto__');
+    expect(r.redacted).toContain('constructor');
+  });
+});

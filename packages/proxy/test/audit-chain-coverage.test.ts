@@ -32,7 +32,7 @@ import { startScanHttp } from '../src/transports/scan-http.js';
 
 const CANARY = 'cAnArY-7f3e9'; // short and plain: no value pattern would catch it
 const RESPONSE_CANARY = 'Rz9';  // a secret the upstream returns under a "token" key
-const RECIPIENT = 'NotAllowlisted1111111111111111111111111111';
+const RECIPIENT = CANARY; // the trade guard's reason string names the recipient
 
 let root: string;
 let auditDir: string;
@@ -98,11 +98,19 @@ function allFiles(dir: string): string[] {
   });
 }
 
+/// Everything the in-process proxies write to stderr (MCP clients persist a server's stderr).
+let stderrText = '';
+const realStderrWrite = process.stderr.write.bind(process.stderr);
+
 let proxyWarn: string;  // trade guard: unknown payee → warn
 let proxyBlock: string; // trade guard: unknown payee → block
 let scan: string;
 
 beforeAll(async () => {
+  (process.stderr as unknown as { write: unknown }).write = (chunk: string | Uint8Array, ...rest: unknown[]) => {
+    stderrText += String(chunk);
+    return (realStderrWrite as (...a: unknown[]) => boolean)(chunk, ...rest);
+  };
   root = mkdtempSync(path.join(os.tmpdir(), 'bs-chain-cov-'));
   auditDir = path.join(root, 'audit');
   const up = await upstream();
@@ -115,6 +123,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  (process.stderr as unknown as { write: unknown }).write = realStderrWrite;
   for (const s of servers) await new Promise<void>((r) => s.close(() => r()));
   process.env = savedEnv;
   rmSync(root, { recursive: true, force: true });
@@ -183,6 +192,8 @@ describe('every decision path appends a content-free chain entry (audit #5)', ()
       expect(raw.includes(CANARY), f).toBe(false);
       expect(raw.includes(`"${RESPONSE_CANARY}"`), f).toBe(false);
     }
+    expect(stderrText).toMatch(/capability-(warn|block)/); // the warn/block lines were written…
+    expect(stderrText.includes(CANARY)).toBe(false);       // …without the argument values
     const meta = readFileSync(path.join(root, 'metadata.jsonl'), 'utf8');
     expect(meta).not.toMatch(/Preview|reasoning|"reason"|"args"|"text"/);
   });
@@ -195,13 +206,23 @@ describe('stdio proxy (real pipeline) records to the chain (audit #5)', () => {
     try {
       const env: Record<string, string | undefined> = { ...savedEnv };
       for (const k of Object.keys(env)) if (k.startsWith('BLINDSEAL_')) delete env[k];
-      Object.assign(env, { BLINDSEAL_AUDIT_DIR: path.join(dir, 'audit'), BLINDSEAL_AUDIT_LOG: path.join(dir, 'metadata.jsonl'), BLINDSEAL_MANIFEST_CHECK: 'off' });
+      Object.assign(env, {
+        BLINDSEAL_AUDIT_DIR: path.join(dir, 'audit'), BLINDSEAL_AUDIT_LOG: path.join(dir, 'metadata.jsonl'), BLINDSEAL_MANIFEST_CHECK: 'off',
+        BLINDSEAL_TRADE_GUARD: '1', BLINDSEAL_TRADE_ALLOWLIST: 'allowlisted-only', BLINDSEAL_TRADE_ALLOWLIST_MODE: 'warn',
+      });
       const child = spawn(process.execPath, ['--import', 'tsx', path.join(here, '../src/index.ts'), '--', process.execPath, path.join(here, 'fixture-mcp-server.mjs')], { stdio: ['pipe', 'pipe', 'pipe'], env: env as NodeJS.ProcessEnv });
-      child.stderr.on('data', () => {});
+      let childErr = '';
+      child.stderr.on('data', (d) => (childErr += String(d)));
       const rl = createInterface({ input: child.stdout });
-      const reply = new Promise<string>((resolve) => rl.on('line', (l) => { if (l.includes('"id":7')) resolve(l); }));
+      const replies = new Set<number>();
+      const both = new Promise<void>((resolve) => rl.on('line', (l) => {
+        const id = (JSON.parse(l) as { id?: number }).id;
+        if (id === 7 || id === 8) replies.add(id);
+        if (replies.size === 2) resolve();
+      }));
       child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'read_file', arguments: { path: 'clean.txt', api_key: CANARY, note: CANARY } } }) + '\n');
-      await reply;
+      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'send_payment', arguments: { recipient: CANARY, amount: 5 } } }) + '\n');
+      await both;
       await new Promise((r) => setTimeout(r, 200));
       // SIGKILL: chain appends are synchronous, so nothing is pending; the stdio proxy's own
       // SIGTERM handling is not what this test is about.
@@ -209,9 +230,12 @@ describe('stdio proxy (real pipeline) records to the chain (audit #5)', () => {
       child.kill('SIGKILL');
       await exited;
       const c = openAudit(path.join(dir, 'audit')).chain;
-      expect(c.all().map((e) => e.verdict)).toEqual(['pass', 'pass']);
+      // read_file: capability pass + detection pass; send_payment: capability warn (flag) + detection pass
+      expect(c.all().map((e) => e.verdict).sort()).toEqual(['flag', 'pass', 'pass', 'pass']);
       expect(c.verify().ok).toBe(true);
       for (const f of allFiles(dir)) expect(readFileSync(f).includes(CANARY), f).toBe(false);
+      expect(childErr).toMatch(/capability-warn/);
+      expect(childErr.includes(CANARY)).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

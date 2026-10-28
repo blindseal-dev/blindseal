@@ -151,7 +151,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         }
         if (decision.action === 'block') {
           process.stderr.write(
-            `blindseal[http]: capability-block tool '${toolName}' (${decision.reason})\n`,
+            `blindseal[http]: capability-block tool '${toolName}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
           );
           const blocked = buildCapabilityBlockedResponse(
             reqMsg.id,
@@ -164,7 +164,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
         }
         if (decision.action === 'warn') {
           process.stderr.write(
-            `blindseal[http]: capability-warn tool '${toolName}' (${decision.reason})\n`,
+            `blindseal[http]: capability-warn tool '${toolName}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
           );
         }
       }

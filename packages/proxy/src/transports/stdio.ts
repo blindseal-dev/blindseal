@@ -166,11 +166,11 @@ export function startProxy(cmd: string, args: string[]): void {
         }
         if (decision.action === 'warn') {
           process.stderr.write(
-            `blindseal: capability-warn tool '${name}' (${decision.reason})\n`,
+            `blindseal: capability-warn tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
           );
         } else if (decision.action === 'block') {
           process.stderr.write(
-            `blindseal: capability-block tool '${name}' (${decision.reason})\n`,
+            `blindseal: capability-block tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
           );
           const blocked = buildCapabilityBlockedResponse(
             msg.id,

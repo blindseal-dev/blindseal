@@ -180,7 +180,10 @@ const MAX_JSON_DEPTH = 4; // JSON nested inside JSON strings (MCP content text) 
 function walk(v: unknown, ctx: Counter, depth: number): unknown {
   if (Array.isArray(v)) return v.map((x) => walk(x, ctx, depth));
   if (v && typeof v === 'object') {
-    const out: Record<string, unknown> = {};
+    // Null prototype: a parsed own "__proto__" key must stay a plain property. On a `{}` the
+    // assignment would set the prototype instead and JSON.stringify would drop that subtree,
+    // hiding it from L2/L3.
+    const out: Record<string, unknown> = Object.create(null);
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       if (isSensitiveKey(k) && val !== null && val !== '') out[k] = mark(ctx, 'secret_field');
       else out[k] = walk(val, ctx, depth);

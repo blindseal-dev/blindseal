@@ -20,6 +20,7 @@ const TOOLCALL = path.join(FIX, 'mainnet-toolcall.json');
 const REAL_ATTESTATION = path.join(FIX, 'attestation-mainnet.json');
 
 let dir: string;
+const savedHome = process.env.HOME;
 async function capture(fn: () => Promise<number>): Promise<{ code: number; out: string }> {
   const orig = process.stdout.write.bind(process.stdout);
   let out = '';
@@ -29,6 +30,8 @@ async function capture(fn: () => Promise<number>): Promise<{ code: number; out: 
 
 beforeAll(() => {
   dir = mkdtempSync(path.join(os.tmpdir(), 'bs-e2e-'));
+  // attest runs in-process and records the proof time under ~/.blindseal: keep it in the sandbox.
+  process.env.HOME = dir;
   const prover = path.join(dir, 'mock-prover.mjs');
   writeFileSync(prover, `#!/usr/bin/env node
 import { copyFileSync } from 'node:fs';
@@ -37,7 +40,10 @@ copyFileSync(${JSON.stringify(REAL_ATTESTATION)}, a[a.indexOf('--out') + 1]);
 `);
   chmodSync(prover, 0o755);
 });
-afterAll(() => rmSync(dir, { recursive: true, force: true }));
+afterAll(() => {
+  if (savedHome === undefined) delete process.env.HOME; else process.env.HOME = savedHome;
+  rmSync(dir, { recursive: true, force: true });
+});
 
 describe('attest → disclose → verify (CLI + browser) agree on the clean verdict (audit #10)', () => {
   it('a real attest decision discloses as a clean window in both verifiers', async () => {
