@@ -79,6 +79,26 @@ jobs:
             exit 1
           fi
 
+  dependency-audit:
+    name: dependency audit (prod, critical/high)
+    # `pnpm audit --prod` over the lockfile (no install needed). Fails on any critical/high advisory that is
+    # not in scripts/audit-allowlist.json; every allowlisted id is triaged as not reachable in SECURITY.md
+    # ("Dependency advisories") and expires, so it is re-checked. Moderate/low are reported, not failing.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: pnpm audit --prod (allowlist applied)
+        run: node scripts/audit-deps.mjs
+
   rust:
     name: rust (host crates + programs, test + clippy)
     # Host-buildable crates only. crates/guest is skipped: it builds for the SP1 riscv target with the

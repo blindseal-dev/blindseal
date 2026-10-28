@@ -24,7 +24,7 @@
     "prepack": "pnpm build"
   },
   "dependencies": {
-    "@solana/web3.js": "1.98.0",
+    "@solana/web3.js": "1.98.4",
     "blindseal-verifier-wasm": "workspace:*"
   },
   "devDependencies": {

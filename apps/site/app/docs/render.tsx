@@ -52,7 +52,7 @@ function BlockView({ b }: { b: Block }) {
       <div className="docs-links">
         {b.links.map((l) => l.external
           ? <a key={l.href} className="docs-link" href={l.href} target="_blank" rel="noopener">{l.label}<i data-lucide={l.icon ?? 'arrow-up-right'} /></a>
-          : <Link key={l.href} className="docs-link" href={l.href}>{l.label}<i data-lucide={l.icon ?? 'arrow-right'} /></Link>)}
+          : <Link prefetch={false} key={l.href} className="docs-link" href={l.href}>{l.label}<i data-lucide={l.icon ?? 'arrow-right'} /></Link>)}
       </div>
     );
     case 'api': return <ApiTable endpoints={b.endpoints} />;
@@ -75,9 +75,9 @@ function PrevNext({ pg }: { pg: DocPage }) {
   const prev = pg.prev ? BY_SLUG[pg.prev] : undefined, next = pg.next ? BY_SLUG[pg.next] : undefined;
   return (
     <nav className="docs-pn" aria-label="Previous and next page">
-      {prev ? <Link className="docs-pn__card" href={prev.path} rel="prev"><span className="docs-pn__k"><i data-lucide="chevron-left" />Previous</span><span className="docs-pn__t">{prev.title}</span><span className="docs-pn__g">{BUCKET_OF[prev.slug]}</span></Link>
+      {prev ? <Link prefetch={false} className="docs-pn__card" href={prev.path} rel="prev"><span className="docs-pn__k"><i data-lucide="chevron-left" />Previous</span><span className="docs-pn__t">{prev.title}</span><span className="docs-pn__g">{BUCKET_OF[prev.slug]}</span></Link>
             : <p className="docs-pn__start">You are on the first page.</p>}
-      {next ? <Link className="docs-pn__card docs-pn__card--next" href={next.path} rel="next"><span className="docs-pn__k">Next<i data-lucide="chevron-right" /></span><span className="docs-pn__t">{next.title}</span><span className="docs-pn__g">{BUCKET_OF[next.slug]}</span></Link>
+      {next ? <Link prefetch={false} className="docs-pn__card docs-pn__card--next" href={next.path} rel="next"><span className="docs-pn__k">Next<i data-lucide="chevron-right" /></span><span className="docs-pn__t">{next.title}</span><span className="docs-pn__g">{BUCKET_OF[next.slug]}</span></Link>
             : <p className="docs-pn__end">End of the docs.</p>}
     </nav>
   );

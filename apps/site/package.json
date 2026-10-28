@@ -14,11 +14,11 @@
     "bundle-kit": "node scripts/bundle-kit.mjs"
   },
   "dependencies": {
-    "next": "14.2.15",
+    "next": "15.5.28",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "blindseal-verifier-wasm": "workspace:*",
-    "@solana/web3.js": "1.98.0",
+    "@solana/web3.js": "1.98.4",
     "@blindseal/chain-reads": "workspace:*",
     "@noble/ed25519": "2.1.0"
   },
@@ -27,6 +27,6 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "typescript": "5.6.3",
-    "@playwright/test": "1.48.2"
+    "@playwright/test": "1.55.1"
   }
 }

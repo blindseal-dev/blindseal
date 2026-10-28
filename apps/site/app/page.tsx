@@ -1,4 +1,6 @@
 import Link from 'next/link';
+// prefetch={false} on every next/link: Next 15 inserts <link rel=preload as=style> for a prefetched route's
+// CSS into <head>, so the DOM would change after hydration (e2e/mismatch-probe.mts must see none).
 import type { Metadata } from 'next';
 import { pageMeta, ONE_LINER } from './meta';
 import { CopyButton } from './copy';
@@ -30,8 +32,8 @@ export default function Home() {
           <p className="hero__sub">Blindseal checks your agent&apos;s requests for hidden threats, right on your computer. For supported actions, it can issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security rules stay private.</p>
           <p className="hero__note">Today&apos;s proof covers checks for known attack patterns. It does not guarantee that an action is safe.</p>
           <div className="hero__actions">
-            <Link className="btn primary hero__primary" href="/how-it-works">See how it works<i data-lucide="arrow-right" /></Link>
-            <Link className="hero__secondary" href="/docs">Install Blindseal<i data-lucide="arrow-right" /></Link>
+            <Link prefetch={false} className="btn primary hero__primary" href="/how-it-works">See how it works<i data-lucide="arrow-right" /></Link>
+            <Link prefetch={false} className="hero__secondary" href="/docs">Install Blindseal<i data-lucide="arrow-right" /></Link>
           </div>
           <ul className="hero__trust">
             <li><span className="hero__trust-ico"><i data-lucide="file-check" /></span>Checks before tools run</li>
@@ -68,7 +70,7 @@ export default function Home() {
           <p className="site-panel__body">Blindseal checks the proposed action. If it passes and supports proof creation, your computer can create a private proof tied to that payment. Once the proof is ready, the receiving app checks it before allowing the payment. The proof must still be within its time limit.</p>
           <p className="site-panel__body"><strong>Blindseal does not hold, send, or mix the funds.</strong> It checks and proves; the receiving app decides.</p>
         </div>
-        <p className="s01-more"><Link className="btn link s01-link" href="/how-it-works">See how it works<i data-lucide="arrow-right" className="nudge" /></Link></p>
+        <p className="s01-more"><Link prefetch={false} className="btn link s01-link" href="/how-it-works">See how it works<i data-lucide="arrow-right" className="nudge" /></Link></p>
       </section>
 
       <section className="site-section reveal" aria-labelledby="hp-h">
@@ -105,7 +107,7 @@ export default function Home() {
           <h2 className="hm-scope__title" id="scope-h">What does the proof guarantee?</h2>
           <p className="callout__body">It proves that the checked request, tied to a specific action, passed checks for known attack patterns under a specific rule set and software version.</p>
           <p className="callout__body">Other checks run on your computer too, but their results are not yet proven by this proof. A valid proof does <strong>not</strong> mean an agent or transaction is guaranteed safe.</p>
-          <p className="callout__body"><Link className="btn link" href="/docs/scope">Read exactly what is proven<i data-lucide="arrow-right" className="nudge" /></Link></p>
+          <p className="callout__body"><Link prefetch={false} className="btn link" href="/docs/scope">Read exactly what is proven<i data-lucide="arrow-right" className="nudge" /></Link></p>
         </div>
       </section>
 
@@ -124,8 +126,8 @@ export default function Home() {
         <h2 className="section-head__title" id="cta-h">Want to see proof that an action was checked?</h2>
         <p className="section-head__body hm-cta__body">Try the sample proof in your browser, or add Blindseal between your agent and its tools.</p>
         <div className="hero__actions">
-          <Link className="btn primary hero__primary" href="/verify">Try a sample proof<i data-lucide="arrow-right" /></Link>
-          <Link className="hero__secondary" href="/docs">Install Blindseal<i data-lucide="arrow-right" /></Link>
+          <Link prefetch={false} className="btn primary hero__primary" href="/verify">Try a sample proof<i data-lucide="arrow-right" /></Link>
+          <Link prefetch={false} className="hero__secondary" href="/docs">Install Blindseal<i data-lucide="arrow-right" /></Link>
           <div className="install"><span className="install__tile" aria-hidden>$</span><code className="install__cmd">{INSTALL}</code><CopyButton text={INSTALL} label="Copy the install command" /></div>
         </div>
       </section>

@@ -63,8 +63,11 @@ test.afterAll(async () => { site?.kill(); await new Promise<void>((r) => rpc.clo
 test('explorer: direct submissions are not counted as a consumer program', async ({ page }) => {
   await page.goto(BASE + '/explorer');
   await expect(page.locator('#ex')).toHaveAttribute('data-view', 'ready');
-  await expect(page.locator('[data-odo="total"]')).toHaveText('3');
-  await expect(page.locator('[data-odo="programs"]')).toHaveText('1', { timeout: 10_000 });
+  // an odometer's value is its screen-reader text once the kit has mounted it (the visible digits are
+  // aria-hidden tick cells, so textContent reads "33"), and its plain text before that
+  const odo = (k: string) => page.locator(`[data-odo="${k}"]`).evaluate((e) => (e.querySelector('.sr-only') ?? e).textContent);
+  await expect.poll(() => odo('total')).toBe('3');
+  await expect.poll(() => odo('programs'), { timeout: 10_000 }).toBe('1');
   const rows = page.locator('#ex-programs-rows .ex-row');
   await expect(rows).toHaveCount(1);
   await expect(rows.first().locator('.hash')).toHaveAttribute('data-hash', GATE);

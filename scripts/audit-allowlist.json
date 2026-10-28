@@ -1,0 +1,38 @@
+[
+  {
+    "id": "GHSA-w5hq-g745-h8pq",
+    "package": "uuid",
+    "reason": "uuid@8 via @solana/web3.js > jayson. The bug is in the v3/v5/v6 functions when the caller passes an output buffer. jayson only calls v4() with no buffer, so the affected code never runs.",
+    "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-528h-pc64-c93x",
+    "package": "stream-json",
+    "reason": "stream-json@1 via @solana/web3.js > jayson. web3.js loads only jayson/lib/client/browser, which never requires stream-json; only jayson's lib/utils.js (servers, package entry) requires it, and nothing here loads that.",
+    "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-hqr4-qq8f-hg3x",
+    "package": "stream-json",
+    "reason": "stream-json@1 via @solana/web3.js > jayson. web3.js loads only jayson/lib/client/browser, which never requires stream-json; the JSONC parser is not used anywhere in the tree.",
+    "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-mjw6-4jj6-33hc",
+    "package": "stream-json",
+    "reason": "stream-json@1 via @solana/web3.js > jayson. web3.js loads only jayson/lib/client/browser, which never requires stream-json, so its Assembler never parses RPC responses (web3.js uses JSON.parse via fetch).",
+    "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-wrjc-x8rr-h8h6",
+    "package": "react-router",
+    "reason": "react-router@6.30 in the local dashboard. Fixed only in v7. Every <Link>/navigate() target is built from a constant prefix ('/decisions/' + audit-log id, '/' + a fixed route id); no attacker-supplied path reaches navigation. The dashboard is a HashRouter SPA served on localhost.",
+    "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-337j-9hxr-rhxg",
+    "package": "react-router",
+    "reason": "react-router@6.30 in the local dashboard. Fixed only in v7. Affects only Framework/Data Mode apps doing SSR hydration (deserializeErrors); the dashboard uses Declarative Mode (HashRouter), with no SSR and no hydrationData.",
+    "expires": "2027-04-30"
+  }
+]

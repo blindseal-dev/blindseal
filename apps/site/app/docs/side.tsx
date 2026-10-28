@@ -50,7 +50,7 @@ export function DocsSide({ latest }: { latest: { version: string; dateLabel: str
             <div key={g.group} className="docs-tree__group" hidden={!g.items.some((it) => it.hit)}>
               <p className="docs-tree__head">{g.group}</p>
               {g.items.map((it) => (
-                <Link key={it.slug} className="docs-tree__item" href={it.path} data-page={it.slug} hidden={!it.hit} aria-current={path === it.path ? 'page' : undefined}>
+                <Link prefetch={false} key={it.slug} className="docs-tree__item" href={it.path} data-page={it.slug} hidden={!it.hit} aria-current={path === it.path ? 'page' : undefined}>
                   <span className="docs-tree__dot" aria-hidden="true" /><span>{it.title}</span>
                 </Link>
               ))}
@@ -62,7 +62,7 @@ export function DocsSide({ latest }: { latest: { version: string; dateLabel: str
           <p className="docs-side__k">Latest release</p>
           <p className="docs-side__v">proxy {latest.version}{latest.dateLabel && <span className="chip outline">{latest.dateLabel}</span>}</p>
           <p className="docs-side__sub">The docs track the latest proxy release.</p>
-          <Link className="docs-link" href="/changelog">Changelog<i data-lucide="arrow-up-right" /></Link>
+          <Link prefetch={false} className="docs-link" href="/changelog">Changelog<i data-lucide="arrow-up-right" /></Link>
         </div>
       </div>
     </aside>
