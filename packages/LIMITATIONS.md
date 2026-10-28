@@ -174,6 +174,12 @@ That decoder, the search past a base64-only decoy, and per-chunk zero-width dens
 proxy screening only: the proven L0/L1 (`blindseal attest`, the zk guest) keep the Rust
 detector-core's rules, which the parity gate checks byte for byte.
 
+**Planned for 0.7.1:**
+- Layer 2 latency under concurrency: one Layer 2 worker serves every message, so benign replies
+  queue behind each other (10 concurrent 64 KB replies took ~7.5 s each in CI).
+- JSON parsing off the main thread for multi-MB replies, so a single large reply no longer
+  delays `/health` by ~20 ms per MB.
+
 ### 12. False positives when Blindseal scans its own source repo (or similar)
 Self-referential FPs: a Blindseal-protected agent that browses Blindseal's own commit
 history or test fixtures will see attack-vocabulary verbatim (commit messages

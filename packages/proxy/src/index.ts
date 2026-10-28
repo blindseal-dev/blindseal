@@ -47,6 +47,9 @@ Proxy flags
   --port, --listen-port <n>           default: 8800 (http) / 9787 (scan-http)
   --host <addr>                       default: 127.0.0.1
   --server-url <url>                  logical server identifier for scan-http (default: scan-http:blindseal)
+                                      POST /scan answers {verdict, layer, detectedPatterns, contentHash};
+                                      ?verbose=1 with Authorization: Bearer <dashboard token> adds the
+                                      detectors' reasoning, which may contain input text
   --allow-degraded                    start even if the layer-2 embedding model fails to load (block
                                       mode otherwise refuses to start, exit code 4); decisions made
                                       without layer 2 are marked degraded

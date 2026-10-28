@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openAudit } from '@blindseal/audit';
 import { startHttpProxy } from '../src/transports/http.js';
+import { startScanHttp } from '../src/transports/scan-http.js';
 import { noticeText, detectionNotice } from '../src/transports/notice.js';
 
 const CANARY = 'Quokkazebralantern';
@@ -118,3 +119,41 @@ describe('template fields', () => {
     expect(t).toBe('[BLINDSEAL_BLOCKED] direction=request tool=unknown verdict=malicious layer=L1 patterns=instruction-prefix:ignore-previous. The call was not sent. Details are in the local Blindseal audit log.');
   });
 });
+
+describe('/scan returns the template by default', () => {
+  const TOKEN = 'scan-dashboard-token-for-tests';
+  async function scan(query = '', headers: Record<string, string> = {}) {
+    const srv = startScanHttp({ listenPort: 0, listenHost: '127.0.0.1', dashboardToken: TOKEN });
+    await new Promise<void>((r) => (srv.listening ? r() : srv.on('listening', () => r())));
+    const res = await fetch(`http://127.0.0.1:${(srv.address() as AddressInfo).port}/scan${query}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ text: BENIGN, toolName: 'get_weather' }),
+    });
+    const text = await res.text();
+    await new Promise<void>((r) => srv.close(() => r()));
+    return { status: res.status, text };
+  }
+
+  it('default: a quoting judge puts no input-derived text in the response', async () => {
+    const { status, text } = await scan();
+    expect(status).toBe(200);
+    expect(text).not.toContain(CANARY);
+    expect(text).not.toContain('Weather');
+    const body = JSON.parse(text);
+    expect(body).toEqual({ verdict: 'malicious', layer: 3, detectedPatterns: ['layer-3-judge'], contentHash: body.contentHash });
+    expect(body.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  }, 120_000);
+
+  it('verbose=1 without the dashboard token is refused', async () => {
+    expect((await scan('?verbose=1')).status).toBe(401);
+    expect((await scan('?verbose=1', { authorization: 'Bearer wrong' })).status).toBe(401);
+  }, 120_000);
+
+  it('verbose=1 with the dashboard token adds the reasoning, marked as possibly containing input text', async () => {
+    const { status, text } = await scan('?verbose=1', { authorization: `Bearer ${TOKEN}` });
+    expect(status).toBe(200);
+    const body = JSON.parse(text);
+    expect(body.verbose.warning).toBe('may contain input text');
+    expect(body.verbose.reasoning).toContain(CANARY);
+  }, 120_000);
+});
+

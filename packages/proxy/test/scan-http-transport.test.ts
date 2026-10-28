@@ -107,12 +107,12 @@ describe('scan-http transport', () => {
       verdict: string;
       layer: number | null;
       detectedPatterns: string[];
-      confidence: number;
     };
     expect(body.verdict).toBe('malicious');
     expect(body.layer).toBe(1);
     expect(body.detectedPatterns.length).toBeGreaterThan(0);
-    expect(body.confidence).toBeGreaterThanOrEqual(0.85);
+    // The default response is the fixed template: no reasoning, no other fields.
+    expect(Object.keys(body).sort()).toEqual(['contentHash', 'detectedPatterns', 'layer', 'verdict']);
   }, 20_000);
 
   it('POST /scan rejects body missing text field', async () => {

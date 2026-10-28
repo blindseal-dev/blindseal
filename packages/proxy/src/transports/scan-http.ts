@@ -4,6 +4,11 @@
 /// an MCP transport — it is a back-end service for external callers (e.g. a demo site)
 /// that want a verdict on free-form text.
 ///
+/// The response is the same fixed template the agent-facing notices use (notice.ts): verdict,
+/// layer, pattern ids (and the hash of the scanned text). Detector reasoning can quote the input
+/// (an AI judge explains what it read), so it is returned only on request: `?verbose=1` with the
+/// dashboard token as `Authorization: Bearer <token>`. It is always in the encrypted audit store.
+///
 /// Detection logic is reused verbatim. Every scan verdict (and every pipeline failure) is a
 /// decision and is appended to the audit hash chain like the MCP transports' decisions.
 /// Capability gating, taint tracking, manifest checking and local scan persistence are not
@@ -21,6 +26,9 @@ import { httpServerIdentifier } from './server-id.js';
 import { runPipeline } from '../detection/pipeline.js';
 import { sha256Hex } from './shared.js';
 import { createAuditLogger } from '../audit/index.js';
+import { timingSafeEqual } from 'node:crypto';
+import { resolveDashboardToken } from '../paths.js';
+import { noticePatterns } from './notice.js';
 
 export interface ScanHttpOptions {
   listenPort: number;
@@ -28,6 +36,16 @@ export interface ScanHttpOptions {
   /// Logical server identifier recorded with each scan (e.g. "https://github.com/blindseal-dev/blindseal").
   /// Per-request overrides via the serverUrl body field take precedence.
   defaultServerUrl?: string;
+  /// The token that unlocks `?verbose=1` (default: ~/.blindseal/dashboard.token, as for `blindseal run`).
+  dashboardToken?: string;
+}
+
+function tokenMatches(header: string | undefined, token: string): boolean {
+  const m = /^Bearer\s+(\S+)$/.exec(header ?? '');
+  if (!m) return false;
+  const a = Buffer.from(m[1]!);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 const DEFAULT_MAX_BODY = 256 * 1024; // 256 KB — comfortably above the demo's 8 KB cap
@@ -94,6 +112,7 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
   const audit = createAuditLogger(config.audit);
 
   const defaultServerUrl = opts.defaultServerUrl ?? 'scan-http:blindseal';
+  const dashboardToken = resolveDashboardToken(opts.dashboardToken);
 
   const server = createServer(async (req, res) => {
     const url = req.url ?? '/';
@@ -108,6 +127,11 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
 
     if (req.method !== 'POST' || path !== '/scan') {
       sendJson(res, 404, { error: 'not found' });
+      return;
+    }
+    const verbose = new URLSearchParams(url.split('?')[1] ?? '').get('verbose') === '1';
+    if (verbose && !tokenMatches(req.headers.authorization, dashboardToken)) {
+      sendJson(res, 401, { error: 'verbose=1 needs the dashboard token (Authorization: Bearer <token>)' });
       return;
     }
 
@@ -168,16 +192,24 @@ export function startScanHttp(opts: ScanHttpOptions): Server {
     await audit.settled();
     sendJson(res, 200, {
       verdict: result.verdict,
-      confidence: result.confidence,
       layer: result.layer ?? null,
-      reasoning: result.reasoning,
-      detectedPatterns: result.detectedPatterns,
-      matchedId: result.matchedId,
-      matchedCategory: result.matchedCategory,
-      distance: result.distance,
-      l3Status: result.l3Status,
-      degraded: result.degraded === true,
+      detectedPatterns: noticePatterns(result),
       contentHash,
+      ...(verbose
+        ? {
+            verbose: {
+              warning: 'may contain input text',
+              reasoning: result.reasoning,
+              detectedPatterns: result.detectedPatterns,
+              confidence: result.confidence,
+              matchedId: result.matchedId,
+              matchedCategory: result.matchedCategory,
+              distance: result.distance,
+              l3Status: result.l3Status,
+              degraded: result.degraded === true,
+            },
+          }
+        : {}),
     });
   });
 

@@ -11,6 +11,9 @@ calls other than the ones listed below.
   store (`~/.blindseal/content.json`, key in `~/.blindseal/content.key`), after best-effort redaction.
   So is the detectors' reasoning (an AI judge's explanation can quote the text it read). The agent
   only ever gets a fixed notice: tool, direction, verdict, layer and pattern ids.
+  The stand-alone scan endpoint (`--transport scan-http`, `POST /scan`) answers with the same
+  fields; it returns the reasoning only for `?verbose=1` with the dashboard token, and then marks
+  it "may contain input text".
 - Binary image and audio content (an image or audio item that is a valid file of its declared type)
   is passed to the agent without being screened. Every other embedded file is decoded and its text
   screened like any other text.
