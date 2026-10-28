@@ -30,7 +30,7 @@ import {
   type JsonRpcMessage,
 } from './shared.js';
 import { serializeSseEvent, streamScanSse } from './sse-scan.js';
-import { isPlainObject, parseErrorReply, parseJson, PendingRequests, requestScreeningErrorReply, screenServerMessage } from './reply-screen.js';
+import { inboundProblem, invalidRequestReply, isPlainObject, parseErrorReply, parseJson, PendingRequests, requestScreeningErrorReply, screenServerMessage } from './reply-screen.js';
 import { displayUrl, httpServerIdentifier } from './server-id.js';
 
 export interface HttpProxyOptions {
@@ -289,7 +289,15 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     return s.forward;
   }
 
-  const server = createServer(async (req, res) => {
+  const server = createServer((req, res) => {
+    handle(req, res).catch((err) => {
+      // Fail closed: nothing from this exchange reaches the agent, and the server keeps running.
+      process.stderr.write(`blindseal[http]: request failed (${err instanceof Error ? err.message : String(err)})\n`);
+      if (!res.headersSent) sendJson(res, 500, { error: 'proxy error' });
+      else res.destroy();
+    });
+  });
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (req.method === 'GET' && (req.url === '/health' || req.url === '/')) {
       sendJson(res, 200, { ok: true });
       return;
@@ -327,8 +335,15 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
     const forwarded: unknown[] = [];
     let dropped = 0;
     for (const el of elements) {
-      const m = el && typeof el === 'object' && !Array.isArray(el) ? (el as JsonRpcMessage) : null;
-      if (m && m.method === 'tools/call') {
+      const problem = inboundProblem(el);
+      if (problem) {
+        process.stderr.write(`blindseal[http]: refused an agent message (${problem}); not forwarded\n`);
+        if (isPlainObject(el) && !('id' in el)) { dropped++; continue; }
+        synthetic.push(invalidRequestReply(isPlainObject(el) ? el.id : undefined, problem) as JsonRpcMessage);
+        continue;
+      }
+      const m = el as JsonRpcMessage;
+      if (m.method === 'tools/call') {
         const params = m.params as { name?: unknown; arguments?: unknown } | undefined;
         if (params && typeof params.name === 'string') {
           let reply: JsonRpcMessage | 'drop' | null;
@@ -449,7 +464,7 @@ export function startHttpProxy(opts: HttpProxyOptions): Server {
       'Content-Length': Buffer.byteLength(payload).toString(),
     });
     res.end(payload);
-  });
+  }
 
   server.listen(opts.listenPort, opts.listenHost ?? '127.0.0.1', () => {
     process.stderr.write(

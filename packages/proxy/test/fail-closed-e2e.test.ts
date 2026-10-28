@@ -52,6 +52,28 @@ describe('the proxy fails closed on agent input it cannot screen', () => {
     }, 120000);
   }
 
+  it('a deeply nested message that is not a tools/call does not crash the proxy and is not forwarded', async () => {
+    const { file, log } = fixture();
+    h = spawnProxy({ fixture: file, env: { BLINDSEAL_AUDIT_DIR: path.join(dir!, 'audit') } });
+    const pad = '['.repeat(10000) + ']'.repeat(10000);
+    h.child.stdin.write(`{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"file:///x","x":${pad}}}\n`);
+    expect((await h.next(90000)).error?.code).toBe(-32700);
+    h.send({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'echo', arguments: {} } });
+    expect((await h.next(30000)).result?.content?.[0]?.text).toBe('echo');
+    expect(existsSync(log) ? readFileSync(log, 'utf8') : '').not.toContain('[[[[[[');
+  }, 120000);
+
+  it('a nested batch and a non-string tool name are refused, not forwarded', async () => {
+    const { file, log } = fixture();
+    h = spawnProxy({ fixture: file, env: { BLINDSEAL_AUDIT_DIR: path.join(dir!, 'audit') } });
+    h.child.stdin.write(`[[{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"echo","arguments":{"t":${JSON.stringify(INJ)}}}}]]\n`);
+    const a = (await h.next(90000)) as any;
+    expect((Array.isArray(a) ? a[0] : a).error?.code).toBe(-32600);
+    h.child.stdin.write(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":["echo"],"arguments":{"t":${JSON.stringify(INJ)}}}}\n`);
+    expect((await h.next(30000)).error?.code).toBe(-32600);
+    expect(existsSync(log) ? readFileSync(log, 'utf8') : '').not.toContain('attacker.example');
+  }, 120000);
+
   it('a line that is not JSON is answered with a parse error and not forwarded', async () => {
     const { file, log } = fixture();
     h = spawnProxy({ fixture: file, env: { BLINDSEAL_AUDIT_DIR: path.join(dir!, 'audit') } });

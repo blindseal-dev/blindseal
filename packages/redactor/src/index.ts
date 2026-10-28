@@ -84,10 +84,11 @@ function looksOpaque(m: string): boolean {
 /// never re-matches an already-inserted `[REDACTED:…]` marker (brackets/colons aren't in the
 /// token classes). `private_key`/`jwt`/`api_key` precede `high_entropy` so the catch-all
 /// doesn't mislabel a structured secret.
-const PROSE_WORDS = new Set(['the', 'and', 'for', 'your', 'with', 'from', 'are', 'was', 'not', 'but']); // checked: none is in the BIP39 English list
-function notProse(match: string): boolean {
-  return !match.split(/\s+/).some((w) => PROSE_WORDS.has(w));
-}
+/// A word that can be in a BIP39 mnemonic: 3–8 lowercase letters and not an English function word
+/// (none of these is in the BIP39 English list, checked). Excluding them per word, rather than
+/// rejecting a whole 12-word match, lets the regex retry at the next word: a stopword right before
+/// a real mnemonic ("save the abandon ability …") must not hide it.
+const MNEMONIC_WORD = '(?!(?:the|and|for|your|with|from|are|was|not|but)\\b)[a-z]{3,8}';
 
 const RULES: Rule[] = [
   // PEM blocks and raw 32-byte keys (eth-style 0x + 64 hex).
@@ -109,8 +110,8 @@ const RULES: Rule[] = [
   // BIP39-style mnemonic: 12 or 24 space-separated lowercase words. Ordinary prose matches the
   // shape too; a run containing an English function word (none of which is in the BIP39 list) is
   // prose, and is left for L2/L3 to read.
-  { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){23}[a-z]{3,8}\b/g, keep: notProse },
-  { kind: 'seed_phrase', re: /\b(?:[a-z]{3,8}\s+){11}[a-z]{3,8}\b/g, keep: notProse },
+  // Greedy: the whole run of 12+ such words, so a mnemonic is never cut short by where the match began.
+  { kind: 'seed_phrase', re: new RegExp(`\\b(?:${MNEMONIC_WORD}\\s+){11,}${MNEMONIC_WORD}\\b`, 'g') },
   // Email.
   { kind: 'email', re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g },
   // US SSN (before card, so the 9-digit dashed form isn't eaten as a card).

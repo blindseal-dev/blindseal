@@ -38,6 +38,11 @@ export function parseJson(text: string): unknown {
   return toNullPrototype(JSON.parse(text));
 }
 
+/// JSON-RPC messages are shallow; anything nested deeper than this is refused at parse time (the
+/// caller treats it as unparseable: never forwarded), so no later recursive step — redaction,
+/// serialisation — can overflow the stack and take the proxy down.
+export const MAX_JSON_DEPTH = 256;
+
 /// Rebuilds every plain object of a parsed value with a null prototype. Iterative: a deeply nested
 /// message must not overflow the stack here (a reviver recursed, threw at ~3000 levels, and the
 /// caller then treated the line as "not JSON").
@@ -49,13 +54,15 @@ function toNullPrototype(root: unknown): unknown {
     return o;
   };
   const top = convert(root);
-  const stack: unknown[] = [top];
+  const stack: Array<[unknown, number]> = [[top, 1]];
   while (stack.length > 0) {
-    const v = stack.pop();
+    const [v, depth] = stack.pop()!;
+    if (v === null || typeof v !== 'object') continue;
+    if (depth > MAX_JSON_DEPTH) throw new RangeError(`JSON nested deeper than ${MAX_JSON_DEPTH} levels`);
     if (Array.isArray(v)) {
-      for (let i = 0; i < v.length; i++) { v[i] = convert(v[i]); stack.push(v[i]); }
-    } else if (isPlainObject(v)) {
-      for (const k of Object.keys(v)) { v[k] = convert(v[k]); stack.push(v[k]); }
+      for (let i = 0; i < v.length; i++) { v[i] = convert(v[i]); stack.push([v[i], depth + 1]); }
+    } else {
+      for (const k of Object.keys(v as Obj)) { (v as Obj)[k] = convert((v as Obj)[k]); stack.push([(v as Obj)[k], depth + 1]); }
     }
   }
   return top;
@@ -221,11 +228,20 @@ export interface ScreenOutcome {
 /// A long string that is only base64 (image `data`, resource `blob`) gets L0/L1 on its own and
 /// is left out of the model-layer text: embedding base64 tells L2 nothing and costs seconds.
 const MEDIA_MIN = 1024;
-/// Line breaks are allowed (wrapped base64), spaces are not: prose without punctuation would
-/// otherwise pass as base64 and skip L2/L3.
+/// Line breaks are allowed (wrapped base64), spaces are not. Base64 of binary data is also
+/// mixed-case with digits throughout; text joined by '/', '_' or '-' is not, and must reach L2/L3.
 const BASE64_RE = /^[A-Za-z0-9+/_-]+={0,2}$/;
 function isMediaString(s: string): boolean {
-  return s.length >= MEDIA_MIN && BASE64_RE.test(s.replace(/\r?\n/g, ''));
+  if (s.length < MEDIA_MIN) return false;
+  const t = s.replace(/\r?\n/g, '');
+  if (!BASE64_RE.test(t)) return false;
+  let upper = 0, digit = 0;
+  for (let i = 0; i < t.length; i++) {
+    const c = t.charCodeAt(i);
+    if (c >= 65 && c <= 90) upper++;
+    else if (c >= 48 && c <= 57) digit++;
+  }
+  return upper / t.length >= 0.2 && digit / t.length >= 0.05;
 }
 
 /// Strings in a body that the model layers (and the joined passes) need not see again: text
@@ -300,6 +316,7 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
     // below sort keys and interleave them): a phrase split across neighbouring fields must not
     // slip between two leaves.
     consider(runOutboundScreen(stringLeaves(body, 'as-sent', false).join('\n')));
+    consider(runOutboundScreen(stringLeaves(body, 'as-sent', true).join('\n'))); // keys too: a phrase split around a key
 
     const rest = withoutScreened(body, skip);
     const leaves = stringLeaves(rest);
@@ -383,6 +400,25 @@ export interface ScreenedMessage {
 /// message is not forwarded: what the gate cannot read, the server must not receive.
 export function parseErrorReply(): Obj {
   return { jsonrpc: '2.0', id: null, error: { code: -32700, message: '[BLINDSEAL] parse error: the message was not forwarded' } };
+}
+
+/// Why an agent → server element cannot be gated (and so is not forwarded), or null. The gate
+/// screens tools/call by name and arguments, so a tools/call whose name is not a string is refused
+/// rather than passed on for a lenient server to coerce; anything that is not a JSON-RPC object
+/// (a nested batch, a bare value) is refused too.
+export function inboundProblem(el: unknown): string | null {
+  if (!isPlainObject(el)) return 'not a JSON-RPC message object';
+  if (el.method === 'tools/call') {
+    if (!isPlainObject(el.params) || typeof el.params.name !== 'string' || el.params.name.length === 0) {
+      return 'tools/call needs params.name as a string';
+    }
+  }
+  return null;
+}
+
+/// The proxy's answer to an agent element it refuses to forward (JSON-RPC -32600).
+export function invalidRequestReply(id: unknown, problem: string): Obj {
+  return { jsonrpc: '2.0', id: typeof id === 'string' || typeof id === 'number' ? id : null, error: { code: -32600, message: `[BLINDSEAL] invalid request (${problem}): not forwarded` } };
 }
 
 /// The proxy's answer to an agent request whose screening threw (fail closed, not forwarded).

@@ -201,6 +201,18 @@ describe('http transport — end-to-end through the proxy', () => {
     expect(JSON.stringify(body)).not.toContain(ctx.fixtureUrl);
   });
 
+  it('a deeply nested POST is answered with a parse error; the proxy keeps running (third review)', async () => {
+    const addr = ctx.proxyServer.address() as AddressInfo;
+    const pad = '['.repeat(10000) + ']'.repeat(10000);
+    const r = await fetch(`http://127.0.0.1:${addr.port}/`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: `{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"x":${pad}}}`,
+    });
+    expect(r.status).toBe(400);
+    expect((await r.json()).error.code).toBe(-32700);
+    expect((await fetch(`http://127.0.0.1:${addr.port}/health`)).status).toBe(200);
+  });
+
   it('returns 405 for non-POST tool-call requests', async () => {
     const addr = ctx.proxyServer.address() as AddressInfo;
     const r = await fetch(`http://127.0.0.1:${addr.port}/mcp`, { method: 'PUT' });

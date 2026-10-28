@@ -139,3 +139,13 @@ describe('composite values that never close, and prose that looks like a mnemoni
     expect(redact(`seed: ${mnemonic}`).redacted).toContain('[REDACTED:seed_phrase');
   });
 });
+
+describe('a stopword right before a mnemonic does not hide it (third review)', () => {
+  const m = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+  for (const pre of ['save the ', 'here are your ', 'words for the wallet ']) {
+    it(JSON.stringify(pre), () => {
+      const r = redact(pre + m).redacted;
+      for (const w of m.split(' ')) expect(r).not.toMatch(new RegExp(`\\b${w}\\b`));
+    });
+  }
+});

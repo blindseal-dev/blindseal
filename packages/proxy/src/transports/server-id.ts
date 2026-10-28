@@ -34,7 +34,7 @@ export function computeServerIdentifier(cmd: string, args: string[]): string {
     // (`env TOKEN=…`, `docker -e KEY=…`), shell snippets (`sh -c "…"`) and anything else are
     // skipped: they can carry credentials.
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(a)) return `stdio:${cmd}:${urlHost(a)}`;
-    if (a.includes('=') || !SAFE_TARGET.test(a)) continue;
+    if (a.includes('=') || !SAFE_TARGET.test(a) || /:[^/]*@/.test(a)) continue; // last: user:pass@host
     target = a;
     break;
   }

@@ -122,3 +122,12 @@ describe('long prose is not mistaken for base64 media', () => {
     expect(seen.l2.some((t) => t.includes('word3 word4 word5'))).toBe(true);
   });
 });
+
+describe('text joined by / _ - is not base64 media (third review)', () => {
+  it('L2 sees long slash-joined lowercase text', async () => {
+    const prose = Array.from({ length: 200 }, (_, i) => `word${i % 7}`).join('/');
+    const m: any = { jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'see notes' }], structuredContent: { notes: prose } } };
+    await inspectToolCallResponse(m, 'notes', 'block');
+    expect(seen.l2.some((t) => t.includes('word3/word4/word5'))).toBe(true);
+  });
+});

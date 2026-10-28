@@ -96,3 +96,7 @@ describe('server identifiers: assignments and shell snippets are never the serve
     expect(computeServerIdentifier('sh', ['-c', 'API_KEY=SECRET node srv.js'])).toBe('stdio:sh');
   });
 });
+
+it('a user:pass@host argument is never the server name (third review)', () => {
+  expect(computeServerIdentifier('pgmcp', ['root:pw@localhost', 'db'])).toBe('stdio:pgmcp:db');
+});

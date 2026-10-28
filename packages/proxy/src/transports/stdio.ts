@@ -25,7 +25,7 @@ import {
   responseText,
   type JsonRpcMessage,
 } from './shared.js';
-import { isPlainObject, parseErrorReply, parseJson, PendingRequests, requestScreeningErrorReply, screenServerMessage } from './reply-screen.js';
+import { inboundProblem, invalidRequestReply, isPlainObject, parseErrorReply, parseJson, PendingRequests, requestScreeningErrorReply, screenServerMessage } from './reply-screen.js';
 import { computeServerIdentifier } from './server-id.js';
 
 function addResponseToTaint(
@@ -212,7 +212,12 @@ export function startProxy(cmd: string, args: string[]): void {
     /// Gate one element; a gate that throws (e.g. arguments nested too deeply to serialise)
     /// fails closed: the call is answered with an error and never forwarded.
     const gate = (el: unknown): JsonRpcMessage | 'drop' | null => {
-      if (!isPlainObject(el)) return null;
+      const problem = inboundProblem(el);
+      if (problem) {
+        process.stderr.write(`blindseal: refused an agent message (${problem}); not forwarded\n`);
+        const id = isPlainObject(el) ? el.id : undefined;
+        return isPlainObject(el) && !('id' in el) ? 'drop' : (invalidRequestReply(id, problem) as JsonRpcMessage);
+      }
       try {
         return gateToolCall(el as JsonRpcMessage);
       } catch (err) {
@@ -350,7 +355,13 @@ export function startProxy(cmd: string, args: string[]): void {
   let chain: Promise<void> = Promise.resolve();
   const outRl = createInterface({ input: childStdout });
   outRl.on('line', (line) => {
-    chain = chain.then(async () => {
+    chain = chain.then(() => relayServerLine(line)).catch((err) => {
+      // Fail closed for this line; the chain must keep running for the next one.
+      process.stderr.write(`blindseal: dropped a server message (${err instanceof Error ? err.message : String(err)})\n`);
+    });
+  });
+  async function relayServerLine(line: string): Promise<void> {
+    {
       let parsed: unknown;
       try { parsed = parseJson(line); } catch { parsed = undefined; }
       if (Array.isArray(parsed)) {
@@ -368,8 +379,8 @@ export function startProxy(cmd: string, args: string[]): void {
       }
       const r = await screenServerElement(parsed);
       if (r) process.stdout.write(JSON.stringify(r) + '\n');
-    });
-  });
+    }
+  }
 
   // SIGINT/SIGTERM: forward to the server and exit when it does (see finish above). A server
   // that ignores the signal is killed after CHILD_KILL_GRACE_MS so the proxy cannot hang.
