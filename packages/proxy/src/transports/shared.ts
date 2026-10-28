@@ -1,7 +1,7 @@
 /// Shared scanning + mutation logic used by both stdio and http transports.
 
 import { screenEach } from '../detection/scan-pool.js';
-import { noticeText, detectionNotice, noticePatterns } from './notice.js';
+import { noticeText, detectionNotice, noticePatterns, safeToken } from './notice.js';
 import { ScanBudget } from '../detection/scan-budget.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 import { createHash } from 'node:crypto';
@@ -93,7 +93,9 @@ export function buildCapabilityBlockedResponse(
         {
           type: 'text',
           text: noticeText('BLINDSEAL_CAPABILITY_BLOCKED', {
-            direction: 'request', tool: toolName, verdict: 'blocked', layer: null, patterns: [matchedPattern ?? 'capability-policy'], sources: sourceTools,
+            // A sensitive-tool rule is a regex source, not an identifier: it shows as capability-policy.
+            direction: 'request', tool: toolName, verdict: 'blocked', layer: null,
+            patterns: [matchedPattern && safeToken(matchedPattern) !== 'unknown' ? matchedPattern : 'capability-policy'], sources: sourceTools,
           }),
         },
       ],

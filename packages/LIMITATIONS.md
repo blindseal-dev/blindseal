@@ -166,7 +166,9 @@ runs that made the old regexes quadratic. Every L0/L1 pass over one message shar
 time allowance (`BLINDSEAL_SCAN_BUDGET_MS`, default 2000); a message not fully scanned
 within it is blocked in block mode and forwarded with a warning in warn mode. L0/L1, redaction
 and blob decoding run in scan worker threads (`BLINDSEAL_SCAN_WORKERS`), so a slow message never
-stalls the event loop, other messages or `/health`. Layer 0
+stalls the event loop, other messages or `/health`; so does Layer 2 (its own worker). What stays on
+the event loop is parsing and walking the JSON of each message, which is linear: about 20 ms of
+`/health` delay per MB of a single message (measured: 0.9 MB → 17 ms, 5.8 MB → 115 ms). Layer 0
 also reads text with zero-width characters removed, so a split phrase is caught at any length.
 That decoder, the search past a base64-only decoy, and per-chunk zero-width density are
 proxy screening only: the proven L0/L1 (`blindseal attest`, the zk guest) keep the Rust

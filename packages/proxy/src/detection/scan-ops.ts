@@ -24,7 +24,7 @@ export type ScanOp =
   /// become a marker. Returns its stable JSON and its joined string leaves.
   | { op: 'model-forms'; json: string; skip: string[] }
   /// decodeBlob(value, media)
-  | { op: 'blob'; value: string; media?: { type: 'image' | 'audio'; mimeType: unknown } };
+  | { op: 'blob'; value: string; media?: { type: 'image' | 'audio'; mimeType: unknown }; mimeType?: unknown };
 
 
 export type ScanResult =
@@ -66,7 +66,7 @@ export function runScanOp(req: ScanOp): ScanResult {
       return { op: 'model-forms', json: stableStringify(redacted), leaves: jsonStringLeaves(redacted) };
     }
     case 'blob':
-      return { op: 'blob', decoded: decodeBlob(req.value, req.media) };
+      return { op: 'blob', decoded: decodeBlob(req.value, req.media, undefined, req.mimeType) };
   }
 }
 

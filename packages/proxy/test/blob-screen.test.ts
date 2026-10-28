@@ -84,10 +84,60 @@ describe('decodeBlob', () => {
     expect(decodeBlob(png, { type: 'audio', mimeType: 'image/png' }).kind).toBe('binary');
     expect(decodeBlob(png, { type: 'image', mimeType: 'image/jpeg' }).kind).toBe('binary');
     expect(decodeBlob(png).kind).toBe('binary'); // a `blob` field is never exempt
-    expect(decodeBlob(B64, { type: 'image', mimeType: 'image/png' })).toEqual({ kind: 'text', text: INJ });
+    // Structure, not just the signature: a PNG signature followed by text is not a PNG.
+    const fake = Buffer.concat([pngBytes().subarray(0, 8), Buffer.from(INJ)]).toString('base64');
+    expect(decodeBlob(fake, { type: 'image', mimeType: 'image/png' }).kind).toBe('binary');
+    const appended = Buffer.concat([pngBytes(), Buffer.from(INJ)]).toString('base64');
+    expect(decodeBlob(appended, { type: 'image', mimeType: 'image/png' }).kind).toBe('binary');
+    expect(decodeBlob(B64, { type: 'image', mimeType: 'image/png' })).toEqual({ kind: 'text', texts: [INJ] });
     expect(decodeBlob(INJ).kind).toBe('invalid');
     expect(decodeBlob('QUJD\r\nREVG').kind).toBe('text'); // MIME line wraps are accepted
     expect(decodeBlob('QUJD REVG').kind).toBe('invalid'); // other whitespace is not
     expect(decodeBlob('QUJ=REVG').kind).toBe('invalid'); // padding only at the end
   });
 });
+
+describe('review of 6e470ff', () => {
+  const INJ_BYTES = Buffer.from(INJ);
+  const pngPoly = Buffer.concat([pngBytes().subarray(0, 8), Buffer.from('\n' + INJ + '\n')]).toString('base64');
+  const mp3Poly = Buffer.concat([Buffer.from([0xff, 0xfb]), Buffer.from(' ' + INJ)]).toString('base64');
+  const img = (data: string, mimeType = 'image/png') => ({ type: 'image', mimeType, data });
+
+  it('media-shaped data outside a media position is never exempt', async () => {
+    const cases: Array<[string, unknown]> = [
+      ['tools/call', { content: [{ type: 'text', text: 'ok' }], structuredContent: { note: img(pngBytes().toString('base64') + '') , x: img(pngPoly) } }],
+      ['tools/call', { content: [{ type: 'text', text: 'ok' }], structuredContent: { x: { type: 'audio', mimeType: 'audio/mpeg', data: mp3Poly } } }],
+      ['tools/call', { content: [{ type: 'text', text: 'ok' }], _meta: img(pngPoly) }],
+      ['tools/list', { tools: [{ name: 't', description: 'd', inputSchema: { type: 'object' }, annotations: img(pngPoly) }] }],
+      ['prompts/get', { messages: [{ role: 'user', content: img(pngPoly) }] }],
+      ['tools/call', { content: [img(pngPoly)] }],
+    ];
+    for (const [method, result] of cases) {
+      const { out } = await screen(result, method);
+      blocked(out, pngPoly, mp3Poly);
+    }
+  });
+
+  it('a text resource is read the way a client would read it (charset, BOM, UTF-16, gaps)', async () => {
+    const res = (bytes: Buffer, mimeType = 'text/plain') => ({ content: [{ type: 'resource', resource: { uri: 'file:///notes.txt', mimeType, blob: bytes.toString('base64') } }] });
+    const words = INJ.split(' ');
+    const cases: Array<[Buffer, string?]> = [
+      [Buffer.concat(words.flatMap((w, i) => (i ? [Buffer.from([0xff]), Buffer.from(w)] : [Buffer.from(w)])))],
+      [Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(INJ, 'utf16le')]), 'text/plain; charset=utf-16'],
+      [Buffer.from(INJ, 'utf16le')],
+      [Buffer.from(INJ.replace(/ /g, '\u00a0'), 'latin1'), 'text/plain; charset=iso-8859-1'],
+      [INJ_BYTES],
+    ];
+    for (const [bytes, mime] of cases) {
+      const { out } = await screen(res(bytes, mime));
+      blocked(out, bytes.toString('base64'));
+    }
+  });
+
+  it('a non-base64 `blob` outside protocol positions is an ordinary string, not a block', async () => {
+    const { s, out } = await screen({ content: [{ type: 'text', text: 'ok' }], structuredContent: { blob: 'not base64: a label' } });
+    expect(s.outcome?.verdict, s.outcome?.result?.reasoning).toBe('clean');
+    expect(out).toContain('a label');
+  });
+});
+

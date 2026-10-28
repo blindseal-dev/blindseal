@@ -28,13 +28,32 @@ function readPoolSize(): number {
 
 const pool = new WorkerPool<ScanOp, ScanResult>('scan', 'scan-worker', readPoolSize, runScanOp);
 
+/// Inputs up to this many characters are handled on the calling thread: Layer 0/1, redaction and
+/// decoding of 4 KB take microseconds (every step is linear), less than a round trip to a worker.
+/// Anything larger always goes to a worker.
+export const INLINE_MAX_CHARS = 4096;
+
+function opSize(op: ScanOp): number {
+  switch (op.op) {
+    case 'scan': case 'redact': return op.text.length;
+    case 'outbound-each': return op.texts.reduce((n, t) => n + t.length, 0);
+    case 'redact-value': case 'model-forms': return op.op === 'model-forms' ? op.json.length + op.skip.reduce((n, t) => n + t.length, 0) : op.json.length;
+    case 'blob': return op.value.length;
+  }
+}
+
+function submit(op: ScanOp, timeoutMs: number): Promise<ScanResult> {
+  if (opSize(op) <= INLINE_MAX_CHARS) return Promise.resolve().then(() => runScanOp(op));
+  return pool.submit(op, timeoutMs);
+}
+
 type BudgetedOp = Extract<ScanOp, { ms: number }>;
 
 async function budgeted<T extends ScanResult & { usedMs: number }>(op: BudgetedOp, budget: ScanBudget): Promise<T | null> {
   const ms = budget.remainingMs();
   if (ms <= 0) return null;
   try {
-    const r = (await pool.submit({ ...op, ms } as BudgetedOp, ms + SCAN_SLACK_MS)) as T;
+    const r = (await submit({ ...op, ms } as BudgetedOp, ms + SCAN_SLACK_MS)) as T;
     if (r.op !== op.op) throw new Error('scan worker: wrong reply');
     budget.charge(r.usedMs);
     return r;
@@ -61,26 +80,26 @@ export async function screenEach(texts: string[], budget: ScanBudget): Promise<D
 }
 
 export async function redactText(text: string): Promise<string> {
-  const r = await pool.submit({ op: 'redact', text }, OTHER_OP_TIMEOUT_MS);
+  const r = await submit({ op: 'redact', text }, OTHER_OP_TIMEOUT_MS);
   if (r.op !== 'redact') throw new Error('scan worker: wrong reply');
   return r.redacted;
 }
 
 /// redactValue(value).redacted, in a worker. The value goes as JSON (key order kept).
 export async function redactValueText(value: unknown): Promise<string> {
-  const r = await pool.submit({ op: 'redact-value', json: JSON.stringify(value) ?? 'null' }, OTHER_OP_TIMEOUT_MS);
+  const r = await submit({ op: 'redact-value', json: JSON.stringify(value) ?? 'null' }, OTHER_OP_TIMEOUT_MS);
   if (r.op !== 'redact-value') throw new Error('scan worker: wrong reply');
   return r.redacted;
 }
 
 export async function modelForms(json: string, skip: string[]): Promise<{ json: string; leaves: string }> {
-  const r = await pool.submit({ op: 'model-forms', json, skip }, OTHER_OP_TIMEOUT_MS);
+  const r = await submit({ op: 'model-forms', json, skip }, OTHER_OP_TIMEOUT_MS);
   if (r.op !== 'model-forms') throw new Error('scan worker: wrong reply');
   return { json: r.json, leaves: r.leaves };
 }
 
-export async function decodeBlobInWorker(value: string, media?: { type: 'image' | 'audio'; mimeType: unknown }) {
-  const r = await pool.submit({ op: 'blob', value, media }, OTHER_OP_TIMEOUT_MS);
+export async function decodeBlobInWorker(value: string, media?: { type: 'image' | 'audio'; mimeType: unknown }, mimeType?: unknown) {
+  const r = await submit({ op: 'blob', value, media, mimeType }, OTHER_OP_TIMEOUT_MS);
   if (r.op !== 'blob') throw new Error('scan worker: wrong reply');
   return r.decoded;
 }

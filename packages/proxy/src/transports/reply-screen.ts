@@ -136,38 +136,67 @@ export interface ScreenOutcome {
 // Embedded binary (blob-decode.ts): `data` of image/audio items and every `blob` field.
 
 const SEPARATE = '[screened separately]';
+/// Texts (text items, decoded blobs) that get a model-layer pass each; the rest share one.
+const MODEL_SINGLES = 16;
+
+/// Where an embedded-binary string sits, which decides how it is treated:
+///   media     `data` of an image/audio item in a media position (a tool result's content[],
+///             a prompt message's or sampling request's message content). The only kind that can
+///             be exempt (validated media file); otherwise decoded and screened, or blocked.
+///   protocol  a `blob` field inside content / contents / messages (embedded resources,
+///             resources/read). Decoded and screened; not base64 or oversized → blocked.
+///   loose     any other `blob` key, or media-shaped data anywhere else (structuredContent,
+///             _meta, annotations). Decoded and screened when it is base64; otherwise it stays an
+///             ordinary string for the string passes. Never exempt.
+type SiteKind = 'media' | 'protocol' | 'loose';
 
 interface BlobSite {
+  kind: SiteKind;
   value: string;
   media?: { type: 'image' | 'audio'; mimeType: unknown };
+  /// The blob's own declared mimeType (its charset decides how its bytes are read as text).
+  mimeType?: unknown;
 }
 
-const siteKey = (site: BlobSite) => (site.media ? `${site.media.type}|${String(site.media.mimeType)}` : 'blob') + '\u0000' + site.value;
+const siteKey = (site: BlobSite) => `${site.kind}|${site.media ? `${site.media.type}|${String(site.media.mimeType)}` : String(site.mimeType ?? '')}\u0000${site.value}`;
 
-/// Calls `visit` for each embedded-binary site: the `data` string of any object whose `type` is
-/// "image" or "audio", and the string under any `blob` key. `visit` returns the replacement.
-function mapBlobSites(v: unknown, visit: (site: BlobSite) => string, depth = 0): unknown {
-  if (Array.isArray(v)) return v.map((x) => mapBlobSites(x, visit, depth + 1));
+/// path[0..] of the containing object, e.g. ['result', 'content', 3].
+type Path = Array<string | number>;
+const isMediaPosition = (p: Path) =>
+  (p.length === 3 && p[0] === 'result' && p[1] === 'content' && typeof p[2] === 'number') ||
+  (p.length === 4 && (p[0] === 'result' || p[0] === 'params') && p[1] === 'messages' && typeof p[2] === 'number' && p[3] === 'content');
+const isProtocolBlobArea = (p: Path) =>
+  (p[0] === 'result' && (p[1] === 'content' || p[1] === 'contents' || p[1] === 'messages')) || (p[0] === 'params' && p[1] === 'messages');
+
+/// Calls `visit` for each embedded-binary site; `visit` returns the replacement string.
+function mapBlobSites(v: unknown, visit: (site: BlobSite) => string, path: Path = []): unknown {
+  if (Array.isArray(v)) return v.map((x, i) => mapBlobSites(x, visit, [...path, i]));
   if (!isPlainObject(v)) return v;
-  const isMedia = (v.type === 'image' || v.type === 'audio') && typeof v.data === 'string';
+  const mediaShaped = (v.type === 'image' || v.type === 'audio') && typeof v.data === 'string';
   const o = Object.create(null) as Obj;
   for (const k of Object.keys(v)) {
     const val = v[k];
-    if (k === 'blob' && typeof val === 'string') o[k] = visit({ value: val });
-    else if (k === 'data' && isMedia) o[k] = visit({ value: val as string, media: { type: v.type as 'image' | 'audio', mimeType: v.mimeType } });
-    else o[k] = mapBlobSites(val, visit, depth + 1);
+    if (k === 'blob' && typeof val === 'string') {
+      o[k] = visit({ kind: isProtocolBlobArea(path) ? 'protocol' : 'loose', value: val, mimeType: v.mimeType });
+    } else if (k === 'data' && mediaShaped) {
+      o[k] = isMediaPosition(path)
+        ? visit({ kind: 'media', value: val as string, media: { type: v.type as 'image' | 'audio', mimeType: v.mimeType } })
+        : visit({ kind: 'loose', value: val as string, mimeType: v.mimeType });
+    } else {
+      o[k] = mapBlobSites(val, visit, [...path, k]);
+    }
   }
   return o;
 }
 
 interface BlobScreen {
   /// The body with each site replaced: validated media by a size marker, decoded blobs by
-  /// SEPARATE (their text is screened on its own), oversized blobs by SEPARATE. A blob that is
-  /// not base64 keeps its raw value, so the string passes still read it.
+  /// SEPARATE (their text is screened on its own), oversized protocol blobs by SEPARATE. Anything
+  /// not decoded keeps its raw value, so the string passes still read it.
   body: Obj;
-  /// Decoded text of every non-media blob.
+  /// Every text reading of every decoded blob.
   texts: string[];
-  /// One result per invalid blob (not base64 / oversized): non-clean, blocked in block mode.
+  /// One result per invalid media/protocol blob (not base64 / oversized): blocked in block mode.
   problems: DetectionResult[];
 }
 
@@ -180,19 +209,19 @@ async function screenBlobs(body: Obj): Promise<BlobScreen> {
     // Size first, without copying a huge string to the worker.
     const d: BlobDecode = Math.floor((site.value.length * 3) / 4) > max
       ? { kind: 'invalid', reason: 'oversized' }
-      : await decodeBlobInWorker(site.value, site.media);
+      : await decodeBlobInWorker(site.value, site.kind === 'media' ? site.media : undefined, site.mimeType);
     decoded.set(key, d);
   }));
   const texts: string[] = [];
   const problems: DetectionResult[] = [];
-  for (const d of decoded.values()) {
-    if (d.kind === 'text' || d.kind === 'binary') texts.push(d.text);
-    if (d.kind === 'invalid') problems.push(blobProblem(d.reason));
+  for (const [key, d] of decoded) {
+    if (d.kind === 'text' || d.kind === 'binary') texts.push(...d.texts);
+    if (d.kind === 'invalid' && sites.get(key)!.kind !== 'loose') problems.push(blobProblem(d.reason));
   }
   const out = mapBlobSites(body, (site) => {
     const d = decoded.get(siteKey(site))!;
     if (d.kind === 'media') return `[media: ${site.value.length} chars]`;
-    if (d.kind === 'invalid' && d.reason === 'not-base64') return site.value;
+    if (d.kind === 'invalid') return d.reason === 'oversized' && site.kind !== 'loose' ? SEPARATE : site.value;
     return SEPARATE;
   }) as Obj;
   return { body: out, texts, problems };
@@ -278,8 +307,11 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
     ], budget));
     if ((worst as DetectionResult | null)?.verdict === 'malicious') return; // the model layers cannot change that
 
-    // Phase 2.
-    for (const t of texts) consider(await runPipeline(t, ctx, { budget }));
+    // Phase 2. The first MODEL_SINGLES texts each run the full pipeline (best L2 signal); any
+    // more are joined into one pass, so model cost follows the bytes, not the number of items
+    // (thousands of tiny blobs must not mean thousands of embeddings).
+    for (const t of texts.slice(0, MODEL_SINGLES)) consider(await runPipeline(t, ctx, { budget }));
+    if (texts.length > MODEL_SINGLES) consider(await runPipeline(texts.slice(MODEL_SINGLES).join('\n\n'), ctx, { budget }));
     const rest = withoutScreened(noMedia, skip);
     const leaves = stringLeaves(rest);
     if (leaves.every((s) => STRUCTURAL.has(s))) return;
