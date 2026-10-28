@@ -1,5 +1,6 @@
 // Shared state for the degraded-mode warning.
 // Both pipeline.ts and streaming.ts import from here to avoid a circular dependency.
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 let _missCount = 0;
 const REPEAT_EVERY = 100; // re-emit every N L3 misses so the warning stays visible in long-running proxies
@@ -29,8 +30,22 @@ export function _resetDegradedWarningForTesting(): void {
   _missCount = 0;
 }
 
+/// One decision can run the pipeline several times (a tool result has up to four screened
+/// surfaces: text, embedded resource, structuredContent and its string leaves). Inside a
+/// decision scope the layer-2 notice is printed at most once.
+const decisionScope = new AsyncLocalStorage<{ l2NoticeEmitted: boolean }>();
+
+export function inDecisionScope<T>(fn: () => Promise<T>): Promise<T> {
+  return decisionScope.run({ l2NoticeEmitted: false }, fn);
+}
+
 /** One line per decision whose Layer 2 failed at runtime (the decision is marked degraded). */
 export function emitLayer2UnavailableNotice(reason: string): void {
+  const scope = decisionScope.getStore();
+  if (scope) {
+    if (scope.l2NoticeEmitted) return;
+    scope.l2NoticeEmitted = true;
+  }
   const oneLine = reason.replace(/\s+/g, ' ').slice(0, 200);
   process.stderr.write(`blindseal: layer-2 unavailable (${oneLine}) — decision marked degraded\n`);
 }

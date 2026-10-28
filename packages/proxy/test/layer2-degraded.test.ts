@@ -100,4 +100,32 @@ describe('runtime layer-2 failure ⇒ degraded decision', () => {
     expect(out.degraded).toBe(true);
     expect(msg.result.content[0].text).toBe('The meeting moved to 3pm.');
   });
+
+  // 0.7.0 gap: a result with several screened surfaces runs the pipeline once per surface; the
+  // notice used to print once per surface (up to 4x for one tool call).
+  it('one decision over four surfaces prints the layer-2 notice once', async () => {
+    _setClientForTesting(null);
+    const msg: any = {
+      jsonrpc: '2.0', id: 1,
+      result: {
+        content: [
+          { type: 'text', text: 'The meeting moved to 3pm.' },
+          { type: 'resource', resource: { uri: 'file:///notes', text: 'Agenda: budget review.' } },
+        ],
+        structuredContent: { room: 'B2', note: 'bring\nslides' },
+      },
+    };
+    const out = await inspectToolCallResponse(msg, 'calendar', 'block');
+    expect(out.degraded).toBe(true);
+    expect(l2Notices()).toHaveLength(1);
+  });
+
+  it('two separate decisions print two notices', async () => {
+    _setClientForTesting(null);
+    for (const id of [1, 2]) {
+      const msg: any = { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'ok' }, { type: 'text', text: 'also ok' }] } };
+      await inspectToolCallResponse(msg, 'calendar', 'block');
+    }
+    expect(l2Notices()).toHaveLength(2);
+  });
 });

@@ -1,6 +1,7 @@
 /// Shared scanning + mutation logic used by both stdio and http transports.
 
 import { runPipeline, runOutboundScreen } from '../detection/pipeline.js';
+import { inDecisionScope } from '../detection/degraded-state.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
 import { createHash } from 'node:crypto';
 
@@ -198,18 +199,21 @@ export async function inspectToolCallResponse(
 ): Promise<InspectionOutcome> {
   const items = Array.isArray(msg.result.content) ? msg.result.content : [];
   const surfaces = collectResponseSurfaces(msg.result);
-  let worst: Verdict = 'clean';
-  let worstResult: DetectionResult | null = null;
+  let worst = 'clean' as Verdict;
+  let worstResult = null as DetectionResult | null;
   let degraded = false;
 
-  for (const surface of surfaces) {
-    const r = await runPipeline(surface.text, { toolName, mcpMethod: 'tools/call' });
-    if (r.degraded) degraded = true;
-    if (rankVerdict(r.verdict) > rankVerdict(worst)) {
-      worst = r.verdict;
-      worstResult = r;
+  // One decision, however many surfaces: the layer-2-unavailable notice prints at most once.
+  await inDecisionScope(async () => {
+    for (const surface of surfaces) {
+      const r = await runPipeline(surface.text, { toolName, mcpMethod: 'tools/call' });
+      if (r.degraded) degraded = true;
+      if (rankVerdict(r.verdict) > rankVerdict(worst)) {
+        worst = r.verdict;
+        worstResult = r;
+      }
     }
-  }
+  });
 
   const scannedText = surfaces.filter((s) => s.kind !== 'structured-strings').map((s) => s.text).join('\n');
   const contentHash = sha256Hex(scannedText);
