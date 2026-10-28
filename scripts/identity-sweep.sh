@@ -24,7 +24,9 @@ FILES=$(git ls-files --cached --others --exclude-standard | grep -vE '\.(png|jpg
 FILES=$(printf '%s\n' "$FILES" | grep -vxF '.identity-sweep')
 fail=0
 if [ -n "$COMP_RE" ]; then
-  ch=$(git grep -ilE "$COMP_RE" 2>/dev/null || true)
+  # grep, not `git grep -E`: Apple's git uses the macOS regex library, where \b never matches in an ERE, so a
+  # word-bounded pattern silently found nothing locally (glibc on CI does support it)
+  ch=$(git ls-files -z | xargs -0 grep -ilE "$COMP_RE" -- 2>/dev/null || true)
   [ -n "$ch" ] && { echo "competitor names in tracked files:"; echo "$ch" | sed 's/^/  /'; fail=1; }
 fi
 hitsA=$(printf '%s\n' "$FILES" | tr '\n' '\0' | xargs -0 grep -IliE "$A_RE" 2>/dev/null)
