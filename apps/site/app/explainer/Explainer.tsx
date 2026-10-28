@@ -86,7 +86,7 @@ const Stage = memo(function Stage({ f }: { f: Frame }) {
             <p className="ex-ly ex-idle" style={L('idle2')}>Waiting for the next request.</p>
 
             <div className="ex-ly ex-card" style={L('blk')}>
-              <Kv k="to"><span className="ex-mono ex-mis">{ADDR.bad}</span><span className="ex-note" style={V('mis')}>invoice says {ADDR.ok}</span></Kv>
+              <Kv k="to"><span className="ex-mono">{ADDR.bad}</span></Kv>
               <Kv k="amount"><span className="ex-mono">1.2 SOL</span></Kv>
               <span className="ex-k">Tool reply</span>
               <div className="ex-ctx">

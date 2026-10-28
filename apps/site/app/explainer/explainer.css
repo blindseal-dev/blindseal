@@ -124,8 +124,6 @@
 }
 .ex-ctx .ex-hid--lift::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: 0; height: 1.5px; background: var(--accent);
   transform: scaleX(var(--ul)); transform-origin: left center; }
-.ex-mis { color: color-mix(in srgb, var(--accent-text) calc(var(--mis) * 100%), var(--ink));
-  background: linear-gradient(var(--accent), var(--accent)) left bottom / calc(var(--mis) * 100%) 1.5px no-repeat; }
 .ex-match { font: var(--fw-medium) var(--fs-12)/18px var(--font-sans); color: var(--accent-text); }
 .ex-verdict { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; font-size: var(--fs-12); color: var(--muted); }
 .ex-swap { display: inline-grid; min-width: 0; }

@@ -5,13 +5,20 @@
 // with JavaScript off the lists, the per-day table and every reveal are server-rendered and visible.
 import { test, expect } from '@playwright/test';
 import { createServer, type Server } from 'node:http';
+import { createServer as netServer, type AddressInfo } from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { INVISIBLE_TEXT } from './nojs-lib';
 
-const RPC_PORT = 3018, SITE_PORT = 3017, BASE = `http://127.0.0.1:${SITE_PORT}`;
+// Both servers take free ports chosen by the OS at start, so parallel runs (other worktrees, CI
+// shards) never collide on a fixed port.
+let RPC_PORT = 0, SITE_PORT = 0, BASE = '';
+const freePort = () => new Promise<number>((resolve, reject) => {
+  const s = netServer(); s.unref(); s.on('error', reject);
+  s.listen(0, '127.0.0.1', () => { const { port } = s.address() as AddressInfo; s.close(() => resolve(port)); });
+});
 const GATE = '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa';
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 function b58decode(s: string): Buffer {
@@ -50,7 +57,10 @@ test.beforeAll(async () => {
       res.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: answer(method) }));
     });
   });
-  await new Promise<void>((r) => rpc.listen(RPC_PORT, '127.0.0.1', r));
+  await new Promise<void>((r) => rpc.listen(0, '127.0.0.1', r));
+  RPC_PORT = (rpc.address() as AddressInfo).port;
+  SITE_PORT = await freePort();
+  BASE = `http://127.0.0.1:${SITE_PORT}`;
   // the default suite's webServer (serve-standalone) has already copied static + public beside the build
   const server = path.join(__dirname, '../.next/standalone/apps/site/server.js');
   if (!existsSync(server)) throw new Error('no standalone build');
@@ -63,9 +73,15 @@ test.afterAll(async () => { site?.kill(); await new Promise<void>((r) => rpc.clo
 test('explorer: direct submissions are not counted as a consumer program', async ({ page }) => {
   await page.goto(BASE + '/explorer');
   await expect(page.locator('#ex')).toHaveAttribute('data-view', 'ready');
-  // an odometer's value is its screen-reader text once the kit has mounted it (the visible digits are
-  // aria-hidden tick cells, so textContent reads "33"), and its plain text before that
-  const odo = (k: string) => page.locator(`[data-odo="${k}"]`).evaluate((e) => (e.querySelector('.sr-only') ?? e).textContent);
+  // Assert an odometer's ACCESSIBLE value: its text with every aria-hidden subtree removed. Once the
+  // kit mounts, the visible digits are aria-hidden tick cells and a screen-reader twin carries the
+  // value; before that, the plain text is the value. Reading the parent's textContent mixes both
+  // (e.g. "33") while the cells roll, which made this test flaky.
+  const odo = (k: string) => page.locator(`[data-odo="${k}"]`).evaluate((e) => {
+    const c = e.cloneNode(true) as HTMLElement;
+    c.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+    return (c.textContent ?? '').trim();
+  });
   await expect.poll(() => odo('total')).toBe('3');
   await expect.poll(() => odo('programs'), { timeout: 10_000 }).toBe('1');
   const rows = page.locator('#ex-programs-rows .ex-row');
