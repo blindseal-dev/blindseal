@@ -10,14 +10,18 @@
 import {
   inspectToolCallResponse,
   isToolCallResponse,
-  tryParse,
   type JsonRpcMessage,
   type BlindsealMode,
   type ToolCallResult,
 } from './shared.js';
+import { screeningErrorResponse } from '../audit/index.js';
 
 export interface SseScanHooks {
+  /// Tool name to use when no per-id name is known (legacy single-call callers).
   toolName: string | null;
+  /// Resolve the tool name of a response by its JSON-RPC id (batch requests). Responses with no
+  /// known name are still screened, as 'unknown'.
+  toolNameFor?: (id: string | number | undefined) => string | undefined;
   mode: BlindsealMode;
   /// Invoked AFTER inspectToolCallResponse mutates (or doesn't). Lets the transport hook
   /// audit, persistence, taint, attestation.
@@ -26,6 +30,8 @@ export interface SseScanHooks {
     toolName: string,
     outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>,
   ) => void | Promise<void>;
+  /// Screening of one element threw: it is withheld (replaced by a JSON-RPC error).
+  onScreeningError?: (msg: JsonRpcMessage & { result: ToolCallResult }, toolName: string, err: unknown) => void;
 }
 
 interface ParsedEvent {
@@ -76,22 +82,46 @@ export async function processSseEvent(block: string, hooks: SseScanHooks): Promi
     return block + '\n\n';
   }
 
-  const msg = tryParse(parsed.data);
-  if (!msg) {
+  let msg: JsonRpcMessage | JsonRpcMessage[] | null;
+  try { msg = JSON.parse(parsed.data) as JsonRpcMessage | JsonRpcMessage[]; } catch { msg = null; }
+  if (!msg || typeof msg !== 'object') {
     // Not JSON — pass through verbatim.
     return block + '\n\n';
   }
 
-  if (isToolCallResponse(msg) && hooks.toolName) {
-    const outcome = await inspectToolCallResponse(msg, hooks.toolName, hooks.mode);
-    if (hooks.onScanned) await hooks.onScanned(msg, hooks.toolName, outcome);
-    // Re-serialize the (possibly mutated) message.
-    const newData = JSON.stringify(msg);
-    return serializeSseEvent(parsed.preLines, newData);
+  // A batch response arrives as one JSON array in one event: screen every element.
+  if (Array.isArray(msg)) {
+    let changed = false;
+    const out: unknown[] = [];
+    for (const el of msg as unknown[]) {
+      if (el && typeof el === 'object' && !Array.isArray(el)) {
+        const r = await screenElement(el as JsonRpcMessage, hooks);
+        if (r.screened) changed = true;
+        out.push(r.msg);
+      } else out.push(el);
+    }
+    return changed ? serializeSseEvent(parsed.preLines, JSON.stringify(out)) : block + '\n\n';
   }
 
-  // Non-tool-call message (initialize, tools/list, error, etc.) — pass through.
-  return block + '\n\n';
+  const r = await screenElement(msg, hooks);
+  // Re-serialize the (possibly mutated) message; anything else passes through verbatim.
+  return r.screened ? serializeSseEvent(parsed.preLines, JSON.stringify(r.msg)) : block + '\n\n';
+}
+
+async function screenElement(msg: JsonRpcMessage, hooks: SseScanHooks): Promise<{ msg: JsonRpcMessage; screened: boolean }> {
+  // Non-tool-call messages (initialize, tools/list, errors, notifications) pass through.
+  if (!isToolCallResponse(msg)) return { msg, screened: false };
+  const toolName = hooks.toolNameFor?.(msg.id) ?? hooks.toolName ?? 'unknown';
+  let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
+  try {
+    outcome = await inspectToolCallResponse(msg, toolName, hooks.mode);
+  } catch (err) {
+    if (!hooks.onScreeningError) throw err;
+    hooks.onScreeningError(msg, toolName, err);
+    return { msg: screeningErrorResponse(msg.id ?? null) as unknown as JsonRpcMessage, screened: true };
+  }
+  if (hooks.onScanned) await hooks.onScanned(msg, toolName, outcome);
+  return { msg, screened: true };
 }
 
 /// Stream-scans an SSE upstream response. Reads chunks from the upstream body, buffers until

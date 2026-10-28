@@ -26,7 +26,6 @@ import {
   inspectToolCallResponse,
   isToolCallResponse,
   responseText,
-  tryParse,
   type JsonRpcMessage,
   type ToolCallResult,
 } from './shared.js';
@@ -139,78 +138,100 @@ export function startProxy(cmd: string, args: string[]): void {
   // agent → server: capability gate runs here. Sensitive tool calls whose args overlap
   // a tainted source get rewritten into a synthetic [BLINDSEAL_CAPABILITY_BLOCKED] response
   // and never reach the server.
+  /// Gate ONE tools/call element. Returns the synthetic reply when it must not be forwarded.
+  function gateToolCall(msg: JsonRpcMessage): JsonRpcMessage | null {
+    if (msg.method !== 'tools/call' || msg.id == null) return null;
+    const params = msg.params as { name?: unknown; arguments?: unknown } | undefined;
+    const name = params && typeof params.name === 'string' ? params.name : null;
+    if (!name) return null;
+    // Outbound screen (L0 + L1) on the arguments before anything else sees them.
+    const outbound = inspectToolCallArguments(name, params?.arguments, config.mode);
+    if (outbound.verdict !== 'clean') {
+      process.stderr.write(
+        `blindseal: ${outbound.verdict} (L${outbound.layer ?? '?'}) arguments to '${name}' (mode=${config.mode}, ${outbound.action === 'block' ? 'not forwarded' : 'forwarded'})\n`,
+      );
+      if (audit.enabled) {
+        audit.log({
+          type: 'detection',
+          direction: 'request',
+          toolName: name,
+          layer: outbound.layer ?? null,
+          verdict: outbound.verdict,
+          confidence: outbound.result?.confidence ?? 0,
+          patterns: outbound.result?.detectedPatterns ?? [],
+          mode: config.mode,
+          mutated: outbound.action === 'block',
+          reasoning: outbound.result?.reasoning,
+          contentHash: outbound.argsHash,
+          text: outbound.scannedText,
+          transport: 'stdio',
+          serverKey: serverIdentifier,
+        });
+      }
+      if (outbound.action === 'block' && outbound.result) {
+        return buildOutboundBlockedResponse(msg.id, name, outbound.result); // never forwarded
+      }
+    }
+
+    toolNameById.set(msg.id, name);
+
+    const decision = mergeDecisions(
+      decideCapability(name, params?.arguments, taint, config.capability),
+      decideTradePolicy(name, params?.arguments, taint, config.tradePolicy, tradeRate),
+    );
+    if (audit.enabled) {
+      audit.log({
+        type: 'capability',
+        toolName: name,
+        action: decision.action,
+        matchedPattern: decision.matchedPattern,
+        taintSources: (decision.taintSources ?? []).map((s) => s.toolName),
+        reason: decision.reason,
+        args: params?.arguments,
+      });
+    }
+    if (decision.action === 'warn') {
+      process.stderr.write(
+        `blindseal: capability-warn tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
+      );
+    } else if (decision.action === 'block') {
+      process.stderr.write(
+        `blindseal: capability-block tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
+      );
+      toolNameById.delete(msg.id);
+      return buildCapabilityBlockedResponse(
+        msg.id,
+        name,
+        decision.reason ?? 'tainted args',
+        (decision.taintSources ?? []).map((s) => s.toolName),
+      ); // do NOT forward the original call to the child
+    }
+    return null;
+  }
+
+  // agent → server: outbound screen + capability gate run here, for a single message and for
+  // every element of a JSON-RPC batch. Blocked calls are answered by the proxy and never reach
+  // the server.
   const inRl = createInterface({ input: process.stdin });
   inRl.on('line', (line) => {
-    const msg = tryParse(line);
-    if (msg && msg.method === 'tools/call' && msg.id != null) {
-      const params = msg.params as { name?: unknown; arguments?: unknown } | undefined;
-      const name = params && typeof params.name === 'string' ? params.name : null;
-      if (name) {
-        // Outbound screen (L0 + L1) on the arguments before anything else sees them.
-        const outbound = inspectToolCallArguments(name, params?.arguments, config.mode);
-        if (outbound.verdict !== 'clean') {
-          process.stderr.write(
-            `blindseal: ${outbound.verdict} (L${outbound.layer ?? '?'}) arguments to '${name}' (mode=${config.mode}, ${outbound.action === 'block' ? 'not forwarded' : 'forwarded'})\n`,
-          );
-          if (audit.enabled) {
-            audit.log({
-              type: 'detection',
-              direction: 'request',
-              toolName: name,
-              layer: outbound.layer ?? null,
-              verdict: outbound.verdict,
-              confidence: outbound.result?.confidence ?? 0,
-              patterns: outbound.result?.detectedPatterns ?? [],
-              mode: config.mode,
-              mutated: outbound.action === 'block',
-              reasoning: outbound.result?.reasoning,
-              contentHash: outbound.argsHash,
-              text: outbound.scannedText,
-            });
-          }
-          if (outbound.action === 'block' && outbound.result) {
-            process.stdout.write(
-              JSON.stringify(buildOutboundBlockedResponse(msg.id, name, outbound.result)) + '\n',
-            );
-            return; // never forwarded to the server
-          }
-        }
-
-        toolNameById.set(msg.id, name);
-
-        const decision = mergeDecisions(
-          decideCapability(name, params?.arguments, taint, config.capability),
-          decideTradePolicy(name, params?.arguments, taint, config.tradePolicy, tradeRate),
-        );
-        if (audit.enabled) {
-          audit.log({
-            type: 'capability',
-            toolName: name,
-            action: decision.action,
-            matchedPattern: decision.matchedPattern,
-            taintSources: (decision.taintSources ?? []).map((s) => s.toolName),
-            reason: decision.reason,
-            args: params?.arguments,
-          });
-        }
-        if (decision.action === 'warn') {
-          process.stderr.write(
-            `blindseal: capability-warn tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
-          );
-        } else if (decision.action === 'block') {
-          process.stderr.write(
-            `blindseal: capability-block tool '${name}' (${decision.matchedPattern ?? 'policy'}; reason in the encrypted audit store)\n`,
-          );
-          const blocked = buildCapabilityBlockedResponse(
-            msg.id,
-            name,
-            decision.reason ?? 'tainted args',
-            (decision.taintSources ?? []).map((s) => s.toolName),
-          );
-          toolNameById.delete(msg.id);
-          process.stdout.write(JSON.stringify(blocked) + '\n');
-          return; // do NOT forward the original call to the child
-        }
+    let parsed: unknown;
+    try { parsed = JSON.parse(line); } catch { parsed = undefined; }
+    if (Array.isArray(parsed)) {
+      const replies: JsonRpcMessage[] = [];
+      const forward: unknown[] = [];
+      for (const el of parsed) {
+        const reply = el && typeof el === 'object' && !Array.isArray(el) ? gateToolCall(el as JsonRpcMessage) : null;
+        if (reply) replies.push(reply); else forward.push(el);
+      }
+      if (replies.length > 0) process.stdout.write(JSON.stringify(replies) + '\n');
+      if (forward.length > 0) childStdin.write((replies.length > 0 ? JSON.stringify(forward) : line) + '\n');
+      return;
+    }
+    if (parsed && typeof parsed === 'object') {
+      const reply = gateToolCall(parsed as JsonRpcMessage);
+      if (reply) {
+        process.stdout.write(JSON.stringify(reply) + '\n');
+        return;
       }
     }
     childStdin.write(line + '\n');
@@ -221,106 +242,122 @@ export function startProxy(cmd: string, args: string[]): void {
 
   // server → agent: detection runs here. After mutation (if any), the final content
   // is added to the taint store so subsequent capability checks can see it.
+  /// Server → agent for ONE response element: manifest observation, then — for anything shaped
+  /// like a tool-call result, whether or not its id matches a call we saw — screening, audit,
+  /// persistence and taint. Returns what to send to the agent (a screening failure withholds it).
+  async function screenResponseElement(msg: JsonRpcMessage): Promise<JsonRpcMessage> {
+    if (manifest && msg.result && typeof msg.result === 'object') {
+      const result = msg.result as Record<string, unknown>;
+      if ('serverInfo' in result || 'protocolVersion' in result) {
+        manifest.observeInitialize(result as InitializeResult);
+      }
+      if ('tools' in result && Array.isArray(result.tools)) {
+        manifest.observeToolsList(result as ToolsListResult);
+      }
+      const verdict = manifest.finalizeIfReady();
+      if (verdict) {
+        reportManifestVerdict(
+          verdict,
+          config.manifest.mode === 'strict' ? 'strict' : 'on',
+        );
+        if (audit.enabled) {
+          audit.log({
+            type: 'manifest',
+            serverKey: verdict.serverKey,
+            fingerprint: verdict.fingerprint.fingerprint,
+            status: verdict.status,
+            changes: verdict.changes,
+          });
+        }
+      }
+    }
+
+    if (!isToolCallResponse(msg)) return msg;
+    const toolName =
+      (msg.id != null ? toolNameById.get(msg.id) : undefined) ?? 'unknown';
+    if (msg.id != null) toolNameById.delete(msg.id);
+
+    let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
+    try {
+      outcome = await inspectToolCallResponse(msg, toolName, config.mode);
+    } catch (err) {
+      // Screening failed: record it and fail closed (the response is withheld).
+      audit.log(screeningErrorEntry(msg, toolName, 'detection', err));
+      return screeningErrorResponse(msg.id ?? null) as unknown as JsonRpcMessage;
+    }
+    if (outcome.verdict !== 'clean') {
+      process.stderr.write(
+        `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
+      );
+    }
+    if (audit.enabled) {
+      audit.log({
+        ...(outcome.degraded ? { degraded: true } : {}),
+        type: 'detection',
+        toolName,
+        layer: outcome.layer ?? null,
+        verdict: outcome.verdict,
+        confidence: outcome.result?.confidence ?? 0,
+        patterns: outcome.result?.detectedPatterns ?? [],
+        mode: config.mode,
+        mutated: outcome.mutated,
+        reasoning: outcome.result?.reasoning,
+        contentHash: outcome.contentHash,
+        text: outcome.scannedText,
+        l3Status: outcome.result?.l3Status,
+        transport: 'stdio',
+        serverKey: serverIdentifier,
+      });
+    }
+    if (scanStore.enabled) {
+      const rawText = responseText(msg.result);
+      try {
+        scanStore.insert({
+          serverKey: serverIdentifier,
+          transport: 'stdio',
+          toolName,
+          verdict: outcome.verdict,
+          layer: outcome.layer ?? null,
+          confidence: outcome.result?.confidence ?? 0,
+          patterns: outcome.result?.detectedPatterns ?? [],
+          contentHash: outcome.contentHash,
+          rawText,
+          reasoning: outcome.result?.reasoning ?? null,
+          mode: config.mode,
+          mutated: outcome.mutated,
+          degraded: outcome.degraded,
+        });
+      } catch (err) {
+        process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
+    }
+    if (config.capability.enabled || config.tradePolicy.enabled)
+      addResponseToTaint(msg, toolName, taint, isTrustedSource(toolName, config.tradePolicy));
+    return msg;
+  }
+
+  // server → agent: detection runs here, on single messages and on every element of a batch.
+  // After mutation (if any), the final content is added to the taint store so subsequent
+  // capability checks can see it.
   let chain: Promise<void> = Promise.resolve();
   const outRl = createInterface({ input: childStdout });
   outRl.on('line', (line) => {
     chain = chain.then(async () => {
-      const msg = tryParse(line);
-      if (!msg) {
+      let parsed: unknown;
+      try { parsed = JSON.parse(line); } catch { parsed = undefined; }
+      if (Array.isArray(parsed)) {
+        const out: unknown[] = [];
+        for (const el of parsed) {
+          out.push(el && typeof el === 'object' && !Array.isArray(el) ? await screenResponseElement(el as JsonRpcMessage) : el);
+        }
+        process.stdout.write(JSON.stringify(out) + '\n');
+        return;
+      }
+      if (!parsed || typeof parsed !== 'object') {
         process.stdout.write(line + '\n');
         return;
       }
-
-      if (manifest && msg.result && typeof msg.result === 'object') {
-        const result = msg.result as Record<string, unknown>;
-        if ('serverInfo' in result || 'protocolVersion' in result) {
-          manifest.observeInitialize(result as InitializeResult);
-        }
-        if ('tools' in result && Array.isArray(result.tools)) {
-          manifest.observeToolsList(result as ToolsListResult);
-        }
-        const verdict = manifest.finalizeIfReady();
-        if (verdict) {
-          reportManifestVerdict(
-            verdict,
-            config.manifest.mode === 'strict' ? 'strict' : 'on',
-          );
-          if (audit.enabled) {
-            audit.log({
-              type: 'manifest',
-              serverKey: verdict.serverKey,
-              fingerprint: verdict.fingerprint.fingerprint,
-              status: verdict.status,
-              changes: verdict.changes,
-            });
-          }
-        }
-      }
-
-      if (isToolCallResponse(msg)) {
-        const toolName =
-          (msg.id != null ? toolNameById.get(msg.id) : undefined) ?? 'unknown';
-        if (msg.id != null) toolNameById.delete(msg.id);
-
-        let outcome: Awaited<ReturnType<typeof inspectToolCallResponse>>;
-        try {
-          outcome = await inspectToolCallResponse(msg, toolName, config.mode);
-        } catch (err) {
-          // Screening failed: record it and fail closed (the response is withheld).
-          audit.log(screeningErrorEntry(msg, toolName, 'detection', err));
-          process.stdout.write(JSON.stringify(screeningErrorResponse(msg.id ?? null)) + '\n');
-          return;
-        }
-        if (outcome.verdict !== 'clean') {
-          process.stderr.write(
-            `blindseal: ${outcome.verdict} (L${outcome.layer ?? '?'}) response from '${toolName}' (mode=${config.mode}${outcome.mutated ? ', mutated' : ''}${outcome.degraded ? ', degraded' : ''})\n`,
-          );
-        }
-        if (audit.enabled) {
-          const previewText = responseText(msg.result);
-          audit.log({
-            ...(outcome.degraded ? { degraded: true } : {}),
-            type: 'detection',
-            toolName,
-            layer: outcome.layer ?? null,
-            verdict: outcome.verdict,
-            confidence: outcome.result?.confidence ?? 0,
-            patterns: outcome.result?.detectedPatterns ?? [],
-            mode: config.mode,
-            mutated: outcome.mutated,
-            reasoning: outcome.result?.reasoning,
-            contentHash: outcome.contentHash,
-            text: previewText,
-            l3Status: outcome.result?.l3Status,
-          });
-        }
-        if (scanStore.enabled) {
-          const rawText = responseText(msg.result);
-          try {
-            scanStore.insert({
-              serverKey: serverIdentifier,
-              transport: 'stdio',
-              toolName,
-              verdict: outcome.verdict,
-              layer: outcome.layer ?? null,
-              confidence: outcome.result?.confidence ?? 0,
-              patterns: outcome.result?.detectedPatterns ?? [],
-              contentHash: outcome.contentHash,
-              rawText,
-              reasoning: outcome.result?.reasoning ?? null,
-              mode: config.mode,
-              mutated: outcome.mutated,
-              degraded: outcome.degraded,
-            });
-          } catch (err) {
-            process.stderr.write(`blindseal: persistence insert failed: ${err instanceof Error ? err.message : String(err)}\n`);
-          }
-        }
-        if (config.capability.enabled || config.tradePolicy.enabled)
-          addResponseToTaint(msg, toolName, taint, isTrustedSource(toolName, config.tradePolicy));
-      }
-
-      process.stdout.write(JSON.stringify(msg) + '\n');
+      process.stdout.write(JSON.stringify(await screenResponseElement(parsed as JsonRpcMessage)) + '\n');
     });
   });
 
