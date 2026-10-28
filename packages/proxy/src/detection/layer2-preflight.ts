@@ -1,7 +1,7 @@
 /// Startup check for Layer 2 (embeddings). Runs before any MCP server is spawned or any port is
 /// opened, so a refused start never leaves an orphaned child behind.
 ///
-///   block mode, L2 loads           → start normally
+///   block mode, L2 loads           → start normally (stderr: `layer-2 embeddings: ready`)
 ///   block mode, L2 fails           → refuse to start (exit code LAYER2_PREFLIGHT_EXIT) unless
 ///                                    --allow-degraded was passed
 ///   warn/log mode, L2 fails        → start, with a stderr notice (decisions marked degraded)
@@ -26,6 +26,7 @@ export async function preflightLayer2(opts: {
   const write = opts.write ?? ((s: string) => process.stderr.write(s));
   try {
     await (opts.warmup ?? warmupLayer2)();
+    write('blindseal: layer-2 embeddings: ready\n');
     return { ok: true };
   } catch (err) {
     const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, ' ').slice(0, 300).replace(/\.+$/, '');

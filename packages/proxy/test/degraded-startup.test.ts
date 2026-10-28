@@ -131,3 +131,21 @@ describe('layer-2 startup preflight', () => {
     expect(h.stderr()).not.toMatch(/refusing to start|DEGRADED —/);
   }, 30000);
 });
+
+describe('startup status lines (0.7.0)', () => {
+  it('a healthy start prints both the layer-2 and the layer-3 status', async () => {
+    const { spawnProxy } = await import('./helpers/proxy-harness.js');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const fixture = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixture-mcp-server.mjs');
+    const h = spawnProxy({ fixture, env: { BLINDSEAL_LAYER3_PROVIDER: undefined } });
+    try {
+      h.send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+      await h.next(90000);
+      expect(h.stderr()).toMatch(/layer-3 judge: off/);
+      expect(h.stderr()).toMatch(/layer-2 embeddings: ready/);
+    } finally {
+      h.close();
+    }
+  }, 120000);
+});
