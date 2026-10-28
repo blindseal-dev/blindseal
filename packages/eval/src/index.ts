@@ -2,7 +2,10 @@
 ///
 /// Usage:
 ///   pnpm --filter @blindseal/eval score                     # all available competitors
-///   ANTHROPIC_API_KEY=... pnpm eval score
+///   BLINDSEAL_LAYER3_PROVIDER=anthropic ANTHROPIC_API_KEY=... pnpm eval score
+///
+/// blindseal-full includes layer 3 only when BLINDSEAL_LAYER3_PROVIDER is set (the same rule as
+/// the proxy: a provider key alone never enables it); the active judge is printed first.
 ///
 /// Writes the scoreboard to stdout and to packages/eval/scoreboard.md.
 
@@ -14,6 +17,7 @@ import { openaiModeration } from './competitors/openai-moderation.js';
 import { anthropicJudge } from './competitors/anthropic-judge.js';
 import { scoreCompetitor } from './runner.js';
 import { renderMarkdown } from './scoreboard.js';
+import { evalLayer3 } from './l3-env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(__dirname, '..', 'scoreboard.md');
@@ -22,6 +26,7 @@ const COMPETITORS = [blindsealFull, blindsealL1, blindsealL2, openaiModeration, 
 
 async function main(): Promise<void> {
   process.stderr.write(`blindseal-eval: running ${COMPETITORS.length} competitors against corpus...\n`);
+  process.stderr.write(`blindseal-eval: blindseal-full ${evalLayer3().line}\n`);
   const scores = [];
   for (const c of COMPETITORS) {
     process.stderr.write(`  ${c.name}... `);

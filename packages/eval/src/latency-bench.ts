@@ -5,11 +5,12 @@
 /// layer. Writes one markdown file that every latency figure in the README should cite.
 ///
 /// L1 and L2 run fully offline and are measured here. L3 is a network round-trip to the
-/// configured judge (Anthropic Haiku / OpenAI / Ollama); it is measured only when a key is
-/// present, and is dominated by provider latency, not Blindseal code.
+/// judge chosen by BLINDSEAL_LAYER3_PROVIDER (anthropic / openai / ollama / custom); it is
+/// measured only when that variable selects a usable judge (a provider key alone never does),
+/// and is dominated by provider latency, not Blindseal code.
 ///
 ///   cd packages/eval && npx tsx src/latency-bench.ts
-///   ANTHROPIC_API_KEY=... cd packages/eval && npx tsx src/latency-bench.ts   # also measures L3
+///   BLINDSEAL_LAYER3_PROVIDER=anthropic ANTHROPIC_API_KEY=... npx tsx src/latency-bench.ts   # also measures L3
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -19,6 +20,7 @@ import { runLayer2, warmupLayer2 } from '../../proxy/src/detection/layer2-embedd
 import { runLayer3 } from '../../proxy/src/detection/layer3-judge.js';
 import { Layer3Unavailable } from '../../proxy/src/detection/clients/types.js';
 import { createClientFromEnv } from '../../proxy/src/detection/clients/factory.js';
+import { evalLayer3 } from './l3-env.js';
 
 const require = createRequire(import.meta.url);
 
@@ -50,6 +52,7 @@ function loadCorpus(): CorpusEntry[] {
 
 async function main() {
   const hasL3Client = createClientFromEnv();
+  process.stderr.write(`latency-bench: ${evalLayer3().line}\n`);
   const inputs = [...loadCorpus().map((e) => e.text), ...BENIGN];
   process.stderr.write(`latency-bench: ${inputs.length} inputs, warming up L2...\n`);
   await warmupLayer2();
@@ -101,7 +104,7 @@ async function main() {
 
   const l3Note = hasL3Client
     ? `L3 measured over ${l3Measured} escalated inputs (provider round-trip; dominated by the judge API, not Blindseal).`
-    : `L3 not measured this run — requires an LLM key. L3 is a single provider round-trip (Anthropic Haiku 4.5 / OpenAI / Ollama); observed ~1.5–2 s in prior runs, network-bound.`;
+    : `L3 not measured this run — requires BLINDSEAL_LAYER3_PROVIDER (and that provider's key). L3 is a single provider round-trip (Anthropic Haiku 4.5 / OpenAI / Ollama); observed ~1.5–2 s in prior runs, network-bound.`;
 
   const md = `# Blindseal latency baseline — ${date}
 

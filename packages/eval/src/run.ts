@@ -10,6 +10,9 @@
 ///   pnpm --filter @blindseal/eval run -- --set both --no-l3            # skip L3 to estimate cost first
 ///   pnpm --filter @blindseal/eval run -- --set both --dry-run-l3       # log what would call L3 without spending
 ///
+/// Layer 3 runs only with BLINDSEAL_LAYER3_PROVIDER set (e.g. BLINDSEAL_LAYER3_PROVIDER=anthropic
+/// with ANTHROPIC_API_KEY); without it the run refuses to start unless --allow-degraded.
+///
 /// Output:
 ///   packages/eval/results/eval-YYYY-MM-DD-HHMM.md
 ///   packages/eval/results/eval-YYYY-MM-DD-HHMM.json
@@ -22,6 +25,7 @@ import { runLayer2 } from '../../proxy/src/detection/layer2-embeddings.js';
 import { runLayer3 } from '../../proxy/src/detection/layer3-judge.js';
 import { Layer3Unavailable } from '../../proxy/src/detection/clients/types.js';
 import { createClientFromEnv } from '../../proxy/src/detection/clients/factory.js';
+import { evalLayer3, layer3RequiredMessage } from './l3-env.js';
 import type { DetectionResult } from '../../proxy/src/detection/types.js';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -360,12 +364,13 @@ function renderMarkdown(opts: RunOptions, attackAgg: Aggregate | null, benignAgg
   const degradedTag = degraded ? '[DEGRADED — L3 disabled] ' : '';
   lines.push(`# ${degradedTag}Blindseal Eval — ${nowStamp()}\n`);
   if (degraded) {
-    lines.push(`> **DEGRADED MODE**: L3 (LLM judge) was unavailable during this run (no ANTHROPIC_API_KEY). Numbers reflect L1+L2 detection only. Re-run with ANTHROPIC_API_KEY set for full results.\n`);
+    lines.push(`> **DEGRADED MODE**: L3 (LLM judge) was unavailable during this run (BLINDSEAL_LAYER3_PROVIDER not set or not usable). Numbers reflect L1+L2 detection only. Re-run with BLINDSEAL_LAYER3_PROVIDER (and its key) set for full results.\n`);
   }
   lines.push(`Command: \`pnpm --filter @blindseal/eval run -- --set ${opts.set}${opts.noL3 ? ' --no-l3' : ''}${opts.dryRunL3 ? ' --dry-run-l3' : ''}${opts.allowDegraded ? ' --allow-degraded' : ''}${opts.includeOutOfScope ? ' --include-out-of-scope' : ''}${opts.max ? ` --max ${opts.max}` : ''}\`\n`);
   lines.push(`Scope: ${opts.includeOutOfScope ? 'all entries including out-of-scope' : 'in-scope only (out_of_scope_* entries excluded — use --include-out-of-scope for full run)'}\n`);
-  lines.push(`Pipeline: L1 heuristics → L2 bge-small embeddings → L3 ${opts.noL3 ? 'DISABLED' : opts.dryRunL3 ? 'DRY-RUN (no API calls)' : degraded ? 'UNAVAILABLE (no API key)' : 'Anthropic Haiku judge'}\n`);
-  lines.push(`L3 status: ${degraded ? 'UNAVAILABLE — no API key configured; results reflect L1+L2 only' : 'API key set — L3 fully active'}\n`);
+  const l3 = evalLayer3();
+  lines.push(`Pipeline: L1 heuristics → L2 bge-small embeddings → L3 ${opts.noL3 ? 'DISABLED' : opts.dryRunL3 ? 'DRY-RUN (no API calls)' : degraded ? 'UNAVAILABLE' : `judge (${l3.selection.label})`}\n`);
+  lines.push(`L3 status: ${degraded ? `UNAVAILABLE — ${l3.line}; results reflect L1+L2 only` : `${l3.line} — L3 active`}\n`);
   lines.push('');
 
   // Headline numbers
@@ -450,13 +455,12 @@ async function main(): Promise<void> {
   // Preflight: refuse to run in silent-degraded mode. If L3 is unavailable and the
   // caller hasn't explicitly acknowledged this with --allow-degraded, fail fast and
   // loud rather than producing misleading numbers.
+  // L3 is selected only by BLINDSEAL_LAYER3_PROVIDER (a provider key alone never enables it).
+  process.stderr.write(`${evalLayer3().line}\n`);
   if (!opts.noL3 && !opts.dryRunL3 && !opts.allowDegraded) {
-    const l3Client = createClientFromEnv();
-    if (!l3Client) {
-      process.stderr.write(
-        `ERROR: L3 client unavailable. Set ANTHROPIC_API_KEY (or OPENAI_API_KEY) to enable full detection.\n` +
-        `       Pass --allow-degraded to run in L1+L2-only mode (results will be labeled [DEGRADED]).\n`,
-      );
+    const msg = layer3RequiredMessage();
+    if (msg) {
+      process.stderr.write(msg);
       process.exit(1);
     }
   }
