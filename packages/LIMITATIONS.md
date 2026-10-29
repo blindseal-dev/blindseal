@@ -301,14 +301,21 @@ Output goes to `packages/eval/red-team/attempts/<date>.md` and
 `packages/eval/results/eval-<timestamp>.md` respectively.
 
 ### 15. Binary image and audio content is not screened
-An `image` or `audio` content item whose `data` is strict base64 of a file of its declared type
-(magic bytes match the mimeType: PNG, JPEG, GIF, WebP, BMP, TIFF, AVIF/HEIC, ICO; WAV, MP3, Ogg/Opus,
-FLAC, MP4/M4A, AAC, WebM, AIFF) and is not valid UTF-8 is forwarded without screening what the
-picture or sound contains: text drawn in an image, metadata chunks, or speech in audio. Everything
-else is decoded and its text screened: resource blobs, `resources/read` contents, SVG (XML text),
-media of an unknown subtype, and media whose bytes do not match the declared type. A blob that is
-not base64, or decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default 10 MiB), is blocked in block
-mode.
+An `image` or `audio` content item whose `data` is strict base64 of a file that parses as its
+declared type and is not valid UTF-8 is forwarded without screening what the picture or sound
+contains: text drawn in an image, metadata chunks (a PNG `tEXt` chunk, an ID3 or Vorbis comment),
+or speech in audio. "Parses as" means the proxy's own structural parser walks the whole file and
+accounts for every byte, as a decoder would open it, including the checksums the format carries:
+PNG (chunks with CRC-32, a valid IHDR, IDAT that inflates to exactly the scanline bytes the header
+implies, IEND last), JPEG (marker segments from SOI to a final EOI, with frame, table and scan
+headers), GIF (descriptors, colour tables, data sub-blocks, trailer), WebP (RIFF chunks and the VP8 /
+VP8L / VP8X bitstream header), BMP, TIFF (first IFD), ICO, AVIF / HEIC (ISO BMFF boxes); WAV and AIFF
+(chunk structure and a valid format chunk), MP3 and AAC (every frame header, frames tiling the file),
+Ogg / Opus (every page's CRC), FLAC (metadata blocks and the first frame header with its CRC-8),
+MP4 / M4A and WebM (container structure). A signature, trailer or size field alone does not qualify
+(0.7.0 final re-audit, A817-R3). Everything else is decoded and its text screened: resource blobs,
+`resources/read` contents, SVG (XML text), media of an unknown or unsupported subtype (RF64 WAV, for
+example), and media whose bytes do not parse as the declared type. A blob that is not base64, or
+decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default 10 MiB), is blocked in block mode.
 
 **Status:** By design for 0.7.0. OCR / speech-to-text screening of media is not planned for v1.
-

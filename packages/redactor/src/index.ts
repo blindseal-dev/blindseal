@@ -214,39 +214,55 @@ const QUOTED_KEY_RE = /"((?:[^"\\]|\\.){1,128})"(\s*:\s*)("(?:[^"\\]|\\.)*"|-?\d
 const QUOTED_KEY_OPEN_RE = /"((?:[^"\\]|\\.){1,128})"\s*:\s*(?=[[{])/g;
 
 function redactCompositeValues(text: string, ctx: Counter): string {
-  let out = '';
-  let last = 0;
-  // Total bracket-scanning work per call: each value that never closes scans to the end of the
-  // text, so many of them would be quadratic. Past the allowance a value is treated as unclosed
-  // (left in place, as an unclosed value always is).
-  let scanLeft = 4 * text.length + 65536;
+  const cands: Array<{ at: number; start: number; kind: RedactionKind }> = [];
   QUOTED_KEY_OPEN_RE.lastIndex = 0;
   for (let m = QUOTED_KEY_OPEN_RE.exec(text); m; m = QUOTED_KEY_OPEN_RE.exec(text)) {
     const kind = keyKind(m[1]!);
-    const start = m.index + m[0].length;
-    if (!kind || start < last || scanLeft <= 0) continue;
-    const end = matchingBracket(text, start, start + scanLeft);
-    scanLeft -= (end < 0 ? text.length : end) - start;
-    // Only a value that actually closes is replaced: an unbalanced '"token": [' must not redact
-    // the rest of the text (that would hide whatever follows from L2/L3).
-    if (end < 0) continue;
+    if (kind) cands.push({ at: m.index, start: m.index + m[0].length, kind });
+  }
+  if (cands.length === 0) return text;
+  const ends = closingBrackets(text, cands.map((c) => c.start));
+  let out = '';
+  let last = 0;
+  for (let i = 0; i < cands.length; i++) {
+    const { at, start, kind } = cands[i]!;
+    const end = ends[i]!;
+    // A key inside a value already replaced is gone with it. Only a value that actually closes is
+    // replaced: an unbalanced '"token": [' must not redact the rest of the text (that would hide
+    // whatever follows from L2/L3).
+    if (at < last || end < 0) continue;
     out += text.slice(last, start) + `"${mark(ctx, kind)}"`;
     last = end;
-    QUOTED_KEY_OPEN_RE.lastIndex = end;
   }
   return out + text.slice(last);
 }
 
-/// Index just past the bracket that closes the one at `start` (ignoring brackets inside JSON
-/// strings), or -1 when it does not close before `limit`.
-function matchingBracket(text: string, start: number, limit = text.length): number {
+/// For each of `starts` (increasing positions of opening brackets), the index just past the bracket
+/// that closes it, brackets inside JSON strings ignored, or -1 when it never closes. One pass over
+/// the text with a stack of the starts still open, so the cost is linear however many values never
+/// close. (Scanning from each start on its own is quadratic in that case; a work allowance that
+/// gave up part-way left every later value in place, unredacted: 0.7.0 re-audit A817-R2.) The
+/// string state is reset at each start: the quoted key just before it has closed, so its bracket
+/// is outside any string, whatever a stray quote earlier in the text suggested.
+function closingBrackets(text: string, starts: number[]): number[] {
+  const ends = new Array<number>(starts.length).fill(-1);
+  const open: Array<{ i: number; depth: number }> = [];
   let depth = 0;
   let inStr = false;
-  const stop = Math.min(limit, text.length);
-  for (let i = start; i < stop; i++) {
-    const c = text[i];
+  let esc = false;
+  let next = 0;
+  for (let p = starts[0]!; p < text.length; p++) {
+    const c = text[p];
+    if (next < starts.length && starts[next] === p) {
+      inStr = false;
+      esc = false;
+      open.push({ i: next++, depth });
+      depth++;
+      continue;
+    }
     if (inStr) {
-      if (c === '\\') i++;
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
       else if (c === '"') inStr = false;
       continue;
     }
@@ -254,10 +270,11 @@ function matchingBracket(text: string, start: number, limit = text.length): numb
     else if (c === '[' || c === '{') depth++;
     else if (c === ']' || c === '}') {
       depth--;
-      if (depth === 0) return i + 1;
+      // Open starts sit at strictly increasing depths, so at most the top one closes here.
+      if (open.length > 0 && open[open.length - 1]!.depth === depth) ends[open.pop()!.i] = p + 1;
     }
   }
-  return -1;
+  return ends;
 }
 
 const LOCAL_CHAR = /[A-Za-z0-9._%+\-]/;

@@ -149,3 +149,40 @@ describe('a stopword right before a mnemonic does not hide it (third review)', (
     });
   }
 });
+
+/// Final re-audit of a8172a5 (A817-R2): the composite-value pass had a work allowance; past it,
+/// later closed values under recognised keys were left in place and sent on to L2/L3. The pass is
+/// now one linear scan, so no number of unclosed values ahead can exhaust it.
+describe('many unclosed composite values ahead of a closed secret (A817-R2)', () => {
+  const PASSWORD = 'cedar-pond-41';
+  const NAME = 'Mira Samplefield';
+  for (const unclosed of [0, 3, 64, 128, 200, 256, 2048]) {
+    it(`${unclosed} unclosed "token": [ prefixes`, () => {
+      const text = 'log: ' + '"token": [ '.repeat(unclosed) + `\n{"password":["${PASSWORD}"],"name":["${NAME}"]}`;
+      const r = redact(text);
+      expect(r.redacted).not.toContain(PASSWORD);
+      expect(r.redacted).not.toContain(NAME);
+      expect(r.redacted).toContain('[REDACTED:secret_field:');
+      expect(r.redacted).toContain('[REDACTED:personal_field:');
+    });
+  }
+  it('the same log as a string inside otherwise valid structured content', () => {
+    const log = '"token": [ '.repeat(128) + `\n{"password":["${PASSWORD}"],"name":["${NAME}"]}`;
+    for (const r of [redact(JSON.stringify({ ok: true, log })), redactValue({ ok: true, log })]) {
+      expect(r.redacted).not.toContain(PASSWORD);
+      expect(r.redacted).not.toContain(NAME);
+    }
+  });
+  it('a stray quote earlier in the text does not hide a later closed value', () => {
+    const r = redact(`He said "hi. {"password": ["${PASSWORD}"]} and left`).redacted;
+    expect(r).not.toContain(PASSWORD);
+    expect(r).toContain('and left');
+  });
+  it('is linear: 1 MB of unclosed prefixes then a closed secret, well under a second', () => {
+    const text = '"token": [ '.repeat(100_000) + `{"password":["${PASSWORD}"]}`;
+    const t0 = performance.now();
+    const r = redact(text).redacted;
+    expect(performance.now() - t0).toBeLessThan(1000);
+    expect(r).not.toContain(PASSWORD);
+  });
+});

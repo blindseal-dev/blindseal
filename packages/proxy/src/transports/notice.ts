@@ -28,11 +28,18 @@ export function safeToken(s: unknown): string {
   return typeof s === 'string' && TOKEN_RE.test(s) ? s : 'unknown';
 }
 
-/// Pattern ids fit for the notice. A layer-3 result's ids come from the judge's output, so they
-/// are replaced by one fixed id; others are kept only if they look like identifiers.
+/// Pattern ids fit for any plaintext surface: the notice, the default /scan reply, the optional
+/// metadata log (BLINDSEAL_AUDIT_LOG) and the scan history. A layer-3 result's ids come from the
+/// judge's output, which can quote the text it read, so they are replaced by one fixed id; others
+/// are kept only if they look like identifiers. The judge's own labels survive only in the
+/// encrypted store.
+export function trustedPatterns(layer: number | null | undefined, patterns: readonly string[]): string[] {
+  if (layer === 3) return ['layer-3-judge'];
+  return patterns.filter((p) => TOKEN_RE.test(p)).slice(0, MAX_PATTERNS);
+}
+
 export function noticePatterns(r: DetectionResult): string[] {
-  if (r.layer === 3) return ['layer-3-judge'];
-  return r.detectedPatterns.filter((p) => TOKEN_RE.test(p)).slice(0, MAX_PATTERNS);
+  return trustedPatterns(r.layer, r.detectedPatterns);
 }
 
 const SUFFIX: Record<NoticeKind, Record<NoticeFields['direction'], string>> = {

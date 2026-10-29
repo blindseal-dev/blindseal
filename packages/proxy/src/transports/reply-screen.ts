@@ -22,6 +22,7 @@ import { noticeText, detectionNotice } from './notice.js';
 import { ScanBudget } from '../detection/scan-budget.js';
 import { inDecisionScope } from '../detection/degraded-state.js';
 import { rankVerdict, type DetectionResult, type Verdict } from '../detection/types.js';
+import { isPersonalKey, isSensitiveKey } from '@blindseal/redactor';
 
 export type BlindsealMode = 'block' | 'warn' | 'log';
 
@@ -156,9 +157,14 @@ interface BlobSite {
   media?: { type: 'image' | 'audio'; mimeType: unknown };
   /// The blob's own declared mimeType (its charset decides how its bytes are read as text).
   mimeType?: unknown;
+  /// An ancestor key names a secret or personal data (`password: { blob }`, `name: { files: [...] }`).
+  /// The key-based redactor replaces such a value whole, so the decoded text is screened by Layer
+  /// 0/1 only and never becomes a model-layer input of its own (0.7.0 re-audit A817-R1).
+  sensitive: boolean;
 }
 
-const siteKey = (site: BlobSite) => `${site.kind}|${site.media ? `${site.media.type}|${String(site.media.mimeType)}` : String(site.mimeType ?? '')}\u0000${site.value}`;
+const siteKey = (site: BlobSite) => `${site.kind}|${site.sensitive ? 's' : '-'}|${site.media ? `${site.media.type}|${String(site.media.mimeType)}` : String(site.mimeType ?? '')}\u0000${site.value}`;
+const sensitiveKey = (k: string) => isSensitiveKey(k) || isPersonalKey(k);
 
 /// path[0..] of the containing object, e.g. ['result', 'content', 3].
 type Path = Array<string | number>;
@@ -169,21 +175,22 @@ const isProtocolBlobArea = (p: Path) =>
   (p[0] === 'result' && (p[1] === 'content' || p[1] === 'contents' || p[1] === 'messages')) || (p[0] === 'params' && p[1] === 'messages');
 
 /// Calls `visit` for each embedded-binary site; `visit` returns the replacement string.
-function mapBlobSites(v: unknown, visit: (site: BlobSite) => string, path: Path = []): unknown {
-  if (Array.isArray(v)) return v.map((x, i) => mapBlobSites(x, visit, [...path, i]));
+/// `sensitive`: a key on `path` names a secret or personal data.
+function mapBlobSites(v: unknown, visit: (site: BlobSite) => string, path: Path = [], sensitive = false): unknown {
+  if (Array.isArray(v)) return v.map((x, i) => mapBlobSites(x, visit, [...path, i], sensitive));
   if (!isPlainObject(v)) return v;
   const mediaShaped = (v.type === 'image' || v.type === 'audio') && typeof v.data === 'string';
   const o = Object.create(null) as Obj;
   for (const k of Object.keys(v)) {
     const val = v[k];
     if (k === 'blob' && typeof val === 'string') {
-      o[k] = visit({ kind: isProtocolBlobArea(path) ? 'protocol' : 'loose', value: val, mimeType: v.mimeType });
+      o[k] = visit({ kind: isProtocolBlobArea(path) ? 'protocol' : 'loose', value: val, mimeType: v.mimeType, sensitive });
     } else if (k === 'data' && mediaShaped) {
       o[k] = isMediaPosition(path)
-        ? visit({ kind: 'media', value: val as string, media: { type: v.type as 'image' | 'audio', mimeType: v.mimeType } })
-        : visit({ kind: 'loose', value: val as string, mimeType: v.mimeType });
+        ? visit({ kind: 'media', value: val as string, media: { type: v.type as 'image' | 'audio', mimeType: v.mimeType }, sensitive })
+        : visit({ kind: 'loose', value: val as string, mimeType: v.mimeType, sensitive });
     } else {
-      o[k] = mapBlobSites(val, visit, [...path, k]);
+      o[k] = mapBlobSites(val, visit, [...path, k], sensitive || sensitiveKey(k));
     }
   }
   return o;
@@ -194,8 +201,11 @@ interface BlobScreen {
   /// SEPARATE (their text is screened on its own), oversized protocol blobs by SEPARATE. Anything
   /// not decoded keeps its raw value, so the string passes still read it.
   body: Obj;
-  /// Every text reading of every decoded blob.
+  /// Every text reading of every decoded blob (Layer 0/1 screen them all).
   texts: string[];
+  /// The readings that may also be model-layer inputs: those of blobs under no sensitive key. A
+  /// blob under `password`, `token`, `name`, … is a value the key-based redactor removes whole.
+  modelTexts: string[];
   /// One result per invalid media/protocol blob (not base64 / oversized): blocked in block mode.
   problems: DetectionResult[];
 }
@@ -213,10 +223,15 @@ async function screenBlobs(body: Obj): Promise<BlobScreen> {
     decoded.set(key, d);
   }));
   const texts: string[] = [];
+  const modelTexts: string[] = [];
   const problems: DetectionResult[] = [];
   for (const [key, d] of decoded) {
-    if (d.kind === 'text' || d.kind === 'binary') texts.push(...d.texts);
-    if (d.kind === 'invalid' && sites.get(key)!.kind !== 'loose') problems.push(blobProblem(d.reason));
+    const site = sites.get(key)!;
+    if (d.kind === 'text' || d.kind === 'binary') {
+      texts.push(...d.texts);
+      if (!site.sensitive) modelTexts.push(...d.texts);
+    }
+    if (d.kind === 'invalid' && site.kind !== 'loose') problems.push(blobProblem(d.reason));
   }
   const out = mapBlobSites(body, (site) => {
     const d = decoded.get(siteKey(site))!;
@@ -224,7 +239,7 @@ async function screenBlobs(body: Obj): Promise<BlobScreen> {
     if (d.kind === 'invalid') return d.reason === 'oversized' && site.kind !== 'loose' ? SEPARATE : site.value;
     return SEPARATE;
   }) as Obj;
-  return { body: out, texts, problems };
+  return { body: out, texts, modelTexts, problems };
 }
 
 function blobProblem(reason: 'not-base64' | 'oversized'): DetectionResult {
@@ -271,8 +286,9 @@ export function messageBody(msg: Obj): Obj {
 ///   1. Layer 0/1 (in the scan worker): text items, the decoded text of every blob, every other
 ///      string on its own, and all strings joined in the order the agent receives them.
 ///   2. Unless phase 1 already found it malicious, the model layers: the full pipeline on each
-///      text item and decoded blob, then on the rest of the body (stable JSON and joined leaves)
-///      with L2/L3 seeing its key-redacted form.
+///      text item and decoded blob (except a blob under a secret or personal key, which the
+///      key-based redactor would remove whole), then on the rest of the body (stable JSON and
+///      joined leaves) with L2/L3 seeing its key-redacted form.
 /// Validated binary media (blob-decode.ts) is the only content not screened.
 export async function screenMessage(msg: Obj, toolName: string, mcpMethod: string): Promise<ScreenOutcome> {
   const body = messageBody(msg);
@@ -309,9 +325,11 @@ export async function screenMessage(msg: Obj, toolName: string, mcpMethod: strin
 
     // Phase 2. The first MODEL_SINGLES texts each run the full pipeline (best L2 signal); any
     // more are joined into one pass, so model cost follows the bytes, not the number of items
-    // (thousands of tiny blobs must not mean thousands of embeddings).
-    for (const t of texts.slice(0, MODEL_SINGLES)) consider(await runPipeline(t, ctx, { budget }));
-    if (texts.length > MODEL_SINGLES) consider(await runPipeline(texts.slice(MODEL_SINGLES).join('\n\n'), ctx, { budget }));
+    // (thousands of tiny blobs must not mean thousands of embeddings). A decoded blob under a
+    // sensitive key is not among them: the structure it came from is redacted whole at that key.
+    const modelTexts = [...items, ...blobs.modelTexts];
+    for (const t of modelTexts.slice(0, MODEL_SINGLES)) consider(await runPipeline(t, ctx, { budget }));
+    if (modelTexts.length > MODEL_SINGLES) consider(await runPipeline(modelTexts.slice(MODEL_SINGLES).join('\n\n'), ctx, { budget }));
     const rest = withoutScreened(noMedia, skip);
     const leaves = stringLeaves(rest);
     if (leaves.every((s) => STRUCTURAL.has(s))) return;

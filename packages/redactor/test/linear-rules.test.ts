@@ -44,7 +44,7 @@ describe('redact() is fast on any 1 MB input', () => {
       expect(performance.now() - t0).toBeLessThan(3000);
     });
   }
-  it('still redacts a closed composite value after many unclosed ones (within the allowance)', () => {
+  it('still redacts a closed composite value after many unclosed ones', () => {
     expect(redact('"token": [ '.repeat(3) + ' "secret": ["x"]').redacted).toContain('[REDACTED:');
   });
 });

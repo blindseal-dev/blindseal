@@ -1,6 +1,6 @@
 /// SQLite-backed local scan history. Opt-in via BLINDSEAL_PERSIST=1.
 /// Content-free: a row holds decision METADATA only (tool, verdict, layer, confidence, pattern
-/// ids, content hash, mode, flags) plus the audit decisionId. What the decision was about — the
+/// ids as identifiers, content hash, mode, flags) plus the audit decisionId. What the decision was about — the
 /// redacted response text and the judge's reasoning — is retained only in the encrypted content
 /// store (<audit dir>/content.json), keyed by that decisionId; `blindseal history` decrypts it
 /// locally. Databases written by earlier versions (content_preview / reasoning columns) are
@@ -11,6 +11,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import Database, { type Database as Db, type Statement } from 'better-sqlite3';
+import { safeToken, trustedPatterns } from '../transports/notice.js';
 
 export interface ScanRecord {
   id?: number;
@@ -197,15 +198,17 @@ export function createScanStore(config: ScanStoreConfig): ScanStore {
     enabled: true,
     dbPath,
     insert(input) {
+      // Identifiers only, as in the agent's notice: a layer-3 decision's patterns are the judge's
+      // output and can quote the text it read, so they are stored as the fixed `layer-3-judge`.
       insertStmt.run(
         Date.now(),
         input.serverKey,
         input.transport,
-        input.toolName,
+        safeToken(input.toolName),
         input.verdict,
         input.layer,
         input.confidence,
-        JSON.stringify(input.patterns ?? []),
+        JSON.stringify(trustedPatterns(input.layer, input.patterns ?? [])),
         input.contentHash,
         input.decisionId ?? null,
         input.mode,

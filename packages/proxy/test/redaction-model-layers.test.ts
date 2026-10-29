@@ -131,3 +131,67 @@ describe('text joined by / _ - is not base64 media (third review)', () => {
     expect(seen.l2.some((t) => t.includes('word3/word4/word5'))).toBe(true);
   });
 });
+
+/// Final re-audit of a8172a5, A817-R1: a decoded blob was handed to the model layers as a string
+/// of its own, without the key it sat under, so `password: { blob }` reached L2/L3 decoded and
+/// unredacted. The key-based redactor removes such a value whole, so a blob under a secret or
+/// personal key is now screened by Layer 0/1 only.
+describe('a decoded blob keeps its sensitive parent key (A817-R1)', () => {
+  const PASSWORD = 'cedar-pond-41';
+  const NAME = 'Mira Samplefield';
+  const b64 = (t: string) => Buffer.from(t).toString('base64');
+
+  it('password/name: { blob } never reaches L2 or L3', async () => {
+    const m: any = { jsonrpc: '2.0', id: 1, result: { content: [], structuredContent: { password: { blob: b64(PASSWORD) }, name: { blob: b64(NAME) } } } };
+    await inspectToolCallResponse(m, 'account', 'block');
+    expect(seen.l3.length).toBeGreaterThan(0);
+    for (const t of [...seen.l2, ...seen.l3]) { expect(t).not.toContain(PASSWORD); expect(t).not.toContain(NAME); }
+  });
+
+  it('a files array nested under the sensitive key, and the same blob at every accepted site', async () => {
+    const m: any = {
+      jsonrpc: '2.0', id: 1,
+      result: {
+        content: [{ type: 'text', text: 'see attachments' }, { type: 'resource', resource: { uri: 'file:///a', blob: b64('Meeting notes') } }],
+        structuredContent: { account: { password: { files: [{ blob: b64(PASSWORD) }, { kind: 'audio', data: b64(PASSWORD) }] } }, customer: { name: { files: [{ blob: b64(NAME) }] } } },
+        _meta: { credentials: [{ blob: b64(PASSWORD) }] },
+      },
+    };
+    await inspectToolCallResponse(m, 'account', 'block');
+    expect(seen.l3.length).toBeGreaterThan(0);
+    for (const t of [...seen.l2, ...seen.l3]) { expect(t).not.toContain(PASSWORD); expect(t).not.toContain(NAME); }
+    expect(seen.l3.some((t) => t.includes('Meeting notes'))).toBe(true); // a blob under no sensitive key is still judged
+  });
+
+  it('a blob whose decoded text is itself JSON with secret keys is redacted by key (control)', async () => {
+    const m: any = { jsonrpc: '2.0', id: 1, result: { content: [], structuredContent: { files: [{ blob: b64(JSON.stringify({ password: PASSWORD, name: NAME, note: 'hello' })) }] } } };
+    await inspectToolCallResponse(m, 'account', 'block');
+    for (const t of [...seen.l2, ...seen.l3]) { expect(t).not.toContain(PASSWORD); expect(t).not.toContain(NAME); }
+    expect(seen.l3.some((t) => t.includes('hello'))).toBe(true);
+  });
+});
+
+/// A817-R2: the redactor's composite-value pass had a work allowance; a text item with enough
+/// unclosed `"token": [` fragments ahead of a closed password/name array exhausted it, and the
+/// values went to L2/L3 as written. The pass is now one linear scan.
+describe('the redactor cannot be exhausted ahead of a sensitive value (A817-R2)', () => {
+  const PASSWORD = 'cedar-pond-41';
+  const NAME = 'Mira Samplefield';
+  const log = (n: number) => 'log: ' + '"token": [ '.repeat(n) + `\n{"password":["${PASSWORD}"],"name":["${NAME}"]}`;
+
+  for (const n of [128, 200, 256]) {
+    it(`a text item with ${n} unclosed prefixes: L2/L3 never see the values`, async () => {
+      const m: any = { jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: log(n) }] } };
+      await inspectToolCallResponse(m, 'logs', 'block');
+      expect(seen.l3.length).toBeGreaterThan(0);
+      for (const t of [...seen.l2, ...seen.l3]) { expect(t).not.toContain(PASSWORD); expect(t).not.toContain(NAME); }
+    });
+  }
+
+  it('the same log as a string inside structuredContent (JSON and flattened model forms)', async () => {
+    const m: any = { jsonrpc: '2.0', id: 1, result: { content: [], structuredContent: { ok: true, log: log(128) } } };
+    await inspectToolCallResponse(m, 'logs', 'block');
+    expect(seen.l3.length).toBeGreaterThan(0);
+    for (const t of [...seen.l2, ...seen.l3]) { expect(t).not.toContain(PASSWORD); expect(t).not.toContain(NAME); }
+  });
+});

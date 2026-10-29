@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openAudit } from '@blindseal/audit';
@@ -157,3 +157,44 @@ describe('/scan returns the template by default', () => {
   }, 120_000);
 });
 
+
+/// A817-R4: the agent notice and /scan replaced a judge's pattern strings with `layer-3-judge`, but
+/// the optional plaintext metadata log (BLINDSEAL_AUDIT_LOG) copied them as written, and so did the
+/// scan history. Both now carry identifiers only; the judge's labels stay in the encrypted store.
+describe('plaintext records carry identifiers only (A817-R4)', () => {
+  it('the metadata log and scans.db have no judge text; the encrypted store keeps the labels', async () => {
+    const metaFile = path.join(root, 'meta', 'audit.jsonl');
+    const dbFile = path.join(root, 'db', 'scans.db');
+    process.env.BLINDSEAL_AUDIT_LOG = metaFile;
+    process.env.BLINDSEAL_PERSIST = '1';
+    process.env.BLINDSEAL_PERSIST_PATH = dbFile;
+    const p = await proxyFor('block');
+    try {
+      const text = await call(p.url, 41);
+      expect(text).toMatch(/BLINDSEAL_BLOCKED/);
+      expect(text).not.toContain(CANARY);
+    } finally {
+      delete process.env.BLINDSEAL_AUDIT_LOG;
+      delete process.env.BLINDSEAL_PERSIST;
+      delete process.env.BLINDSEAL_PERSIST_PATH;
+      await p.close();
+    }
+    // The metadata line is written to a stream; give it a moment to reach the file.
+    let raw = '';
+    for (let i = 0; i < 100 && !/"type":"detection"/.test(raw); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      raw = existsSync(metaFile) ? readFileSync(metaFile, 'utf8') : '';
+    }
+    expect(raw).not.toContain(CANARY);
+    expect(raw).not.toContain('Weather for today');
+    expect(raw).not.toContain('Tool output');
+    const detections = raw.trim().split('\n').map((l) => JSON.parse(l)).filter((e) => e.type === 'detection' && e.layer === 3);
+    expect(detections.length).toBeGreaterThan(0);
+    for (const d of detections) expect(d.patterns).toEqual(['layer-3-judge']);
+    for (const f of [dbFile, `${dbFile}-wal`]) if (existsSync(f)) expect(readFileSync(f).includes(Buffer.from(CANARY))).toBe(false);
+    // The judge's own labels are retained, encrypted.
+    const audit = openAudit(path.join(root, 'audit'));
+    const kept = detections.map((d) => audit.content.get<{ patterns?: string[] }>(d.decisionId));
+    expect(kept.some((r) => r?.patterns?.some((x) => x.includes(CANARY)))).toBe(true);
+  }, 60_000);
+});

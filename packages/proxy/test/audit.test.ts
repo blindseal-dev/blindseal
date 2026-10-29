@@ -95,3 +95,45 @@ describe('audit logger (decision recorder)', () => {
     ).not.toThrow();
   });
 });
+
+/// Final re-audit of a8172a5, A817-R4: the plaintext metadata line copied a detection's pattern
+/// strings as written. A layer-3 decision's patterns are the judge's output, which can quote the
+/// text it read; they are now the fixed `layer-3-judge` in plaintext and kept only encrypted.
+describe('metadata log: identifiers only (A817-R4)', () => {
+  it('a quoting judge leaves no text in the JSONL; the encrypted record keeps its labels', async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'blindseal-audit-'));
+    try {
+      const file = path.join(tmpDir, 'audit.jsonl');
+      const logger = createAuditLogger({ dir: tmpDir, filepath: file });
+      const quoted = 'judge:[Tool: echo_reply | MCP method: tools/call]\n\nTool output:\nWeather: sunny. UNTRUSTED-CANARY';
+      const rec = logger.log({
+        type: 'detection', toolName: 'echo reply (weird name)', layer: 3, verdict: 'malicious', confidence: 0.9,
+        patterns: [quoted, 'UNTRUSTED-CANARY'], mode: 'block', mutated: true, reasoning: `Quoted: ${quoted}`,
+        contentHash: '11'.repeat(32), text: 'Weather: sunny. UNTRUSTED-CANARY',
+      });
+      // Layer 1 ids pass as identifiers; a non-identifier is dropped even at layer 1.
+      logger.log({
+        type: 'detection', toolName: 'read_file', layer: 1, verdict: 'suspicious', confidence: 0.6,
+        patterns: ['instruction-prefix:ignore-previous', 'not an identifier: UNTRUSTED-CANARY'], mode: 'warn', mutated: true, contentHash: '22'.repeat(32),
+      });
+      logger.log({ type: 'capability', toolName: 'http_get', action: 'block', matchedPattern: '(?i)curl .* UNTRUSTED-CANARY', taintSources: ['read_file', 'tool UNTRUSTED-CANARY'] });
+      await logger.shutdown();
+
+      const raw = readFileSync(file, 'utf8');
+      expect(raw).not.toContain('UNTRUSTED-CANARY');
+      expect(raw).not.toContain('Tool output');
+      const [l3, l1, cap] = raw.trim().split('\n').map((l) => JSON.parse(l));
+      expect(l3.patterns).toEqual(['layer-3-judge']);
+      expect(l3.toolName).toBe('unknown');
+      expect(l1.patterns).toEqual(['instruction-prefix:ignore-previous']);
+      expect(cap.matchedPattern).toBe('capability-policy');
+      expect(cap.taintSources).toEqual(['read_file', 'unknown']);
+
+      const stored = openAudit(tmpDir).content.get<{ patterns: string[]; toolName: string }>(rec!.decisionId);
+      expect(stored?.patterns).toEqual([quoted, 'UNTRUSTED-CANARY']);
+      expect(stored?.toolName).toBe('echo reply (weird name)');
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});

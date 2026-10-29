@@ -9,16 +9,20 @@ calls other than the ones listed below.
   audit log (`~/.blindseal/audit.log`) holds only fingerprints (hashes), ids and verdicts.
 - What a decision was about (the tool-call arguments or the reply text) is kept only in an encrypted
   store (`~/.blindseal/content.json`, key in `~/.blindseal/content.key`), after best-effort redaction.
-  So is the detectors' reasoning (an AI judge's explanation can quote the text it read). The agent
-  only ever gets a fixed notice: tool, direction, verdict, layer and pattern ids.
+  So is the detectors' reasoning and an AI judge's own labels (a judge's explanation, and the
+  pattern names it reports, can quote the text it read). The agent only ever gets a fixed notice:
+  tool, direction, verdict, layer and pattern ids, where a judge decision's pattern id is always
+  `layer-3-judge`. The same identifier-only rule applies to every plaintext record: the optional
+  metadata log (`BLINDSEAL_AUDIT_LOG`) and the scan history below.
   The stand-alone scan endpoint (`--transport scan-http`, `POST /scan`) answers with the same
   fields; it returns the reasoning only for `?verbose=1` with the dashboard token, and then marks
   it "may contain input text".
-- Binary image and audio content (an image or audio item that is a valid file of its declared type)
-  is passed to the agent without being screened. Every other embedded file is decoded and its text
+- Binary image and audio content (an image or audio item whose bytes parse as a file of its
+  declared type: the proxy walks the whole file, checksums included; see `LIMITATIONS.md` §15) is
+  passed to the agent without being screened. Every other embedded file is decoded and its text
   screened like any other text.
 - Scan history (`BLINDSEAL_PERSIST=1`, `~/.blindseal/scans.db`) is local, opt-in and holds metadata
-  only (tool, verdict, layer, fingerprint) — no text.
+  only (tool, verdict, layer, pattern ids as identifiers, fingerprint) — no text.
 - The audit chain and scan history name the wrapped server by an identifier that holds no
   credentials: `stdio:<command>:<package or script name>` (never the value after a credential-looking
   flag such as `--api-key` or `--token`), or `http:<host>#<short hash>` for an upstream URL (never its path, query or

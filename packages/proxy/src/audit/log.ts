@@ -9,15 +9,18 @@
 /// @blindseal/redactor first and truncated to RETAIN_MAX chars — keyed by the decisionId.
 ///
 /// BLINDSEAL_AUDIT_LOG (opt-in) additionally writes a plaintext JSONL of decision METADATA for
-/// `blindseal-audit`: ids, verdicts, layers, patterns, modes. It never contains arguments,
+/// `blindseal-audit`: ids, verdicts, layers, pattern ids, modes. It never contains arguments,
 /// response text, previews, judge reasoning or capability reasons (all of which can quote
-/// content).
+/// content). Pattern ids and tool names pass the same identifier allowlist as the agent's notice,
+/// and a layer-3 decision's patterns are written as the fixed `layer-3-judge`: a judge's labels are
+/// its output, which can quote the text it read (0.7.0 re-audit A817-R4).
 
 import { createHash, randomBytes } from 'node:crypto';
 import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs';
 import path from 'node:path';
 import { openAudit, toChainVerdict, ERROR_VERDICT, type ChainVerdict } from '@blindseal/audit';
 import { redactText, redactValueText } from '../detection/scan-pool.js';
+import { safeToken, trustedPatterns } from '../transports/notice.js';
 
 export interface AuditConfig {
   /// Directory holding audit.log, content.json, content.key, identity.key (default ~/.blindseal,
@@ -189,17 +192,24 @@ async function retainedOf(e: AuditEntryInput): Promise<Record<string, unknown>> 
 }
 
 /// The plaintext metadata line — an allowlist, so a new content-bearing field can never leak.
-function metadataOf(e: AuditEntryInput, rec: RecordedDecision): AuditEntry {
+/// Free-form strings (tool names, pattern ids, rule ids, taint sources) are reduced to identifiers
+/// exactly as in the agent's notice; the originals are in the encrypted record.
+export function metadataOf(e: AuditEntryInput, rec: RecordedDecision): AuditEntry {
   const base: AuditEntry = { type: e.type, ts: Date.now(), decisionId: rec.decisionId, auditIndex: rec.index, chainVerdict: rec.verdict };
   switch (e.type) {
     case 'detection':
-      return { ...base, toolName: e.toolName, layer: e.layer, verdict: e.verdict, confidence: e.confidence, patterns: e.patterns, mode: e.mode, mutated: e.mutated, ...(e.l3Status ? { l3Status: e.l3Status } : {}), ...(e.direction ? { direction: e.direction } : {}), ...(e.degraded ? { degraded: true } : {}) };
+      return { ...base, toolName: safeToken(e.toolName), layer: e.layer, verdict: e.verdict, confidence: e.confidence, patterns: trustedPatterns(e.layer, e.patterns), mode: e.mode, mutated: e.mutated, ...(e.l3Status ? { l3Status: e.l3Status } : {}), ...(e.direction ? { direction: e.direction } : {}), ...(e.degraded ? { degraded: true } : {}) };
     case 'capability':
-      return { ...base, toolName: e.toolName, action: e.action, matchedPattern: e.matchedPattern, taintSources: e.taintSources };
+      return {
+        ...base, toolName: safeToken(e.toolName), action: e.action,
+        // A sensitive-tool rule is a regex source, not an identifier: it shows as capability-policy.
+        ...(e.matchedPattern !== undefined ? { matchedPattern: safeToken(e.matchedPattern) === 'unknown' ? 'capability-policy' : e.matchedPattern } : {}),
+        ...(e.taintSources ? { taintSources: e.taintSources.map(safeToken) } : {}),
+      };
     case 'manifest':
       return { ...base, serverKey: e.serverKey, fingerprint: e.fingerprint, status: e.status, changeCount: e.changes.length };
     case 'error':
-      return { ...base, toolName: e.toolName, stage: e.stage };
+      return { ...base, toolName: safeToken(e.toolName), stage: e.stage };
   }
 }
 
