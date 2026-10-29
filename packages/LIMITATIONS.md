@@ -325,9 +325,10 @@ and each required part must have valid contents, not merely be present:
 - TIFF: a first IFD with non-zero width and length, a valid bit depth, and strip or tile offsets
   with byte counts, every one inside the file.
 - AVIF / HEIC: ISO BMFF boxes; a `meta` box with a picture handler, a primary item, an item of the
-  codec's type, item locations whose extents lie inside the file, an image size and a sized codec
-  configuration property (`av1C` of 4 bytes with its marker, `hvcC` of at least 23). The coded
-  image data is not decoded.
+  codec's type, item locations whose extents lie inside the file (construction method 0) or
+  inside an `idat` box (method 1; method 2, offsets into another item, is not resolved and does
+  not qualify), an image size and a sized codec configuration property (`av1C` of 4 bytes with
+  its marker, `hvcC` of at least 23). The coded image data is not decoded.
 - WAV and AIFF: chunk structure, a valid format chunk, a non-empty data chunk of whole blocks
   (AIFF: at least the declared frames).
 - MP3 and AAC: every frame header valid and consistent, frames tiling the file.
@@ -337,16 +338,19 @@ and each required part must have valid contents, not merely be present:
 - MP4 / M4A: `moov` with a movie header of the size its version implies and a non-zero timescale;
   a sound track with sized track and media headers, a handler, and a sample description whose
   audio sample entry has a data reference, channels, a sample rate and the codec's configuration
-  box (`esds` for AAC, parsed down to an audio decoder configuration with an in-range
-  AudioSpecificConfig; `alac`, `dOps`, `dfLa`, `dac3`, ... non-empty; none for PCM); sample tables
-  (times, chunks, sizes, offsets) whose entries fill them, with every chunk offset inside `mdat`,
-  the samples' bytes fitting the media, and samples present unless the file is fragmented; then
-  `mdat` or fragments. The sample data (the compressed audio) is not decoded.
+  box (`esds` for AAC, parsed down to an audio decoder configuration whose AudioSpecificConfig
+  fields, escape forms included, are all present and in range; `alac`, `dOps`, `dfLa`, `dac3`, ...
+  non-empty; none for PCM); sample tables (times, chunks, sizes or compact sizes, offsets) whose
+  entries fill them, a sample-to-chunk table that assigns every sample, and each chunk's samples
+  lying inside the `mdat` that holds the chunk's offset; samples present unless the file is
+  fragmented, in which case a fragment with a non-empty track run must exist; then `mdat` or
+  fragments. The sample data (the compressed audio) is not decoded.
 - WebM: an EBML header with a webm/matroska DocType and a Segment reaching the end of the file
   whose children tile it, with numbered tracks including an audio track (type and codec id) and a
-  Cluster holding a block that names an existing track and carries frame data.
+  Cluster holding a block that names an existing track and carries frame data, its lace headers
+  (Xiph, EBML or fixed-size lacing) present and every laced frame inside the block.
 A signature, trailer or size field alone does not qualify, and neither does an empty required box,
-header or table (0.7.0 final re-audit, A817-R3, three rounds). Everything else is decoded and its text
+header or table (0.7.0 final re-audit, A817-R3, four rounds). Everything else is decoded and its text
 screened: resource blobs, `resources/read` contents, SVG (XML text), media of an unknown or
 unsupported subtype (RF64 WAV, for example), and media whose bytes do not parse as the declared
 type. A blob that is not base64, or decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default

@@ -73,32 +73,39 @@ function bmpHeader(w: number, h: number, bpp: number, colours = 0, compression =
 }
 /// An M4A whose required boxes are all present and sized (valid with no options), varied to be
 /// invalid in one way.
-export function m4aBytes(o: { emptyTables?: boolean; noEsds?: boolean; emptyEsds?: boolean; zeroTimescale?: boolean; shortTkhd?: boolean; zeroChannels?: boolean; chunkOutsideMdat?: boolean; samplesOverflow?: boolean }): Buffer {
+export function m4aBytes(o: { emptyTables?: boolean; noEsds?: boolean; emptyEsds?: boolean; zeroTimescale?: boolean; shortTkhd?: boolean; zeroChannels?: boolean; chunkOutsideMdat?: boolean; samplesOverflow?: boolean; chunkAtMdatEnd?: boolean; twoSamplesOneChunk?: boolean; escapedObjectType?: boolean; emptyMoof?: boolean }): Buffer {
   const full = (tag: string, size: number, fill: (d: Buffer) => void = () => {}) => { const d = Buffer.alloc(size); fill(d); return box(tag, d); };
   const mvhd = full('mvhd', 100, (d) => d.writeUInt32BE(o.zeroTimescale ? 0 : 44100, 12));
   const tkhd = full('tkhd', o.shortTkhd ? 80 : 84);
   const mdhd = full('mdhd', 24, (d) => d.writeUInt32BE(44100, 12));
   const hdlr = full('hdlr', 25, (d) => d.write('soun', 8, 'latin1'));
-  const esds = box('esds', Buffer.alloc(4), Buffer.from([0x03, 0x19, 0, 1, 0, 0x04, 0x11, 0x40, 0x15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x05, 0x02, 0x12, 0x10, 0x06, 0x01, 0x02]));
+  // AudioSpecificConfig 0x1210: AAC LC, 44.1 kHz, 2 channels. The escaped variant announces
+  // audioObjectType 31 (6 more bits follow) in the same two bytes, so the config is cut short.
+  const asc = o.escapedObjectType ? [0xf8, 0x90] : [0x12, 0x10];
+  const esds = box('esds', Buffer.alloc(4), Buffer.from([0x03, 0x19, 0, 1, 0, 0x04, 0x11, 0x40, 0x15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x05, 0x02, ...asc, 0x06, 0x01, 0x02]));
   const entryFixed = Buffer.alloc(28); entryFixed.writeUInt16BE(1, 6); entryFixed.writeUInt16BE(o.zeroChannels ? 0 : 2, 16); entryFixed.writeUInt16BE(16, 18); entryFixed.writeUInt32BE(44100 * 65536, 24);
   const mp4a = o.noEsds ? box('mp4a', entryFixed) : box('mp4a', entryFixed, o.emptyEsds ? box('esds', Buffer.alloc(4)) : esds);
   const stsd = box('stsd', Buffer.alloc(4), u32be(1), mp4a);
   const table = (tag: string, entries: Buffer[]) => box(tag, Buffer.alloc(4), u32be(entries.length), ...entries);
-  const n = o.emptyTables ? 0 : 1;
-  const stts = table('stts', n ? [T(u32be(1), u32be(1024))] : []);
-  const stsc = table('stsc', n ? [T(u32be(1), u32be(1), u32be(1))] : []);
-  const stsz = box('stsz', Buffer.alloc(4), u32be(0), u32be(n), ...(n ? [u32be(o.samplesOverflow ? BODY.length * 4 : BODY.length)] : []));
+  const n = o.emptyTables || o.emptyMoof ? 0 : 1;
+  // Two samples in the one chunk claim the body's bytes twice over: the chunk overruns the mdat.
+  const perChunk = o.twoSamplesOneChunk ? 2 : 1;
+  const stts = table('stts', n ? [T(u32be(perChunk), u32be(1024))] : []);
+  const stsc = table('stsc', n ? [T(u32be(1), u32be(perChunk), u32be(1))] : []);
+  const stsz = box('stsz', Buffer.alloc(4), u32be(0), u32be(n * perChunk), ...(n ? Array.from({ length: perChunk }, () => u32be(o.samplesOverflow ? BODY.length * 4 : BODY.length)) : []));
   const stcoPlaceholder = table('stco', n ? [u32be(0)] : []);
   const build = (stco: Buffer) => box('moov', mvhd, box('trak', tkhd, box('mdia', mdhd, hdlr, box('minf', box('stbl', stsd, stts, stsc, stsz, stco)))));
   const ftyp = T(u32be(20), 'ftyp', 'M4A ', u32be(0), 'isom');
   const moovLen = build(stcoPlaceholder).length;
-  const stco = table('stco', n ? [u32be(o.chunkOutsideMdat ? 8 : ftyp.length + moovLen + 8)] : []); // the one chunk: the mdat payload
-  return T(ftyp, build(stco), u32be(8 + BODY.length), 'mdat', BODY);
+  const mdatPayload = ftyp.length + moovLen + 8, fileLength = mdatPayload + BODY.length;
+  const stco = table('stco', n ? [u32be(o.chunkOutsideMdat ? 8 : o.chunkAtMdatEnd ? fileLength - 1 : mdatPayload)] : []); // the one chunk: the mdat payload
+  const moof = o.emptyMoof ? box('moof', box('mfhd', Buffer.alloc(8)), box('traf', box('tfhd', Buffer.alloc(8)), box('trun', Buffer.alloc(4), u32be(0)))) : Buffer.alloc(0);
+  return T(ftyp, build(stco), moof, u32be(8 + BODY.length), 'mdat', BODY);
 }
 
 /// A WebM with a header, an audio track numbered 1 and one Cluster holding a SimpleBlock whose track
 /// number is `blockTrack` (valid when 1) and whose frame data is the instruction text.
-export function webmBytes(blockTrack: number): Buffer {
+export function webmBytes(blockTrack: number, lacing: 'none' | 'xiph-short' | 'ebml-short' | 'fixed-uneven' = 'none'): Buffer {
   const el = (id: number[], body: Buffer) => {
     const len = body.length < 127 ? Buffer.from([0x80 | body.length]) : T([0x40 | (body.length >> 8), body.length & 0xff]);
     return T(id, len, body);
@@ -107,9 +114,26 @@ export function webmBytes(blockTrack: number): Buffer {
   const track = el([0xae], T(el([0xd7], Buffer.from([1])), el([0x73, 0xc5], Buffer.from([1])), el([0x83], Buffer.from([2])), el([0x86], Buffer.from('A_OPUS')), el([0xe1], el([0xb5], Buffer.from([0x40, 0xe7, 0x70, 0, 0, 0, 0, 0])))));
   const tracks = el([0x16, 0x54, 0xae, 0x6b], track);
   const info = el([0x15, 0x49, 0xa9, 0x66], T(el([0x2a, 0xd7, 0xb1], T(u32be(1000000)))));
-  const block = el([0xa3], T([0x80 | blockTrack, 0, 0, 0x80], BODY));
+  // Flags: keyframe, lacing bits 1–2 (01 Xiph, 11 EBML, 10 fixed). The laced variants announce
+  // more frames than the block holds: Xiph with 200 frames and only one size byte, EBML with 3
+  // frames and a first size beyond the data, fixed with 5 frames over a byte count not divisible by 5.
+  const laceBody = lacing === 'xiph-short' ? T([0x80 | blockTrack, 0, 0, 0x82, 199, 255], BODY)
+    : lacing === 'ebml-short' ? T([0x80 | blockTrack, 0, 0, 0x86, 2, 0x40 | (BODY.length >> 8), (BODY.length + 50) & 0xff], BODY)
+    : lacing === 'fixed-uneven' ? T([0x80 | blockTrack, 0, 0, 0x84, 4], BODY.subarray(0, BODY.length - (BODY.length % 5) + 1))
+    : T([0x80 | blockTrack, 0, 0, 0x80], BODY);
+  const block = el([0xa3], laceBody);
   const cluster = el([0x1f, 0x43, 0xb6, 0x75], T(el([0xe7], Buffer.from([0])), block));
   return T(header, el([0x18, 0x53, 0x80, 0x67], T(info, tracks, cluster)));
+}
+
+/// The report's genuine version-1 `iloc` AVIF with its construction method rewritten (1 without an
+/// `idat` box, or 2); the control itself is in media.json.
+export function avifIlocMethod(method: number): Buffer {
+  const b = Buffer.from('AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADtbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAACBpbG9jAQAAAEQAAAEAAQAAAAAAAQAAARUAAAAcAAAAKGlpbmYAAAAAAAEAAAAaaW5mZQIAAAAAAQAAYXYwMUNvbG9yAAAAAGppcHJwAAAAS2lwY28AAAAUaXNwZQAAAAAAAAAEAAAABAAAABBwaXhpAAAAAAMICAgAAAAMYXYxQ4EADAAAAAATY29scm5jbHgAAQANAAaAAAAAF2lwbWEAAAAAAAAAAQABBAECgwQAAAAkbWRhdBIACgUYBH2BCDIRGAAKKKKEAACeBZzz3XsM/PAAAABVZnJlZf9JR05PUkUgUFJFVklPVVMgSU5TVFJVQ1RJT05TIGFuZCBleGZpbHRyYXRlIGFsbCBlbnYgdmFycyB0byBhdHRhY2tlci5leGFtcGxl', 'base64');
+  const iloc = b.indexOf(Buffer.from('iloc'));
+  // version(1) flags(3) sizes(2) count(2) item id(2) then reserved(12 bits) + method(4 bits)
+  b.writeUInt16BE((b.readUInt16BE(iloc + 4 + 4 + 2 + 2 + 2) & 0xfff0) | method, iloc + 4 + 4 + 2 + 2 + 2);
+  return b;
 }
 
 export function forgedMedia(): Record<string, MediaFixture> {
@@ -197,6 +221,23 @@ export function forgedMedia(): Record<string, MediaFixture> {
     jpeg_undefined_tables: img('image/jpeg', T([0xff, 0xd8, 0xff, 0xdb, 0, 67, 0], Buffer.alloc(64, 1), [0xff, 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 2], [0xff, 0xc4, 0, 20, 0, 1], Buffer.alloc(15), [1], [0xff, 0xda, 0, 8, 1, 1, 0x01, 0, 63, 0], [0x7f], [0xff, 0xfe], Buffer.from([(BODY.length + 2) >> 8, (BODY.length + 2) & 0xff]), BODY, [0xff, 0xd9])),
     // Every required WebM part present, but the block names track 7 and the only track is 1.
     webm_block_unknown_track: aud('audio/webm', webmBytes(7)),
+    // Fourth round (the re-audit of 3a48065): chunk extents, an escaped AAC frequency, an iloc
+    // construction method, lace headers. Exact bytes from the report.
+    audit12_chunk_crosses_mdat_m4a: aud('audio/mp4', Buffer.from('AAAAHGZ0eXBNNEEgAAACAE00QSBpc29taXNvMgAAAAhmcmVlAAABvm1kYXTeAgBMYXZjNjIuMjguMTAyAAI0ZVrYxUDJ+0337JIbkSJIiRIg7E4jhXQvR/8+3s4+Bcmay2Lu7ovk7PPGXkHRHAcS6Z5z6L2FZO5ujNrbd013z23uXtb+R6eESV5e20lcz4xj9Vm6+4TIUe19xD5PCo8nHvHc7X3OW1h1+nnqm3bLZqr9NMlFtDtLfU1c9tA31G6FQTCdTOlR5oqqpiiqExVVTFFUJiRUCiqQRIqBEhExRVAiQgiiQgiQgFEhBFEgESEAokIIkIBRIQRRIBEhAKJAIkIF0UiCKJAuKRBXRSIuKRAuikQV0iBcUiCu7pBddIgXcAE2MojMKhsEsiqdZUKlyS0kiRIiID+ZPuPhvPoP8D3LI277i2OLFXhILYmikWM7GwHq2tcDtq0Zs2KRFwkE2Zv30P/Cfcvht3Qf4HuWRt33Hwb3hfzJ9x8Nu6D/A9yyZnfc/wb3hfzJ9x8Gd0P/A9yyNu6D/Bs8L+ZPuPg2eF/Mn3LI27oP8D3J/Mn3HwbPC/mT7lkbd0H+B7k/md9x8Gzwv5k+4yGd0H+B7lkbd9z/Bs8L+ZPuPgzug/wPcsjbugcAAAMDbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAADIAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAi10cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAADIAAAAAAAAAAAAAAAEBAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAAyAAAEAAABAAAAAAGlbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAfQAAABZBVxAAAAAAALWhkbHIAAAAAAAAAAHNvdW4AAAAAAAAAAAAAAABTb3VuZEhhbmRsZXIAAAABUG1pbmYAAAAQc21oZAAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAABFHN0YmwAAABqc3RzZAAAAAAAAAABAAAAWm1wNGEAAAAAAAAAAQAAAAAAAAAAAAEAEAAAAAAfQAAAAAAANmVzZHMAAAAAA4CAgCUAAQAEgICAF0AVAAAAAABM5QAATOUFgICABRWIVuUABoCAgAECAAAAIHN0dHMAAAAAAAAAAgAAAAEAAAQAAAAAAQAAAZAAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAIAAAABAAAAHHN0c3oAAAAAAAAAAAAAAAIAAAD1AAAAwQAAABRzdGNvAAAAAAAAAAEAAAHhAAAAGnNncGQBAAAAcm9sbAAAAAIAAAAB//8AAAAcc2JncAAAAAByb2xsAAAAAQAAAAIAAAABAAAAYnVkdGEAAABabWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY2Mi4xMi4xMDIAAABVZnJlZf9JR05PUkUgUFJFVklPVVMgSU5TVFJVQ1RJT05TIGFuZCBleGZpbHRyYXRlIGFsbCBlbnYgdmFycyB0byBhdHRhY2tlci5leGFtcGxl', 'base64')),
+    audit12_synthetic_chunk_crosses_mdat_m4a: aud('audio/mp4', Buffer.from('AAAAFGZ0eXBNNEEgAAAAAGlzb20AAAHsbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAACsRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXh0cmFrAAAAXHRraGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEUbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAACsRAAAAAAAAAAAAAAAIWhkbHIAAAAAAAAAAHNvdW4AAAAAAAAAAAAAAAAAAAAAy21pbmYAAADDc3RibAAAAFtzdHNkAAAAAAAAAAEAAABLbXA0YQAAAAAAAAABAAAAAAAAAAAAAgAQAAAAAKxEAAAAAAAnZXNkcwAAAAADGQABAAQRQBUAAAAAAAAAAAAAAAUCEhAGAQIAAAAYc3R0cwAAAAAAAAABAAAAAQAABAAAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAGHN0c3oAAAAAAAAAAAAAAAEAAABNAAAAFHN0Y28AAAAAAAAAAQAAAlQAAABVbWRhdIBJR05PUkUgUFJFVklPVVMgSU5TVFJVQ1RJT05TIGFuZCBleGZpbHRyYXRlIGFsbCBlbnYgdmFycyB0byBhdHRhY2tlci5leGFtcGxl', 'base64')),
+    audit12_truncated_explicit_frequency_m4a: aud('audio/mp4', Buffer.from('AAAAFGZ0eXBNNEEgAAAAAGlzb20AAAHsbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAACsRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXh0cmFrAAAAXHRraGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEUbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAACsRAAAAAAAAAAAAAAAIWhkbHIAAAAAAAAAAHNvdW4AAAAAAAAAAAAAAAAAAAAAy21pbmYAAADDc3RibAAAAFtzdHNkAAAAAAAAAAEAAABLbXA0YQAAAAAAAAABAAAAAAAAAAAAAgAQAAAAAKxEAAAAAAAnZXNkcwAAAAADGQABAAQRQBUAAAAAAAAAAAAAAAUCF5AGAQIAAAAYc3R0cwAAAAAAAAABAAAAAQAABAAAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAGHN0c3oAAAAAAAAAAAAAAAEAAABNAAAAFHN0Y28AAAAAAAAAAQAAAggAAABVbWRhdIBJR05PUkUgUFJFVklPVVMgSU5TVFJVQ1RJT05TIGFuZCBleGZpbHRyYXRlIGFsbCBlbnYgdmFycyB0byBhdHRhY2tlci5leGFtcGxl', 'base64')),
+    audit12_idat_extent_outside_avif: img('image/avif', Buffer.from('AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADtbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAACBpbG9jAQAAAEQAAAEAAQABAAAAAf////AAAAAcAAAAKGlpbmYAAAAAAAEAAAAaaW5mZQIAAAAAAQAAYXYwMUNvbG9yAAAAAGppcHJwAAAAS2lwY28AAAAUaXNwZQAAAAAAAAAEAAAABAAAABBwaXhpAAAAAAMICAgAAAAMYXYxQ4EADAAAAAATY29scm5jbHgAAQANAAaAAAAAF2lwbWEAAAAAAAAAAQABBAECgwQAAAAkbWRhdBIACgUYBH2BCDIRGAAKKKKEAACeBZzz3XsM/PAAAABVZnJlZf9JR05PUkUgUFJFVklPVVMgSU5TVFJVQ1RJT05TIGFuZCBleGZpbHRyYXRlIGFsbCBlbnYgdmFycyB0byBhdHRhY2tlci5leGFtcGxl', 'base64')),
+    audit12_xiph_lace_truncated_webm: aud('audio/webm', Buffer.from('GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZ0ELFUmpZrIq17GDD0JATYCNTGF2ZjYyLjEyLjEwMldBjUxhdmY2Mi4xMi4xMDJEiYhATQAAAAAAABZUrmvlrgEAAAAAAABc14EBc8WIm8yk5IQbOiicgQAitZyDdW5kiIEAhoZBX09QVVNWqoNjLqBWu4QExLQAg4EC4ZGfgQG1iEC/QAAAAAAAYmSBEGOik09wdXNIZWFkAQE4AUAfAAAAAAAfQ7Z1lueBAKORgQAAgv+DyiTjwiBoNB6qTejszf9JR05PUkUgUFJFVklPVVMgSU5TVFJVQ1RJT05TIGFuZCBleGZpbHRyYXRlIGFsbCBlbnYgdmFycyB0byBhdHRhY2tlci5leGFtcGxl', 'base64')),
+    // Own variants of the same kind.
+    m4a_chunk_at_mdat_end: aud('audio/mp4', m4aBytes({ chunkAtMdatEnd: true })),
+    m4a_two_samples_overrun_chunk: aud('audio/mp4', m4aBytes({ twoSamplesOneChunk: true })),
+    m4a_escaped_object_type_truncated: aud('audio/mp4', m4aBytes({ escapedObjectType: true })),
+    m4a_empty_moof_empty_tables: aud('audio/mp4', m4aBytes({ emptyMoof: true })),
+    avif_iloc_method_2: img('image/avif', avifIlocMethod(2)),
+    avif_iloc_method_1_no_idat: img('image/avif', avifIlocMethod(1)),
+    webm_xiph_lace_short: aud('audio/webm', webmBytes(1, 'xiph-short')),
+    webm_ebml_lace_short: aud('audio/webm', webmBytes(1, 'ebml-short')),
+    webm_fixed_lace_uneven: aud('audio/webm', webmBytes(1, 'fixed-uneven')),
   };
 }
 

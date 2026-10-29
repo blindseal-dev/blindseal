@@ -566,7 +566,8 @@ function heif(b: Buffer, brands: readonly string[], itemTypes: readonly string[]
   if (!image) return false;
   // iloc: every extent inside the file.
   const iloc = child(b, meta, 'iloc', true);
-  if (!iloc || !ilocExtentsInside(b, iloc)) return false;
+  const idat = child(b, meta, 'idat', true);
+  if (!iloc || !ilocExtentsInside(b, iloc, idat ? idat.end - idat.start : -1)) return false;
   // iprp/ipco: an image size and the codec configuration.
   const iprp = child(b, meta, 'iprp', true);
   const ipco = iprp && child(b, iprp, 'ipco');
@@ -579,8 +580,8 @@ function heif(b: Buffer, brands: readonly string[], itemTypes: readonly string[]
 }
 
 /// Parses an `iloc` box (versions 0–2) and checks that every extent lies inside the file (for
-/// construction method 0, file offsets; method 1 offsets are into `idat`, accepted as given).
-function ilocExtentsInside(b: Buffer, iloc: Box): boolean {
+/// construction method 0, file offsets; method 1 offsets are into `idat`; method 2 is refused).
+function ilocExtentsInside(b: Buffer, iloc: Box, idatSize: number): boolean {
   let p = iloc.start;
   const version = b[p]!;
   p += 4;
@@ -610,7 +611,11 @@ function ilocExtentsInside(b: Buffer, iloc: Box): boolean {
         if (version > 0) read(indexSize);
         const off = read(offsetSize), len = read(lengthSize);
         if (len === 0) return false;
+        // Method 0: file offsets. Method 1: offsets into the `idat` box, which must exist and hold
+        // the extent. Method 2 (offsets into another item's data) is not resolved here: refused.
         if (method === 0 && base + off + len > b.length) return false;
+        if (method === 1 && (idatSize < 0 || base + off + len > idatSize)) return false;
+        if (method > 1) return false;
         anyExtent = true;
       }
     }
@@ -699,9 +704,25 @@ function esdsValid(b: Buffer, esds: Box): boolean {
     q = d.end;
   }
   if (!dsi || dsi.end - dsi.start < 2) return false;
-  const asc = b.readUInt16BE(dsi.start);
-  const audioObjectType = asc >> 11, frequencyIndex = (asc >> 7) & 15, channelConfig = (asc >> 3) & 15;
-  return audioObjectType !== 0 && (frequencyIndex <= 12 || frequencyIndex === 15) && channelConfig <= 7;
+  // AudioSpecificConfig: audioObjectType (5 bits; 31 escapes to 6 more), samplingFrequencyIndex
+  // (4 bits; 15 escapes to a 24-bit frequency), channelConfiguration (4 bits). Every field must be
+  // present in the descriptor's bytes.
+  let bit = 0;
+  const totalBits = (dsi.end - dsi.start) * 8;
+  const bits = (n: number): number => {
+    if (bit + n > totalBits) throw new RangeError('asc');
+    let v = 0;
+    for (let i = 0; i < n; i++, bit++) v = v * 2 + ((b[dsi.start + (bit >> 3)]! >> (7 - (bit & 7))) & 1);
+    return v;
+  };
+  try {
+    let audioObjectType = bits(5);
+    if (audioObjectType === 31) audioObjectType = 32 + bits(6);
+    const frequencyIndex = bits(4);
+    const frequency = frequencyIndex === 15 ? bits(24) : frequencyIndex <= 12 ? 1 : 0;
+    const channelConfig = bits(4);
+    return audioObjectType !== 0 && frequency > 0 && channelConfig <= 7;
+  } catch { return false; }
 }
 
 /// A QuickTime `wave` box's children; it may end with an 8-byte terminator atom of type 0.
@@ -738,8 +759,8 @@ const mp4: Check = (b) => {
   const fragmented = top.some((x) => x.type === 'moof');
   const mdats = top.filter((x) => x.type === 'mdat');
   if (!fragmented && mdats.length === 0) return false;
-  const mediaBytes = mdats.reduce((n, x) => n + (x.end - x.start), 0);
-  const inMedia = (o: number) => fragmented || mdats.some((x) => o >= x.start && o < x.end);
+  // A fragmented file must carry at least one movie fragment with a track run of samples.
+  if (fragmented && !top.some((moof) => moof.type === 'moof' && (children(b, moof) ?? []).some((traf) => traf.type === 'traf' && (children(b, traf) ?? []).some((trun) => trun.type === 'trun' && trun.end - trun.start >= 8 && b.readUInt32BE(trun.start + 4) > 0)))) return false;
   const traks = children(b, moov)?.filter((x) => x.type === 'trak') ?? [];
   let audio = false;
   for (const trak of traks) {
@@ -761,27 +782,47 @@ const mp4: Check = (b) => {
     const stts = tableEntries(b, child(b, stbl, 'stts'), 8);
     const stsc = tableEntries(b, child(b, stbl, 'stsc'), 12);
     const stsz = child(b, stbl, 'stsz'), stz2 = child(b, stbl, 'stz2');
-    let samples = -1, sampleBytes = 0;
+    let samples = -1;
+    let sizeOf: (i: number) => number = () => 0;
     if (stsz && stsz.end - stsz.start >= 12) {
       const constant = b.readUInt32BE(stsz.start + 4);
       samples = tableEntries(b, stsz, constant === 0 ? 4 : 0, 4);
-      if (samples > 0 && constant === 0) for (let i = 0; i < samples; i++) sampleBytes += b.readUInt32BE(stsz.start + 12 + 4 * i);
-      else if (samples > 0) sampleBytes = constant * samples;
+      sizeOf = constant === 0 ? (i) => b.readUInt32BE(stsz.start + 12 + 4 * i) : () => constant;
     } else if (stz2 && stz2.end - stz2.start >= 12) {
       const field = b[stz2.start + 7]!, n = b.readUInt32BE(stz2.start + 8);
-      if ([4, 8, 16].includes(field) && stz2.start + 12 + Math.ceil((n * field) / 8) === stz2.end) samples = n;
+      if ([4, 8, 16].includes(field) && stz2.start + 12 + Math.ceil((n * field) / 8) === stz2.end) {
+        samples = n;
+        sizeOf = field === 16 ? (i) => b.readUInt16BE(stz2.start + 12 + 2 * i) : field === 8 ? (i) => b[stz2.start + 12 + i]! : (i) => (b[stz2.start + 12 + (i >> 1)]! >> (i & 1 ? 0 : 4)) & 15;
+      }
     }
     const stco = child(b, stbl, 'stco') ?? child(b, stbl, 'co64');
     const wide = stco?.type === 'co64';
     const chunks = tableEntries(b, stco, wide ? 8 : 4);
     if (stts < 0 || stsc < 0 || samples < 0 || chunks < 0) return false;
     if (!fragmented && (stts === 0 || stsc === 0 || samples === 0 || chunks === 0)) return false;
-    // Every chunk starts inside media data, and the samples' bytes fit the media there is.
-    if (!fragmented && sampleBytes > mediaBytes) return false;
-    for (let i = 0; i < chunks; i++) {
-      const o = wide ? Number(b.readBigUInt64BE(stco!.start + 8 + 8 * i)) : b.readUInt32BE(stco!.start + 8 + 4 * i);
-      if (o >= b.length || !inMedia(o)) return false;
+    // Sample-to-chunk: entries (first chunk, samples per chunk, description index) with increasing
+    // first chunks from 1, assigning every sample to a chunk; each chunk's samples must lie within
+    // the `mdat` that holds the chunk's offset.
+    const stscBox = child(b, stbl, 'stsc')!;
+    let sample = 0;
+    for (let i = 0; i < stsc; i++) {
+      const first = b.readUInt32BE(stscBox.start + 8 + 12 * i), per = b.readUInt32BE(stscBox.start + 12 + 12 * i), sdi = b.readUInt32BE(stscBox.start + 16 + 12 * i);
+      const next = i + 1 < stsc ? b.readUInt32BE(stscBox.start + 8 + 12 * (i + 1)) : chunks + 1;
+      if ((i === 0 && first !== 1) || per === 0 || sdi === 0 || sdi > entries.length || next <= first || next > chunks + 1) return false;
+      for (let c = first; c < next; c++) {
+        const o = wide ? Number(b.readBigUInt64BE(stco!.start + 8 + 8 * (c - 1))) : b.readUInt32BE(stco!.start + 8 + 4 * (c - 1));
+        const holder = mdats.find((x) => o >= x.start && o < x.end);
+        if (!holder) return false;
+        let bytesInChunk = 0;
+        for (let k = 0; k < per; k++, sample++) {
+          if (sample >= samples) return false;
+          bytesInChunk += sizeOf(sample);
+        }
+        if (o + bytesInChunk > holder.end) return false;
+      }
     }
+    if (sample !== samples) return false;
+    if (stsc === 0 && chunks !== 0) return false;
     if (b.toString('latin1', hdlr.start + 8, hdlr.start + 12) === 'soun') {
       if (!entries.every((e) => audioSampleEntry(b, e))) return false;
       audio = true;
@@ -1089,10 +1130,54 @@ const webm: Check = (b) => {
     if (!!type && type.end - type.start === 1 && b[type.start] === 2 && !!codec && codec.end > codec.start) audio = true;
   }
   if (!audio) return false;
-  // A block: track number (vint), 16-bit timecode, flags, then frame data; its track must exist.
+  // A block: track number (vint), 16-bit timecode, flags, then frames. Its track must exist, and
+  // when the flags announce lacing (Xiph, EBML or fixed-size), the lace headers must be present
+  // and every frame's bytes must lie within the block.
   const blockOk = (start: number, end: number) => {
     const tn = ebmlVint(b, start, false);
-    return !!tn && trackNumbers.has(tn.value) && end - (start + tn.width) > 3;
+    if (!tn || !trackNumbers.has(tn.value)) return false;
+    let p = start + tn.width + 3;
+    if (p > end) return false;
+    const lacing = (b[p - 1]! >> 1) & 3;
+    if (lacing === 0) return end - p >= 1;
+    if (p >= end) return false;
+    const frames = b[p++]! + 1;
+    const sizes: number[] = [];
+    if (lacing === 2) {
+      if ((end - p) % frames !== 0 || end - p === 0) return false;
+      return true;
+    }
+    if (lacing === 1) {
+      for (let f = 0; f < frames - 1; f++) {
+        let size = 0;
+        for (;;) {
+          if (p >= end) return false;
+          const x = b[p++]!;
+          size += x;
+          if (x < 255) break;
+        }
+        sizes.push(size);
+      }
+    } else {
+      const firstSize = ebmlVint(b, p, false);
+      if (!firstSize || firstSize.value < 0n || p + firstSize.width > end) return false;
+      p += firstSize.width;
+      let size = Number(firstSize.value);
+      sizes.push(size);
+      for (let f = 1; f < frames - 1; f++) {
+        const raw = ebmlVint(b, p, false);
+        if (!raw || p + raw.width > end) return false;
+        p += raw.width;
+        // Signed delta: subtract the bias 2^(7·width − 1) − 1 from the unsigned value.
+        const bias = (1n << BigInt(7 * raw.width - 1)) - 1n;
+        const unsigned = raw.value < 0n ? (1n << BigInt(7 * raw.width)) - 1n : raw.value;
+        size += Number(unsigned - bias);
+        if (size < 0) return false;
+        sizes.push(size);
+      }
+    }
+    const laced = sizes.reduce((a, x) => a + x, 0);
+    return sizes.every((x) => x >= 1) && end - p - laced >= 1; // the last frame takes the rest
   };
   const clusters = kids.filter((e) => e.id === EBML_CLUSTER);
   if (clusters.length === 0) return false;
