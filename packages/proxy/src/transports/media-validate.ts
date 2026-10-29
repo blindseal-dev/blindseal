@@ -134,8 +134,9 @@ const png: Check = (b) => {
 const jpeg: Check = (b) => {
   if (!bytes(b, [0xff, 0xd8])) return false;
   let off = 2;
-  let sof = false, sos = false, dqt = false, dht = false, arith = false;
-  const componentIds = new Set<number>();
+  let sof = false, sos = false, dqt = false, dht = false, arith = false, progressive = false;
+  const componentIds = new Set<number>(), componentTq = new Map<number, number>();
+  const qTables = new Set<number>(), hTables = new Set<number>(); // Huffman tables keyed class * 4 + id
   while (off < b.length) {
     if (b[off] !== 0xff) return false;
     while (off < b.length && b[off] === 0xff) off++; // fill bytes
@@ -151,13 +152,17 @@ const jpeg: Check = (b) => {
     if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
       if (sof) return false;
       const nc = seg[5] ?? 0;
-      if (seg.length !== 6 + 3 * nc || nc < 1 || nc > 4 || ![8, 12].includes(seg[0]!) || seg.readUInt16BE(3) === 0) return false;
+      // Precision 8 or 12, non-zero height (a zero height deferred to a DNL marker is not supported
+      // by common decoders and does not qualify) and width, 1–4 components.
+      if (seg.length !== 6 + 3 * nc || nc < 1 || nc > 4 || ![8, 12].includes(seg[0]!) || seg.readUInt16BE(1) === 0 || seg.readUInt16BE(3) === 0) return false;
       for (let i = 0; i < nc; i++) {
         const id = seg[6 + 3 * i]!, hv = seg[7 + 3 * i]!, tq = seg[8 + 3 * i]!;
         if (componentIds.has(id) || (hv >> 4) < 1 || (hv >> 4) > 4 || (hv & 15) < 1 || (hv & 15) > 4 || tq > 3) return false;
         componentIds.add(id);
+        componentTq.set(id, tq);
       }
       if (m >= 0xc9) arith = true;
+      if (m === 0xc2 || m === 0xc6 || m === 0xca || m === 0xce) progressive = true;
       sof = true;
     } else if (m === 0xdb) {
       // DQT: tables of (Pq/Tq, 64 entries of 1 or 2 bytes) filling the segment exactly.
@@ -165,7 +170,10 @@ const jpeg: Check = (b) => {
       if (seg.length === 0) return false;
       while (p < seg.length) {
         const pq = seg[p]! >> 4, tq = seg[p]! & 15;
-        if (pq > 1 || tq > 3) return false;
+        if (pq > 1 || tq > 3 || p + 1 + 64 * (pq + 1) > seg.length) return false;
+        // No zero quantisation step.
+        for (let i = 0; i < 64; i++) if ((pq ? seg.readUInt16BE(p + 1 + 2 * i) : seg[p + 1 + i]!) === 0) return false;
+        qTables.add(tq);
         p += 1 + 64 * (pq + 1);
       }
       if (p !== seg.length) return false;
@@ -176,9 +184,15 @@ const jpeg: Check = (b) => {
       if (seg.length === 0) return false;
       while (p < seg.length) {
         if (p + 17 > seg.length || (seg[p]! >> 4) > 1 || (seg[p]! & 15) > 3) return false;
-        let symbols = 0;
-        for (let i = 1; i <= 16; i++) symbols += seg[p + i]!;
+        // Counts per code length must fit a prefix code (canonical Huffman), 1–256 symbols in all.
+        let symbols = 0, code = 0;
+        for (let i = 1; i <= 16; i++) {
+          symbols += seg[p + i]!;
+          code = (code + seg[p + i]!) * 2;
+          if (code > 2 << i) return false;
+        }
         if (symbols === 0 || symbols > 256) return false;
+        hTables.add((seg[p]! >> 4) * 4 + (seg[p]! & 15));
         p += 17 + symbols;
       }
       if (p !== seg.length) return false;
@@ -187,9 +201,18 @@ const jpeg: Check = (b) => {
       if (!sof) return false;
       const ns = seg[0] ?? 0;
       if (ns < 1 || ns > 4 || seg.length !== 4 + 2 * ns) return false;
+      // Spectral selection and successive approximation: baseline/sequential scans cover 0..63.
+      const ss = seg[1 + 2 * ns]!, se = seg[2 + 2 * ns]!, ah = seg[3 + 2 * ns]! >> 4, al = seg[3 + 2 * ns]! & 15;
+      if (se > 63 || ss > se || ah > 13 || al > 13 || (!progressive && (ss !== 0 || se !== 63 || ah !== 0 || al !== 0))) return false;
       for (let i = 0; i < ns; i++) {
-        const cs = seg[1 + 2 * i]!, t = seg[2 + 2 * i]!;
-        if (!componentIds.has(cs) || (t >> 4) > 3 || (t & 15) > 3) return false;
+        const cs = seg[1 + 2 * i]!, t = seg[2 + 2 * i]!, td = t >> 4, ta = t & 15;
+        if (!componentIds.has(cs) || td > 3 || ta > 3 || !qTables.has(componentTq.get(cs)!)) return false;
+        // Huffman-coded scans need their DC (ss = 0) and AC (se > 0) tables defined already;
+        // progressive refinement scans (ah > 0) of DC coefficients use no table.
+        if (!arith) {
+          if (ss === 0 && ah === 0 && !hTables.has(td)) return false;
+          if (se > 0 && !hTables.has(4 + ta)) return false;
+        }
       }
       sos = true;
     }
@@ -346,13 +369,14 @@ const webp: Check = (b) => {
   return chunks.slice(1).some((c) => (c.id === 'VP8 ' && vp8(c)) || (c.id === 'VP8L' && vp8l(c)) || (c.id === 'ANMF' && c.len > 16));
 };
 
-/// A Windows DIB (BITMAPINFOHEADER family) at `dib`, as a BMP body or an ICO image: header size,
-/// dimensions, planes, bit depth, compression; the colour table and pixel rows (and, for an icon,
-/// the AND mask) fit in `avail` bytes from `pixels`. Returns the pixel-array size needed, or -1.
-function dibCheck(d: Buffer, icon: boolean): boolean {
-  if (d.length < 12) return false;
+/// A DIB (BMP / ICO bitmap) header: its validated layout (where the header plus colour table or
+/// bit masks end, and how many pixel and mask bytes the image needs), or null. Arithmetic is kept
+/// in doubles so oversized dimensions cannot wrap.
+interface DibLayout { headerEnd: number; pixelBytes: number; maskBytes: number }
+function dibLayout(d: Buffer, icon: boolean): DibLayout | null {
+  if (d.length < 12) return null;
   const size = d.readUInt32LE(0);
-  if (![12, 40, 52, 56, 64, 108, 124].includes(size) || d.length < size) return false;
+  if (![12, 40, 52, 56, 64, 108, 124].includes(size) || d.length < size) return null;
   let w: number, h: number, planes: number, bpp: number, compression = 0, imageSize = 0, colours = 0;
   if (size === 12) {
     w = d.readUInt16LE(4); h = d.readUInt16LE(6); planes = d.readUInt16LE(8); bpp = d.readUInt16LE(10);
@@ -360,29 +384,49 @@ function dibCheck(d: Buffer, icon: boolean): boolean {
     w = d.readInt32LE(4); h = d.readInt32LE(8); planes = d.readUInt16LE(12); bpp = d.readUInt16LE(14);
     compression = d.readUInt32LE(16); imageSize = d.readUInt32LE(20); colours = d.readUInt32LE(32);
   }
-  if (icon) { if (h % 2 !== 0) return false; h /= 2; } // XOR bitmap over AND mask
+  if (icon) { if (h % 2 !== 0) return null; h /= 2; } // XOR bitmap over AND mask
   h = Math.abs(h);
-  if (w <= 0 || h === 0 || planes !== 1 || ![1, 2, 4, 8, 16, 24, 32].includes(bpp)) return false;
-  if (![0, 1, 2, 3, 4, 5, 6, 11, 12, 13].includes(compression) || (icon && compression !== 0)) return false;
-  let p = size;
-  if (bpp <= 8) p += 4 * (colours || 1 << bpp);
-  else if (compression === 3 && size === 40) p += 12;
-  const rowBytes = (bits: number) => ((bits * w + 31) >> 5) << 2;
+  if (w <= 0 || h === 0 || planes !== 1 || ![1, 2, 4, 8, 16, 24, 32].includes(bpp)) return null;
+  if (![0, 1, 2, 3, 4, 5, 6, 11, 12, 13].includes(compression) || (icon && compression !== 0)) return null;
+  if (bpp <= 8 && colours > 1 << bpp) return null;
+  let headerEnd = size;
+  if (bpp <= 8) headerEnd += 4 * (colours || 1 << bpp);
+  else if (compression === 3 && size === 40) headerEnd += 12;
+  else if (compression === 6 && size === 40) headerEnd += 16;
+  if (headerEnd > d.length) return null;
+  const rowBytes = (bits: number) => Math.floor((bits * w + 31) / 32) * 4;
   if (compression === 0 || compression === 3 || compression === 6) {
-    p += rowBytes(bpp) * h;
-    if (icon) p += rowBytes(1) * h;
-    return p <= d.length;
+    return { headerEnd, pixelBytes: rowBytes(bpp) * h, maskBytes: icon ? rowBytes(1) * h : 0 };
   }
-  return imageSize > 0 && p + imageSize <= d.length;
+  // Compressed (RLE / JPEG / PNG) pixel data: its declared size, which must be non-zero.
+  return imageSize > 0 && !icon ? { headerEnd, pixelBytes: imageSize, maskBytes: 0 } : null;
+}
+/// An ICO bitmap: DIB header and colour table, then the XOR pixel rows and the AND mask, all inside
+/// the image bytes.
+function dibCheck(d: Buffer): boolean {
+  const l = dibLayout(d, true);
+  return l !== null && l.headerEnd + l.pixelBytes + l.maskBytes <= d.length;
 }
 
-/// BMP: file header (size field, pixel-array offset ≥ the DIB header) and a valid DIB whose colour
-/// table and pixel array fit.
+/// BMP: file header (size field, pixel-array offset) and a valid DIB whose header and colour table
+/// or masks end before the declared pixel-array offset, with the pixel array from that offset (and
+/// a V5 header's colour profile, if any) ending the file.
 const bmp: Check = (b) => {
   if (!at(b, 0, 'BM') || b.length < 26) return false;
-  const size = b.readUInt32LE(2), dataOff = b.readUInt32LE(10), dib = b.readUInt32LE(14);
-  if ((size !== 0 && size !== b.length) || dataOff < 14 + dib || dataOff > b.length) return false;
-  return dibCheck(b.subarray(14), false);
+  const size = b.readUInt32LE(2), dataOff = b.readUInt32LE(10);
+  if ((size !== 0 && size !== b.length) || dataOff > b.length) return false;
+  const l = dibLayout(b.subarray(14), false);
+  if (l === null || 14 + l.headerEnd > dataOff) return false;
+  let end = dataOff + l.pixelBytes;
+  // BITMAPV5HEADER: an embedded ICC profile may follow the pixel array.
+  if (b.readUInt32LE(14) === 124) {
+    const profileOff = b.readUInt32LE(14 + 112), profileSize = b.readUInt32LE(14 + 116);
+    if (profileSize > 0) {
+      if (14 + profileOff < end) return false;
+      end = 14 + profileOff + profileSize;
+    }
+  }
+  return end === b.length;
 };
 
 const TIFF_TYPE_SIZE = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8, 4];
@@ -445,7 +489,7 @@ const ico: Check = (b) => {
     if (size < 40 || off < 6 + 16 * n || off + size > b.length) return false;
     const img = b.subarray(off, off + size);
     if (bytes(img, [0x89, 0x50, 0x4e, 0x47])) { if (!png(img)) return false; }
-    else if (!dibCheck(img, true)) return false;
+    else if (!dibCheck(img)) return false;
   }
   return true;
 };
@@ -530,7 +574,8 @@ function heif(b: Buffer, brands: readonly string[], itemTypes: readonly string[]
   if (!props) return false;
   const ispe = props.find((x) => x.type === 'ispe');
   if (!ispe || ispe.end - ispe.start < 12 || b.readUInt32BE(ispe.start + 4) === 0 || b.readUInt32BE(ispe.start + 8) === 0) return false;
-  return props.some((x) => x.type === codecConfig);
+  // av1C: 4 bytes starting with marker 1 / version 1; hvcC: a 23-byte header plus parameter arrays.
+  return props.some((x) => x.type === codecConfig && (codecConfig === 'av1C' ? x.end - x.start === 4 && b[x.start] === 0x81 : x.end - x.start >= 23));
 }
 
 /// Parses an `iloc` box (versions 0–2) and checks that every extent lies inside the file (for
@@ -577,43 +622,170 @@ const avif: Check = (b) => heif(b, ['avif', 'avis'], ['av01'], 'av1C');
 const heic: Check = (b) => heif(b, ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'], ['hvc1', 'hev1'], 'hvcC');
 
 const MP4_AUDIO_BRANDS = ['M4A ', 'M4B ', 'M4P ', 'mp41', 'mp42', 'isom', 'iso2', 'iso5', 'iso6', 'dash', 'avc1', '3gp4', '3gp5', 'qt  '];
-const AUDIO_SAMPLE_ENTRIES = new Set(['mp4a', 'alac', 'ac-3', 'ec-3', 'Opus', 'fLaC', 'samr', 'sawb', 'sowt', 'twos', 'lpcm', 'ipcm', 'fpcm', 'dtsc', 'dtse', 'dtsh', 'dtsl', 'mha1', 'mhm1', 'enca', 'ulaw', 'alaw', '.mp3', 'mp3 ']);
+/// Audio sample entries and the codec configuration box each must carry (null: none required,
+/// as for uncompressed PCM).
+const AUDIO_SAMPLE_ENTRIES: Record<string, string | null> = {
+  mp4a: 'esds', alac: 'alac', 'ac-3': 'dac3', 'ec-3': 'dec3', Opus: 'dOps', fLaC: 'dfLa', samr: 'damr', sawb: 'damr',
+  dtsc: 'ddts', dtse: 'ddts', dtsh: 'ddts', dtsl: 'ddts', mha1: 'mhaC', mhm1: 'mhaC', enca: 'sinf',
+  sowt: null, twos: null, lpcm: null, ipcm: null, fpcm: null, ulaw: null, alaw: null, '.mp3': null, 'mp3 ': null,
+  in24: null, in32: null, fl32: null, fl64: null, 'raw ': null, NONE: null, ima4: null,
+};
+/// FullBox payload sizes by version: movie header, track header, media header.
+const FULLBOX_SIZES: Record<string, [number, number]> = { mvhd: [100, 112], tkhd: [84, 96], mdhd: [24, 36] };
 
-/// MP4 / M4A audio: `moov` with a movie header and at least one track whose handler is sound,
-/// with a sample description box holding an audio sample entry; then media (`mdat`) or fragments
-/// (`moof`), the sample table's chunk offsets inside the file.
+/// A FullBox whose payload is exactly the size its version implies, with a non-zero timescale where
+/// the box carries one (`mvhd`, `mdhd`).
+function fullBoxSized(b: Buffer, box: Box | undefined): boolean {
+  if (!box) return false;
+  const sizes = FULLBOX_SIZES[box.type]!, version = b[box.start]!;
+  if (version > 1 || box.end - box.start !== sizes[version]!) return false;
+  if (box.type === 'mvhd' || box.type === 'mdhd') {
+    const timescale = b.readUInt32BE(box.start + (version === 1 ? 20 : 12));
+    if (timescale === 0) return false;
+  }
+  return true;
+}
+
+/// A sample-table FullBox: version/flags, an entry count, and `entrySize` bytes per entry filling
+/// the payload. Returns the entry count, or -1.
+function tableEntries(b: Buffer, box: Box | undefined, entrySize: number, lead = 0): number {
+  if (!box || box.end - box.start < 8 + lead) return -1;
+  const n = b.readUInt32BE(box.start + 4 + lead);
+  return box.start + 8 + lead + n * entrySize === box.end ? n : -1;
+}
+
+/// An audio sample entry: the 28-byte fixed part (QuickTime versions 1 and 2 extend it), with a data
+/// reference, at least one channel and a sample rate, followed by boxes including the codec's
+/// configuration (directly, or inside a QuickTime `wave` box).
+/// MPEG-4 descriptor at off: tag byte, then an expandable size (up to 4 bytes, high bit continues).
+function descriptor(b: Buffer, off: number, end: number): { tag: number; start: number; end: number } | null {
+  if (off + 2 > end) return null;
+  const tag = b[off]!;
+  let size = 0, p = off + 1, n = 0;
+  for (;;) {
+    if (p >= end || n === 4) return null;
+    const x = b[p++]!;
+    size = size * 128 + (x & 0x7f);
+    n++;
+    if (!(x & 0x80)) break;
+  }
+  return p + size <= end ? { tag, start: p, end: p + size } : null;
+}
+const MP4_AUDIO_OBJECT_TYPES = new Set([0x40, 0x66, 0x67, 0x68, 0x69, 0x6b, 0xa5, 0xa6, 0xa9, 0xac, 0xad, 0xdd, 0xe1]);
+/// esds: an ES_Descriptor holding a DecoderConfigDescriptor of audio stream type with a known audio
+/// object type and, for MPEG-4 audio, a DecoderSpecificInfo (AudioSpecificConfig) whose object
+/// type, sampling frequency index and channel configuration are in range.
+function esdsValid(b: Buffer, esds: Box): boolean {
+  const es = descriptor(b, esds.start + 4, esds.end);
+  if (!es || es.tag !== 0x03 || es.end - es.start < 3) return false;
+  const flags = b[es.start + 2]!;
+  let p = es.start + 3 + (flags & 0x80 ? 2 : 0) + (flags & 0x40 ? 1 + b[es.start + 3 + (flags & 0x80 ? 2 : 0)]! : 0) + (flags & 0x20 ? 2 : 0);
+  let dcd: ReturnType<typeof descriptor> = null;
+  while (p < es.end) {
+    const d = descriptor(b, p, es.end);
+    if (!d) return false;
+    if (d.tag === 0x04) dcd = d;
+    p = d.end;
+  }
+  if (!dcd || dcd.end - dcd.start < 13) return false;
+  const objectType = b[dcd.start]!, streamType = b[dcd.start + 1]! >> 2;
+  if (streamType !== 0x05 || !MP4_AUDIO_OBJECT_TYPES.has(objectType)) return false;
+  if (objectType !== 0x40) return true;
+  let q = dcd.start + 13, dsi: ReturnType<typeof descriptor> = null;
+  while (q < dcd.end) {
+    const d = descriptor(b, q, dcd.end);
+    if (!d) return false;
+    if (d.tag === 0x05) dsi = d;
+    q = d.end;
+  }
+  if (!dsi || dsi.end - dsi.start < 2) return false;
+  const asc = b.readUInt16BE(dsi.start);
+  const audioObjectType = asc >> 11, frequencyIndex = (asc >> 7) & 15, channelConfig = (asc >> 3) & 15;
+  return audioObjectType !== 0 && (frequencyIndex <= 12 || frequencyIndex === 15) && channelConfig <= 7;
+}
+
+/// A QuickTime `wave` box's children; it may end with an 8-byte terminator atom of type 0.
+function waveChildren(b: Buffer, wave: Box): Box[] {
+  const terminated = wave.end - wave.start >= 8 && b.readUInt32BE(wave.end - 8) === 8 && b.readUInt32BE(wave.end - 4) === 0;
+  return boxes(b, wave.start, terminated ? wave.end - 8 : wave.end) ?? [];
+}
+
+function audioSampleEntry(b: Buffer, e: Box): boolean {
+  const need = AUDIO_SAMPLE_ENTRIES[e.type];
+  if (need === undefined || e.end - e.start < 28) return false;
+  const version = b.readUInt16BE(e.start + 8);
+  const fixed = version === 0 ? 28 : version === 1 ? 44 : version === 2 ? 64 : -1;
+  if (fixed < 0 || e.end - e.start < fixed) return false;
+  if (b.readUInt16BE(e.start + 6) === 0 || b.readUInt16BE(e.start + 16) === 0 || b.readUInt32BE(e.start + 24) === 0) return false;
+  const inner = boxes(b, e.start + fixed, e.end);
+  if (!inner) return false;
+  if (need === null) return true;
+  const wave = inner.find((x) => x.type === 'wave');
+  const config = inner.find((x) => x.type === need) ?? (wave ? waveChildren(b, wave).find((x) => x.type === need) : undefined);
+  if (!config || config.end === config.start) return false;
+  return need === 'esds' ? esdsValid(b, config) : true;
+}
+
+/// MP4 / M4A audio: `moov` with a sized movie header and at least one track with sized track and
+/// media headers whose handler is sound, a sample description holding a valid audio sample entry,
+/// and the sample tables (times, chunks, sizes, offsets) consistent, with chunk offsets inside the
+/// file; samples present unless the file is fragmented (`moof`); then media (`mdat`) or fragments.
 const mp4: Check = (b) => {
   const top = bmffTop(b, MP4_AUDIO_BRANDS);
   if (!top) return false;
   const moov = top.find((x) => x.type === 'moov');
-  if (!moov || !child(b, moov, 'mvhd')) return false;
-  const hasMedia = top.some((x) => x.type === 'mdat' || x.type === 'moof');
-  if (!hasMedia) return false;
+  if (!moov || !fullBoxSized(b, child(b, moov, 'mvhd'))) return false;
+  const fragmented = top.some((x) => x.type === 'moof');
+  const mdats = top.filter((x) => x.type === 'mdat');
+  if (!fragmented && mdats.length === 0) return false;
+  const mediaBytes = mdats.reduce((n, x) => n + (x.end - x.start), 0);
+  const inMedia = (o: number) => fragmented || mdats.some((x) => o >= x.start && o < x.end);
   const traks = children(b, moov)?.filter((x) => x.type === 'trak') ?? [];
   let audio = false;
   for (const trak of traks) {
     const mdia = child(b, trak, 'mdia');
     const hdlr = mdia && child(b, mdia, 'hdlr');
-    if (!trak || !child(b, trak, 'tkhd') || !mdia || !hdlr || hdlr.end - hdlr.start < 12) return false;
+    if (!fullBoxSized(b, child(b, trak, 'tkhd')) || !mdia || !fullBoxSized(b, child(b, mdia, 'mdhd'))) return false;
+    // hdlr: version/flags, pre_defined, handler_type, 3 × reserved, name.
+    if (!hdlr || hdlr.end - hdlr.start < 24) return false;
     const minf = child(b, mdia, 'minf');
     const stbl = minf && child(b, minf, 'stbl');
+    if (!stbl) return false;
     // stsd: version/flags, entry count, sample entries.
-    const stsd = stbl && child(b, stbl, 'stsd');
+    const stsd = child(b, stbl, 'stsd');
     if (!stsd || stsd.end - stsd.start < 8) return false;
     const entries = boxes(b, stsd.start + 8, stsd.end);
     if (!entries || entries.length === 0 || entries.length !== b.readUInt32BE(stsd.start + 4)) return false;
-    // stco / co64: version/flags, entry count, chunk offsets (all inside the file).
-    const stco = child(b, stbl, 'stco') ?? child(b, stbl, 'co64');
-    if (stco) {
-      if (stco.end - stco.start < 8) return false;
-      const n = b.readUInt32BE(stco.start + 4), wide = stco.type === 'co64';
-      if (stco.start + 8 + n * (wide ? 8 : 4) > stco.end) return false;
-      for (let i = 0; i < n; i++) {
-        const o = wide ? Number(b.readBigUInt64BE(stco.start + 8 + 8 * i)) : b.readUInt32BE(stco.start + 8 + 4 * i);
-        if (o >= b.length) return false;
-      }
+    // Sample tables: decoding times, sample-to-chunk, sizes (stsz: a constant size or one per
+    // sample; stz2: packed field sizes), chunk offsets (every one inside the file).
+    const stts = tableEntries(b, child(b, stbl, 'stts'), 8);
+    const stsc = tableEntries(b, child(b, stbl, 'stsc'), 12);
+    const stsz = child(b, stbl, 'stsz'), stz2 = child(b, stbl, 'stz2');
+    let samples = -1, sampleBytes = 0;
+    if (stsz && stsz.end - stsz.start >= 12) {
+      const constant = b.readUInt32BE(stsz.start + 4);
+      samples = tableEntries(b, stsz, constant === 0 ? 4 : 0, 4);
+      if (samples > 0 && constant === 0) for (let i = 0; i < samples; i++) sampleBytes += b.readUInt32BE(stsz.start + 12 + 4 * i);
+      else if (samples > 0) sampleBytes = constant * samples;
+    } else if (stz2 && stz2.end - stz2.start >= 12) {
+      const field = b[stz2.start + 7]!, n = b.readUInt32BE(stz2.start + 8);
+      if ([4, 8, 16].includes(field) && stz2.start + 12 + Math.ceil((n * field) / 8) === stz2.end) samples = n;
     }
-    if (b.toString('latin1', hdlr.start + 8, hdlr.start + 12) === 'soun' && entries.some((e) => AUDIO_SAMPLE_ENTRIES.has(e.type))) audio = true;
+    const stco = child(b, stbl, 'stco') ?? child(b, stbl, 'co64');
+    const wide = stco?.type === 'co64';
+    const chunks = tableEntries(b, stco, wide ? 8 : 4);
+    if (stts < 0 || stsc < 0 || samples < 0 || chunks < 0) return false;
+    if (!fragmented && (stts === 0 || stsc === 0 || samples === 0 || chunks === 0)) return false;
+    // Every chunk starts inside media data, and the samples' bytes fit the media there is.
+    if (!fragmented && sampleBytes > mediaBytes) return false;
+    for (let i = 0; i < chunks; i++) {
+      const o = wide ? Number(b.readBigUInt64BE(stco!.start + 8 + 8 * i)) : b.readUInt32BE(stco!.start + 8 + 4 * i);
+      if (o >= b.length || !inMedia(o)) return false;
+    }
+    if (b.toString('latin1', hdlr.start + 8, hdlr.start + 12) === 'soun') {
+      if (!entries.every((e) => audioSampleEntry(b, e))) return false;
+      audio = true;
+    }
   }
   return audio;
 };
@@ -884,7 +1056,7 @@ function ebmlChildren(b: Buffer, from: number, to: number, unknownOk: bigint[] =
 }
 
 const EBML_SEGMENT = 0x18538067n, EBML_TRACKS = 0x1654ae6bn, EBML_TRACK_ENTRY = 0xaen, EBML_TRACK_TYPE = 0x83n, EBML_CODEC_ID = 0x86n;
-const EBML_CLUSTER = 0x1f43b675n, EBML_SIMPLE_BLOCK = 0xa3n, EBML_BLOCK_GROUP = 0xa0n, EBML_DOCTYPE = 0x4282n;
+const EBML_CLUSTER = 0x1f43b675n, EBML_SIMPLE_BLOCK = 0xa3n, EBML_BLOCK_GROUP = 0xa0n, EBML_BLOCK = 0xa1n, EBML_DOCTYPE = 0x4282n, EBML_TRACK_NUMBER = 0xd7n;
 
 /// WebM: an EBML header whose DocType is webm or matroska; a Segment that reaches the end of the
 /// file (its size, or unknown) whose children tile it, with a Tracks element holding an audio
@@ -903,17 +1075,35 @@ const webm: Check = (b) => {
   const tracks = kids.find((e) => e.id === EBML_TRACKS);
   if (!tracks) return false;
   const entries = ebmlChildren(b, tracks.start, tracks.end)?.filter((e) => e.id === EBML_TRACK_ENTRY) ?? [];
-  const audio = entries.some((t) => {
+  const trackNumbers = new Set<bigint>();
+  let audio = false;
+  for (const t of entries) {
     const fields = ebmlChildren(b, t.start, t.end);
+    const number = fields?.find((e) => e.id === EBML_TRACK_NUMBER);
+    if (!number || number.end - number.start < 1 || number.end - number.start > 8) return false;
+    let n = 0n;
+    for (let p = number.start; p < number.end; p++) n = (n << 8n) | BigInt(b[p]!);
+    if (n === 0n) return false;
+    trackNumbers.add(n);
     const type = fields?.find((e) => e.id === EBML_TRACK_TYPE), codec = fields?.find((e) => e.id === EBML_CODEC_ID);
-    return !!type && type.end - type.start === 1 && b[type.start] === 2 && !!codec && codec.end > codec.start;
-  });
+    if (!!type && type.end - type.start === 1 && b[type.start] === 2 && !!codec && codec.end > codec.start) audio = true;
+  }
   if (!audio) return false;
+  // A block: track number (vint), 16-bit timecode, flags, then frame data; its track must exist.
+  const blockOk = (start: number, end: number) => {
+    const tn = ebmlVint(b, start, false);
+    return !!tn && trackNumbers.has(tn.value) && end - (start + tn.width) > 3;
+  };
   const clusters = kids.filter((e) => e.id === EBML_CLUSTER);
   if (clusters.length === 0) return false;
   return clusters.some((c) => {
     const inner = c.unknown ? ebmlChildren(b, c.start, c.end, [EBML_CLUSTER]) : ebmlChildren(b, c.start, c.end);
-    return !!inner && inner.some((e) => (e.id === EBML_SIMPLE_BLOCK || e.id === EBML_BLOCK_GROUP) && e.end > e.start);
+    return !!inner && inner.some((e) => {
+      if (e.id === EBML_SIMPLE_BLOCK) return blockOk(e.start, e.end);
+      if (e.id !== EBML_BLOCK_GROUP) return false;
+      const block = ebmlChildren(b, e.start, e.end)?.find((x) => x.id === EBML_BLOCK);
+      return !!block && blockOk(block.start, block.end);
+    });
   });
 };
 

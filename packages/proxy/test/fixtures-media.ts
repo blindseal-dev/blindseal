@@ -65,6 +65,53 @@ const u32be = (n: number) => { const b = Buffer.alloc(4); b.writeUInt32BE(n); re
 const NON_UTF8 = Buffer.from([0x80]);
 const BODY = T(NON_UTF8, INJ);
 
+const box = (tag: string, ...parts: Buffer[]) => { const body = Buffer.concat(parts); return T(u32be(8 + body.length), tag, body); };
+/// A BITMAPINFOHEADER (40 bytes) with the given dimensions, bit depth, colour count and compression.
+function bmpHeader(w: number, h: number, bpp: number, colours = 0, compression = 0): Buffer {
+  const d = Buffer.alloc(40); d.writeUInt32LE(40, 0); d.writeInt32LE(w, 4); d.writeInt32LE(h, 8); d.writeUInt16LE(1, 12); d.writeUInt16LE(bpp, 14);
+  d.writeUInt32LE(compression, 16); d.writeUInt32LE(colours, 32); return d;
+}
+/// An M4A whose required boxes are all present and sized (valid with no options), varied to be
+/// invalid in one way.
+export function m4aBytes(o: { emptyTables?: boolean; noEsds?: boolean; emptyEsds?: boolean; zeroTimescale?: boolean; shortTkhd?: boolean; zeroChannels?: boolean; chunkOutsideMdat?: boolean; samplesOverflow?: boolean }): Buffer {
+  const full = (tag: string, size: number, fill: (d: Buffer) => void = () => {}) => { const d = Buffer.alloc(size); fill(d); return box(tag, d); };
+  const mvhd = full('mvhd', 100, (d) => d.writeUInt32BE(o.zeroTimescale ? 0 : 44100, 12));
+  const tkhd = full('tkhd', o.shortTkhd ? 80 : 84);
+  const mdhd = full('mdhd', 24, (d) => d.writeUInt32BE(44100, 12));
+  const hdlr = full('hdlr', 25, (d) => d.write('soun', 8, 'latin1'));
+  const esds = box('esds', Buffer.alloc(4), Buffer.from([0x03, 0x19, 0, 1, 0, 0x04, 0x11, 0x40, 0x15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x05, 0x02, 0x12, 0x10, 0x06, 0x01, 0x02]));
+  const entryFixed = Buffer.alloc(28); entryFixed.writeUInt16BE(1, 6); entryFixed.writeUInt16BE(o.zeroChannels ? 0 : 2, 16); entryFixed.writeUInt16BE(16, 18); entryFixed.writeUInt32BE(44100 * 65536, 24);
+  const mp4a = o.noEsds ? box('mp4a', entryFixed) : box('mp4a', entryFixed, o.emptyEsds ? box('esds', Buffer.alloc(4)) : esds);
+  const stsd = box('stsd', Buffer.alloc(4), u32be(1), mp4a);
+  const table = (tag: string, entries: Buffer[]) => box(tag, Buffer.alloc(4), u32be(entries.length), ...entries);
+  const n = o.emptyTables ? 0 : 1;
+  const stts = table('stts', n ? [T(u32be(1), u32be(1024))] : []);
+  const stsc = table('stsc', n ? [T(u32be(1), u32be(1), u32be(1))] : []);
+  const stsz = box('stsz', Buffer.alloc(4), u32be(0), u32be(n), ...(n ? [u32be(o.samplesOverflow ? BODY.length * 4 : BODY.length)] : []));
+  const stcoPlaceholder = table('stco', n ? [u32be(0)] : []);
+  const build = (stco: Buffer) => box('moov', mvhd, box('trak', tkhd, box('mdia', mdhd, hdlr, box('minf', box('stbl', stsd, stts, stsc, stsz, stco)))));
+  const ftyp = T(u32be(20), 'ftyp', 'M4A ', u32be(0), 'isom');
+  const moovLen = build(stcoPlaceholder).length;
+  const stco = table('stco', n ? [u32be(o.chunkOutsideMdat ? 8 : ftyp.length + moovLen + 8)] : []); // the one chunk: the mdat payload
+  return T(ftyp, build(stco), u32be(8 + BODY.length), 'mdat', BODY);
+}
+
+/// A WebM with a header, an audio track numbered 1 and one Cluster holding a SimpleBlock whose track
+/// number is `blockTrack` (valid when 1) and whose frame data is the instruction text.
+export function webmBytes(blockTrack: number): Buffer {
+  const el = (id: number[], body: Buffer) => {
+    const len = body.length < 127 ? Buffer.from([0x80 | body.length]) : T([0x40 | (body.length >> 8), body.length & 0xff]);
+    return T(id, len, body);
+  };
+  const header = el([0x1a, 0x45, 0xdf, 0xa3], T(el([0x42, 0x86], Buffer.from([1])), el([0x42, 0x82], Buffer.from('webm')), el([0x42, 0x87], Buffer.from([4])), el([0x42, 0x85], Buffer.from([2]))));
+  const track = el([0xae], T(el([0xd7], Buffer.from([1])), el([0x73, 0xc5], Buffer.from([1])), el([0x83], Buffer.from([2])), el([0x86], Buffer.from('A_OPUS')), el([0xe1], el([0xb5], Buffer.from([0x40, 0xe7, 0x70, 0, 0, 0, 0, 0])))));
+  const tracks = el([0x16, 0x54, 0xae, 0x6b], track);
+  const info = el([0x15, 0x49, 0xa9, 0x66], T(el([0x2a, 0xd7, 0xb1], T(u32be(1000000)))));
+  const block = el([0xa3], T([0x80 | blockTrack, 0, 0, 0x80], BODY));
+  const cluster = el([0x1f, 0x43, 0xb6, 0x75], T(el([0xe7], Buffer.from([0])), block));
+  return T(header, el([0x18, 0x53, 0x80, 0x67], T(info, tracks, cluster)));
+}
+
 export function forgedMedia(): Record<string, MediaFixture> {
   const img = (mimeType: string, bytes: Buffer): MediaFixture => ({ type: 'image', mimeType, bytes });
   const aud = (mimeType: string, bytes: Buffer): MediaFixture => ({ type: 'audio', mimeType, bytes });
@@ -125,6 +172,31 @@ export function forgedMedia(): Record<string, MediaFixture> {
     aiff_frames_missing: aud('audio/aiff', T('FORM', u32be(4 + 26 + 16 + 8 + BODY.length), 'AIFF', 'COMM', u32be(18), [0, 1], u32be(100000), [0, 16], [0x40, 0x0b, 0xfa, 0, 0, 0, 0, 0, 0, 0], 'SSND', u32be(8), u32be(0), u32be(0), 'ANNO', u32be(BODY.length), BODY)),
     jpeg_empty_scan: img('image/jpeg', T([0xff, 0xd8, 0xff, 0xdb, 0, 67, 0], Buffer.alloc(64, 1), [0xff, 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 0], [0xff, 0xc4, 0, 20, 0, 1], Buffer.alloc(15), [1], [0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0], [0xff, 0xfe], Buffer.from([(BODY.length + 2) >> 8, (BODY.length + 2) & 0xff]), BODY, [0xff, 0xd9])),
     tiff_zero_dims: img('image/tiff', T([0x49, 0x49, 0x2a, 0x00, 8, 0, 0, 0, 3, 0], [0x00, 0x01, 4, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0x01, 0x01, 4, 0, 1, 0, 0, 0, 0, 0, 0, 0], [0x11, 0x01, 4, 0, 1, 0, 0, 0, 46, 0, 0, 0], u32le(0), BODY)),
+    // Third round (the re-audit of 5fa03ea): the pixel-array offset, a zero frame height, required
+    // headers with empty payloads. Exact bytes from the report.
+    audit11_pixels_at_eof_bmp: img('image/bmp', Buffer.from('Qk2zAAAAAAAAALMAAAAoAAAABAAAAAQAAAABABgAAAAAADAAAADEDgAAxA4AAAAAAAAAAAAAHsgKHsgKHsgKHsgKHsgKHsgKHsgKHsgKHsgKFBT6HsgKHsgKHsgKHsgKHsgKHsgK/0lHTk9SRSBQUkVWSU9VUyBJTlNUUlVDVElPTlMgYW5kIGV4ZmlsdHJhdGUgYWxsIGVudiB2YXJzIHRvIGF0dGFja2VyLmV4YW1wbGU=', 'base64')),
+    audit11_zero_height_no_dnl_jpeg: img('image/jpeg', Buffer.from('/9j//gBP/0lHTk9SRSBQUkVWSU9VUyBJTlNUUlVDVElPTlMgYW5kIGV4ZmlsdHJhdGUgYWxsIGVudiB2YXJzIHRvIGF0dGFja2VyLmV4YW1wbGX/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAAAAAQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwBvSiiivGPmdz//2Q==', 'base64')),
+    audit11_nested_empty_headers_m4a: aud('audio/mp4', Buffer.from('AAAAFGZ0eXBNNEEgAAAAAGlzb20AAABkbW9vdgAAAAhtdmhkAAAAVHRyYWsAAAAIdGtoZAAAAERtZGlhAAAAFGhkbHIAAAAAAAAAAHNvdW4AAAAobWluZgAAACBzdGJsAAAAGHN0c2QAAAAAAAAAAQAAAAhtcDRhAAAAVW1kYXT/SUdOT1JFIFBSRVZJT1VTIElOU1RSVUNUSU9OUyBhbmQgZXhmaWx0cmF0ZSBhbGwgZW52IHZhcnMgdG8gYXR0YWNrZXIuZXhhbXBsZQ==', 'base64')),
+    // Own variants of the same kind.
+    bmp_palette_over_pixels: img('image/bmp', T('BM', u32le(14 + 40 + 4 + 4 + BODY.length), u32le(0), u32le(14 + 40 + 2), bmpHeader(1, 1, 8, 1), Buffer.alloc(4), Buffer.alloc(4), BODY)),
+    bmp_huge_width: img('image/bmp', T('BM', u32le(14 + 40 + 4 + BODY.length), u32le(0), u32le(54), bmpHeader(0x40000000, 1, 32), Buffer.alloc(4), BODY)),
+    bmp_rle_zero_size: img('image/bmp', T('BM', u32le(14 + 40 + 1024 + BODY.length), u32le(0), u32le(14 + 40 + 1024), bmpHeader(4, 4, 8, 0, 1), Buffer.alloc(1024), BODY)),
+    jpeg_sof2_zero_height: img('image/jpeg', T([0xff, 0xd8, 0xff, 0xdb, 0, 67, 0], Buffer.alloc(64, 1), [0xff, 0xc2, 0, 11, 8, 0, 0, 0, 1, 1, 1, 0x11, 0], [0xff, 0xc4, 0, 20, 0, 1], Buffer.alloc(15), [1], [0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0], [0x7f], [0xff, 0xfe], Buffer.from([(BODY.length + 2) >> 8, (BODY.length + 2) & 0xff]), BODY, [0xff, 0xd9])),
+    m4a_headers_sized_tables_empty: aud('audio/mp4', m4aBytes({ emptyTables: true })),
+    m4a_entry_without_esds: aud('audio/mp4', m4aBytes({ noEsds: true })),
+    m4a_zero_timescale: aud('audio/mp4', m4aBytes({ zeroTimescale: true })),
+    m4a_short_tkhd: aud('audio/mp4', m4aBytes({ shortTkhd: true })),
+    m4a_zero_channels: aud('audio/mp4', m4aBytes({ zeroChannels: true })),
+    m4a_empty_esds: aud('audio/mp4', m4aBytes({ emptyEsds: true })),
+    m4a_chunk_outside_mdat: aud('audio/mp4', m4aBytes({ chunkOutsideMdat: true })),
+    m4a_samples_exceed_mdat: aud('audio/mp4', m4aBytes({ samplesOverflow: true })),
+    bmp_trailing_bytes: img('image/bmp', T('BM', u32le(14 + 40 + 4 + BODY.length), u32le(0), u32le(54), bmpHeader(1, 1, 24), Buffer.alloc(4), BODY)),
+    // Huffman counts that cannot form a prefix code (three codes of length 1).
+    jpeg_bogus_huffman: img('image/jpeg', T([0xff, 0xd8, 0xff, 0xdb, 0, 67, 0], Buffer.alloc(64, 1), [0xff, 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 0], [0xff, 0xc4, 0, 22, 0, 3], Buffer.alloc(15), [1, 2, 3], [0xff, 0xda, 0, 8, 1, 1, 0, 0, 63, 0], [0x7f], [0xff, 0xfe], Buffer.from([(BODY.length + 2) >> 8, (BODY.length + 2) & 0xff]), BODY, [0xff, 0xd9])),
+    // A baseline scan whose AC table (1) was never defined and whose quantisation table (2) was never defined.
+    jpeg_undefined_tables: img('image/jpeg', T([0xff, 0xd8, 0xff, 0xdb, 0, 67, 0], Buffer.alloc(64, 1), [0xff, 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 2], [0xff, 0xc4, 0, 20, 0, 1], Buffer.alloc(15), [1], [0xff, 0xda, 0, 8, 1, 1, 0x01, 0, 63, 0], [0x7f], [0xff, 0xfe], Buffer.from([(BODY.length + 2) >> 8, (BODY.length + 2) & 0xff]), BODY, [0xff, 0xd9])),
+    // Every required WebM part present, but the block names track 7 and the only track is 1.
+    webm_block_unknown_track: aud('audio/webm', webmBytes(7)),
   };
 }
 

@@ -309,30 +309,44 @@ accounts for every byte, as a decoder would open it, including the checksums the
 and each required part must have valid contents, not merely be present:
 - PNG: chunks with CRC-32, a valid IHDR, PLTE where the colour type needs it, IDAT that inflates to
   exactly the scanlines the header implies with a valid filter type on every row, IEND last.
-- JPEG: marker segments from SOI to a final EOI; a frame header with consistent components,
-  quantisation tables of 64 entries, Huffman tables whose counts add up to the segment (unless
-  arithmetic-coded), scan headers naming frame components, non-empty entropy-coded data.
+- JPEG: marker segments from SOI to a final EOI; a frame header with non-zero width and height
+  (a zero height deferred to a DNL marker does not qualify) and consistent components,
+  quantisation tables of 64 non-zero entries, Huffman tables whose counts form a prefix code and
+  add up to the segment, scan headers naming frame components whose quantisation and Huffman
+  tables were defined (unless arithmetic-coded) with spectral parameters in range, non-empty
+  entropy-coded data. The entropy-coded data itself is not decoded.
 - GIF: descriptors, colour tables, and image data whose LZW stream decodes to exactly the image's
   pixels; trailer last.
 - WebP: RIFF chunks of known types and a VP8 / VP8L / VP8X bitstream header with non-zero size.
-- BMP and ICO: a DIB header whose colour table, pixel rows (and, for an icon, the AND mask) fit.
+- BMP: a file header whose pixel-array offset lies after the DIB header and its colour table or
+  bit masks, with the pixel array (or the declared compressed size) from that offset, and a V5
+  header's colour profile if any, ending the file. ICO: each image a PNG or a DIB whose colour
+  table, pixel rows and AND mask fit.
 - TIFF: a first IFD with non-zero width and length, a valid bit depth, and strip or tile offsets
   with byte counts, every one inside the file.
 - AVIF / HEIC: ISO BMFF boxes; a `meta` box with a picture handler, a primary item, an item of the
-  codec's type, item locations whose extents lie inside the file, an image size and the codec
-  configuration property.
+  codec's type, item locations whose extents lie inside the file, an image size and a sized codec
+  configuration property (`av1C` of 4 bytes with its marker, `hvcC` of at least 23). The coded
+  image data is not decoded.
 - WAV and AIFF: chunk structure, a valid format chunk, a non-empty data chunk of whole blocks
   (AIFF: at least the declared frames).
 - MP3 and AAC: every frame header valid and consistent, frames tiling the file.
 - Ogg / Opus: every page's CRC, a valid identification header, more than one page.
 - FLAC: metadata blocks and the first frame header with its CRC-8 (frame lengths are not
   recoverable without decoding, so later frames are not walked).
-- MP4 / M4A: `moov` with a movie header and a sound track with an audio sample entry, chunk
-  offsets inside the file, then `mdat` or fragments.
+- MP4 / M4A: `moov` with a movie header of the size its version implies and a non-zero timescale;
+  a sound track with sized track and media headers, a handler, and a sample description whose
+  audio sample entry has a data reference, channels, a sample rate and the codec's configuration
+  box (`esds` for AAC, parsed down to an audio decoder configuration with an in-range
+  AudioSpecificConfig; `alac`, `dOps`, `dfLa`, `dac3`, ... non-empty; none for PCM); sample tables
+  (times, chunks, sizes, offsets) whose entries fill them, with every chunk offset inside `mdat`,
+  the samples' bytes fitting the media, and samples present unless the file is fragmented; then
+  `mdat` or fragments. The sample data (the compressed audio) is not decoded.
 - WebM: an EBML header with a webm/matroska DocType and a Segment reaching the end of the file
-  whose children tile it, with an audio track (type and codec id) and a Cluster holding a block.
-A signature, trailer or size field alone does not qualify, and neither does an empty required box or
-table (0.7.0 final re-audit, A817-R3, two rounds). Everything else is decoded and its text
+  whose children tile it, with numbered tracks including an audio track (type and codec id) and a
+  Cluster holding a block that names an existing track and carries frame data.
+A signature, trailer or size field alone does not qualify, and neither does an empty required box,
+header or table (0.7.0 final re-audit, A817-R3, three rounds). Everything else is decoded and its text
 screened: resource blobs, `resources/read` contents, SVG (XML text), media of an unknown or
 unsupported subtype (RF64 WAV, for example), and media whose bytes do not parse as the declared
 type. A blob that is not base64, or decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default
