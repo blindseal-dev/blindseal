@@ -2,11 +2,12 @@
 /// type the media exemption (blob-decode.ts) can apply to. Each one walks the whole container the
 /// way a decoder would open it (chunks, segments, frames, pages, boxes), checks the fields a decoder
 /// relies on, verifies the checksums the format carries, and requires the structure to account for
-/// every byte. A signature, a trailer or a plausible length field is not enough: a file "ID3 \xff
-/// <instructions>" is not an MP3 and "\x89PNG…<text chunk>…IEND" with no IHDR, no IDAT and wrong
-/// CRCs is not a PNG (0.7.0 re-audit A817-R3). What a decoder accepts is still not read: pixels,
-/// samples, metadata text and comment chunks are the file's content, which is out of scope by
-/// design (LIMITATIONS §15).
+/// every byte. A signature, a trailer or a plausible length field is not enough, and neither is the
+/// presence of a required part: its contents must be valid too (a quantisation table with no
+/// entries, a TIFF with zero width, an MP4 `moov` with no track, a WebM Segment that ends before
+/// the file does, a PNG scanline with filter type 255 are all refused; 0.7.0 final re-audit
+/// A817-R3, two rounds). What a decoder accepts is still not read: pixels, samples, metadata text
+/// and comment chunks are the file's content, which is out of scope by design (LIMITATIONS §15).
 ///
 /// Pure and dependency-free except for zlib (PNG pixel data): it runs in the scan worker.
 
@@ -65,20 +66,22 @@ function crc8(b: Buffer, end: number): number {
 const MAX_PNG_RAW = 64 * 1024 * 1024;
 const PNG_CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
 const PNG_DEPTHS: Record<number, number[]> = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+const ADAM7 = [[0, 0, 8, 8], [4, 0, 8, 8], [0, 4, 4, 8], [2, 0, 4, 4], [0, 2, 2, 4], [1, 0, 2, 2], [0, 1, 1, 2]] as const;
 
-/// The size of the filtered scanlines IDAT must inflate to (Adam7 passes when interlaced).
-function pngRawSize(w: number, h: number, bpp: number, interlaced: boolean): number {
-  const rows = (pw: number, ph: number) => (pw > 0 && ph > 0 ? ph * (1 + Math.ceil((pw * bpp) / 8)) : 0);
-  if (!interlaced) return rows(w, h);
-  const passes = [[0, 0, 8, 8], [4, 0, 8, 8], [0, 4, 4, 8], [2, 0, 4, 4], [0, 2, 2, 4], [1, 0, 2, 2], [0, 1, 1, 2]] as const;
-  let n = 0;
-  for (const [xs, ys, xd, yd] of passes) n += rows(Math.ceil(Math.max(0, w - xs) / xd), Math.ceil(Math.max(0, h - ys) / yd));
-  return n;
+/// The scanline layout IDAT must inflate to: [row count, bytes per row (filter byte included)] per
+/// pass (one pass unless interlaced), and the total.
+function pngScanlines(w: number, h: number, bpp: number, interlaced: boolean): { passes: Array<[number, number]>; total: number } {
+  const passes: Array<[number, number]> = [];
+  const add = (pw: number, ph: number) => { if (pw > 0 && ph > 0) passes.push([ph, 1 + Math.ceil((pw * bpp) / 8)]); };
+  if (!interlaced) add(w, h);
+  else for (const [xs, ys, xd, yd] of ADAM7) add(Math.ceil(Math.max(0, w - xs) / xd), Math.ceil(Math.max(0, h - ys) / yd));
+  return { passes, total: passes.reduce((n, [rows, len]) => n + rows * len, 0) };
 }
 
 /// PNG: signature; chunks (length, type, data, CRC-32 verified) with IHDR first and valid, PLTE
 /// before IDAT (required for indexed colour), at least one IDAT, consecutive, IEND last and
-/// final; the concatenated IDAT inflates to exactly the scanline bytes the header implies.
+/// final; the concatenated IDAT inflates to exactly the scanlines the header implies, each with a
+/// valid filter type (0–4).
 const png: Check = (b) => {
   if (!bytes(b, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return false;
   let off = 8;
@@ -110,21 +113,29 @@ const png: Check = (b) => {
       data.push(d);
     } else if (type === 'IEND') {
       if (len !== 0 || !idat || off + 12 !== b.length || (colour === 3 && !plte)) return false;
-      const expected = pngRawSize(w, h, PNG_CHANNELS[colour]! * depth, interlaced);
-      if (expected > MAX_PNG_RAW) return false;
-      try { return inflateSync(Buffer.concat(data), { maxOutputLength: expected }).length === expected; } catch { return false; }
+      const lines = pngScanlines(w, h, PNG_CHANNELS[colour]! * depth, interlaced);
+      if (lines.total > MAX_PNG_RAW) return false;
+      let raw: Buffer;
+      try { raw = inflateSync(Buffer.concat(data), { maxOutputLength: lines.total }); } catch { return false; }
+      if (raw.length !== lines.total) return false;
+      let p = 0;
+      for (const [rows, len] of lines.passes) for (let r = 0; r < rows; r++, p += len) if (raw[p]! > 4) return false;
+      return true;
     } else if (idat) idatDone = true;
     off += 12 + len;
   }
 };
 
-/// JPEG: SOI, then marker segments with valid lengths (a frame header, quantisation and Huffman
-/// tables unless arithmetic-coded, a scan header), entropy-coded data skipped to the next marker
-/// (byte stuffing and restart markers understood), EOI as the final two bytes.
+/// JPEG: SOI, then marker segments with valid lengths and contents: a frame header (components
+/// with sampling factors and table ids), quantisation tables (64 entries each), Huffman tables
+/// (count lists adding up to the segment) unless arithmetic-coded, scan headers naming frame
+/// components, each followed by non-empty entropy-coded data skipped to the next marker (byte
+/// stuffing and restart markers understood); EOI as the final two bytes.
 const jpeg: Check = (b) => {
   if (!bytes(b, [0xff, 0xd8])) return false;
   let off = 2;
   let sof = false, sos = false, dqt = false, dht = false, arith = false;
+  const componentIds = new Set<number>();
   while (off < b.length) {
     if (b[off] !== 0xff) return false;
     while (off < b.length && b[off] === 0xff) off++; // fill bytes
@@ -136,17 +147,56 @@ const jpeg: Check = (b) => {
     if (off + 2 > b.length) return false;
     const len = b.readUInt16BE(off);
     if (len < 2 || off + len > b.length) return false;
+    const seg = b.subarray(off + 2, off + len);
     if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
-      const nc = b[off + 7] ?? 0;
-      if (len !== 8 + 3 * nc || nc < 1 || nc > 4 || b.readUInt16BE(off + 5) === 0) return false;
+      if (sof) return false;
+      const nc = seg[5] ?? 0;
+      if (seg.length !== 6 + 3 * nc || nc < 1 || nc > 4 || ![8, 12].includes(seg[0]!) || seg.readUInt16BE(3) === 0) return false;
+      for (let i = 0; i < nc; i++) {
+        const id = seg[6 + 3 * i]!, hv = seg[7 + 3 * i]!, tq = seg[8 + 3 * i]!;
+        if (componentIds.has(id) || (hv >> 4) < 1 || (hv >> 4) > 4 || (hv & 15) < 1 || (hv & 15) > 4 || tq > 3) return false;
+        componentIds.add(id);
+      }
       if (m >= 0xc9) arith = true;
       sof = true;
-    } else if (m === 0xc4) dht = true;
-    else if (m === 0xdb) dqt = true;
+    } else if (m === 0xdb) {
+      // DQT: tables of (Pq/Tq, 64 entries of 1 or 2 bytes) filling the segment exactly.
+      let p = 0;
+      if (seg.length === 0) return false;
+      while (p < seg.length) {
+        const pq = seg[p]! >> 4, tq = seg[p]! & 15;
+        if (pq > 1 || tq > 3) return false;
+        p += 1 + 64 * (pq + 1);
+      }
+      if (p !== seg.length) return false;
+      dqt = true;
+    } else if (m === 0xc4) {
+      // DHT: tables of (Tc/Th, 16 counts, the symbols those counts add up to) filling the segment.
+      let p = 0;
+      if (seg.length === 0) return false;
+      while (p < seg.length) {
+        if (p + 17 > seg.length || (seg[p]! >> 4) > 1 || (seg[p]! & 15) > 3) return false;
+        let symbols = 0;
+        for (let i = 1; i <= 16; i++) symbols += seg[p + i]!;
+        if (symbols === 0 || symbols > 256) return false;
+        p += 17 + symbols;
+      }
+      if (p !== seg.length) return false;
+      dht = true;
+    } else if (m === 0xda) {
+      if (!sof) return false;
+      const ns = seg[0] ?? 0;
+      if (ns < 1 || ns > 4 || seg.length !== 4 + 2 * ns) return false;
+      for (let i = 0; i < ns; i++) {
+        const cs = seg[1 + 2 * i]!, t = seg[2 + 2 * i]!;
+        if (!componentIds.has(cs) || (t >> 4) > 3 || (t & 15) > 3) return false;
+      }
+      sos = true;
+    }
     off += len;
     if (m === 0xda) {
-      if (!sof) return false;
-      sos = true;
+      // Entropy-coded data: at least one byte, up to the next marker.
+      const start = off;
       while (off < b.length) {
         if (b[off] === 0xff && off + 1 < b.length) {
           const n = b[off + 1]!;
@@ -154,27 +204,65 @@ const jpeg: Check = (b) => {
         }
         off++;
       }
+      if (off === start) return false;
     }
   }
   return false;
 };
 
-/// GIF data sub-blocks (length-prefixed, 0 terminates): the offset after the terminator, or -1.
-function gifSubBlocks(b: Buffer, off: number): { end: number; bytes: number } {
-  let n = 0;
+/// GIF data sub-blocks (length-prefixed, 0 terminates): their concatenated bytes and the offset
+/// after the terminator, or null.
+function gifSubBlocks(b: Buffer, off: number): { end: number; data: Buffer } | null {
+  const parts: Buffer[] = [];
   for (;;) {
-    if (off >= b.length) return { end: -1, bytes: n };
+    if (off >= b.length) return null;
     const len = b[off++]!;
-    if (len === 0) return { end: off, bytes: n };
+    if (len === 0) return { end: off, data: Buffer.concat(parts) };
+    if (off + len > b.length) return null;
+    parts.push(b.subarray(off, off + len));
     off += len;
-    n += len;
-    if (off > b.length) return { end: -1, bytes: n };
+  }
+}
+
+/// Decodes a GIF image's LZW stream far enough to know it is one: every code is defined when used,
+/// the stream ends with the end-of-information code (or exactly fills the image), and it produces
+/// exactly `pixels` pixels. Pixel values themselves are not kept.
+function gifLzwDecodes(data: Buffer, minCodeSize: number, pixels: number): boolean {
+  const clear = 1 << minCodeSize, eoi = clear + 1;
+  let codeSize = minCodeSize + 1, next = eoi + 1;
+  const lengths = new Uint32Array(4096); // decoded length of each dictionary entry
+  for (let i = 0; i < clear; i++) lengths[i] = 1;
+  let prev = -1, out = 0, bitBuf = 0, bitCount = 0, p = 0;
+  for (;;) {
+    while (bitCount < codeSize) {
+      if (p >= data.length) return false; // ran out before EOI
+      bitBuf |= data[p++]! << bitCount;
+      bitCount += 8;
+    }
+    const code = bitBuf & ((1 << codeSize) - 1);
+    bitBuf >>>= codeSize;
+    bitCount -= codeSize;
+    if (code === clear) { codeSize = minCodeSize + 1; next = eoi + 1; prev = -1; continue; }
+    if (code === eoi) return out === pixels && data.length - p <= 1;
+    if (code > next || (code === next && prev < 0)) return false; // undefined code
+    const len = code === next ? lengths[prev]! + 1 : lengths[code]!;
+    out += len;
+    if (out > pixels) return false;
+    if (prev >= 0 && next < 4096) { lengths[next] = lengths[prev]! + 1; next++; if (next === 1 << codeSize && codeSize < 12) codeSize++; }
+    prev = code;
+    if (out === pixels) {
+      // The image is full: the stream must end here, with the end-of-information code (or, at
+      // most, bit padding). Data beyond the image is not pixel data.
+      while (bitCount < codeSize && p < data.length) { bitBuf |= data[p++]! << bitCount; bitCount += 8; }
+      if (bitCount < codeSize) return true; // the stream ends exactly with the image
+      return (bitBuf & ((1 << codeSize) - 1)) === eoi && data.length - p <= 1;
+    }
   }
 }
 
 /// GIF: header, logical screen descriptor and colour table; then image descriptors (with their
-/// colour tables, LZW code size and non-empty data sub-blocks) and extension blocks; the trailer
-/// is the last byte and at least one image is present.
+/// colour tables, LZW code size and data that decodes to exactly the image's pixels) and
+/// extension blocks; the trailer is the last byte and at least one image is present.
 const gif: Check = (b) => {
   if (!(at(b, 0, 'GIF87a') || at(b, 0, 'GIF89a')) || b.length < 14) return false;
   let off = 13;
@@ -186,22 +274,22 @@ const gif: Check = (b) => {
     if (block === 0x3b) return images > 0 && off === b.length;
     if (block === 0x2c) {
       if (off + 9 > b.length) return false;
-      if (b.readUInt16LE(off + 4) === 0 || b.readUInt16LE(off + 6) === 0) return false;
-      const flags = b[off + 8]!;
+      const w = b.readUInt16LE(off + 4), h = b.readUInt16LE(off + 6), flags = b[off + 8]!;
+      if (w === 0 || h === 0) return false;
       off += 9;
       if (flags & 0x80) off += 3 << ((flags & 7) + 1);
       if (off >= b.length) return false;
       const lzw = b[off++]!;
       if (lzw < 1 || lzw > 8) return false;
       const sub = gifSubBlocks(b, off);
-      if (sub.end < 0 || sub.bytes === 0) return false;
+      if (!sub || sub.data.length === 0 || !gifLzwDecodes(sub.data, lzw, w * h)) return false;
       off = sub.end;
       images++;
     } else if (block === 0x21) {
       if (off + 1 >= b.length) return false;
       off++;
       const sub = gifSubBlocks(b, off);
-      if (sub.end < 0) return false;
+      if (!sub) return false;
       off = sub.end;
     } else return false;
   }
@@ -227,11 +315,14 @@ function riffChunks(b: Buffer, form: string): Chunk[] | null {
 }
 
 /// WebP: a RIFF/WEBP container whose first chunk is a VP8 key frame (frame tag, start code,
-/// dimensions), a VP8L bitstream (signature, dimensions, version 0) or a VP8X header followed by
-/// such a bitstream or animation frames.
+/// dimensions, first partition inside the chunk), a VP8L bitstream (signature, dimensions,
+/// version 0) or a VP8X header (canvas dimensions) followed by such a bitstream or animation
+/// frames. No chunk but the known ones.
 const webp: Check = (b) => {
   const chunks = riffChunks(b, 'WEBP');
   if (!chunks || chunks.length === 0) return false;
+  const KNOWN = new Set(['VP8 ', 'VP8L', 'VP8X', 'ANIM', 'ANMF', 'ALPH', 'ICCP', 'EXIF', 'XMP ']);
+  if (!chunks.every((c) => KNOWN.has(c.id))) return false;
   const vp8 = (c: Chunk) => {
     if (c.len < 10) return false;
     const tag = b[c.off]! | (b[c.off + 1]! << 8) | (b[c.off + 2]! << 16);
@@ -243,43 +334,62 @@ const webp: Check = (b) => {
   const vp8l = (c: Chunk) => {
     if (c.len < 5 || b[c.off] !== 0x2f) return false;
     const bits = b.readUInt32LE(c.off + 1);
-    return (bits >>> 29) === 0; // version
+    return (bits >>> 29) === 0 && c.len > 5; // version 0, then image data
   };
   const first = chunks[0]!;
   if (first.id === 'VP8 ') return vp8(first);
   if (first.id === 'VP8L') return vp8l(first);
   if (first.id !== 'VP8X' || first.len !== 10) return false;
+  const cw = 1 + (b[first.off + 4]! | (b[first.off + 5]! << 8) | (b[first.off + 6]! << 16));
+  const ch = 1 + (b[first.off + 7]! | (b[first.off + 8]! << 8) | (b[first.off + 9]! << 16));
+  if (cw === 0 || ch === 0) return false;
   return chunks.slice(1).some((c) => (c.id === 'VP8 ' && vp8(c)) || (c.id === 'VP8L' && vp8l(c)) || (c.id === 'ANMF' && c.len > 16));
 };
 
-/// BMP: file header (size field, pixel-array offset), a DIB header of a known size with valid
-/// dimensions, planes, bit depth and compression, and a pixel array that fits in the file.
+/// A Windows DIB (BITMAPINFOHEADER family) at `dib`, as a BMP body or an ICO image: header size,
+/// dimensions, planes, bit depth, compression; the colour table and pixel rows (and, for an icon,
+/// the AND mask) fit in `avail` bytes from `pixels`. Returns the pixel-array size needed, or -1.
+function dibCheck(d: Buffer, icon: boolean): boolean {
+  if (d.length < 12) return false;
+  const size = d.readUInt32LE(0);
+  if (![12, 40, 52, 56, 64, 108, 124].includes(size) || d.length < size) return false;
+  let w: number, h: number, planes: number, bpp: number, compression = 0, imageSize = 0, colours = 0;
+  if (size === 12) {
+    w = d.readUInt16LE(4); h = d.readUInt16LE(6); planes = d.readUInt16LE(8); bpp = d.readUInt16LE(10);
+  } else {
+    w = d.readInt32LE(4); h = d.readInt32LE(8); planes = d.readUInt16LE(12); bpp = d.readUInt16LE(14);
+    compression = d.readUInt32LE(16); imageSize = d.readUInt32LE(20); colours = d.readUInt32LE(32);
+  }
+  if (icon) { if (h % 2 !== 0) return false; h /= 2; } // XOR bitmap over AND mask
+  h = Math.abs(h);
+  if (w <= 0 || h === 0 || planes !== 1 || ![1, 2, 4, 8, 16, 24, 32].includes(bpp)) return false;
+  if (![0, 1, 2, 3, 4, 5, 6, 11, 12, 13].includes(compression) || (icon && compression !== 0)) return false;
+  let p = size;
+  if (bpp <= 8) p += 4 * (colours || 1 << bpp);
+  else if (compression === 3 && size === 40) p += 12;
+  const rowBytes = (bits: number) => ((bits * w + 31) >> 5) << 2;
+  if (compression === 0 || compression === 3 || compression === 6) {
+    p += rowBytes(bpp) * h;
+    if (icon) p += rowBytes(1) * h;
+    return p <= d.length;
+  }
+  return imageSize > 0 && p + imageSize <= d.length;
+}
+
+/// BMP: file header (size field, pixel-array offset ≥ the DIB header) and a valid DIB whose colour
+/// table and pixel array fit.
 const bmp: Check = (b) => {
   if (!at(b, 0, 'BM') || b.length < 26) return false;
   const size = b.readUInt32LE(2), dataOff = b.readUInt32LE(10), dib = b.readUInt32LE(14);
-  if ((size !== 0 && size !== b.length) || ![12, 40, 52, 56, 64, 108, 124].includes(dib) || dataOff < 14 + dib || dataOff > b.length) return false;
-  let w: number, h: number, planes: number, bpp: number, compression = 0, imageSize = 0;
-  if (dib === 12) {
-    if (b.length < 26) return false;
-    w = b.readUInt16LE(18); h = b.readUInt16LE(20); planes = b.readUInt16LE(22); bpp = b.readUInt16LE(24);
-  } else {
-    if (b.length < 14 + 40) return false;
-    w = b.readInt32LE(18); h = Math.abs(b.readInt32LE(22)); planes = b.readUInt16LE(26); bpp = b.readUInt16LE(28);
-    compression = b.readUInt32LE(30); imageSize = b.readUInt32LE(34);
-  }
-  if (w <= 0 || h === 0 || planes !== 1 || ![1, 2, 4, 8, 16, 24, 32].includes(bpp)) return false;
-  if (![0, 1, 2, 3, 4, 5, 6, 11, 12, 13].includes(compression)) return false;
-  if (compression === 0 || compression === 3 || compression === 6) {
-    const row = ((bpp * w + 31) >> 5) << 2;
-    return dataOff + row * h <= b.length;
-  }
-  return imageSize > 0 && dataOff + imageSize <= b.length;
+  if ((size !== 0 && size !== b.length) || dataOff < 14 + dib || dataOff > b.length) return false;
+  return dibCheck(b.subarray(14), false);
 };
 
 const TIFF_TYPE_SIZE = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8, 4];
 
 /// TIFF: byte order and magic, the first IFD within the file, entries with valid types whose
-/// out-of-line values lie inside the file, with width, length and strip or tile offsets present.
+/// out-of-line values lie inside the file, with a non-zero width and length, a bit depth, and
+/// strip (or tile) offsets and byte counts, every one inside the file.
 const tiff: Check = (b) => {
   const le = at(b, 0, 'II'), be = at(b, 0, 'MM');
   if ((!le && !be) || b.length < 8) return false;
@@ -290,20 +400,41 @@ const tiff: Check = (b) => {
   if (ifd < 8 || ifd + 2 > b.length) return false;
   const n = u16(ifd);
   if (n === 0 || ifd + 2 + 12 * n + 4 > b.length) return false;
-  const tags = new Set<number>();
+  const entries = new Map<number, { type: number; count: number; at: number }>();
   for (let i = 0; i < n; i++) {
     const e = ifd + 2 + 12 * i;
     const tag = u16(e), type = u16(e + 2), count = u32(e + 4);
-    if (type < 1 || type > 13) return false;
+    if (type < 1 || type > 13 || entries.has(tag)) return false;
     const size = TIFF_TYPE_SIZE[type]! * count;
-    if (size > 4 && u32(e + 8) + size > b.length) return false;
-    tags.add(tag);
+    const dataAt = size > 4 ? u32(e + 8) : e + 8;
+    if (size > 4 && dataAt + size > b.length) return false;
+    entries.set(tag, { type, count, at: dataAt });
   }
-  return tags.has(256) && tags.has(257) && (tags.has(273) || tags.has(324));
+  /// The `i`th value of a SHORT/LONG entry, or -1.
+  const value = (tag: number, i = 0): number => {
+    const en = entries.get(tag);
+    if (!en || i >= en.count) return -1;
+    if (en.type === 3) return u16(en.at + 2 * i);
+    if (en.type === 4) return u32(en.at + 4 * i);
+    return -1;
+  };
+  const w = value(256), h = value(257);
+  if (w <= 0 || h <= 0) return false;
+  const bits = entries.has(258) ? value(258) : 1;
+  if (![1, 2, 4, 8, 16, 32, 64].includes(bits)) return false;
+  const [offTag, cntTag] = entries.has(273) ? [273, 279] : entries.has(324) ? [324, 325] : [0, 0];
+  if (!offTag) return false;
+  const offs = entries.get(offTag)!, cnts = entries.get(cntTag);
+  if (!cnts || cnts.count !== offs.count || offs.count === 0) return false;
+  for (let i = 0; i < offs.count; i++) {
+    const o = value(offTag, i), c = value(cntTag, i);
+    if (o < 0 || c <= 0 || o + c > b.length) return false;
+  }
+  return true;
 };
 
 /// ICO / CUR: header with at least one directory entry; each entry's image lies inside the file
-/// and is a PNG or a BITMAPINFOHEADER-led DIB.
+/// and is a PNG or a DIB whose header, colour table, XOR bitmap and AND mask all fit.
 const ico: Check = (b) => {
   if (b.length < 22 || b.readUInt16LE(0) !== 0 || ![1, 2].includes(b.readUInt16LE(2))) return false;
   const n = b.readUInt16LE(4);
@@ -311,46 +442,181 @@ const ico: Check = (b) => {
   for (let i = 0; i < n; i++) {
     const e = 6 + 16 * i;
     const size = b.readUInt32LE(e + 8), off = b.readUInt32LE(e + 12);
-    if (size < 16 || off < 6 + 16 * n || off + size > b.length) return false;
+    if (size < 40 || off < 6 + 16 * n || off + size > b.length) return false;
     const img = b.subarray(off, off + size);
     if (bytes(img, [0x89, 0x50, 0x4e, 0x47])) { if (!png(img)) return false; }
-    else if (img.readUInt32LE(0) !== 40 || img.readUInt16LE(12) !== 1 || ![1, 4, 8, 16, 24, 32].includes(img.readUInt16LE(14))) return false;
+    else if (!dibCheck(img, true)) return false;
   }
   return true;
 };
 
-/// ISO base media file (MP4, M4A, AVIF, HEIC): boxes with valid sizes (including 64-bit and
-/// to-end sizes) that tile the file, `ftyp` first with an accepted brand, the required boxes present.
-function bmff(b: Buffer, brands: readonly string[], required: readonly string[][]): boolean {
-  const seen = new Set<string>();
-  let off = 0, first = true;
-  while (off < b.length) {
-    if (off + 8 > b.length) return false;
+// ---------------------------------------------------------------------------------------------
+// ISO base media files (MP4 / M4A audio, AVIF / HEIC images).
+
+interface Box { type: string; off: number; start: number; end: number }
+
+/// The boxes tiling b[from, to): valid sizes (32-bit, 64-bit, to-end), FourCC types.
+function boxes(b: Buffer, from: number, to: number): Box[] | null {
+  const out: Box[] = [];
+  let off = from;
+  while (off < to) {
+    if (off + 8 > to) return null;
     let size = b.readUInt32BE(off), header = 8;
     const type = b.toString('latin1', off + 4, off + 8);
-    if (!FOURCC.test(type)) return false;
+    if (!FOURCC.test(type)) return null;
     if (size === 1) {
-      if (off + 16 > b.length) return false;
+      if (off + 16 > to) return null;
       const big = b.readBigUInt64BE(off + 8);
-      if (big > BigInt(b.length - off)) return false;
+      if (big > BigInt(to - off)) return null;
       size = Number(big);
       header = 16;
-    } else if (size === 0) size = b.length - off;
-    if (size < header || off + size > b.length) return false;
-    if (first) {
-      if (type !== 'ftyp' || size < 16) return false;
-      const found = [b.toString('latin1', off + 8, off + 12)];
-      for (let p = off + 16; p + 4 <= off + size; p += 4) found.push(b.toString('latin1', p, p + 4));
-      if (!found.some((x) => brands.includes(x))) return false;
-      first = false;
-    }
-    seen.add(type);
+    } else if (size === 0) size = to - off;
+    if (size < header || off + size > to) return null;
+    out.push({ type, off, start: off + header, end: off + size });
     off += size;
   }
-  return !first && required.every((alts) => alts.some((t) => seen.has(t)));
+  return out;
 }
-const avif: Check = (b) => bmff(b, ['avif', 'avis'], [['meta'], ['mdat']]);
-const heic: Check = (b) => bmff(b, ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'], [['meta'], ['mdat']]);
+/// Children of a container box; `fullBox` when the container itself is a FullBox (`meta`), whose
+/// version and flags precede its children.
+const child = (b: Buffer, box: Box, type: string, fullBox = false) => boxes(b, box.start + (fullBox ? 4 : 0), box.end)?.find((x) => x.type === type);
+const children = (b: Buffer, box: Box, fullBox = false) => boxes(b, box.start + (fullBox ? 4 : 0), box.end);
+
+/// A file's top-level boxes when `ftyp` comes first with an accepted brand; else null.
+function bmffTop(b: Buffer, brands: readonly string[]): Box[] | null {
+  const top = boxes(b, 0, b.length);
+  if (!top || top.length === 0 || top[0]!.type !== 'ftyp' || top[0]!.end - top[0]!.start < 8) return null;
+  const f = top[0]!;
+  const found = [b.toString('latin1', f.start, f.start + 4)];
+  for (let p = f.start + 8; p + 4 <= f.end; p += 4) found.push(b.toString('latin1', p, p + 4));
+  return found.some((x) => brands.includes(x)) ? top : null;
+}
+
+/// HEIF-family image (AVIF, HEIC): a `meta` box with a `pict` handler, a primary item, item
+/// infos including an image item of the expected codec, item locations whose extents lie inside
+/// the file, and item properties with an image size and the codec configuration.
+function heif(b: Buffer, brands: readonly string[], itemTypes: readonly string[], codecConfig: string): boolean {
+  const top = bmffTop(b, brands);
+  if (!top) return false;
+  const meta = top.find((x) => x.type === 'meta');
+  if (!meta || meta.end - meta.start < 4) return false;
+  const hdlr = child(b, meta, 'hdlr', true);
+  if (!hdlr || hdlr.end - hdlr.start < 12 || b.toString('latin1', hdlr.start + 8, hdlr.start + 12) !== 'pict') return false;
+  if (!child(b, meta, 'pitm', true)) return false;
+  // iinf: entry count, then infe boxes (version 2+: item id, protection, item type).
+  const iinf = child(b, meta, 'iinf', true);
+  if (!iinf || iinf.end - iinf.start < 6) return false;
+  const v = b[iinf.start]!;
+  const infes = boxes(b, iinf.start + 4 + (v === 0 ? 2 : 4), iinf.end);
+  if (!infes || infes.length === 0) return false;
+  let image = false;
+  for (const e of infes) {
+    if (e.type !== 'infe' || e.end - e.start < 4) return false;
+    const ev = b[e.start]!;
+    if (ev >= 2) {
+      const idSize = ev === 2 ? 2 : 4;
+      if (e.end - e.start < 4 + idSize + 2 + 4) return false;
+      if (itemTypes.includes(b.toString('latin1', e.start + 4 + idSize + 2, e.start + 4 + idSize + 6))) image = true;
+    }
+  }
+  if (!image) return false;
+  // iloc: every extent inside the file.
+  const iloc = child(b, meta, 'iloc', true);
+  if (!iloc || !ilocExtentsInside(b, iloc)) return false;
+  // iprp/ipco: an image size and the codec configuration.
+  const iprp = child(b, meta, 'iprp', true);
+  const ipco = iprp && child(b, iprp, 'ipco');
+  const props = ipco && children(b, ipco);
+  if (!props) return false;
+  const ispe = props.find((x) => x.type === 'ispe');
+  if (!ispe || ispe.end - ispe.start < 12 || b.readUInt32BE(ispe.start + 4) === 0 || b.readUInt32BE(ispe.start + 8) === 0) return false;
+  return props.some((x) => x.type === codecConfig);
+}
+
+/// Parses an `iloc` box (versions 0–2) and checks that every extent lies inside the file (for
+/// construction method 0, file offsets; method 1 offsets are into `idat`, accepted as given).
+function ilocExtentsInside(b: Buffer, iloc: Box): boolean {
+  let p = iloc.start;
+  const version = b[p]!;
+  p += 4;
+  if (version > 2 || p + 2 > iloc.end) return false;
+  const offsetSize = b[p]! >> 4, lengthSize = b[p]! & 15, baseOffsetSize = b[p + 1]! >> 4, indexSize = version > 0 ? b[p + 1]! & 15 : 0;
+  p += 2;
+  if (![0, 4, 8].includes(offsetSize) || ![0, 4, 8].includes(lengthSize) || ![0, 4, 8].includes(baseOffsetSize) || ![0, 4, 8].includes(indexSize)) return false;
+  const read = (size: number): number => {
+    if (p + size > iloc.end) throw new RangeError('iloc');
+    const v = size === 0 ? 0 : size === 2 ? b.readUInt16BE(p) : size === 4 ? b.readUInt32BE(p) : Number(b.readBigUInt64BE(p));
+    p += size;
+    return v;
+  };
+  try {
+    const count = read(version < 2 ? 2 : 4);
+    if (count === 0) return false;
+    let anyExtent = false;
+    for (let i = 0; i < count; i++) {
+      read(version < 2 ? 2 : 4); // item id
+      let method = 0;
+      if (version > 0) method = read(2) & 15;
+      read(2); // data reference index
+      const base = read(baseOffsetSize);
+      const extents = read(2);
+      if (extents === 0) return false;
+      for (let e = 0; e < extents; e++) {
+        if (version > 0) read(indexSize);
+        const off = read(offsetSize), len = read(lengthSize);
+        if (len === 0) return false;
+        if (method === 0 && base + off + len > b.length) return false;
+        anyExtent = true;
+      }
+    }
+    return anyExtent && p === iloc.end;
+  } catch { return false; }
+}
+
+const avif: Check = (b) => heif(b, ['avif', 'avis'], ['av01'], 'av1C');
+const heic: Check = (b) => heif(b, ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'], ['hvc1', 'hev1'], 'hvcC');
+
+const MP4_AUDIO_BRANDS = ['M4A ', 'M4B ', 'M4P ', 'mp41', 'mp42', 'isom', 'iso2', 'iso5', 'iso6', 'dash', 'avc1', '3gp4', '3gp5', 'qt  '];
+const AUDIO_SAMPLE_ENTRIES = new Set(['mp4a', 'alac', 'ac-3', 'ec-3', 'Opus', 'fLaC', 'samr', 'sawb', 'sowt', 'twos', 'lpcm', 'ipcm', 'fpcm', 'dtsc', 'dtse', 'dtsh', 'dtsl', 'mha1', 'mhm1', 'enca', 'ulaw', 'alaw', '.mp3', 'mp3 ']);
+
+/// MP4 / M4A audio: `moov` with a movie header and at least one track whose handler is sound,
+/// with a sample description box holding an audio sample entry; then media (`mdat`) or fragments
+/// (`moof`), the sample table's chunk offsets inside the file.
+const mp4: Check = (b) => {
+  const top = bmffTop(b, MP4_AUDIO_BRANDS);
+  if (!top) return false;
+  const moov = top.find((x) => x.type === 'moov');
+  if (!moov || !child(b, moov, 'mvhd')) return false;
+  const hasMedia = top.some((x) => x.type === 'mdat' || x.type === 'moof');
+  if (!hasMedia) return false;
+  const traks = children(b, moov)?.filter((x) => x.type === 'trak') ?? [];
+  let audio = false;
+  for (const trak of traks) {
+    const mdia = child(b, trak, 'mdia');
+    const hdlr = mdia && child(b, mdia, 'hdlr');
+    if (!trak || !child(b, trak, 'tkhd') || !mdia || !hdlr || hdlr.end - hdlr.start < 12) return false;
+    const minf = child(b, mdia, 'minf');
+    const stbl = minf && child(b, minf, 'stbl');
+    // stsd: version/flags, entry count, sample entries.
+    const stsd = stbl && child(b, stbl, 'stsd');
+    if (!stsd || stsd.end - stsd.start < 8) return false;
+    const entries = boxes(b, stsd.start + 8, stsd.end);
+    if (!entries || entries.length === 0 || entries.length !== b.readUInt32BE(stsd.start + 4)) return false;
+    // stco / co64: version/flags, entry count, chunk offsets (all inside the file).
+    const stco = child(b, stbl, 'stco') ?? child(b, stbl, 'co64');
+    if (stco) {
+      if (stco.end - stco.start < 8) return false;
+      const n = b.readUInt32BE(stco.start + 4), wide = stco.type === 'co64';
+      if (stco.start + 8 + n * (wide ? 8 : 4) > stco.end) return false;
+      for (let i = 0; i < n; i++) {
+        const o = wide ? Number(b.readBigUInt64BE(stco.start + 8 + 8 * i)) : b.readUInt32BE(stco.start + 8 + 4 * i);
+        if (o >= b.length) return false;
+      }
+    }
+    if (b.toString('latin1', hdlr.start + 8, hdlr.start + 12) === 'soun' && entries.some((e) => AUDIO_SAMPLE_ENTRIES.has(e.type))) audio = true;
+  }
+  return audio;
+};
 
 export const IMAGE_CHECKS: Record<string, Check> = {
   png, jpeg, jpg: jpeg, gif, webp, bmp, 'x-ms-bmp': bmp, tiff, avif, heic, heif: heic, 'x-icon': ico, 'vnd.microsoft.icon': ico,
@@ -360,43 +626,49 @@ export const IMAGE_CHECKS: Record<string, Check> = {
 // Audio.
 
 /// WAV: RIFF/WAVE chunks; a `fmt ` chunk (known format tag, channels, rate, block alignment and
-/// sample size consistent) before a `data` chunk.
+/// sample size consistent) before a non-empty `data` chunk of whole blocks.
 const wav: Check = (b) => {
   const chunks = riffChunks(b, 'WAVE');
   if (!chunks) return false;
   const fmt = chunks.findIndex((c) => c.id === 'fmt ');
   const data = chunks.findIndex((c) => c.id === 'data');
   if (fmt < 0 || data < 0 || fmt > data) return false;
-  const f = chunks[fmt]!;
-  if (f.len < 16) return false;
+  const f = chunks[fmt]!, d = chunks[data]!;
+  if (f.len < 16 || d.len === 0) return false;
   const tag = b.readUInt16LE(f.off), channels = b.readUInt16LE(f.off + 2), rate = b.readUInt32LE(f.off + 4);
   const align = b.readUInt16LE(f.off + 12), bits = b.readUInt16LE(f.off + 14);
   if (![1, 3, 6, 7, 0x11, 0x55, 0xfffe].includes(tag) || channels === 0 || rate === 0 || align === 0) return false;
   if (tag === 1 || tag === 3 || tag === 0xfffe) {
-    if (![8, 16, 24, 32, 64].includes(bits) || align !== (channels * bits) / 8) return false;
+    if (![8, 16, 24, 32, 64].includes(bits) || align !== (channels * bits) / 8 || d.len % align !== 0) return false;
   }
   return true;
 };
 
-/// AIFF / AIFF-C: FORM container whose chunks tile the file, with a valid COMM and an SSND chunk.
+/// AIFF / AIFF-C: FORM container whose chunks tile the file, a COMM chunk (channels, sample size,
+/// frame count) and an SSND chunk holding at least the frames COMM declares.
 const aiff: Check = (b) => {
   if (!at(b, 0, 'FORM') || b.readUInt32BE(4) + 8 !== b.length) return false;
   const form = b.toString('latin1', 8, 12);
   if (form !== 'AIFF' && form !== 'AIFC') return false;
-  let off = 12, comm = false, ssnd = false;
+  let off = 12, comm: { channels: number; frames: number; bits: number } | null = null, ssndBytes = -1;
   while (off < b.length) {
     if (off + 8 > b.length) return false;
     const id = b.toString('latin1', off, off + 4), len = b.readUInt32BE(off + 4);
     if (!FOURCC.test(id) || off + 8 + len > b.length) return false;
     if (id === 'COMM') {
-      if (len < 18 || b.readUInt16BE(off + 8) === 0) return false; // channels
-      const bits = b.readUInt16BE(off + 14);
-      if (bits < 1 || bits > 32) return false;
-      comm = true;
-    } else if (id === 'SSND') ssnd = true;
+      if (comm || len < (form === 'AIFC' ? 22 : 18)) return false;
+      const channels = b.readUInt16BE(off + 8), frames = b.readUInt32BE(off + 10), bits = b.readUInt16BE(off + 14);
+      if (channels === 0 || bits < 1 || bits > 32 || b.readUInt16BE(off + 16) === 0 /* sample-rate exponent */) return false;
+      comm = { channels, frames, bits };
+    } else if (id === 'SSND') {
+      if (ssndBytes >= 0 || len < 8) return false;
+      ssndBytes = len - 8 - b.readUInt32BE(off + 8);
+    }
     off += 8 + len + (len & 1);
   }
-  return comm && ssnd && (off === b.length || off === b.length + 1);
+  if (!comm || ssndBytes < 0 || (off !== b.length && off !== b.length + 1)) return false;
+  // Uncompressed AIFF: the declared frames must be present (AIFF-C may be compressed).
+  return form === 'AIFC' || ssndBytes >= comm.frames * comm.channels * Math.ceil(comm.bits / 8);
 };
 
 const MP3_RATES = [[44100, 48000, 32000], [22050, 24000, 16000], [11025, 12000, 8000]]; // MPEG1, 2, 2.5
@@ -410,13 +682,13 @@ const MP3_BITRATES = {
 /// shares, or null when the four bytes are not a valid header.
 function mp3Frame(b: Buffer, off: number): { len: number; key: string } | null {
   if (off + 4 > b.length || b[off] !== 0xff || (b[off + 1]! & 0xe0) !== 0xe0) return null;
-  const h1 = b[off + 1]!, h2 = b[off + 2]!;
+  const h1 = b[off + 1]!, h2 = b[off + 2]!, h3 = b[off + 3]!;
   const versionBits = (h1 >> 3) & 3, layerBits = (h1 >> 1) & 3;
   if (versionBits === 1 || layerBits === 0) return null;
   const version = versionBits === 3 ? 0 : versionBits === 2 ? 1 : 2; // MPEG1, MPEG2, MPEG2.5
   const layer = (4 - layerBits) as 1 | 2 | 3;
   const bitrateIndex = h2 >> 4, rateIndex = (h2 >> 2) & 3, padding = (h2 >> 1) & 1;
-  if (bitrateIndex === 0 || bitrateIndex === 15 || rateIndex === 3) return null;
+  if (bitrateIndex === 0 || bitrateIndex === 15 || rateIndex === 3 || (h3 & 3) === 2 /* reserved emphasis */) return null;
   const bitrate = (version === 0 ? MP3_BITRATES.v1 : MP3_BITRATES.v2)[layer][bitrateIndex]! * 1000;
   const rate = MP3_RATES[version]![rateIndex]!;
   let len: number;
@@ -474,7 +746,7 @@ const aac: Check = (b) => {
     const r = (b[off + 2]! >> 2) & 0xf;
     const protection = b[off + 1]! & 1;
     const len = ((b[off + 3]! & 3) << 11) | (b[off + 4]! << 3) | (b[off + 5]! >> 5);
-    if (r >= AAC_RATES || (rate >= 0 && r !== rate) || len < (protection ? 7 : 9) || off + len > b.length) return false;
+    if (r >= AAC_RATES || (rate >= 0 && r !== rate) || len <= (protection ? 7 : 9) || off + len > b.length) return false;
     rate = r;
     off += len;
     frames++;
@@ -501,7 +773,8 @@ function flacUtf8(b: Buffer, off: number): number {
 
 /// FLAC: marker; metadata blocks (STREAMINFO first and valid, known types) to the last one; then
 /// the first audio frame's header: sync code, valid block-size, sample-rate, channel and
-/// sample-size codes, coded frame number, and its CRC-8.
+/// sample-size codes, coded frame number, and its CRC-8. (Frame lengths are not recoverable
+/// without decoding, so later frames are not walked: LIMITATIONS §15.)
 const flac: Check = (b) => {
   if (!at(b, 0, 'fLaC')) return false;
   let off = 4, first = true;
@@ -534,8 +807,9 @@ const flac: Check = (b) => {
 };
 
 /// Ogg: pages with the capture pattern, version 0, a lacing table that fits, and a correct page
-/// CRC, tiling the file; the first page begins a stream (BOS) and identifies a known codec
-/// (Opus, Vorbis, FLAC, Speex). `codec` restricts the first packet (audio/opus → OpusHead).
+/// CRC, tiling the file; the first page begins a stream (BOS) with a valid identification header
+/// of a known codec (Opus, Vorbis, FLAC, Speex); at least one later page carries data.
+/// `codec` restricts the first packet (audio/opus → OpusHead).
 function ogg(b: Buffer, codec?: 'opus'): boolean {
   let off = 0, pages = 0;
   while (off < b.length) {
@@ -552,16 +826,18 @@ function ogg(b: Buffer, codec?: 'opus'): boolean {
     if (oggCrc(page) !== crc) return false;
     if (pages === 0) {
       if (!(flags & 0x02) || segs === 0) return false;
-      const packet = off + 27 + segs;
-      const known = codec === 'opus'
-        ? at(b, packet, 'OpusHead')
-        : at(b, packet, 'OpusHead') || at(b, packet, '\x01vorbis') || at(b, packet, '\x7fFLAC') || at(b, packet, 'Speex   ');
+      const p = off + 27 + segs;
+      let known = false;
+      if (at(b, p, 'OpusHead')) known = body >= 19 && b[p + 8] === 1 && b[p + 9]! > 0;
+      else if (!codec && at(b, p, '\x01vorbis')) known = body >= 30 && b.readUInt32LE(p + 7) === 0 && b[p + 11]! > 0 && b.readUInt32LE(p + 12) > 0 && b[p + 29] === 1;
+      else if (!codec && at(b, p, '\x7fFLAC')) known = body >= 51 && at(b, p + 9, 'fLaC');
+      else if (!codec && at(b, p, 'Speex   ')) known = body >= 80;
       if (!known) return false;
     }
     off += len;
     pages++;
   }
-  return pages > 0 && off === b.length;
+  return pages > 1 && off === b.length;
 }
 
 /// An EBML variable-length integer at `off`: its value (-1n for the reserved all-ones "unknown"
@@ -581,49 +857,65 @@ function ebmlVint(b: Buffer, off: number, keepMarker: boolean): { value: bigint;
   return { value: !keepMarker && allOnes ? -1n : value, width };
 }
 
-/// WebM: an EBML header whose DocType is webm or matroska, then a Segment whose children (ids and
-/// sizes) tile it, with Info or Tracks present. An unknown-size Segment or Cluster runs to the end
-/// of the file, as in a live-written file.
+interface Ebml { id: bigint; start: number; end: number; unknown: boolean }
+
+/// The EBML elements tiling b[from, to); an unknown-size element (allowed only for the ids in
+/// `unknownOk`) runs to `to`.
+function ebmlChildren(b: Buffer, from: number, to: number, unknownOk: bigint[] = []): Ebml[] | null {
+  const out: Ebml[] = [];
+  let off = from;
+  while (off < to) {
+    const id = ebmlVint(b, off, true);
+    if (!id) return null;
+    const len = ebmlVint(b, off + id.width, false);
+    if (!len) return null;
+    const start = off + id.width + len.width;
+    if (len.value < 0n) {
+      if (!unknownOk.includes(id.value)) return null;
+      out.push({ id: id.value, start, end: to, unknown: true });
+      return out;
+    }
+    const end = start + Number(len.value);
+    if (end > to) return null;
+    out.push({ id: id.value, start, end, unknown: false });
+    off = end;
+  }
+  return off === to ? out : null;
+}
+
+const EBML_SEGMENT = 0x18538067n, EBML_TRACKS = 0x1654ae6bn, EBML_TRACK_ENTRY = 0xaen, EBML_TRACK_TYPE = 0x83n, EBML_CODEC_ID = 0x86n;
+const EBML_CLUSTER = 0x1f43b675n, EBML_SIMPLE_BLOCK = 0xa3n, EBML_BLOCK_GROUP = 0xa0n, EBML_DOCTYPE = 0x4282n;
+
+/// WebM: an EBML header whose DocType is webm or matroska; a Segment that reaches the end of the
+/// file (its size, or unknown) whose children tile it, with a Tracks element holding an audio
+/// track with a codec id, and at least one Cluster holding a block.
 const webm: Check = (b) => {
   if (!bytes(b, [0x1a, 0x45, 0xdf, 0xa3])) return false;
-  const size = ebmlVint(b, 4, false);
-  if (!size || size.value < 0n || 4 + size.width + Number(size.value) > b.length) return false;
-  const headerEnd = 4 + size.width + Number(size.value);
-  let off = 4 + size.width, docType = '';
-  while (off < headerEnd) {
-    const id = ebmlVint(b, off, true);
-    if (!id) return false;
-    const len = ebmlVint(b, off + id.width, false);
-    if (!len || len.value < 0n || off + id.width + len.width + Number(len.value) > headerEnd) return false;
-    const start = off + id.width + len.width;
-    if (id.value === 0x4282n) docType = b.toString('latin1', start, start + Number(len.value)).replace(/\0+$/, '');
-    off = start + Number(len.value);
-  }
-  if (off !== headerEnd || (docType !== 'webm' && docType !== 'matroska')) return false;
-  const seg = ebmlVint(b, off, true);
-  if (!seg || seg.value !== 0x18538067n) return false;
-  const segSize = ebmlVint(b, off + seg.width, false);
-  if (!segSize) return false;
-  off += seg.width + segSize.width;
-  const segEnd = segSize.value < 0n ? b.length : off + Number(segSize.value);
-  if (segEnd > b.length) return false;
-  let info = false, tracks = false;
-  while (off < segEnd) {
-    const id = ebmlVint(b, off, true);
-    if (!id) return false;
-    const len = ebmlVint(b, off + id.width, false);
-    if (!len) return false;
-    if (id.value === 0x1549a966n) info = true;
-    if (id.value === 0x1654ae6bn) tracks = true;
-    if (len.value < 0n) { if (id.value !== 0x1f43b675n) return false; off = segEnd; break; } // unknown-size Cluster
-    off += id.width + len.width + Number(len.value);
-    if (off > segEnd) return false;
-  }
-  return off === segEnd && (info || tracks);
+  const top = ebmlChildren(b, 0, b.length, [EBML_SEGMENT]);
+  if (!top || top.length !== 2 || top[0]!.id !== 0x1a45dfa3n || top[1]!.id !== EBML_SEGMENT) return false;
+  const header = ebmlChildren(b, top[0]!.start, top[0]!.end);
+  const docType = header?.find((e) => e.id === EBML_DOCTYPE);
+  if (!docType || !['webm', 'matroska'].includes(b.toString('latin1', docType.start, docType.end).replace(/\0+$/, ''))) return false;
+  const seg = top[1]!;
+  if (seg.end !== b.length) return false;
+  const kids = ebmlChildren(b, seg.start, seg.end, [EBML_CLUSTER]);
+  if (!kids) return false;
+  const tracks = kids.find((e) => e.id === EBML_TRACKS);
+  if (!tracks) return false;
+  const entries = ebmlChildren(b, tracks.start, tracks.end)?.filter((e) => e.id === EBML_TRACK_ENTRY) ?? [];
+  const audio = entries.some((t) => {
+    const fields = ebmlChildren(b, t.start, t.end);
+    const type = fields?.find((e) => e.id === EBML_TRACK_TYPE), codec = fields?.find((e) => e.id === EBML_CODEC_ID);
+    return !!type && type.end - type.start === 1 && b[type.start] === 2 && !!codec && codec.end > codec.start;
+  });
+  if (!audio) return false;
+  const clusters = kids.filter((e) => e.id === EBML_CLUSTER);
+  if (clusters.length === 0) return false;
+  return clusters.some((c) => {
+    const inner = c.unknown ? ebmlChildren(b, c.start, c.end, [EBML_CLUSTER]) : ebmlChildren(b, c.start, c.end);
+    return !!inner && inner.some((e) => (e.id === EBML_SIMPLE_BLOCK || e.id === EBML_BLOCK_GROUP) && e.end > e.start);
+  });
 };
-
-const MP4_AUDIO_BRANDS = ['M4A ', 'M4B ', 'M4P ', 'mp41', 'mp42', 'isom', 'iso2', 'iso5', 'iso6', 'dash', 'avc1', '3gp4', '3gp5', 'qt  '];
-const mp4: Check = (b) => bmff(b, MP4_AUDIO_BRANDS, [['moov'], ['mdat', 'moof']]);
 
 export const AUDIO_CHECKS: Record<string, Check> = {
   wav, 'x-wav': wav, wave: wav, 'vnd.wave': wav,

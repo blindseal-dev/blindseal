@@ -305,17 +305,37 @@ An `image` or `audio` content item whose `data` is strict base64 of a file that 
 declared type and is not valid UTF-8 is forwarded without screening what the picture or sound
 contains: text drawn in an image, metadata chunks (a PNG `tEXt` chunk, an ID3 or Vorbis comment),
 or speech in audio. "Parses as" means the proxy's own structural parser walks the whole file and
-accounts for every byte, as a decoder would open it, including the checksums the format carries:
-PNG (chunks with CRC-32, a valid IHDR, IDAT that inflates to exactly the scanline bytes the header
-implies, IEND last), JPEG (marker segments from SOI to a final EOI, with frame, table and scan
-headers), GIF (descriptors, colour tables, data sub-blocks, trailer), WebP (RIFF chunks and the VP8 /
-VP8L / VP8X bitstream header), BMP, TIFF (first IFD), ICO, AVIF / HEIC (ISO BMFF boxes); WAV and AIFF
-(chunk structure and a valid format chunk), MP3 and AAC (every frame header, frames tiling the file),
-Ogg / Opus (every page's CRC), FLAC (metadata blocks and the first frame header with its CRC-8),
-MP4 / M4A and WebM (container structure). A signature, trailer or size field alone does not qualify
-(0.7.0 final re-audit, A817-R3). Everything else is decoded and its text screened: resource blobs,
-`resources/read` contents, SVG (XML text), media of an unknown or unsupported subtype (RF64 WAV, for
-example), and media whose bytes do not parse as the declared type. A blob that is not base64, or
-decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default 10 MiB), is blocked in block mode.
+accounts for every byte, as a decoder would open it, including the checksums the format carries,
+and each required part must have valid contents, not merely be present:
+- PNG: chunks with CRC-32, a valid IHDR, PLTE where the colour type needs it, IDAT that inflates to
+  exactly the scanlines the header implies with a valid filter type on every row, IEND last.
+- JPEG: marker segments from SOI to a final EOI; a frame header with consistent components,
+  quantisation tables of 64 entries, Huffman tables whose counts add up to the segment (unless
+  arithmetic-coded), scan headers naming frame components, non-empty entropy-coded data.
+- GIF: descriptors, colour tables, and image data whose LZW stream decodes to exactly the image's
+  pixels; trailer last.
+- WebP: RIFF chunks of known types and a VP8 / VP8L / VP8X bitstream header with non-zero size.
+- BMP and ICO: a DIB header whose colour table, pixel rows (and, for an icon, the AND mask) fit.
+- TIFF: a first IFD with non-zero width and length, a valid bit depth, and strip or tile offsets
+  with byte counts, every one inside the file.
+- AVIF / HEIC: ISO BMFF boxes; a `meta` box with a picture handler, a primary item, an item of the
+  codec's type, item locations whose extents lie inside the file, an image size and the codec
+  configuration property.
+- WAV and AIFF: chunk structure, a valid format chunk, a non-empty data chunk of whole blocks
+  (AIFF: at least the declared frames).
+- MP3 and AAC: every frame header valid and consistent, frames tiling the file.
+- Ogg / Opus: every page's CRC, a valid identification header, more than one page.
+- FLAC: metadata blocks and the first frame header with its CRC-8 (frame lengths are not
+  recoverable without decoding, so later frames are not walked).
+- MP4 / M4A: `moov` with a movie header and a sound track with an audio sample entry, chunk
+  offsets inside the file, then `mdat` or fragments.
+- WebM: an EBML header with a webm/matroska DocType and a Segment reaching the end of the file
+  whose children tile it, with an audio track (type and codec id) and a Cluster holding a block.
+A signature, trailer or size field alone does not qualify, and neither does an empty required box or
+table (0.7.0 final re-audit, A817-R3, two rounds). Everything else is decoded and its text
+screened: resource blobs, `resources/read` contents, SVG (XML text), media of an unknown or
+unsupported subtype (RF64 WAV, for example), and media whose bytes do not parse as the declared
+type. A blob that is not base64, or decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default
+10 MiB), is blocked in block mode.
 
 **Status:** By design for 0.7.0. OCR / speech-to-text screening of media is not planned for v1.
