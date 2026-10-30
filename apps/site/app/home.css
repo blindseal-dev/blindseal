@@ -97,13 +97,20 @@ html[data-motion="reduce"] .hero--pinned > .hero__stage { position: relative; }
 html[data-motion="reduce"] .hm-light__video { transition: none; }
 
 /* ── phones (< 720 px, the kit's breakpoint): the still, never the clip; no pin — the hero hugs its content as it
-      did (narrow.css .hero) — and the copy sits on a uniform scrim. The plate fills the stage and the still is
-      cropped so the ring sits top right; the scrim is the canvas at 86 % everywhere (plus the kit's shade), which
-      keeps --muted copy at ≥ 4.5:1 over the brightest part of the ring (measured in e2e). ────────────────────── */
+      did (narrow.css .hero). The copy spans the whole width on a phone, so a ring under it could not hold 4.5:1
+      while staying visible; instead the still sits in a band of its own under the header (--hm-band tall, the ring
+      centred in it, masked out over its bottom 38 %) and the copy starts below it on the plain canvas. No scrim is
+      needed; the kit's banner img stays hidden here (its desktop crop would sit under the copy). Measured in e2e:
+      the brightest pixel under any copy element is the canvas (≥ 6.9:1 for --muted). ───────────────────────────── */
 @media (max-width: 719.98px) {
-  .hero.hero--pinned { min-height: 0; }
-  .hero--pinned > .hero__stage { position: relative; display: block; height: auto; padding: calc(var(--notch-top) + var(--notch-h) + 32px) 0 48px; }
-  .hm-light__plate { left: 0; top: 0; width: 100%; height: 100%; }
-  .hm-light__plate > img { object-fit: cover; object-position: 72% 36%; }
-  .hm-light__scrim, .hm-light::after { background: color-mix(in srgb, var(--canvas) 86%, transparent); }
+  .hero.hero--pinned { min-height: 0; --hm-band: clamp(220px, 72vw, 320px); }
+  .hero--pinned > .hero__stage { position: relative; display: block; height: auto; padding: calc(var(--notch-top) + var(--notch-h) + var(--hm-band)) 0 48px; }
+  .hero__space[data-bg="banner"] .hero__banner { display: none; }
+  .hm-light__plate {
+    left: 0; top: 0; width: 100%; height: calc(var(--notch-top) + var(--notch-h) + var(--hm-band));
+    -webkit-mask-image: linear-gradient(to bottom, black 0, black 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0, black 62%, transparent 100%);
+  }
+  .hm-light__plate > img { object-fit: cover; object-position: 70% 46%; }
+  .hm-light__scrim, .hm-light::after { background: none; }
 }

@@ -24,9 +24,9 @@ import { usePageKit } from './use-page-kit';
 //
 // Reduced motion (?motion=reduce or the OS setting, re-read live on bs:motion): no pin (home.css keys on
 // html[data-motion]), the opened end still (dial-ignite-end.webp) registered the same way, and the clip is never
-// requested. PHONES (< 720 px, the kit's breakpoint): the still as well, never the clip — the plate fills the
-// stage with the still cropped so the ring sits top right, under a uniform scrim that keeps the copy at 4.5:1 or
-// better (home.css); the hero hugs its content as before, no pin.
+// requested. PHONES (< 720 px, the kit's breakpoint): the still as well, never the clip — the plate is a band under
+// the header with the ring centred in it, masked out at its bottom, and the copy starts below it on the plain
+// canvas (home.css), so the copy keeps its contrast; the hero hugs its content as before, no pin.
 const T_END = 7.6;
 const BANNER_RING = { x: 0.70171, y: 0.45155, r: 0.11832 };   /* of the banner image (1672 × 941) */
 const CLIP_RING = { x: 0.69157, y: 0.43662, r: 0.11549 };     /* of the clip frame (16:9) */
