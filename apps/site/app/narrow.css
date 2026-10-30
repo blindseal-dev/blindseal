@@ -76,8 +76,10 @@
   @media (hover: hover) and (pointer: fine) { .site-menu__item:hover { color: var(--ink); } }
   body[data-motion="reduce"] .notch__menu-bars::before, body[data-motion="reduce"] .notch__menu-bars::after { transition: none; }
 
-  /* the pill nav (kit/nav.css) at phone width: the brand link and the two icon buttons are 44 px tap targets
-     inside the 48 px pill (the row stays one 56 px bar; the header behind it is the solid canvas above) */
+  /* the pill nav (kit/nav.css) at phone width: above the menu sheet (as .site-notch__row was, so the menu button
+     still closes it); the brand link and the two icon buttons are 44 px tap targets inside the 48 px pill (the row
+     stays one 56 px bar; the header behind it is the solid canvas above) */
+  .nav-pill { z-index: 1; }
   .nav-pill__brand.site-brand { height: 44px; min-height: 44px; padding: 0 8px 0 2px; margin: 0; }
   .nav-pill__icon.glass-item { height: 44px; min-height: 44px; }
   .nav-pill .notch__menu { margin-right: 0; }
