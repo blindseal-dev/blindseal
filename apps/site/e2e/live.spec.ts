@@ -38,10 +38,11 @@ test('live: reveals, pill nav, banner hero, no footer, console', async ({ page }
   ]);
   expect(notch.cta, 'no action button').toBe(0);
 
-  // 3) the hero: the pinned hooks and the dial banner the kit mounts into the space (no CRT, no nebula)
+  // 3) the hero: the pinned hooks and the dial banner the kit mounts into the space (no CRT, no nebula).
+  //    The kit writes the banner src from its own script URL, so it is absolute on the deployed site: compare the path.
   const hero = await page.locator('.hero.hero--pinned .hero__space').first().evaluate((host) => {
     const img = host.querySelector('img.hero__banner') as HTMLImageElement | null;
-    return { bg: host.getAttribute('data-bg'), banner: !!img, src: img ? img.getAttribute('src') : null, canvas: !!host.querySelector('canvas'), reveal: !!host.parentElement?.querySelector('.hero__reveal video.hm-light__video') };
+    return { bg: host.getAttribute('data-bg'), banner: !!img, src: img ? new URL(img.getAttribute('src') ?? '', location.href).pathname : null, canvas: !!host.querySelector('canvas'), reveal: !!host.parentElement?.querySelector('.hero__reveal video.hm-light__video') };
   });
   expect(hero.bg, `hero: ${JSON.stringify(hero)}`).toBe('banner');
   expect(hero.banner && hero.src === '/kit/brand/banner-dial.webp', `hero banner: ${JSON.stringify(hero)}`).toBe(true);
