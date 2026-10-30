@@ -3,12 +3,13 @@ import { INIT, DIFF, chromeViolations } from './mismatch-lib';
 // Acceptance on the DEPLOYED site (playwright.live.config.ts): the kit must be mounted after
 // hydration. Measured, not eyeballed:
 //   1. after scrolling to the bottom, .reveal elements at opacity 0 → must be 0
-//   2. the notch nav: computed position fixed, backdrop-filter set
-//   3. the hero has a canvas with a live WebGL2 context (the CRT), or an explicit nebula fallback
+//   2. the pill nav (round 2): the header fixed, the glass pill with its backdrop-filter, the five route links
+//      and the sliding pill, X and GitHub icon links (new tab, noopener) and nothing else on the right
+//   3. the hero (round 2): the pinned hooks and the dial banner the kit mounts (img.hero__banner); no footer on any route
 //   4. zero console errors across the routes
 const ROUTES = ['/', '/how-it-works', '/verify', '/docs', '/docs/hashing', '/explorer', '/changelog'];
 
-test('live: reveals, notch, CRT hero, console', async ({ page }) => {
+test('live: reveals, pill nav, banner hero, no footer, console', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -16,37 +17,36 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
   await page.goto('/');
   await page.locator('.site-notch .notch__items').waitFor({ timeout: 20_000 });
 
-  // 2) the notch
+  // 2) the pill nav (round 2): one glass pill, server-rendered, adopted by the kit
   const notch = await page.locator('.site-notch').first().evaluate((el) => {
     const cs = getComputedStyle(el);
-    const inner = el.querySelector('.notch') as HTMLElement | null;
-    const ics = inner ? getComputedStyle(inner) : null;
-    const bf = (ics?.backdropFilter || (ics as any)?.webkitBackdropFilter || cs.backdropFilter || (cs as any).webkitBackdropFilter || '') as string;
-    return { position: cs.position, backdrop: bf, wings: el.querySelectorAll('.notch__wing').length, pill: !!el.querySelector('.notch__pill'), items: el.querySelectorAll('.notch__item').length };
+    const bar = el.querySelector('.nav-pill.glass-bar') as HTMLElement | null;
+    const bcs = bar ? getComputedStyle(bar) : null;
+    const bf = (bcs?.backdropFilter || (bcs as any)?.webkitBackdropFilter || '') as string;
+    const social = [...el.querySelectorAll('[data-site-social]')].map((a) => ({ id: a.getAttribute('data-site-social'), href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel') }));
+    return { position: cs.position, bar: !!bar, backdrop: bf, pill: !!el.querySelector('.nav-pill .notch__pill'), items: el.querySelectorAll('.nav-pill__links > a.notch__item').length, social, cta: el.querySelectorAll('[data-site-cta]').length, footer: !!document.querySelector('.site-footer') };
   });
-  expect(notch.position, 'notch position').toBe('fixed');
-  // The mockups mount nav:"notch" — opaque tabs on the 8px frame (site.css: backdrop-filter only in
-  // the alternative nav:"glass" mode, .site-notch--glass .notch.glass-bar). Accept either: notch
-  // mode must have the wings + pill; glass mode must have the backdrop-filter.
-  const glassMode = await page.locator('.site-notch').first().evaluate((el) => el.classList.contains('site-notch--glass'));
-  if (glassMode) expect(notch.backdrop && notch.backdrop !== 'none', `glass notch backdrop-filter (${notch.backdrop})`).toBe(true);
-  else expect(notch.wings, 'notch wings (notch mode)').toBeGreaterThanOrEqual(2);
-  expect(notch.pill, 'notch pill').toBe(true);
-  expect(notch.items).toBeGreaterThanOrEqual(5);
+  expect(notch.position, 'header position').toBe('fixed');
+  expect(notch.bar, 'the glass pill').toBe(true);
+  expect(notch.backdrop && notch.backdrop !== 'none', `pill backdrop-filter (${notch.backdrop})`).toBe(true);
+  expect(notch.pill, 'the sliding white pill').toBe(true);
+  expect(notch.items, 'five route links').toBe(5);
+  // the right side: X and GitHub icon links only, each in a new tab with rel noopener; no text action
+  expect(notch.social).toEqual([
+    { id: 'x', href: 'https://x.com/blindsealtech', target: '_blank', rel: 'noopener' },
+    { id: 'github', href: 'https://github.com/blindseal-dev/blindseal', target: '_blank', rel: 'noopener' },
+  ]);
+  expect(notch.cta, 'no action button').toBe(0);
 
-  // the notch's primary action: Docs (GitHub once the repo is public); the dashboard is local-only and not linked
-  const cta = page.locator('[data-site-cta]').first();
-  await expect(cta).toHaveAttribute('href', 'https://github.com/blindseal-dev/blindseal');
-
-  // 3) the hero: CRT canvas with WebGL2 (or the nebula fallback declared on the host)
-  const hero = await page.locator('.hero__space').first().evaluate((host) => {
-    const canvas = host.querySelector('canvas') as HTMLCanvasElement | null;
-    let webgl2 = false;
-    try { webgl2 = !!(canvas && canvas.getContext('webgl2')); } catch { webgl2 = false; }
-    return { canvas: !!canvas, webgl2, bg: host.getAttribute('data-bg') };
+  // 3) the hero: the pinned hooks and the dial banner the kit mounts into the space (no CRT, no nebula)
+  const hero = await page.locator('.hero.hero--pinned .hero__space').first().evaluate((host) => {
+    const img = host.querySelector('img.hero__banner') as HTMLImageElement | null;
+    return { bg: host.getAttribute('data-bg'), banner: !!img, src: img ? img.getAttribute('src') : null, canvas: !!host.querySelector('canvas'), reveal: !!host.parentElement?.querySelector('.hero__reveal video.hm-light__video') };
   });
-  const headlessNoGl = !hero.canvas && hero.bg === 'nebula';
-  expect(hero.canvas && hero.webgl2 || headlessNoGl, `hero: ${JSON.stringify(hero)}`).toBe(true);
+  expect(hero.bg, `hero: ${JSON.stringify(hero)}`).toBe('banner');
+  expect(hero.banner && hero.src === '/kit/brand/banner-dial.webp', `hero banner: ${JSON.stringify(hero)}`).toBe(true);
+  expect(hero.canvas, 'no CRT / nebula canvas in the banner hero').toBe(false);
+  expect(hero.reveal, 'the scroll-scrubbed clip element').toBe(true);
 
   // 1) reveals on every route after scrolling to the bottom
   const hidden: Record<string, number> = {};
@@ -66,12 +66,12 @@ test('live: reveals, notch, CRT hero, console', async ({ page }) => {
       return { total: all.length, hidden: hid.length, footer: !!document.querySelector('.site-footer') };
     });
     hidden[r] = counts.hidden;
-    expect(counts.footer, `footer rendered on ${r}`).toBe(true);
+    expect(counts.footer, `a footer rendered on ${r} (round 2: none)`).toBe(false);
     expect(counts.hidden, `${r}: ${counts.hidden}/${counts.total} .reveal still at opacity 0`).toBe(0);
   }
   // 4) console
   expect(errors, `console errors: ${errors.join(' | ')}`).toEqual([]);
-  console.log(`      hidden reveals per route: ${JSON.stringify(hidden)} · notch fixed=${notch.position === 'fixed'} backdrop=${notch.backdrop} · hero canvas=${hero.canvas} webgl2=${hero.webgl2} · console errors=${errors.length}`);
+  console.log(`      hidden reveals per route: ${JSON.stringify(hidden)} · header fixed=${notch.position === 'fixed'} pill backdrop=${notch.backdrop} · hero banner=${hero.banner} · console errors=${errors.length}`);
 });
 
 // 5) hydration, captured rather than inferred (owner's acceptance): the DOM React hydrates against

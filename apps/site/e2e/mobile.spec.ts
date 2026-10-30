@@ -86,11 +86,11 @@ for (const path of ROUTES) {
     const vw = page.viewportSize()!.width;
     expect(vw).toBeLessThan(720);
 
-    // header: one row, ≤ 56 px, a solid bar across the full width; the desktop tabs are gone
+    // header: one row, ≤ 56 px, a solid bar across the full width; the pill's desktop route links are gone (menu instead)
     const hh = await page.evaluate(() => (document.querySelector('header.site-notch') as HTMLElement).getBoundingClientRect().height);
     expect.soft(hh, 'header height').toBeLessThanOrEqual(56);
     expect.soft(hh, 'header height').toBeGreaterThan(40);
-    await expect.soft(page.locator('.notch--center')).toBeHidden();
+    await expect.soft(page.locator('.nav-pill .notch__items')).toBeHidden();
     await expect.soft(page.locator('.site-frame')).toBeHidden();
     await expect.soft(page.locator('[data-site-menu-btn]')).toBeVisible();
 
@@ -143,7 +143,8 @@ test('menu sheet: opens, lists the routes, traps focus, Escape closes and return
   await btn.click();
   await expect(btn).toHaveAttribute('aria-expanded', 'true');
   await expect(sheet).toBeVisible();
-  for (const name of ['How it works', 'Verify', 'Docs', 'Explorer', 'Changelog', 'GitHub']) await expect(sheet.getByRole('link', { name, exact: true })).toBeVisible();
+  // the five routes, then X and GitHub (round 2: the pill's two external links; their sr-only suffix is part of the name)
+  for (const name of ['How it works', 'Verify', 'Docs', 'Explorer', 'Changelog', 'X (opens in a new tab)', 'GitHub (opens in a new tab)']) await expect(sheet.getByRole('link', { name, exact: true })).toBeVisible();
   // full screen
   const box = await sheet.boundingBox(); const vp = page.viewportSize()!;
   expect(box!.width).toBeGreaterThanOrEqual(vp.width - 1); expect(box!.y + box!.height).toBeGreaterThanOrEqual(vp.height - 1);
