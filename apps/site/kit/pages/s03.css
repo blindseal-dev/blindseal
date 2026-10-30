@@ -112,7 +112,7 @@
 .vf-banner__sub:has(.vf-banner__link) { display: flex; align-items: center; gap: 8px; overflow: visible; }
 .vf-banner__link.btn.link { font-size: var(--fs-12); line-height: 16px; }
 .vf-banner__dot { color: var(--faint); }
-.vf-banner__end { font: var(--fw-medium) var(--t-sub) var(--font-sans); color: var(--faint); white-space: nowrap; }
+.vf-banner__end { font: var(--fw-medium) var(--t-sub) var(--font-sans); color: var(--muted); white-space: nowrap; }
 .vf-banner[data-tone="running"] .vf-banner__mark { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .vf-banner[data-tone="running"] .vf-banner__title { color: var(--ink); }
 .vf-banner[data-tone="pass"] .vf-banner__mark { color: var(--ink); background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--line-strong); }
@@ -134,7 +134,7 @@
 .check[data-state="skip"] .check__mark { box-shadow: none; outline: 1px dashed var(--line-strong); outline-offset: -1px; }
 .check[data-state="skip"] .check__title { color: var(--muted); }
 .check[data-state="skip"] .check__detail { color: var(--muted); }
-.check[data-state="skip"] .check__end { color: var(--faint); font-family: var(--font-mono); font-size: var(--fs-11); letter-spacing: .06em; text-transform: uppercase; }
+.check[data-state="skip"] .check__end { color: var(--muted); font-family: var(--font-mono); font-size: var(--fs-11); letter-spacing: .06em; text-transform: uppercase; }
 
 /* step 3: the decoded public inputs */
 .vf-kv { --kv-cols: 2; margin-top: 12px; padding: 16px; border: var(--hairline); border-radius: var(--r-row); background: var(--canvas); gap: 14px 24px; }
@@ -165,7 +165,7 @@
 .vf-hidden__why { font: var(--fw-body) var(--fs-13)/20px var(--font-sans); color: var(--muted); }
 .vf-hidden__row .chip { font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; font-size: var(--fs-10); }
 .vf-hidden__foot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: baseline; padding-top: 14px; border-top: var(--hairline); }
-.vf-hidden__k { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.vf-hidden__k { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .vf-hidden__pub { font: var(--fw-body) var(--t-sub) var(--font-sans); color: var(--muted); }
 .vf-hidden.is-in { animation: rise-8 var(--d-220) var(--ease-out-expo) both; }
 .vf-hidden.is-in .vf-hidden__row { animation: rise-8 var(--d-220) var(--ease-out-expo) both; animation-delay: calc(60ms + var(--i, 0) * 60ms); }

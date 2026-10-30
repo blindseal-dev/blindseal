@@ -14,7 +14,9 @@
                                   it UPDATES in place: what stays transitions
                                   (fills, strokes, progress), what is new draws in,
                                   what is gone fades out. Nothing redraws.
-     replay(host)                 draws the figure again from nothing.
+     (replay — INTERNAL since round 2, D40: pages never replay; figures loop. BS.diagrams._replay(host)
+                                  draws a figure again from nothing for demos; BS.diagrams.replay is a
+                                  non-enumerable deprecated alias that warns once.)
      mount(scope)                 renders every [data-diagram="name"] in scope,
                                   options from data-opts='{"active":"prove"}'.
                                   Mounted by the site after hydration.
@@ -22,7 +24,22 @@
                                   pathLength="1" (the demo logs it).
 
    Options common to all: caption (string | false; default sentence below the
-   figure, only added when the host has no figcaption), label (aria-label).
+   figure, only added when the host has no figcaption), label (aria-label),
+   loop (round 2, D40 / D45):
+     loop: { hold: 10000, fade: 300 } | true (= those) | false
+       The figure draws when it enters the viewport (unchanged), holds its
+       finished state for `hold` ms, then its labels and strokes fade out
+       together over `fade` ms, then it draws again from nothing — for as long
+       as it is on screen (≥ 25 % visible) and the tab is visible; off screen or
+       in a hidden tab the cycle pauses where it is (BS.motion.mountPause
+       semantics) and resumes. Never under reduced motion (drawn, static).
+       DEFAULT: on for site pages (html.bs-site), off elsewhere (the dashboard,
+       D45); pass loop: false to opt out. data-opts='{"loop":{"hold":10000}}'
+       works through mount(). Slow-mo (?motion=slow) stretches hold and fade ×4.
+   Timing (round 2, D40 "25 % slower"): every draw duration and per-path
+   stagger is ×1.25 of the reference app's: strokes 1125 ms (fast 750), +100 ms per
+   path, arrowheads 375, fills 750 at +250, labels 500 at steps × 100 + 50 ×
+   label index. State changes (200 ms) and exits (160 ms) are unchanged.
 
      flow4         active: 0-3 | "screen" | "attest" | "prove" | "verify"
      architecture  focus: "agent" | "proxy" | "tools" | "prover" | "audit" | "verifier"
@@ -36,9 +53,9 @@
                    layers; colours every band, overrides highlight)
 
    Markup contract (shared with the kit's motion.css):
-     path[data-draw][pathLength="1"] style="--i:n"   stroke draw, n × 80ms
+     path[data-draw][pathLength="1"] style="--i:n"   stroke draw, n × 100ms
      [data-draw-tip]    arrowheads   [data-draw-fill]  node fills
-     [data-draw-fade]   [data-draw-label] (4px rise)    --labels-delay = steps × 80ms
+     [data-draw-fade]   [data-draw-label] (4px rise)    --labels-delay = steps × 100ms
    Colours: only tokens via diagrams.css classes. No literal colour here.
    ========================================================================== */
 (function () {
@@ -47,7 +64,8 @@
   if (BS.diagrams) return;
 
   var NS = "http://www.w3.org/2000/svg";
-  var STAGGER = 80;        /* ms per draw step (the kit ProtocolPage.tsx:122) */
+  var STAGGER = 100;       /* ms per draw step: the kit's 80 (ProtocolPage.tsx:122) × 1.25 (D40) */
+  var LOOP = { hold: 10000, fade: 300 };   /* D40 */
   var LEAVE = 160;         /* ms exit fade before removal */
   var root = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
@@ -880,6 +898,124 @@
     if (entering.length) raf2(function () { entering.forEach(function (n) { n.classList.remove("dg-enter"); }); });
   }
 
+  /* ── the loop (D40 / D45): draw → hold → fade → draw again, while on screen ──
+     Engine-agnostic: it watches the host's class list for .is-drawn (added by
+     BS.motion.mountDrawIn or ownDrawIn), waits for the draw's transitions to
+     finish, holds on a pausable timer, fades the art (.is-dg-fading), resets
+     with transitions off and draws again. Off screen / hidden tab: the timer
+     pauses (BS.motion.mountPause's .is-paused when the kit is there, an own
+     IntersectionObserver at the same 25 % threshold otherwise). */
+  function loopOpts(opts) {
+    var l = opts && opts.loop;
+    if (l === undefined) l = root.classList.contains("bs-site");
+    if (!l) return null;
+    if (l === true) return { hold: LOOP.hold, fade: LOOP.fade };
+    return { hold: l.hold != null ? +l.hold : LOOP.hold, fade: l.fade != null ? +l.fade : LOOP.fade };
+  }
+  function scaleMs(ms) { var m = BS.motion; return m && typeof m.scale === "function" ? m.scale(ms) : ms * (root.getAttribute("data-motion") === "slow" ? 4 : 1); }
+  function drawFinished(host) {
+    /* every running transition under the host (strokes, tips, fills, labels); the slow-mo playbackRate is honoured */
+    var list = [];
+    try { list = host.getAnimations ? host.getAnimations({ subtree: true }) : []; } catch (e) { list = []; }
+    if (!list.length) return new Promise(function (r) { setTimeout(r, scaleMs(2400)); });
+    return Promise.all(list.map(function (a) { return a.finished.catch(function () {}); }));
+  }
+  function startLoop(host, lo) {
+    var L = host.__dgLoop;
+    if (L) { L.o = lo; return; }
+    L = host.__dgLoop = { o: lo, phase: "idle", visible: true, timer: 0, left: 0, since: 0, gen: 0, stopPause: null };
+    host.setAttribute("data-dg-loop", "");
+    var k = BS.motion && typeof BS.motion.mountPause === "function" ? BS.motion : null;
+    function onScreen() { return !host.classList.contains("is-paused") && L.visible && !document.hidden; }
+    if (k) L.stopPause = k.mountPause(host, { threshold: 0.25 });
+    else if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (es) { L.visible = es[es.length - 1].intersectionRatio >= 0.25; resume(); }, { root: scrollRoot(), threshold: [0, 0.25, 1] });
+      io.observe(host);
+      document.addEventListener("visibilitychange", resume);
+      L.stopPause = function () { io.disconnect(); document.removeEventListener("visibilitychange", resume); };
+    }
+    function clear() { if (L.timer) { clearTimeout(L.timer); L.timer = 0; } }
+    function stop() {
+      clear(); L.phase = "stopped"; L.gen++;
+      if (L.mo) L.mo.disconnect();
+      if (L.stopPause) L.stopPause();
+      document.removeEventListener("bs:motion", L.onMotion);
+      host.classList.remove("is-dg-fading", "is-nofx");
+      host.removeAttribute("data-dg-loop"); host.removeAttribute("data-dg-phase");
+      delete host.__dgLoop;
+    }
+    L.stop = stop;
+    function phase(p) { L.phase = p; host.setAttribute("data-dg-phase", p); host.dispatchEvent(new CustomEvent("bs:figure-loop", { detail: { phase: p } })); }
+    function settle() { /* reduced motion: the drawn state, static */ clear(); L.gen++; host.classList.remove("is-dg-fading", "is-nofx"); host.classList.add("is-drawn"); phase("static"); }
+    function guard() {
+      if (!host.isConnected) { stop(); return false; }
+      if (reduced()) { settle(); return false; }
+      return true;
+    }
+    /* the hold: a timer that only runs while the figure is on screen */
+    function hold() {
+      if (!guard()) return;
+      phase("hold"); L.left = scaleMs(L.o.hold); resume();
+    }
+    function resume() {
+      if (L.phase === "stopped") return;
+      if (L.phase === "static" && !reduced() && host.classList.contains("is-drawn")) { hold(); return; }
+      if (L.phase === "hold") {
+        if (onScreen()) { if (!L.timer) { L.since = Date.now(); L.timer = setTimeout(function () { L.timer = 0; fade(); }, Math.max(0, L.left)); } }
+        else if (L.timer) { clear(); L.left -= Date.now() - L.since; }
+      } else if (L.phase === "await-redraw" && onScreen()) redraw();
+    }
+    L.resume = resume;
+    function fade() {
+      if (!guard()) return;
+      phase("fade");
+      var g = L.gen, art = host.querySelector(":scope > .fig__art > svg") || host;
+      host.style.setProperty("--dg-loop-fade", L.o.fade + "ms");
+      host.classList.add("is-dg-fading");
+      var done = false, finish = function () { if (done || g !== L.gen) return; done = true; reset(); };
+      art.addEventListener("transitionend", function te(e) { if (e.target === art && e.propertyName === "opacity") { art.removeEventListener("transitionend", te); finish(); } });
+      setTimeout(finish, scaleMs(L.o.fade) + 80);   /* never stuck: a missed transitionend still resets */
+    }
+    function reset() {
+      if (!guard()) return;
+      /* back to nothing with transitions off, then draw again (only on screen, so the redraw is seen) */
+      host.classList.add("is-nofx");
+      host.classList.remove("is-drawn", "is-settled");
+      void host.getBoundingClientRect();
+      host.classList.remove("is-dg-fading");
+      void host.getBoundingClientRect();
+      requestAnimationFrame(function () {
+        host.classList.remove("is-nofx");
+        phase("await-redraw");
+        resume();
+      });
+    }
+    function redraw() {
+      if (!guard()) return;
+      phase("redraw");
+      raf2(function () { host.classList.add("is-drawn"); });
+    }
+    function onDrawn() {
+      if (!guard()) return;
+      var g = ++L.gen;
+      phase("draw");
+      requestAnimationFrame(function () {            /* the transitions exist one frame after the class lands */
+        drawFinished(host).then(function () { if (g === L.gen && L.phase === "draw") hold(); });
+      });
+    }
+    var was = host.classList.contains("is-drawn");
+    L.mo = new MutationObserver(function () {
+      var now = host.classList.contains("is-drawn");
+      if (now && !was) onDrawn();
+      was = now;
+      if (L.phase === "hold" || L.phase === "await-redraw") resume();   /* .is-paused toggled */
+    });
+    L.mo.observe(host, { attributes: true, attributeFilter: ["class"] });
+    L.onMotion = function () { if (L.phase !== "stopped" && reduced()) settle(); else resume(); };
+    document.addEventListener("bs:motion", L.onMotion);
+    if (reduced()) settle(); else if (was) onDrawn(); else phase("idle");
+  }
+
   /* ── public API ───────────────────────────────────────────────────────── */
   function resolve(host) { return typeof host === "string" ? document.querySelector(host) : host; }
 
@@ -925,6 +1061,9 @@
 
     host.__dg = { name: name, opts: opts, stop: prev.stop, v: !!vert };
     watchNarrow(host);
+    var lo = loopOpts(opts);
+    if (lo) startLoop(host, lo);
+    else if (host.__dgLoop) host.__dgLoop.stop();
     return host;
   }
 
@@ -1004,7 +1143,16 @@
      colours are tokens via diagrams.css's --dg-* roles; hover and focus are colour/ring only */
   function ensureStyle() { /* the figure runtime styles are kit/diagrams-runtime.css (imported by globals.css); nothing is written into <head> */ }
 
-  BS.diagrams = { list: Object.keys(FIGS), render: render, replay: replay, mount: mount, check: check };
+  BS.diagrams = { list: Object.keys(FIGS), render: render, mount: mount, check: check, LOOP: LOOP,
+    /* the loop controller of a host: { phase, o: {hold, fade}, stop(), resume() } or null */
+    loopOf: function (host) { host = resolve(host); return (host && host.__dgLoop) || null; },
+    _replay: replay };
+  /* D40: no replay controls on pages. Kept, non-enumerable, for code that still calls it (warns once) */
+  var replayWarned = false;
+  Object.defineProperty(BS.diagrams, "replay", { enumerable: false, configurable: true, writable: true, value: function (host) {
+    if (!replayWarned) { replayWarned = true; if (console && console.warn) console.warn("[BS.diagrams] replay() is internal since round 2 (D40: figures loop); use loop or BS.diagrams._replay for demos"); }
+    return replay(host);
+  } });
 
   /* nothing runs at load; the site renders figures from its mount sequence */
 })();

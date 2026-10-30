@@ -6,12 +6,16 @@
    kit's classes and attributes, so motion.css and this file agree:
 
      host  <figure class="fig">   .is-armed → (in view, 2×rAF) → .is-drawn
-     [data-draw]        stroke draw, pathLength="1", 900ms out-cubic, +80ms × --i
-     [data-draw="fast"] the same at 600ms (ticks, slot bars, the ✕)
-     [data-draw-tip]    arrowhead, opacity 300ms ease at --i × 80 + dur × .5
-     [data-draw-fill]   node fill, opacity 600ms ease at --i × 80 + 200ms
-     [data-draw-fade]   opacity 400ms ease after the paths (--labels-delay)
-     [data-draw-label]  opacity + 4px rise, 400ms out-cubic, --labels-delay + --li × 40ms
+   ROUND 2 (D40): every draw duration and stagger below is × --dg-x (1.25, "25 % slower"):
+     [data-draw]        stroke draw, pathLength="1", 900 → 1125ms out-cubic, +80 → 100ms × --i
+     [data-draw="fast"] the same at 600 → 750ms (ticks, slot bars, the ✕)
+     [data-draw-tip]    arrowhead, opacity 300 → 375ms ease at --i × 100 + dur × .5
+     [data-draw-fill]   node fill, opacity 600 → 750ms ease at --i × 100 + 250ms
+     [data-draw-fade]   opacity 400 → 500ms ease after the paths (--labels-delay = steps × 100, set by JS)
+     [data-draw-label]  opacity + 4px rise, 400 → 500ms out-cubic, --labels-delay + --li × 50ms
+     .is-dg-fading      the loop's exit (diagrams.js loop): the whole art fades to 0 over --dg-loop-fade
+                        (300ms) ease, labels and strokes together; then the figure resets and draws again.
+                        State changes (200ms) and exits (160ms) are NOT slowed.
      [data-draw-to]     partial stroke (status progress): offset 1 → 1 − --to
 
    Sources ((reference study)/):
@@ -69,16 +73,17 @@
   --dg-mono: var(--font-mono, "BS Diagram Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
   /* motion (kit tokens first; the fallbacks are the kit's values) */
   --dg-k: 1;
-  --dg-dur: calc(var(--d-900, .9s) * var(--dg-k));
-  --dg-dur-fast: calc(var(--d-600, .6s) * var(--dg-k));
-  --dg-stagger: calc(var(--stagger-series, 80ms) * var(--dg-k));
-  --dg-label-stagger: calc(40ms * var(--dg-k));
-  --dg-label-dur: calc(var(--d-400, .4s) * var(--dg-k));
-  --dg-tip-dur: calc(.3s * var(--dg-k));
-  --dg-fill-dur: calc(var(--d-600, .6s) * var(--dg-k));
-  --dg-fill-at: calc(var(--d-200, .2s) * var(--dg-k));
+  --dg-x: 1.25;   /* D40: draw-ins 25 % slower than the reference app's */
+  --dg-dur: calc(var(--d-900, .9s) * var(--dg-x) * var(--dg-k));
+  --dg-dur-fast: calc(var(--d-600, .6s) * var(--dg-x) * var(--dg-k));
+  --dg-stagger: calc(var(--stagger-series, 80ms) * var(--dg-x) * var(--dg-k));
+  --dg-label-stagger: calc(40ms * var(--dg-x) * var(--dg-k));
+  --dg-label-dur: calc(var(--d-400, .4s) * var(--dg-x) * var(--dg-k));
+  --dg-tip-dur: calc(.3s * var(--dg-x) * var(--dg-k));
+  --dg-fill-dur: calc(var(--d-600, .6s) * var(--dg-x) * var(--dg-k));
+  --dg-fill-at: calc(var(--d-200, .2s) * var(--dg-x) * var(--dg-k));
   --dg-state: calc(var(--d-200, .2s) * var(--dg-k));
-  --dg-labels: calc(var(--labels-delay, .8s) * var(--dg-k));
+  --dg-labels: calc(var(--labels-delay, 1s) * var(--dg-k));   /* labels-delay already carries × 1.25 (steps × 100ms) */
   --dg-ease: var(--ease-out-cubic, cubic-bezier(.215, .61, .355, 1));
   --dg-ease-state: var(--ease-in-out, cubic-bezier(.4, 0, .2, 1));
   --dg-ease-exit: var(--ease-in-quick, cubic-bezier(.4, 0, 1, 1));
@@ -241,7 +246,11 @@ body[data-motion="slow"] .fig[data-dg-rate="css"] { --dg-k: 4; }
 .fig .dg-leave,
 .fig.is-armed.is-drawn .dg-leave { opacity: 0 !important; transition: opacity calc(var(--d-160, .16s) * var(--dg-k)) var(--dg-ease-exit) !important; }
 
-/* replay: kill transitions for the one frame the figure is reset */
+/* the loop's fade (D40): labels and strokes leave together; then the reset below, then the draw again */
+.fig .fig__art > svg { transition: opacity calc(var(--dg-loop-fade, 300ms) * var(--dg-k)) ease; }
+.fig.is-dg-fading .fig__art > svg { opacity: 0; }
+
+/* replay / the loop's reset: kill transitions for the one frame the figure is reset */
 .fig.is-nofx,
 .fig.is-nofx * { transition: none !important; }
 
@@ -257,3 +266,7 @@ body[data-motion="reduce"] .fig [data-draw-to] { stroke-dashoffset: calc(1 - var
 body[data-motion="reduce"] .fig :is([data-draw-tip], [data-draw-fill], [data-draw-fade], [data-draw-label]) { opacity: 1 !important; transform: none !important; transition: none !important; }
 body[data-motion="reduce"] .fig :is(.dg-conn.is-off, .dg-leave) { opacity: 0 !important; }
 body[data-motion="reduce"] .fig * { transition: none !important; }
+:is(html, body)[data-motion="reduce"] .fig .fig__art > svg { opacity: 1 !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="full"]):not([data-motion="slow"]) .fig .fig__art > svg { opacity: 1 !important; transition: none !important; }
+}

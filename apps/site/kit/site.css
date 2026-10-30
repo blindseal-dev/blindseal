@@ -4,7 +4,7 @@
    Geometry is the notch nav's (the nav/hero spec);
    palette and type are ours. Below the hero the site is the kit.
 
-   (a) THE NOTCH NAV — .site-notch (BS.mountSite renders it)
+   (a) THE NOTCH NAV (round 1; navHtml({ nav: "notch" }) — the default is now the pill, (e)) — .site-notch
        The page sits in a fixed 8px var(--canvas) frame whose inner window is
        rounded 16 (.site-frame). Three opaque canvas tabs hang from the frame's
        top edge: row at top 8 / left 8 / right 8, 54 high; logo tab radius
@@ -14,9 +14,9 @@
        38px pills, padding 0 14, 13px, --muted at rest → --ink on hover (160ms
        in-out); the active link sits under the white sliding pill (--pill,
        ink layer clipped to it, strong weight) — the dashboard shell's idiom.
-       Right: .glass-btn.primary "Open dashboard" alone (no theme toggle: light
-       mode will not be added; owner, 2026-10-22) (38 high, ≥148 wide, radius 10,
-       12px strong, −.01em). the notch nav is static on scroll: so is this.
+       Right: .glass-btn.primary .notch__cta alone, the template's ctx.action (the
+       app passes "GitHub"; round 2 has no dashboard link, D47) (38 high, ≥148 wide,
+       radius 10, 12px strong, −.01em). the notch nav is static on scroll: so is this.
        Variant .site-notch--glass (BS.mountSite({ nav: "glass" })): the tabs
        take the .glass-bar optics and float as 24-radius pills; no frame, no
        wings.
@@ -32,14 +32,29 @@
        eyebrow 11px tracked, a 38px title, the split two-column copy;
        .reveal + the split rise come from motion.css), .site-panel (flat
        panel + hairline, r12, padding 28), .site-grid-2 / -3 (gap 24).
-   (d) THE FOOTER — .site-footer: the six routes, the one-liner, the version.
+   (d) NO FOOTER (round 2, D39) — the page ends on its last section with a section's bottom spacing
+       (.site-main padding-bottom 96). An empty .site-footer (a layout that still renders the wrapper;
+       site-templates footerHtml() returns "") is display:none, so it exposes no empty landmark.
+   (e) THE NAV PILL (round 2, D39) — nav.css, imported below: one liquid-glass pill, the reference bar's geometry.
+   (f) THE BANNER HERO (round 2, D38) — .hero__space[data-bg="banner"] (or BS.mountSite({ hero: {
+       background: "banner" } })): the owner's dial banner (brand/banner-dial.webp) as an <img
+       class="hero__banner"> right-anchored at full hero height (object-fit cover, object-position right
+       center), the ring centred in the right 55 % at 1440; the two shade gradients stay over it; no CRT, no
+       nebula. .hero--pinned + .hero__stage: the sticky hooks for the scroll reveal (the Home page): the section is
+       (1 + --hero-scroll) viewport heights tall (default 1 → 2 × 100vh), the stage sticks at top 0 for the
+       extra one; .hero__reveal is the empty layer between the shade and the copy.
+   (g) TEXTURED SECTIONS (round 2, D41) — .site-section--textured[data-texture="rock|metal|halo"]: a crop of
+       the banner (brand/texture-*.webp, desaturated toward the canvas) full-bleed behind the section at 7 %,
+       masked to the canvas at the top and bottom 28 %; panels stay flat (they are opaque), text contrast
+       is unchanged (measured: worst muted text ≥ 4.5:1, see the round-2 review).
 
    Every element works under body[data-motion=reduce] (end states, no rise).
    ========================================================================== */
+@import url("nav.css");
 
 html.bs-site { --toast-bottom: var(--frame); scroll-padding-top: calc(var(--notch-top) + var(--notch-h) + 16px); }
 html.bs-site body { background: var(--canvas); }
-.site-main { position: relative; display: block; min-width: 0; padding-bottom: 8px; }
+.site-main { position: relative; display: block; min-width: 0; padding-bottom: 96px; }   /* D39: no footer — a section's bottom spacing ends the page */
 
 /* ══ the frame ═══════════════════════════════════════════════════════════ */
 .site-frame { position: fixed; inset: 0; z-index: var(--z-frame); pointer-events: none; }
@@ -241,24 +256,58 @@ html.bs-site-noframe .site-frame { display: none; }
 .site-section__space { position: absolute; inset: -32px -96px auto; height: 320px; z-index: -1; border-radius: var(--r-panel); overflow: hidden; }
 .site-section:has(> .site-section__space) { isolation: isolate; }
 
-/* ══ (d) the footer ══════════════════════════════════════════════════════ */
-.site-footer {
-  width: min(var(--site-max-w), calc(100% - 96px)); margin: 64px auto 0;
-  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 32px; align-items: start;
-  padding: 32px 0 40px; border-top: var(--hairline);
+/* ══ (d) no footer (D39) ════════════════════════════════════════════════ */
+.site-footer:empty { display: none; }
+
+/* ══ (f) the banner hero (D38) ═══════════════════════════════════════════ */
+.hero__space[data-bg="banner"] { background: var(--canvas); overflow: hidden; }
+/* Right-anchored, cover, full hero height. The dial's ring centre sits at (1163, 422) of the 1672 × 941 banner
+   (a circle fit to the glowing ring's pixels); plain "right center" puts it at x 953 at 1440 × 900, left
+   of the right 55 %'s centre (1044). The offset moves it there while the image is height-bound:
+     shift = 27.5vw − (1672 − 1163) / 941 × H   (H = the hero height, max(100vh, 720px))
+   never more than the image overhangs on the left (100vw − 1672 / 941 × H) and never positive (at wide,
+   width-bound viewports the image stays right-anchored; the ring then sits at ≈ 70 %). */
+.hero__banner {
+  --banner-h: max(100vh, var(--hero-min-h));
+  --banner-shift: min(0px, max(calc(27.5vw - 0.5409 * var(--banner-h)), calc(100vw - 1.7768 * var(--banner-h))));
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  object-fit: cover; object-position: right var(--banner-shift) top 50%;   /* 4-value: <position> has no 3-value form */
+  user-select: none; pointer-events: none;
 }
-.site-footer__brand { display: grid; gap: 12px; justify-items: start; }
-.site-footer__line { max-width: 40ch; font: var(--fw-body) var(--fs-14)/22px var(--font-sans); color: var(--muted); }
-.site-footer__routes { display: grid; grid-template-columns: repeat(2, max-content); gap: 8px 32px; }
-.site-footer__routes a { font: var(--fw-medium) var(--fs-13)/20px var(--font-sans); color: var(--muted); border-radius: 3px;
-  transition: color var(--d-150) var(--ease-in-out); }
-@media (hover: hover) and (pointer: fine) { .site-footer__routes a:hover { color: var(--ink); } }
-.site-footer__routes a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.site-footer__routes a[aria-current="page"] { color: var(--ink); }
-.site-footer__ver { font: var(--fw-body) var(--fs-12)/20px var(--font-mono); color: var(--muted); white-space: nowrap; }
+/* the sticky hooks for the scroll reveal (the Home page mounts into them; the reveal itself is theirs) */
+.hero.hero--pinned {
+  --hero-scroll: 1;
+  display: block; overflow: clip; padding: 0;
+  min-height: calc((1 + var(--hero-scroll)) * max(100vh, var(--hero-min-h)));
+}
+.hero--pinned > .hero__stage {
+  position: sticky; top: 0; isolation: isolate; overflow: hidden;
+  display: flex; align-items: center;
+  height: max(100vh, var(--hero-min-h)); height: max(100svh, var(--hero-min-h));
+  padding: calc(var(--notch-top) + var(--notch-h) + 24px) 0 64px;
+}
+.hero__reveal { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.hero__reveal ~ .hero__content { z-index: 3; }
+
+/* ══ (g) textured sections (D41) ═════════════════════════════════════════ */
+.site-section--textured { isolation: isolate; }
+.site-section--textured::before {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  top: 0; bottom: 0; left: calc(50% - 50vw); right: calc(50% - 50vw);
+  background: var(--texture, url("brand/texture-rock.webp")) var(--texture-pos, center) / var(--texture-size, cover) no-repeat;
+  opacity: var(--texture-alpha, .07);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 28%, black 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 28%, black 72%, transparent 100%);
+}
+/* 1440 × 600 crops of the banner (2.4:1, so cover never stretches them): rock = the stone under-right of the
+   dial · metal = the brushed cone · halo = a band through the ring and its cone */
+.site-section--textured[data-texture="rock"]  { --texture: url("brand/texture-rock.webp"); }
+.site-section--textured[data-texture="metal"] { --texture: url("brand/texture-metal.webp"); }
+.site-section--textured[data-texture="halo"]  { --texture: url("brand/texture-halo.webp"); }
+.site-main:has(.site-section--textured) { overflow-x: clip; }   /* the full-bleed layer never widens the page */
 
 /* ══ reduced motion ══════════════════════════════════════════════════════ */
-.site-footer__ver, .install__cmd, .hero__trust { font-variant-numeric: tabular-nums; }
+.install__cmd, .hero__trust { font-variant-numeric: tabular-nums; }
 
 body[data-motion="reduce"] .hero :is(.hero__eyebrow, .hero__title, .hero__sub, .hero__actions, .hero__trust > li) { animation: none !important; opacity: 1 !important; transform: none !important; }
 body[data-motion="reduce"] :is(.notch__pill, .notch__ink, .notch__item, .hero__secondary svg) { transition: none !important; }

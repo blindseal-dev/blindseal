@@ -82,6 +82,9 @@
     if (reduced()) root.dataset.motion = "reduce";
     else if (mode === "slow") root.dataset.motion = "slow";
     else delete root.dataset.motion;
+    /* Round 2: the kit's CSS pins reduced / slow motion on body[data-motion] (the app's move), while this function
+       wrote only html[data-motion], so ?motion=reduce never matched those rules. Mirror it on body as well. */
+    if (document.body) { if (root.dataset.motion) document.body.dataset.motion = root.dataset.motion; else delete document.body.dataset.motion; }
     cancelAnimationFrame(slowLoop);
     var rate = mode === "slow" && !reduced() ? 0.25 : 1;
     var apply = function () {

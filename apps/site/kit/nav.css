@@ -1,0 +1,153 @@
+/* ============================================================================
+   _shared/nav.css — the round-2 site nav: ONE liquid-glass pill (round 2; DECISIONS D39 / D43 / D44 / D47 / D49)
+   ----------------------------------------------------------------------------
+   Imported at the top of site.css, so every page that loads site.css gets it (the app's globals.css needs
+   no change). Markup: site-templates.cjs navHtml(ctx) (ctx.nav "pill", the default), rendered inside
+   header.site-notch[data-site-nav-root]; BS.mountSite adopts it (site.js: the sliding white pill is the
+   notch's measure(), shared).
+
+   REFERENCE BAR READINGS (the extraction pass, headless Chromium, 1440 × 900, 2026-10-28; computed styles and hover states of the live bar)
+     the pill        1328 × 66 at (56, 12) settled; max-width 1328, its fixed wrapper top 12 / padding 0 16.
+                     At scrollY 0 it is HIDDEN behind the reference bar's intro (opacity 0, scale .97 — which is where the
+                     first reading 1288 × 64 at (76, 12) came from: 1328 × .97, 66 × .97) and it appears on the
+                     first scroll (opacity .55s, transform .6s cubic-bezier(.16,1,.3,1)); it never shrinks and
+                     never changes opacity again while scrolling. OURS: visible and glass at all times (brief).
+                     padding 12 24 · radius 18 · border 1px rgba(255,255,255,.12) · fill rgba(214,224,255,.05)
+                     shadow: inset 0 1px .5px w.65 · inset 0 0 0 1px w.08 · inset 0 -8px 12px -8px w.22 ·
+                       inset 0 8px 12px -10px w.35 · inset 4px 0 12px -8px rgba(120,170,255,.32) ·
+                       inset -4px 0 12px -8px rgba(120,170,255,.28) · 0 12px 40px -8px black .55
+                     backdrop: blur(5px) saturate(1.9) brightness(1.05) url(#lg-refract)  (= our glass recipe)
+                     sheens: top white .16 → .02 @34% → 0 @60% · 115° streak (190,230,255,.12) at opacity .7 ·
+                       edges 90° rgba(120,170,255,.10) 0 → 0 @18% / 82% → .10
+     the wordmark    an SVG 99 × 31 at x 81 (bar left 56 + 1 + 24), vertically centred
+     the links       centred absolutely in the bar · gap 12 · each 40 high, padding 10 14, radius 10, gap 8 ·
+                     icon 18 (rest opacity .4, greyscale, brightness 1.5 → hover 1, colour) · label 14 / 400
+                     zinc-300 (#d4d4d8) → #fff · hover wash rgba(255,255,255,.10) + a 1px inset white .4 ring at
+                     opacity .5 · transition 200ms cubic-bezier(.4,0,.2,1) (the ring 300ms)
+     right cluster   gap 8 · X 44 × 36 (icon 16) · Discord 46 × 38 (icon 18): transparent, the same hover ·
+                     "Log in" 92 × 40, padding 10 16, radius 10, fill white .04 → .08, label → #fff, 14px icon
+     page behind     rgb(29,29,29)
+
+   WHAT WE MIRROR / WHAT WE INVENT (logged on the board)
+     mirrored        top 12 · max-width 1328 (→ x 56 at 1440) · radius 18 · padding 0 24 · border, fill, the
+                     7-layer shadow (the reference bar's blue edge lifts re-tinted to our --accent-hover at the same
+                     alphas) · the verbatim control sheens (top .16 / streak .7 / edges 18 %, tinted) · links
+                     centred · link gap 12 · link padding 0 14, radius 10, icon 18, icon→label gap 8, label 14 ·
+                     hover wash .10 + the inset ring (white .4 × .5 = .20) · right cluster gap 8 · X 44 wide
+                     with a 16 icon, GitHub 44 wide with an 18 icon · 200ms in-out.
+     invented        height 64 (brief; the reference bar 66 — our controls are 38, the reference bar's 40) → items 38 high · the
+                     label weight 500 (D02: labels are 500; the reference bar 400) · link icons rest at opacity .55 (the
+                     kit's glass-item value; the reference bar .4 on filled, coloured icons; the label carries the meaning) ·
+                     the X / GitHub glyphs rest at opacity 1 in --muted (they are the only identification:
+                     ≥ 3:1 non-text contrast; the reference bar .4) · the shadow and the hover ring are glass.css tokens
+                     (--tn-glass-shadow-nav, --tn-item-hover-ring) · the mark 30 px + "Blindseal" 16 / strong / −.02em, gap 10
+                     (brief) · the white sliding pill under the active link, radius 10 (= the reference bar's item radius,
+                     the concentric 18 − 12 + 4), 240ms out-quint, never on first paint (the notch's).
+   ========================================================================== */
+
+/* the pill's geometry; the hero's top padding reads --notch-top + --notch-h, so the pill re-points them */
+:root {
+  --nav-top: 12px;         /* the reference bar: top-3 */
+  --nav-gutter: 16px;      /* the reference bar: the fixed wrapper's px-4 */
+  --nav-max-w: 1328px;     /* the reference bar: max-width → x 56 at 1440 */
+  --nav-h: 64px;           /* brief (reference 66) */
+  --nav-r: 18px;           /* the reference bar */
+  --nav-pad-x: 24px;       /* the reference bar */
+  --nav-gap: 12px;         /* the reference bar: between links */
+  --nav-item-h: 38px;      /* the kit's control height inside a bar */
+  --nav-item-r: 10px;      /* the reference bar: rounded-lg */
+  --nav-ico: 18px;         /* the reference bar */
+}
+@media (min-width: 720px) {
+  :root:has(.nav-pill) { --frame: 0px; --notch-top: var(--nav-top); --notch-h: var(--nav-h); --toast-bottom: 8px; }
+  :root:has(.nav-pill) .site-frame { display: none; }      /* the reference bar has no frame; the page is full-bleed */
+}
+
+.nav-pill {
+  position: absolute; top: var(--nav-top); left: var(--nav-gutter); right: var(--nav-gutter);
+  max-width: var(--nav-max-w); height: var(--nav-h); margin-inline: auto;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
+  padding: 0 calc(var(--nav-pad-x) - 1px);                   /* border-box: 1px border + 23 = the reference bar's 24 */
+  pointer-events: auto;
+}
+/* the glass: the kit's .glass-bar is an edge-to-edge strip (radius 0, no border, damped sheens); the pill is a
+   control-scale surface, so it takes the reference bar's numbers — the verbatim sheens and the full inset set */
+.nav-pill.glass-bar {
+  border-width: 1px; border-radius: var(--nav-r);
+  box-shadow: var(--tn-glass-shadow-nav);   /* glass.css: the reference bar's seven layers, side lifts on --accent-hover */
+}
+.nav-pill.glass-bar > .glass-sheen--top { background: var(--tn-sheen-top); }
+.nav-pill.glass-bar > .glass-sheen--streak { opacity: .7; }
+.nav-pill.glass-bar > .glass-sheen--edges {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-hover) 10%, transparent) 0%, transparent 18%,
+    transparent 82%, color-mix(in srgb, var(--accent-hover) 10%, transparent) 100%);
+}
+
+/* ── left: the cut-out render + the wordmark ─────────────────────────────── */
+.nav-pill__brand.site-brand { justify-self: start; gap: 10px; height: var(--nav-item-h); padding: 0 8px 0 2px; border-radius: var(--nav-item-r); }
+.nav-pill__brand .bs-mark-render { display: block; width: 30px; height: 30px; flex: none; }
+
+/* ── middle: the links (the notch's .notch__items mechanics, the reference bar's geometry) ─ */
+.nav-pill .notch__items { justify-self: center; gap: var(--nav-gap); --pill-r: var(--nav-item-r); }
+.nav-pill .notch__item {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: var(--nav-item-h); padding: 0 14px; border-radius: var(--nav-item-r);
+  font: var(--fw-medium) var(--fs-14)/20px var(--font-sans); letter-spacing: -0.005em; color: var(--muted);
+  transition: color var(--d-200) var(--ease-in-out), background-color var(--d-200) var(--ease-in-out),
+    box-shadow var(--d-200) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+.nav-pill .notch__item::after { content: none; }
+.nav-pill .nav-pill__ico { width: var(--nav-ico); height: var(--nav-ico); flex: none; opacity: .55; transition: opacity var(--d-200) var(--ease-in-out); }
+/* the label reserves its strong weight's width, so the active label never shifts the row */
+.nav-pill__label { display: inline-grid; }
+.nav-pill__label > span, .nav-pill__label::after { grid-area: 1 / 1; }
+.nav-pill__label::after { content: attr(data-label); font-weight: var(--fw-strong); visibility: hidden; height: 0; overflow: hidden; }
+@media (hover: hover) and (pointer: fine) {
+  .nav-pill .notch__item:not([aria-current="page"]):hover { color: var(--ink); background-color: var(--tn-item-hover-bg); box-shadow: var(--tn-item-hover-ring); }
+  .nav-pill .notch__item:not([aria-current="page"]):hover .nav-pill__ico { opacity: 1; }
+}
+.nav-pill .notch__item.is-hover:not([aria-current="page"]) { color: var(--ink); background-color: var(--tn-item-hover-bg); box-shadow: var(--tn-item-hover-ring); }
+.nav-pill .notch__item.is-hover .nav-pill__ico { opacity: 1; }
+.nav-pill .notch__item:active { transform: scale(.98); }
+.nav-pill .notch__item:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.nav-pill .notch__item[aria-current="page"] { color: var(--pill-ink); font-weight: var(--fw-strong); background-color: transparent; }
+.nav-pill .notch__item[aria-current="page"] .nav-pill__ico { opacity: 1; }
+/* the white pill + its ink layer: the same gap and item box, so the ink copy sits exactly on the links */
+.nav-pill .notch__pill { border-radius: var(--nav-item-r); }
+.nav-pill .notch__ink { gap: var(--nav-gap); }
+.nav-pill .notch__ink .notch__item { color: var(--pill-ink); font-weight: var(--fw-strong); }
+.nav-pill .notch__ink .nav-pill__ico { opacity: 1; }
+
+/* ── right: X and GitHub only (D49) — .glass-item: glass inside the glass would frost nothing ─ */
+.nav-pill__actions { justify-self: end; display: flex; align-items: center; gap: 8px; }
+.nav-pill__icon.glass-item {
+  width: 44px; min-height: var(--nav-item-h); height: var(--nav-item-h); padding: 0; border-radius: var(--nav-item-r);
+  color: var(--muted);
+  transition: background-color var(--d-200) var(--ease-in-out), color var(--d-200) var(--ease-in-out),
+    box-shadow var(--d-200) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
+}
+/* the glyph IS the control's identification (no label), so it rests at full opacity in --muted (≥ 3:1 non-text;
+   the link icons may rest at .55 because their labels carry the meaning); hover → --ink */
+.nav-pill__icon.glass-item svg { opacity: 1; }
+.nav-pill__icon--x.glass-item svg { width: 16px; height: 16px; }
+.nav-pill__icon--github.glass-item svg { width: 18px; height: 18px; }
+@media (hover: hover) and (pointer: fine) {
+  .nav-pill__icon.glass-item:hover { color: var(--ink); background-color: var(--tn-item-hover-bg); box-shadow: var(--tn-item-hover-ring); }
+  .nav-pill__icon.glass-item:hover svg { opacity: 1; }
+}
+.nav-pill__icon.glass-item.is-hover { color: var(--ink); background-color: var(--tn-item-hover-bg); box-shadow: var(--tn-item-hover-ring); }
+.nav-pill__icon.glass-item.is-hover svg { opacity: 1; }
+.nav-pill__icon.glass-item[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.nav-pill .notch__menu { display: none; }
+
+/* ── phone width (desktop is the target; this keeps the pill usable): the links fold into the menu ─ */
+@media (max-width: 719.98px) {
+  .nav-pill { top: calc(var(--notch-top) + 4px); left: 8px; right: 8px; height: calc(var(--notch-h) - 8px); padding: 0 6px 0 9px; grid-template-columns: minmax(0, 1fr) auto; }
+  .nav-pill .notch__items { display: none; }
+  .nav-pill__actions { gap: 4px; }
+  .nav-pill .notch__menu { display: grid; }
+}
+
+/* ── reduced motion: end states, no transitions, no press scale ─────────── */
+:is(html, body)[data-motion="reduce"] .nav-pill :is(.notch__item, .nav-pill__ico, .nav-pill__icon, .notch__pill, .notch__ink) { transition: none !important; }
+:is(html, body)[data-motion="reduce"] .nav-pill :is(.notch__item, .nav-pill__icon, .site-brand):active { transform: none; }

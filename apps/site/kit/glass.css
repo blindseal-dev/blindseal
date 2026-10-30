@@ -98,6 +98,18 @@
     inset 0 -8px 12px -8px rgba(0,0,0,.28),
     inset 0 8px 12px -10px rgba(255,255,255,.30),
     0 8px 24px -10px rgba(0,0,0,.6);
+  /* the site nav pill (nav.css, round 2): the reference bar's seven layers, measured — our six insets with the two
+     side lifts tinted (reference: rgba(120,170,255,.32/.28) → our --accent-hover at the same alphas) + the drop */
+  --tn-glass-shadow-nav:
+    inset 0 1px .5px rgba(255,255,255,.65),
+    inset 0 0 0 1px rgba(255,255,255,.08),
+    inset 0 -8px 12px -8px rgba(255,255,255,.22),
+    inset 0 8px 12px -10px rgba(255,255,255,.35),
+    inset 4px 0 12px -8px color-mix(in srgb, var(--accent-hover) 32%, transparent),
+    inset -4px 0 12px -8px color-mix(in srgb, var(--accent-hover) 28%, transparent),
+    0 12px 40px -8px rgba(0,0,0,.55);
+  /* the hover ring of a control inside the nav pill (reference: 1px inset white .4 at opacity .5) */
+  --tn-item-hover-ring: inset 0 0 0 1px rgba(255,255,255,.2);
   --tn-sheen-top: linear-gradient(to bottom, rgba(255,255,255,.16) 0%, rgba(255,255,255,.02) 34%, transparent 60%);
   --tn-sheen-streak: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.12) 46%, rgba(255,255,255,.02) 52%, transparent 60%);
   --tn-sheen-edges: linear-gradient(90deg, rgba(255,255,255,.06) 0%, transparent 18%, transparent 82%, rgba(255,255,255,.06) 100%);

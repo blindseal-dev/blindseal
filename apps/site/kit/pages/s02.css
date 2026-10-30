@@ -110,22 +110,14 @@ html.bs-site[data-motion="reduce"] { scroll-behavior: auto; }
 }
 .hiw-sec .section-head__body { max-width: 440px; }
 
-/* figures: full column width, a replay link on the caption line */
+/* figures: full column width; the caption line (round 2, D40: no replay link — the figures loop) */
 .hiw-fig.fig { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 24px; margin: 32px 0 0; }
 .hiw-fig .fig__art { grid-column: 1 / -1; }
 .hiw-fig .fig__caption { grid-column: 1; max-width: 760px; }
 .hiw-fig .fig__caption::before { content: "Fig. " attr(data-n) " · "; color: var(--ink); }
-.hiw-replay {
-  grid-column: 2; display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px; margin-right: -4px;
-  border: 0; border-radius: var(--r-chip); background: none; cursor: pointer;
-  font: var(--fw-medium) var(--fs-12)/18px var(--font-sans); color: var(--accent);
-  transition: color var(--d-150) var(--ease-in-out), opacity var(--d-150) var(--ease-in-out), transform var(--d-160) var(--ease-out-quint);
-}
-.hiw-replay svg { width: 13px; height: 13px; }
-@media (hover: hover) and (pointer: fine) { .hiw-replay:not(:disabled):hover { color: var(--accent-hover); } }
-.hiw-replay:active { transform: scale(.98); }
-.hiw-replay:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.hiw-replay:disabled { opacity: .45; cursor: not-allowed; }
+/* D40: no replay controls anywhere. how-kit.tsx still appends .hiw-replay buttons until the port removes them;
+   hidden here (display:none also takes them out of the tab order and the accessibility tree) */
+.hiw-replay { display: none !important; }
 
 /* two-column copy (protocol.css .pi-grid2 / .pi-article) */
 .hiw-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; margin-top: 32px; }
@@ -233,7 +225,7 @@ html.bs-site[data-motion="reduce"] { scroll-behavior: auto; }
 
 /* ══ reduced motion: end states, no rise, no press scale ════════════════ */
 body[data-motion="reduce"] :is(.hiw-mast__eyebrow, .hiw-mast__title, .hiw-mast__lede, .hiw-toc) { animation: none !important; opacity: 1 !important; transform: none !important; }
-body[data-motion="reduce"] :is(.hiw-toc__link, .hiw-toc__top, .hiw-replay):active { transform: none; }
+body[data-motion="reduce"] :is(.hiw-toc__link, .hiw-toc__top):active { transform: none; }
 body[data-motion="reduce"] .hiw-toc__fill { transition: none; }
 
 /* programmatic focus targets (section titles after a TOC jump) carry no ring: they are not controls */
