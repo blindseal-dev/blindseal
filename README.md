@@ -2,8 +2,9 @@
 
 **AI agents can be tricked. Blindseal helps stop them.**
 
-Blindseal checks your AI agent's requests for hidden threats and can provide proof that specific checks passed, without revealing your instructions or security rules. Blindseal runs the checks on your computer and can create a proof for supported actions.
-Apps can check that proof before accepting your agent's request.
+Blindseal checks your AI agent's requests for hidden threats and can provide proof that specific checks passed, without
+revealing your instructions or security rules. Blindseal runs the checks on your computer and can create a proof for
+supported actions. Apps can check that proof before accepting your agent's request.
 
 It runs on your computer between the AI agent and its tools, as a local MCP proxy. It checks both directions: the
 arguments of every tool call your agent sends, and every message the server sends back — every string in it, keys
