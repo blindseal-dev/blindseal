@@ -42,7 +42,8 @@ export default function Home() {
           <div className="hero__shade" aria-hidden />
           <div className="hero__content"><div className="hero__col">
           <h1 className="hero__title">AI agents can be tricked. <br /><em>Blindseal helps stop them.</em></h1>
-          <p className="hero__sub">Blindseal checks your agent&apos;s tool calls, and the replies they bring back, for hidden threats, right on your computer. For supported actions, it can issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security rules stay private.</p>
+          <p className="hero__sub">Blindseal checks your AI agent&apos;s requests for hidden threats and can provide proof that specific checks passed, without revealing your instructions or security rules.</p>
+          <p className="hero__sub">Blindseal runs the checks on your computer and can create a proof for supported actions. Apps can check that proof before accepting your agent&apos;s request.</p>
           <p className="hero__note">Today&apos;s proof covers checks for known attack patterns. It does not guarantee that an action is safe.</p>
           <div className="hero__actions">
             <Link prefetch={false} className="btn primary hero__primary" href="/how-it-works">See how it works<i data-lucide="arrow-right" /></Link>
