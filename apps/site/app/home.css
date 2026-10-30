@@ -1,6 +1,7 @@
 /* Home page additions for the 02 copy (three steps, example panel, notes, FAQ, the hero's secondary disclaimer).
    Built from the kit's tokens; nothing here restyles an existing kit class. */
 .hero__note { max-width: 620px; margin-top: 14px; font: var(--fw-body) var(--fs-13)/20px var(--font-sans); color: var(--muted); opacity: .85; }
+.hero__sub + .hero__sub { margin-top: 12px; }   /* the intro is two paragraphs (round 2 copy); the kit styles one */
 .hero__primary { min-height: 44px; }
 .s01-cols.hm-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; }   /* the kit indents .s01-cols under its old flow figure */
 .s01-how .s01-more { padding-left: 0; }
