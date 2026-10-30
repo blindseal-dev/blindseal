@@ -33,8 +33,8 @@ afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
 
 describe('prover resolution', () => {
   it('ships a manifest with the release shape (sha256 values may still be TBD)', () => {
-    expect(PROVER_MANIFEST.version).toBe('0.5.1');
-    expect(PROVER_MANIFEST.release).toBe('https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.5.1');
+    expect(PROVER_MANIFEST.version).toBe('0.7.0');
+    expect(PROVER_MANIFEST.release).toBe('https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.7.0');
     expect(Object.keys(PROVER_MANIFEST.assets).sort()).toEqual(['darwin-arm64', 'linux-x64']);
     expect(PROVER_MANIFEST.assets['darwin-arm64']!.name).toBe('blindseal-prover-darwin-arm64');
   });

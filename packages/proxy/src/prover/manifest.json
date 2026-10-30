@@ -1,14 +1,14 @@
 {
-  "version": "0.5.1",
-  "release": "https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.5.1",
+  "version": "0.7.0",
+  "release": "https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.7.0",
   "assets": {
     "darwin-arm64": {
       "name": "blindseal-prover-darwin-arm64",
-      "sha256": "5a4cdfd6c1c6cca33e2d106966b0e0db81016a35fa47a31918bc9817556061d4"
+      "sha256": "ac2e2ea14568d27bceff0d7b696ae38023a32ea4c42d132efda5fae890eeb4eb"
     },
     "linux-x64": {
       "name": "blindseal-prover-linux-x64",
-      "sha256": "b4b95cae2414a06c87c58135a64d9106354c1b3116e57579e14278d33bdb41dc"
+      "sha256": "798b214502c85b98364f1db9ed6e012965317fba137f65fc28c26907d2f07a35"
     }
   }
 }
