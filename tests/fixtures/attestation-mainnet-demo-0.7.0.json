@@ -1,0 +1,30 @@
+{
+  "action": {
+    "amount": "1000000",
+    "instruction": "0x981894646560fc2b",
+    "mint": "",
+    "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+    "sourceAuthority": "GdPZNkh4Ugt3PCauGtUdNVDXsxDHFigbGqy4gjYGNC3L",
+    "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
+  },
+  "actionHash": "0xcad6859edb67d3dffad886d62a225bdc6ad089113f3363222ba6ae01b2b00270",
+  "chainId": 1,
+  "decisionId": "d_bb0eb04894c749bc",
+  "detectorVersion": "0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967",
+  "expirySlot": 463600736,
+  "nonce": "0x9d249fd186c251517aca347dc045b2941d3eac0b25e0a82880224c56dc9bba41",
+  "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)",
+  "nullifier": "0xfb1e49f45e15f791c851ba596b939cefa4b4b47f0da2778e557c1b75df2b0aa7",
+  "payloadHash": "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec",
+  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "proof": {
+    "bytes": "0xa4594c5908e1d710c9ebc71acdd6f862854fdab8181f1721034a8ffa9e894e9269dec70c03b34654defb0d9b8e1e1dc65b4fbc97efd161d99579f983fdf8710581114c82304bb8492cec6f755c7cfdfabed2b8e80c1c7e35e4ba613a459d35e9ff650d971681461acb4d8bc763ee29a674a9b314fc300d5f7cad80aab446dd911db7e8331266dc51e9ff5b48b0024d7ffbfd59c4c91f1ece9ab67c0f9aede5188d20d06a25db8ff38455676571abf9b53ea9fa9f8f26411940734189dea3b8bd436457ae26bf69f0e643e559c79924b4eed16e4a1770f1b26e31913bc7854585b91b7f8c03e827d4d10c9f60b5bace5a3bfdb7b8a61f636bcb8f7cf54a6059d66675d3a5",
+    "curve": "bn254",
+    "protocol": "groth16"
+  },
+  "proveMs": 8740766,
+  "publicInputs": [
+    "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c3839700cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967cad6859edb67d3dffad886d62a225bdc6ad089113f3363222ba6ae01b2b00270fb1e49f45e15f791c851ba596b939cefa4b4b47f0da2778e557c1b75df2b0aa760fca11b00000000"
+  ],
+  "version": 1
+}
