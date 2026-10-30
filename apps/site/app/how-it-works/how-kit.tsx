@@ -186,7 +186,7 @@ export function HowKit({ data: D }: { data: HowData }) {
       });
     });
 
-    /* ── the four figures, each with a replay link ───────────────────────── */
+    /* ── the four figures (round 2: they loop under html.bs-site; no replay control) ─────── */
     const entries = entriesAll.slice(0, 10).map((e) => ({ index: e.index, hash: e.hash }));
     const FIGS: Array<[string, string, Record<string, unknown>]> = [
       ['#fig-architecture', 'architecture', {}],
@@ -201,21 +201,8 @@ export function HowKit({ data: D }: { data: HowData }) {
       if (!host) return;
       const cap = host.querySelector(':scope > figcaption');
       if (cap) cap.setAttribute('data-n', host.getAttribute('data-fig-n') || '');
-      if (host.querySelector(':scope > .hiw-replay')) return;
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'hiw-replay'; b.setAttribute('data-replay', f[1]);
-      b.setAttribute('aria-label', 'Replay figure ' + host.getAttribute('data-fig-n'));
-      b.innerHTML = ico('rotate-ccw') + '<span>Replay</span>';
-      host.appendChild(b);
-      /* a figure that has not drawn yet cannot replay (BS.diagrams keeps it for the scroll) */
-      const sync = () => { b.disabled = !host.classList.contains('is-drawn'); };
-      sync();
-      const mo = new MutationObserver(sync); mo.observe(host, { attributes: true, attributeFilter: ['class'] });
-      cleanups.push(() => { mo.disconnect(); b.remove(); });
-      b.addEventListener('click', () => {
-        if (reduced()) { BS.toast({ title: 'Reduced motion is on', body: 'Figures are shown drawn; replay is off.', tone: 'info', id: 'replay' }); return; }
-        BS.diagrams.replay(host);
-      });
+      /* the loop is the kit's (diagrams.js startLoop); stop it with the figure on route change */
+      cleanups.push(() => { try { BS.diagrams.loopOf?.(host)?.stop?.(); } catch { /* already gone */ } });
     });
     decorate($('.hiw') || document);
 

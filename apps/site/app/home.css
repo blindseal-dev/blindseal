@@ -31,3 +31,79 @@
 /* the trust row wraps with the longer 02 items: the kit's dot separators would start a wrapped line, so they go; the gap separates */
 .hero__trust { column-gap: 32px; }
 .hero__trust > li + li::before { display: none; }
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════════
+   Round 2 · the scroll-lit hero background (the mockup's r2/home/page.css, ported)
+   The hero is the kit's pinned hooks (kit/site.css (f)): section.hero.hero--pinned is 2 × max(100vh, 720)
+   tall and its .hero__stage sticks for the extra one, the 100vh pin. Inside the stage:
+     .hero__space[data-bg=banner]  the dial banner (the kit's, untouched)
+     .hero__reveal.hm-light        THIS BLOCK: the clip, registered to the banner's ring (home-kit.tsx sizes
+                                   the plate), and the copy-column scrim
+     .hero__shade                  the kit's two shade gradients, over the clip (the reveal sits before it)
+     .hero__content                the hero copy, z 3
+   The plate is invisible at rest (the banner IS frame 0); it fades in over the first 4 % of the pin, once
+   its first frame has decoded, then the clip's currentTime follows scroll. Nothing here animates on its
+   own: every value below is written by home-kit.tsx from scroll progress, or is a static layout.
+   Tokens only; no colour literal. Values: plate fade-in p 0 → .04 · the ready fade 320 ms ease-out · scrim
+   stops in px from the copy column's right edge C = site-pad + hero-col (874 at every desktop width): the
+   wash canvas 94 % at 0, 90 % at C − 270, 74 % at C − 40, 0 at C + 200, its opacity .25 → 1 over
+   p 0 → .45 · the guard canvas 82 % to C − 100 (the headline's end), 0 at C + 40.
+   ════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── the plate: absolutely placed by home-kit.tsx (left / top / width / height in px) ── */
+.hm-light { overflow: hidden; }
+.hm-light__plate {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  opacity: 0; will-change: opacity;
+  /* no edge mask: the plate's left edge stays at or before x 0 (under the 94 % wash), and a mask on a layer
+     whose video changes every frame halved the frame rate */
+}
+.hm-light__plate > video, .hm-light__plate > img {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  object-fit: fill;                 /* the plate is the clip's own 16:9: nothing is cropped, nothing distorts */
+  background: transparent; user-select: none; pointer-events: none;
+}
+.hm-light__plate > [hidden] { display: none; }
+/* the ready gate: the clip shows only once its first scrubbed frame has decoded (until then the banner stays) */
+.hm-light__video { opacity: 0; transition: opacity var(--d-320) var(--ease-out-cubic); }
+.hm-light__plate.is-ready > .hm-light__video { opacity: 1; }
+
+/* ── the copy-column scrim, two layers, both anchored in px to the copy column's right edge C (= site-pad +
+      hero-col, 874 at every desktop width), never to a % of the hero width, so they sit the same distance from
+      the copy at 1280 as at 1440 (the copy holds ≥ 4.5:1 at both):
+        .hm-light__scrim  the wash: home-kit.tsx raises it with the light, .25 → 1 over p 0 → .45
+        .hm-light::after  the guard: constant, strong only under the copy and gone 40 px past the column, so it
+                          leaves the ring alone at 1440 and covers it where it reaches under the headline (1280) ── */
+.hm-light { --hm-copy-r: calc(var(--site-pad) + var(--hero-col)); }
+.hm-light__scrim {
+  position: absolute; inset: 0; opacity: 0; will-change: opacity; pointer-events: none;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--canvas) 94%, transparent) 0px,
+    color-mix(in srgb, var(--canvas) 90%, transparent) calc(var(--hm-copy-r) - 270px),
+    color-mix(in srgb, var(--canvas) 74%, transparent) calc(var(--hm-copy-r) - 40px),
+    transparent calc(var(--hm-copy-r) + 200px));
+}
+.hm-light::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--canvas) 82%, transparent) 0px,
+    color-mix(in srgb, var(--canvas) 82%, transparent) calc(var(--hm-copy-r) - 100px),
+    transparent calc(var(--hm-copy-r) + 40px));
+}
+
+/* ── reduced motion (?motion=reduce or the OS setting): no pin, the opened end still, no clip ─────────── */
+html[data-motion="reduce"] .hero.hero--pinned { min-height: max(100vh, var(--hero-min-h)); min-height: max(100svh, var(--hero-min-h)); }
+html[data-motion="reduce"] .hero--pinned > .hero__stage { position: relative; }
+html[data-motion="reduce"] .hm-light__video { transition: none; }
+
+/* ── phones (< 720 px, the kit's breakpoint): the still, never the clip; no pin — the hero hugs its content as it
+      did (narrow.css .hero) — and the copy sits on a uniform scrim. The plate fills the stage and the still is
+      cropped so the ring sits top right; the scrim is the canvas at 86 % everywhere (plus the kit's shade), which
+      keeps --muted copy at ≥ 4.5:1 over the brightest part of the ring (measured in e2e). ────────────────────── */
+@media (max-width: 719.98px) {
+  .hero.hero--pinned { min-height: 0; }
+  .hero--pinned > .hero__stage { position: relative; display: block; height: auto; padding: calc(var(--notch-top) + var(--notch-h) + 32px) 0 48px; }
+  .hm-light__plate { left: 0; top: 0; width: 100%; height: 100%; }
+  .hm-light__plate > img { object-fit: cover; object-position: 72% 36%; }
+  .hm-light__scrim, .hm-light::after { background: color-mix(in srgb, var(--canvas) 86%, transparent); }
+}

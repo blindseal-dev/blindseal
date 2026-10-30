@@ -24,7 +24,6 @@
   .hiw-grid2, .hiw-layers, .hiw-claim, .hiw-next { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .hiw-flows__v { max-width: none; }
   .hiw-fig.fig { grid-template-columns: minmax(0, 1fr); }
-  .hiw-replay { grid-column: 1; justify-self: start; margin: 0; }
 
   .hiw-redact { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; }
   .hiw-redact__arrow { grid-auto-flow: column; justify-items: start; justify-content: start; align-items: center; gap: 12px; }
@@ -80,7 +79,6 @@
   .hiw-fig.fig { margin-top: 24px; }
   .hiw-fig .fig__art > svg, .fig .fig__art > svg { max-width: 100%; height: auto; }
   .hiw-fig .fig__caption { max-width: none; font-size: var(--fs-13); line-height: 20px; }
-  .hiw-replay { min-height: 44px; padding: 8px 10px; margin: 0 0 0 -10px; }
   .hiw-grid2 { gap: 20px; margin-top: 24px; }
   .hiw-art__body { max-width: none; font-size: var(--fs-15); line-height: 24px; }
   .hiw-route { font-size: var(--fs-14); }

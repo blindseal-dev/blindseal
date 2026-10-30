@@ -53,15 +53,6 @@ export function ChangelogKit({ entries: LOG }: { entries: Entry[] }) {
     $$('.cl-anchor', list).forEach((b) => { b.setAttribute('data-copy', urlFor(b.getAttribute('data-anchor') || '')); });
     try { ui.copy(list); } catch { /* the document-level delegate wires on click */ }
 
-    /* ── footer version = the latest entry ─────────────────────────────── */
-    const verEl = $('.site-footer__ver');
-    if (verEl && latest) {
-      const orig = verEl.innerHTML;
-      const rest = (verEl.textContent || '').replace(/^v\S+/, '');
-      verEl.innerHTML = '<a href="#' + esc(latest.id) + '" data-go="' + esc(latest.id) + '">v' + esc(latest.version) + '</a>' + esc(rest);
-      cleanups.push(() => { verEl.innerHTML = orig; });
-    }
-
     /* ── masthead field + the ladder ───────────────────────────────────── */
     const mast = $('.cl-mast'), body = $('#cl'), space = $('.cl-mast__space');
     if (space && BS.mountSpace && !space.hasAttribute('data-space-mounted')) { space.setAttribute('data-space-mounted', ''); BS.mountSpace(space, { intensity: 'faint', fade: false }); }

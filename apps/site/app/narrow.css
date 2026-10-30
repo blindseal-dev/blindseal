@@ -1,6 +1,6 @@
 /* Phone-width addition to the verbatim kit: the mockups' site.css carries no
-   width queries. Below 720 px the chrome is a phone header — ONE solid 56 px row across the full width (logo
-   left; GitHub and the menu button right; no frame, no notch wings, no tab row), the page full-bleed with
+   width queries. Below 720 px the chrome is a phone header — ONE solid 56 px row across the full width (the pill
+   folds to logo left; X, GitHub and the menu button right; no frame, no route links), the page full-bleed with
    16 px gutters, and the routes in a full-screen sheet opened by the menu button (markup server-rendered in
    kit/site-templates.cjs, wired by app/site-menu.tsx). Nothing here applies at or above 720 px except the
    two display:none rules that keep the phone-only markup out of the desktop layout. */
@@ -76,9 +76,11 @@
   @media (hover: hover) and (pointer: fine) { .site-menu__item:hover { color: var(--ink); } }
   body[data-motion="reduce"] .notch__menu-bars::before, body[data-motion="reduce"] .notch__menu-bars::after { transition: none; }
 
-  /* the footer stacks */
-  .site-footer { grid-template-columns: minmax(0, 1fr); }
-  .site-footer__routes { grid-template-columns: repeat(2, max-content); }
+  /* the pill nav (kit/nav.css) at phone width: the brand link and the two icon buttons are 44 px tap targets
+     inside the 48 px pill (the row stays one 56 px bar; the header behind it is the solid canvas above) */
+  .nav-pill__brand.site-brand { height: 44px; min-height: 44px; padding: 0 8px 0 2px; margin: 0; }
+  .nav-pill__icon.glass-item { height: 44px; min-height: 44px; }
+  .nav-pill .notch__menu { margin-right: 0; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════════
@@ -89,12 +91,6 @@
    Tokens only; no colour literal.
    ════════════════════════════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 719.98px) {
-  /* ── the footer: one column, 44 px links ────────────────────────────────────────────────────── */
-  .site-footer { width: calc(100% - 2 * var(--gutter)); gap: 20px; padding: 28px 0 32px; }
-  .site-footer__line { max-width: none; font-size: var(--fs-15); line-height: 24px; }
-  .site-footer__routes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
-  .site-footer__routes a { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--fs-15); }
-
   /* ── the shared column + section head ───────────────────────────────────────────────────────── */
   .site-section { width: calc(100% - 2 * var(--gutter)); padding: 28px 0; }
   .site-section + .site-section { margin-top: 20px; }
@@ -134,7 +130,7 @@
   .empty__body { max-width: none; }
 
   /* ── S01 · home ─────────────────────────────────────────────────────────────────────────────── */
-  /* the hero shows the nebula at phone width (site.js / kit-provider skip the CRT under 720 px), held still */
+  /* a nebula hero (not Home's banner) is held still at phone width */
   .hero__space .space__nebula { animation: none; }
   .hero { min-height: 0; padding: calc(var(--notch-top) + var(--notch-h) + 32px) 0 48px; }   /* the hero hugs its content: no empty band under the trust row */
   .hero__content { padding: 0 var(--gut-r) 0 var(--gut-l); }

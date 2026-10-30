@@ -9,9 +9,9 @@ export { ROUTES };
 // boot()/mount()/observer was stripped from the modules), so the kit can never touch React-owned DOM
 // mid-hydration. The mockups ran their mount sequence on DOMContentLoaded — here it runs once the
 // script has loaded and again on every route change, idempotently, in the same order:
-//   syncMotionAttr → mountSite (frame, notch nav with wings/row/pill, footer, hero rise, spaces
-//   incl. the CRT hero with the nebula fallback) → icons → glass.decorate → spaces for new hosts →
-//   mountReveals → mountDrawIn → mountPause → diagrams.
+//   syncMotionAttr → mountSite (frame, the pill nav with its sliding white pill, hero rise, spaces
+//   incl. the banner / CRT hero with the nebula fallback) → icons → glass.decorate → spaces for new
+//   hosts (BS.site.mountSpaces, the kit's own loop) → mountReveals → mountDrawIn → mountPause → diagrams.
 // Elements already handled carry a data-kit marker, so route changes never re-animate.
 type BSKit = {
   motion?: { boot?: () => void; syncMotionAttr?: () => void; mountReveals?: (scope: Node) => void; mountDrawIn?: (el: Element) => void; mountPause?: (el: Element) => void; reduced?: () => boolean };
@@ -19,9 +19,7 @@ type BSKit = {
   icons?: ((root?: Node) => void) & { boot?: (root?: Node) => void };
   ui?: { copy?: () => void };
   mountSite?: (o: unknown) => unknown;
-  site?: { setActive?: (id: string, o?: { animate?: boolean }) => void; refs?: { notch?: HTMLElement } };
-  mountSpace?: (host: Element, o: { intensity: string; fade?: boolean }) => unknown;
-  mountCRT?: (host: Element, o?: unknown) => unknown;
+  site?: { setActive?: (id: string, o?: { animate?: boolean }) => void; refs?: { notch?: HTMLElement }; mountSpaces?: () => void };
   diagrams?: { render?: (name: string, host: Element, o: unknown) => void };
 };
 
@@ -41,26 +39,17 @@ function mountSequence(BS: BSKit, firstMount: boolean, active: string) {
   };
   try { (BS.motion?.boot ?? BS.motion?.syncMotionAttr)?.(); } catch {}
   if (firstMount) {
-    try { BS.mountSite?.({ active, routes: ROUTES, action: { label: 'GitHub', href: 'https://github.com/blindseal-dev/blindseal', external: true } }); } catch {}
-    // the dashboard is local-first: open it in a new tab, never navigate the site away
-    /* the CTA's target/rel are in the server-rendered template */
+    try { BS.mountSite?.({ active, routes: ROUTES }); } catch {}
   } else {
     try { BS.site?.setActive?.(active, { animate: true }); } catch {}
   }
   try { (BS.icons?.boot ?? BS.icons)?.(document); } catch {}
   try { (BS.glass?.boot ?? BS.glass?.decorate)?.(document); } catch {}
   try { BS.ui?.copy?.(); } catch {}          // [data-copy] buttons (the mockups wired these on DOMContentLoaded)
-  // spaces/CRT for hosts mountSite did not see (pages rendered after the first mount)
-  document.querySelectorAll<HTMLElement>('.hero__space, [data-space]').forEach((host) => {
-    if (host.hasAttribute('data-space-mounted')) return;
-    host.setAttribute('data-space-mounted', '');
-    // phone width: the nebula, never the CRT (site.js mountCrtHero)
-    const wantCrt = host.getAttribute('data-bg') === 'crt' && !window.matchMedia('(max-width: 719.98px)').matches;
-    if (wantCrt && BS.mountCRT?.(host, {})) return;
-    if (host.getAttribute('data-bg') === 'crt') host.dataset.bg = 'nebula';
-    const i = host.getAttribute('data-intensity') || host.getAttribute('data-space') || 'hero';
-    try { BS.mountSpace?.(host, { intensity: i === 'faint' ? 'faint' : 'hero', fade: host.getAttribute('data-fade') !== 'false' }); } catch {}
-  });
+  // spaces for hosts mountSite did not see (pages rendered after the first mount, on client-side navigation):
+  // the kit's own loop (site.js mountSpaces), which knows every hero background — data-bg="banner" (Home,
+  // round 2), "crt" (the nebula at phone width or without WebGL2) and the nebula — and skips mounted hosts
+  try { BS.site?.mountSpaces?.(); } catch {}
   try { BS.motion?.mountReveals?.(document); } catch {}
   document.querySelectorAll<HTMLElement>('[data-draw-in], .draw-in').forEach((el) => once(el, 'Draw', (e) => BS.motion?.mountDrawIn?.(e)));
   document.querySelectorAll<HTMLElement>('[data-pause]').forEach((el) => once(el, 'Pause', (e) => BS.motion?.mountPause?.(e)));

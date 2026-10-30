@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { pageMeta, ONE_LINER } from './meta';
 import { CopyButton } from './copy';
+import { HomeKit } from './home-kit';
 
 // Plain-language copy; the hero disclaimer is small secondary text. Layout reuses the S01 kit classes; additions live in app/home.css.
 const INSTALL = 'npx blindseal init';
@@ -24,11 +25,22 @@ export const metadata: Metadata = pageMeta({ path: '/', title: 'Blindseal — pr
 export default function Home() {
   return (
     <>
-      <section className="hero" aria-label="Introduction">
-        {/* CRT field (crt.js, WebGL2) with the reduced-motion still frame; BS.mountSite falls back to the nebula without WebGL2 */}
-        <div className="hero__space" data-bg="crt" data-intensity="hero" aria-hidden />
-        <div className="hero__shade" aria-hidden />
-        <div className="hero__content"><div className="hero__col">
+      {/* Round 2: the hero is pinned for one viewport of scrolling (kit/site.css .hero--pinned / .hero__stage). Behind the
+          copy: the dial banner (data-bg="banner", mounted by the kit as img.hero__banner) and, over it, the scroll-scrubbed
+          clip of the dial igniting (.hero__reveal, home-kit.tsx: the plate is sized to the banner's ring; scroll sets
+          currentTime, nothing autoplays; phones and reduced motion show the end still and never request the clip). */}
+      <section className="hero hero--pinned" aria-label="Introduction">
+        <div className="hero__stage">
+          <div className="hero__space" data-bg="banner" data-intensity="hero" aria-hidden />
+          <div className="hero__reveal hm-light" aria-hidden>
+            <div className="hm-light__plate">
+              <img className="hm-light__still" alt="" width={1920} height={1080} decoding="async" hidden />
+              <video className="hm-light__video" playsInline preload="none" disablePictureInPicture disableRemotePlayback tabIndex={-1} />
+            </div>
+            <div className="hm-light__scrim" />
+          </div>
+          <div className="hero__shade" aria-hidden />
+          <div className="hero__content"><div className="hero__col">
           <h1 className="hero__title">AI agents can be tricked. <br /><em>Blindseal helps stop them.</em></h1>
           <p className="hero__sub">Blindseal checks your agent&apos;s tool calls, and the replies they bring back, for hidden threats, right on your computer. For supported actions, it can issue a proof that lets Solana apps confirm specific security checks passed. Your private instructions and security rules stay private.</p>
           <p className="hero__note">Today&apos;s proof covers checks for known attack patterns. It does not guarantee that an action is safe.</p>
@@ -42,9 +54,11 @@ export default function Home() {
             <li><span className="hero__trust-ico"><i data-lucide="stamp" /></span>One-time proof checked on Solana</li>
           </ul>
         </div></div>
+        </div>
       </section>
+      <HomeKit />
 
-      <section className="site-section s01-problem" aria-labelledby="problem-h">
+      <section className="site-section s01-problem site-section--textured" data-texture="rock" aria-labelledby="problem-h">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow reveal"><b>01</b> / The problem</p><h2 className="section-head__title reveal" id="problem-h">AI agents can be tricked into doing things you never asked them to do.</h2></div>
         </div>
@@ -55,7 +69,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="site-section reveal s01-how" aria-labelledby="how-h">
+      <section className="site-section reveal s01-how site-section--textured" data-texture="metal" aria-labelledby="how-h">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / How it works</p><h2 className="section-head__title" id="how-h">Three steps. One private proof.</h2></div>
         </div>
@@ -74,7 +88,7 @@ export default function Home() {
         <p className="s01-more"><Link prefetch={false} className="btn link s01-link" href="/how-it-works">See how it works<i data-lucide="arrow-right" className="nudge" /></Link></p>
       </section>
 
-      <section className="site-section reveal" aria-labelledby="hp-h">
+      <section className="site-section reveal site-section--textured" data-texture="halo" aria-labelledby="hp-h">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow"><b>03</b> / What stays private</p><h2 className="section-head__title" id="hp-h">Show proof, not your private data.</h2></div>
           <p className="section-head__body">The proof checker receives a proof and digital fingerprints: short codes made from the data. It does not need your private instructions, the private details sent to tools, or the text of your security rules. The proof is tied to one action and expires.</p>
@@ -92,7 +106,7 @@ export default function Home() {
         <p className="hm-note">Normal Solana transaction details, such as the receiving wallet and amount, may still be public. Blindseal hides the private details used in its checks, not the transaction itself. It does not promise that the person behind a payment cannot be identified.</p>
       </section>
 
-      <section className="site-section reveal" aria-labelledby="who-h">
+      <section className="site-section reveal site-section--textured" data-texture="rock" aria-labelledby="who-h">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow">Who is it for?</p><h2 className="section-head__title" id="who-h">For people using AI agents and teams building apps.</h2></div>
         </div>
@@ -103,7 +117,7 @@ export default function Home() {
         <p className="hm-note">Blindseal works with agents that use tools to carry out tasks. It needs to be connected to those tools; it does not automatically protect every AI chat or app.</p>
       </section>
 
-      <section className="site-section reveal" aria-labelledby="scope-h">
+      <section className="site-section reveal site-section--textured" data-texture="metal" aria-labelledby="scope-h">
         <div className="callout s01-scope"><p className="callout__eyebrow">What the proof actually means</p>
           <h2 className="hm-scope__title" id="scope-h">What does the proof guarantee?</h2>
           <p className="callout__body">It proves that the checked request, tied to a specific action, passed checks for known attack patterns under a specific rule set and software version.</p>
@@ -112,7 +126,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="site-section reveal" aria-labelledby="faq-h" id="faq">
+      <section className="site-section reveal site-section--textured" data-texture="halo" aria-labelledby="faq-h" id="faq">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow">FAQ</p><h2 className="section-head__title" id="faq-h">Questions, answered plainly.</h2></div>
         </div>
@@ -123,7 +137,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="site-section site-cta reveal" aria-labelledby="cta-h">
+      <section className="site-section site-cta reveal site-section--textured" data-texture="rock" aria-labelledby="cta-h">
         <h2 className="section-head__title" id="cta-h">Want to see proof that an action was checked?</h2>
         <p className="section-head__body hm-cta__body">Try the sample proof in your browser, or add Blindseal between your agent and its tools.</p>
         <div className="hero__actions">
