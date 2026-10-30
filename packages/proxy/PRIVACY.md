@@ -18,9 +18,10 @@ calls other than the ones listed below.
   fields; it returns the reasoning only for `?verbose=1` with the dashboard token, and then marks
   it "may contain input text".
 - Binary image and audio content (an image or audio item whose bytes parse as a file of its
-  declared type: the proxy walks the whole file, checksums included; see `LIMITATIONS.md` §15) is
-  passed to the agent without being screened. Every other embedded file is decoded and its text
-  screened like any other text.
+  declared type, for the formats the proxy can walk whole, checksums included: PNG, JPEG, GIF, WebP,
+  BMP, ICO and TIFF images, WAV, AIFF, MP3, AAC, FLAC and Ogg audio; see `LIMITATIONS.md` §15) is
+  passed to the agent without being screened. Every other embedded file, including AVIF / HEIC
+  images and MP4 / M4A and WebM audio, is decoded and its text screened like any other text.
 - Scan history (`BLINDSEAL_PERSIST=1`, `~/.blindseal/scans.db`) is local, opt-in and holds metadata
   only (tool, verdict, layer, pattern ids as identifiers, fingerprint) — no text.
 - The audit chain and scan history name the wrapped server by an identifier that holds no

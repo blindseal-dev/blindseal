@@ -1,13 +1,18 @@
 /// Is this byte string a file of its declared image or audio type? Structural parsers for every
 /// type the media exemption (blob-decode.ts) can apply to. Each one walks the whole container the
-/// way a decoder would open it (chunks, segments, frames, pages, boxes), checks the fields a decoder
+/// way a decoder would open it (chunks, segments, frames, pages), checks the fields a decoder
 /// relies on, verifies the checksums the format carries, and requires the structure to account for
 /// every byte. A signature, a trailer or a plausible length field is not enough, and neither is the
 /// presence of a required part: its contents must be valid too (a quantisation table with no
-/// entries, a TIFF with zero width, an MP4 `moov` with no track, a WebM Segment that ends before
-/// the file does, a PNG scanline with filter type 255 are all refused; 0.7.0 final re-audit
-/// A817-R3, two rounds). What a decoder accepts is still not read: pixels, samples, metadata text
-/// and comment chunks are the file's content, which is out of scope by design (LIMITATIONS §15).
+/// entries, a TIFF with zero width, a PNG scanline with filter type 255, a BMP whose pixel array
+/// is not where its header says are all refused; 0.7.0 final re-audit A817-R3). What a decoder
+/// accepts is still not read: pixels, samples, metadata text and comment chunks are the file's
+/// content, which is out of scope by design (LIMITATIONS §15).
+///
+/// In 0.7.0 the exemption covers PNG, JPEG, GIF, WebP, BMP, ICO and TIFF images and WAV, AIFF,
+/// MP3, AAC (ADTS), FLAC and Ogg audio. The ISO BMFF families (AVIF / HEIC, MP4 / M4A) and WebM
+/// are not exempt: their parsers are kept below (`DEFERRED_*_CHECKS`) but not consulted, after
+/// four re-audit rounds each found another required structure they did not establish.
 ///
 /// Pure and dependency-free except for zlib (PNG pixel data): it runs in the scan worker.
 
@@ -832,8 +837,14 @@ const mp4: Check = (b) => {
 };
 
 export const IMAGE_CHECKS: Record<string, Check> = {
-  png, jpeg, jpg: jpeg, gif, webp, bmp, 'x-ms-bmp': bmp, tiff, avif, heic, heif: heic, 'x-icon': ico, 'vnd.microsoft.icon': ico,
+  png, jpeg, jpg: jpeg, gif, webp, bmp, 'x-ms-bmp': bmp, tiff, 'x-icon': ico, 'vnd.microsoft.icon': ico,
 };
+/// Parsers for families whose exemption is withdrawn in 0.7.0 (ISO BMFF images and audio, WebM /
+/// Matroska): four re-audit rounds each found a further required structure they did not establish.
+/// Items of these types are decoded and screened like every other embedded file. The parsers are
+/// kept, and tested, for a later release that can show they establish the whole structure
+/// (LIMITATIONS §15); `mediaCheckFor` never consults them.
+export const DEFERRED_IMAGE_CHECKS: Record<string, Check> = { avif, heic, heif: heic };
 
 // ---------------------------------------------------------------------------------------------
 // Audio.
@@ -1197,11 +1208,10 @@ export const AUDIO_CHECKS: Record<string, Check> = {
   mpeg: mp3, mp3, 'x-mpeg': mp3,
   ogg: (b) => ogg(b), 'x-ogg': (b) => ogg(b), opus: (b) => ogg(b, 'opus'),
   flac, 'x-flac': flac,
-  mp4, m4a: mp4, 'x-m4a': mp4, 'x-mp4': mp4,
   aac, 'x-aac': aac, aacp: aac,
-  webm,
   aiff, 'x-aiff': aiff, aifc: aiff, 'x-aifc': aiff,
 };
+export const DEFERRED_AUDIO_CHECKS: Record<string, Check> = { mp4, m4a: mp4, 'x-m4a': mp4, 'x-mp4': mp4, webm };
 
 /// The parser for a declared mimeType on an item of `type`, or null when that combination can
 /// never be exempt (wrong family, unknown subtype, SVG and other text formats).

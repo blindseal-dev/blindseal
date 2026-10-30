@@ -304,9 +304,16 @@ Output goes to `packages/eval/red-team/attempts/<date>.md` and
 An `image` or `audio` content item whose `data` is strict base64 of a file that parses as its
 declared type and is not valid UTF-8 is forwarded without screening what the picture or sound
 contains: text drawn in an image, metadata chunks (a PNG `tEXt` chunk, an ID3 or Vorbis comment),
-or speech in audio. "Parses as" means the proxy's own structural parser walks the whole file and
-accounts for every byte, as a decoder would open it, including the checksums the format carries,
-and each required part must have valid contents, not merely be present:
+or speech in audio. In 0.7.0 this applies to PNG, JPEG, GIF, WebP, BMP, ICO and TIFF images and to
+WAV, AIFF, MP3, AAC (ADTS), FLAC and Ogg (Vorbis, Opus, FLAC, Speex) audio. AVIF / HEIC images and
+MP4 / M4A and WebM / Matroska audio are **not exempt**: five re-audit rounds each found a further
+required structure their parsers did not establish, so items of those types are decoded and
+screened like every other embedded file, valid or not (instruction text in their boxes or frames
+is then screened too). Their parsers stay in the tree, held to the same fixtures, for a later
+release that can show they establish the whole structure. "Parses as" means the proxy's own
+structural parser walks the whole file and accounts for every byte, as a decoder would open it,
+including the checksums the format carries, and each required part must have valid contents, not
+merely be present:
 - PNG: chunks with CRC-32, a valid IHDR, PLTE where the colour type needs it, IDAT that inflates to
   exactly the scanlines the header implies with a valid filter type on every row, IEND last.
 - JPEG: marker segments from SOI to a final EOI; a frame header with non-zero width and height
@@ -324,7 +331,7 @@ and each required part must have valid contents, not merely be present:
   table, pixel rows and AND mask fit.
 - TIFF: a first IFD with non-zero width and length, a valid bit depth, and strip or tile offsets
   with byte counts, every one inside the file.
-- AVIF / HEIC: ISO BMFF boxes; a `meta` box with a picture handler, a primary item, an item of the
+- AVIF / HEIC (parser retained, not exempt in 0.7.0): ISO BMFF boxes; a `meta` box with a picture handler, a primary item, an item of the
   codec's type, item locations whose extents lie inside the file (construction method 0) or
   inside an `idat` box (method 1; method 2, offsets into another item, is not resolved and does
   not qualify), an image size and a sized codec configuration property (`av1C` of 4 bytes with
@@ -335,7 +342,7 @@ and each required part must have valid contents, not merely be present:
 - Ogg / Opus: every page's CRC, a valid identification header, more than one page.
 - FLAC: metadata blocks and the first frame header with its CRC-8 (frame lengths are not
   recoverable without decoding, so later frames are not walked).
-- MP4 / M4A: `moov` with a movie header of the size its version implies and a non-zero timescale;
+- MP4 / M4A (parser retained, not exempt in 0.7.0): `moov` with a movie header of the size its version implies and a non-zero timescale;
   a sound track with sized track and media headers, a handler, and a sample description whose
   audio sample entry has a data reference, channels, a sample rate and the codec's configuration
   box (`esds` for AAC, parsed down to an audio decoder configuration whose AudioSpecificConfig
@@ -345,12 +352,13 @@ and each required part must have valid contents, not merely be present:
   lying inside the `mdat` that holds the chunk's offset; samples present unless the file is
   fragmented, in which case a fragment with a non-empty track run must exist; then `mdat` or
   fragments. The sample data (the compressed audio) is not decoded.
-- WebM: an EBML header with a webm/matroska DocType and a Segment reaching the end of the file
+- WebM (parser retained, not exempt in 0.7.0): an EBML header with a webm/matroska DocType and a Segment reaching the end of the file
   whose children tile it, with numbered tracks including an audio track (type and codec id) and a
   Cluster holding a block that names an existing track and carries frame data, its lace headers
   (Xiph, EBML or fixed-size lacing) present and every laced frame inside the block.
 A signature, trailer or size field alone does not qualify, and neither does an empty required box,
-header or table (0.7.0 final re-audit, A817-R3, four rounds). Everything else is decoded and its text
+header or table (0.7.0 final re-audit, A817-R3, five rounds; the fifth withdrew the ISO BMFF and
+WebM exemptions rather than extend their parsers again). Everything else is decoded and its text
 screened: resource blobs, `resources/read` contents, SVG (XML text), media of an unknown or
 unsupported subtype (RF64 WAV, for example), and media whose bytes do not parse as the declared
 type. A blob that is not base64, or decodes to more than `BLINDSEAL_MAX_BLOB_BYTES` (default

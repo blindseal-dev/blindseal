@@ -12,7 +12,8 @@ and values at any depth, single messages and batches — before passing it on. A
 agent made, or does not have the shape the protocol requires, never reaches the agent. In block mode, anything that
 fails the checks is replaced by a fixed notice built by Blindseal (tool, verdict, layer and pattern ids; no detector
 reasoning and nothing from the original). Embedded files are decoded and their text checked; binary image and audio
-content (a valid image or sound file of its declared type) is not screened. For supported actions that pass, your
+content (a valid image or sound file of its declared type, in the formats listed in `packages/LIMITATIONS.md` §15:
+PNG, JPEG, GIF, WebP, BMP, ICO, TIFF; WAV, AIFF, MP3, AAC, FLAC, Ogg) is not screened. For supported actions that pass, your
 computer can create a zero-knowledge proof that the pattern checks passed, tied to the exact action and the rule set
 used. A Solana program verifies the proof and records it, so it can be used only once.
 

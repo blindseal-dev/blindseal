@@ -263,7 +263,7 @@ program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
           'Novel attacks the committed rules miss. On the published red-team corpus the proven layer alone catches roughly a third of attacks and little of the novel holdout set; detection in practice leans on L2/L3, which are attested rather than proven. The numbers are in `packages/LIMITATIONS.md` and are updated with every corpus change.',
           'The correctness of the gated program beyond the fields it forwards. Blindseal checks that the forwarded action equals the screened one; it does not audit the program.',
           'L0 (decode-then-L1) is run by the proxy but is not inside the proof yet; the proof covers L1 on the payload as received. L0 inside the proof is the next increment and will change the detector version.',
-          'Binary image and audio content. An image or audio item whose data is a valid file of its declared type is passed through without screening what the picture or sound contains. Every other embedded file is decoded and its text checked.',
+          'Binary image and audio content. An image or audio item whose data is a valid file of its declared type, in a format the proxy can walk whole (PNG, JPEG, GIF, WebP, BMP, ICO, TIFF; WAV, AIFF, MP3, AAC, FLAC, Ogg), is passed through without screening what the picture or sound contains. Every other embedded file, AVIF / HEIC, MP4 / M4A and WebM included, is decoded and its text checked.',
         ]),
       ] },
       { id: 'privacy', heading: 'What is public', blocks: [
