@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Check the released prover binary that packages/proxy/src/prover/manifest.json pins — the one
 # `blindseal attest` downloads — actually runs and is the committed guest:
-#   1. download <release>/<asset> and <release>/SHA256SUMS; the asset's sha256 must equal the
-#      SHA256SUMS line AND the manifest's pin
+#   1. download <release>/<asset>, <release>/SHA256SUMS and <release>/SHA256SUMS.<platform>; the asset's
+#      sha256 must equal its SHA256SUMS line AND the manifest's pin
 #   2. the committed guest ELF (crates/guest/elf/blindseal-guest) must have sha256
 #      $EXPECTED_GUEST_ELF_SHA256 and appear byte for byte inside the binary (include_bytes!)
 #   3. run the binary in execute-only mode (BLINDSEAL_EXECUTE=1: the SP1 executor, no proof) on the
@@ -36,13 +36,17 @@ ASSET=$(j $MANIFEST "m.assets['$PLATFORM'].name"); PINNED=$(j $MANIFEST "m.asset
 echo "manifest: prover $VERSION, $PLATFORM asset $ASSET"
 echo "release:  $RELEASE"
 
-# 1 · download + sha256 (SHA256SUMS line and manifest pin)
+# 1 · download + sha256 (SHA256SUMS line and manifest pin). The release carries SHA256SUMS (written with the
+# darwin build) and SHA256SUMS.linux-x64 (written by the prover-linux workflow); the asset must be in one of them.
 curl -sSfL --retry 3 -o "$DL/$ASSET" "$RELEASE/$ASSET"
 curl -sSfL --retry 3 -o "$DL/SHA256SUMS" "$RELEASE/SHA256SUMS"
+curl -sfL --retry 3 -o "$DL/SHA256SUMS.$PLATFORM" "$RELEASE/SHA256SUMS.$PLATFORM" || rm -f "$DL/SHA256SUMS.$PLATFORM"
 GOT=$(sha256 "$DL/$ASSET")
-SUMS=$(grep -E "[[:space:]]\*?$ASSET\$" "$DL/SHA256SUMS" | awk '{print $1}' | head -1)
+SUMS=$(cat "$DL"/SHA256SUMS* | grep -E "[[:space:]]\*?$ASSET\$" | awk '{print $1}' | sort -u || true)
 echo "sha256:   $GOT"
-[ -n "$SUMS" ] || { echo "FAIL: $ASSET is not listed in SHA256SUMS"; exit 1; }
+echo "listed:   $(ls "$DL" | grep SHA256SUMS | tr '\n' ' ')"
+[ -n "$SUMS" ] || { echo "FAIL: $ASSET is not listed in SHA256SUMS or SHA256SUMS.$PLATFORM"; exit 1; }
+[ "$(echo "$SUMS" | wc -l | tr -d ' ')" = 1 ] || { echo "FAIL: SHA256SUMS files disagree about $ASSET: $(echo $SUMS)"; exit 1; }
 [ "$GOT" = "$SUMS" ] || { echo "FAIL: sha256 differs from SHA256SUMS ($SUMS)"; exit 1; }
 [ "$GOT" = "$PINNED" ] || { echo "FAIL: sha256 differs from the manifest pin ($PINNED)"; exit 1; }
 echo "ok: sha256 equals SHA256SUMS and the manifest pin"
