@@ -242,6 +242,23 @@ jobs:
       - name: M2 suite on a local validator
         run: scripts/test-m2.sh
 
+  prover-asset:
+    name: pinned prover asset (download, sha256, guest ELF, execute)
+    # The released prover binary that packages/proxy/src/prover/manifest.json pins is what `blindseal attest`
+    # downloads. scripts/check-prover-asset.sh downloads the linux-x64 asset, checks its sha256 against the
+    # release's SHA256SUMS and the manifest, checks the committed guest ELF is embedded verbatim, and runs it
+    # in execute-only mode (SP1 executor, no proof) on the mainnet sample: every public value must reproduce.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: check the pinned linux-x64 prover
+        run: scripts/check-prover-asset.sh linux-x64 "$RUNNER_TEMP/prover-asset"
+
   identity-sweep:
     name: identity sweep
     runs-on: ubuntu-latest
