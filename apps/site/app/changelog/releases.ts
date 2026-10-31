@@ -3,6 +3,19 @@
 // {{sig:<base58>}} for a program id / transaction signature (rendered as a copyable, truncated hash).
 export const RELEASES: { v: string; date: string; added: string[]; changed: string[]; fixed: string[] }[] = [
   {
+    v: '0.7.1', date: '2026-10-31',
+    added: [
+      'Off-chain verification binds the action. `blindseal verify`, the SDK’s `verifyOffchain` and the verify page recompute the action hash from the file’s action fields (program, source, instruction, recipient, mint, amount), chain id and nonce over the committed public inputs, and the nullifier from the committed action hash; any difference is INVALID with the recomputed and committed values shown. Before, an attestation whose action was edited after proving read VALID off chain and failed only on chain with `ActionHashMismatch`. The verify page shows this as step 4, Action matches the proof; a file without action fields says so instead of passing silently',
+      'Tamper tests for every action field (amount, recipient, mint, source authority, target program, instruction, nonce, chain id) in the SDK, the CLI and the site’s end-to-end suite',
+      'CI downloads the linux-x64 prover the manifest pins, checks its sha256 against the release’s SHA256SUMS and the manifest, checks the committed guest ELF is embedded byte for byte, and runs it in execute-only mode on the mainnet sample: every public value must reproduce (`scripts/check-prover-asset.sh`)',
+    ],
+    changed: [
+      'The verify page’s sample proof and the how-it-works walkthrough use the 0.7.0 attestation (vkey `0x00cdf40c…9f2967`, consumed in {{sig:2HrABCZYnaHk66gmg9yi3mB27t487mpF6HgZMgbQJcxBhTm2L7nr1P2BbHPd46gHQWAvscAuJCTTGHtQz5mCFj26}}). The 0.6.0 sample still verifies off chain but its vkey is no longer allowed on chain',
+      '`VerifyOffchainResult` gains `action` (the binding: `checked`, recomputed `actionHash`, derived `nullifier`, `mismatches`, `error`); `recomputeActionBinding`, `actionArgsStrict` and `actionBindingReason` are exported',
+    ],
+    fixed: [],
+  },
+  {
     v: '0.7.0', date: '2026-10-30',
     added: [
       'Screening covers every agent-visible surface: every server message and every string in it (structuredContent included), outbound tool-call arguments, and each element of a JSON-RPC batch on its own (HTTP, SSE, stdio). An id-less `tools/call` is screened and gated too; blocked, it is dropped',
