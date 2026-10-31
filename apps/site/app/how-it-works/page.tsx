@@ -14,10 +14,10 @@ import { TocToggle } from './toc-toggle';
 //
 // Every value page.js pulled from the mockup fixtures comes from real, committed, deterministic
 // sources (fixtures.js is never loaded by the site):
-//   attestation-mainnet.json  the attestation consumed on Solana mainnet-beta on 2026-10-27 through transfer-gate
-//                             from the demo wallet (tests/fixtures/attestation-mainnet-demo.json, verbatim): action fields,
-//                             hashes, nullifier, expiry slot, nonce. Its tx signature is TX_SIG
-//                             (REPORT.md, "Mainnet signatures").
+//   attestation-mainnet.json  the attestation consumed on Solana mainnet-beta on 2026-10-30 through transfer-gate
+//                             from the demo wallet under the 0.7.0 vkey (tests/fixtures/attestation-mainnet-demo-0.7.0.json,
+//                             verbatim): action fields, hashes, nullifier, expiry slot, nonce. Its tx signature is TX_SIG
+//                             (docs/release-0.7.0-notes.md, the sample proof).
 //   toolcall-mainnet.json     the tool call `blindseal attest` screened for it
 //                             (tests/fixtures/mainnet-toolcall.json, verbatim). payloadHash is
 //                             recomputed from it here and asserted against the attestation.
@@ -36,7 +36,7 @@ export const metadata: Metadata = pageMeta({
   description: 'Four detection layers, redaction before the judge, a hash-chained audit log, and a Groth16 attestation bound to one on-chain action — and a plain line where the claim stops.',
 });
 
-const TX_SIG = '7iwA4nxnBG73o8H8j8XUESYsmyGhGrxU5HiqXww8Nzp1YRC9oa7oE2ArWsd2fZN736vyhMatECyd2zw5agedpye';
+const TX_SIG = '2HrABCZYnaHk66gmg9yi3mB27t487mpF6HgZMgbQJcxBhTm2L7nr1P2BbHPd46gHQWAvscAuJCTTGHtQz5mCFj26';
 const PROGRAM_NAMES: Record<string, string> = {
   '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa': 'transfer-gate',
   '6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx': 'blindseal-verify',
