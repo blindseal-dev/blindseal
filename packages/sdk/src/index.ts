@@ -7,7 +7,8 @@ import { createRequire } from 'node:module';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, type Signer } from '@solana/web3.js';
 import {
   CHAIN_ID_SOLANA_MAINNET, DEFAULT_RPC_URL, MAINNET_GENESIS_HASH, PROGRAM_ID, TRANSFER_GATE_ID, VERIFY_CU_LIMIT,
-  actionArgsFrom, buildGatedTransferIx, decodePublicInputs, hex, nullifierPda, type Attestation, type DecodedPublicInputs,
+  actionArgsFrom, actionBindingReason, buildGatedTransferIx, decodePublicInputs, hex, nullifierPda, recomputeActionBinding,
+  type ActionBinding, type Attestation, type DecodedPublicInputs,
 } from './ix.js';
 export * from './ix.js';
 
@@ -88,12 +89,15 @@ export type LabeledField = (typeof LABELED_FIELDS)[number];
  *   is a decimal u64 string.
  * - `mismatches`: the labeled fields that differ from `decoded` (empty when none, or when the blob
  *   did not parse).
+ * - `action`: the action binding (see `recomputeActionBinding`): present whenever the blob parses.
+ *   `checked` is false for a file without an `action` object. Any mismatch or error fails the result.
  */
 export interface VerifyOffchainResult {
   ok: boolean;
   reason?: string;
   decoded?: DecodedPublicInputs;
   mismatches: string[];
+  action?: ActionBinding;
 }
 /** @deprecated Use `VerifyOffchainResult`. */
 export type VerifyResult = VerifyOffchainResult;
@@ -138,6 +142,10 @@ const loadWasm = () => (wasmReady ??= (async () => {
  *    verified with equals the blob's). The proof therefore stands or falls on the blob alone.
  * 3. Compare each labeled top-level field to the decoded value; any difference fails the result,
  *    because the proof binds only the blob — a tampered label would otherwise pass unnoticed.
+ * 4. Recompute actionHash from the file's action fields (`action.*`, `chainId`, `nonce`) over the
+ *    committed inputs, and the nullifier from the committed actionHash; any difference fails the
+ *    result — the proof commits to the action only as a hash, so an edited amount, recipient, mint,
+ *    source or program would otherwise still read VALID off chain (on chain it is ActionHashMismatch).
  * Does NOT check expiry against the current slot, nullifier consumption or the on-chain allowlists.
  */
 export async function verifyOffchain(att: Attestation): Promise<VerifyOffchainResult> {
@@ -152,8 +160,11 @@ export async function verifyOffchain(att: Attestation): Promise<VerifyOffchainRe
   const forWasm = decoded ? { ...att, detectorVersion: decoded.detectorVersion } : att;
   const proof = JSON.parse(wasm.verify_attestation_json(JSON.stringify(forWasm))) as { ok: boolean; reason: string | null };
   const mismatches = decoded ? labelMismatches(att, decoded) : [];
-  if (!proof.ok) return { ok: false, reason: proof.reason ?? 'proof did not verify', decoded, mismatches };
+  const action = decoded ? recomputeActionBinding(att, decoded) : undefined;
+  if (!proof.ok) return { ok: false, reason: proof.reason ?? 'proof did not verify', decoded, mismatches, action };
   if (!decoded) return { ok: false, reason: decodeError ?? 'publicInputs did not decode', mismatches };
-  if (mismatches.length) return { ok: false, reason: `label mismatch: ${mismatches.join(', ')}`, decoded, mismatches };
-  return { ok: true, decoded, mismatches };
+  if (mismatches.length) return { ok: false, reason: `label mismatch: ${mismatches.join(', ')}`, decoded, mismatches, action };
+  const actionReason = action ? actionBindingReason(action, decoded) : null;
+  if (actionReason) return { ok: false, reason: actionReason, decoded, mismatches, action };
+  return { ok: true, decoded, mismatches, action };
 }

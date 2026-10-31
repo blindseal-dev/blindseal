@@ -4,6 +4,7 @@
 // node:crypto; page.tsx asserts the result against the attestation's recorded actionHash and
 // nullifier at render time, so any drift from the SDK fails the page, never shows a wrong hash).
 import { createHash } from 'node:crypto';
+import { pubkeyBytes } from '../verify/base58';
 
 export const ACTION_DOMAIN = 'blindseal.action.v1';
 export const NULLIFIER_DOMAIN = 'blindseal.nullifier.v1';
@@ -11,19 +12,7 @@ export const NULLIFIER_DOMAIN = 'blindseal.nullifier.v1';
 export interface Action { targetProgram: string; sourceAuthority: string; instruction: string; recipient: string; mint: string; amount: string; }
 export interface ActionInputs { chainId: number; action: Action; payloadHash: string; policyRoot: string; detectorVersion: string; expirySlot: number; nonce: string; }
 
-const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-/** base58 → 32 bytes ('' = the zero key, as PublicKey.default in the SDK). */
-export function pubkeyBytes(s: string): Buffer {
-  if (!s) return Buffer.alloc(32);
-  let n = 0n;
-  for (const c of s) { const i = B58.indexOf(c); if (i < 0) throw new Error(`not base58: ${s}`); n = n * 58n + BigInt(i); }
-  const body: number[] = [];
-  while (n > 0n) { body.unshift(Number(n & 255n)); n >>= 8n; }
-  let zeros = 0; for (const c of s) { if (c !== '1') break; zeros++; }
-  const out = Buffer.concat([Buffer.alloc(zeros), Buffer.from(body)]);
-  if (out.length !== 32) throw new Error(`pubkey ${s} is ${out.length} bytes, not 32`);
-  return out;
-}
+export { pubkeyBytes };
 export const hex = (s: string): Buffer => Buffer.from(s.replace(/^0x/, ''), 'hex');
 const u16le = (n: number) => { const b = Buffer.alloc(2); b.writeUInt16LE(n); return b; };
 const u64le = (n: bigint) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(n); return b; };

@@ -1,14 +1,16 @@
 // Verifier boundary — the REAL checks behind the S03 checklist. Step 2 runs the SP1 v5 Groth16
 // check in-browser via blindseal-verifier-wasm (wasm-bindgen build of crates/verifier-wasm) — the
 // same check the on-chain program does via sp1-solana. Steps 1 and 3 are plain TS (schema, and the
-// public-input blob decoded into its six fields and cross-checked against the file). The .wasm is
-// served from the site's own origin (public/blindseal_verifier_bg.wasm) — nothing is uploaded.
+// public-input blob decoded into its six fields and cross-checked against the file); step 4 is
+// action-binding.ts (the action fields rehashed, WebCrypto). The .wasm is served from the site's own
+// origin (public/blindseal_verifier_bg.wasm) — nothing is uploaded.
 import init, { verify_attestation_json } from 'blindseal-verifier-wasm';
 import { isDisclosure, verifyDisclosure, isCleanWindow, type Disclosure } from './disclosure';
 
 export type AttestationDoc = {
   version?: unknown; actionHash?: string; policyRoot?: string; detectorVersion?: string; expirySlot?: unknown;
   nullifier?: string; payloadHash?: string; publicInputs?: unknown; proof?: { protocol?: unknown; curve?: unknown; bytes?: unknown };
+  chainId?: unknown; nonce?: unknown; action?: unknown;   // the action fields: labels the proof commits to only through actionHash (step 4)
   [k: string]: unknown;
 };
 

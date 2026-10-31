@@ -32,5 +32,8 @@ describe('blindseal verify — label mismatch contract', () => {
     expect(r.text).toContain('label mismatch (2): nullifier, expirySlot');
     expect(r.text).toContain('nullifier: labeled 0xff ≠ decoded 0xee');
     expect(r.text).toContain('expirySlot: labeled 99 ≠ decoded 42');
+    // an sdk build without the 0.7.1 action binding: reported, never assumed
+    expect(r.action).toBeUndefined();
+    expect(r.text).toContain('action binding   not checked (this sdk build does not recompute it)');
   });
 });

@@ -35,25 +35,50 @@ test('verify: sample valid, tampered invalid, disclosure accepted, nothing store
   // This is the only test that triggers the lazy wasm fetch — assert it stays same-origin.
   page.on('request', (r) => { try { const h = new URL(r.url()).hostname; if (!['localhost','127.0.0.1',''].includes(h) && r.url().startsWith('http')) off.push(r.url()); } catch {} });
   await page.goto('/verify');
-  // the kit paints the idle checklist (four pending steps) once it has mounted
-  await expect(page.locator('#vf-checks .check')).toHaveCount(4);
+  // the kit paints the idle checklist (five pending steps) once it has mounted
+  await expect(page.locator('#vf-checks .check')).toHaveCount(5);
   await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
   await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Proof verified');
+  await expect(page.locator('#vf-banner .vf-banner__end')).toHaveText('4 of 4');
   await expect(page.locator('#vf-checks .check').nth(1)).toHaveAttribute('data-state', 'pass');
   // step 3 decoded the single public-input blob into its six fields
   await expect(page.locator('#vf-checks .vf-kv .kv__item')).toHaveCount(7);
-  // step 4 is on demand; the e2e server runs with BLINDSEAL_RPC_URL=off, so the same-origin read says unavailable
+  // step 4 rehashed the action fields (WebCrypto) to the committed action hash
+  await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'pass');
+  await expect(page.locator('#vf-checks .check').nth(3)).toContainText('rehash to the committed action fingerprint');
+  // step 5 is on demand; the e2e server runs with BLINDSEAL_RPC_URL=off, so the same-origin read says unavailable
   await page.locator('#vf-checks [data-n4]').click();
-  await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'fail', { timeout: 10_000 });
-  await expect(page.locator('#vf-checks .check').nth(3)).toContainText('RPC unavailable');
+  await expect(page.locator('#vf-checks .check').nth(4)).toHaveAttribute('data-state', 'fail', { timeout: 10_000 });
+  await expect(page.locator('#vf-checks .check').nth(4)).toContainText('RPC unavailable');
+  // 0.7.1: an edited action field (amount + 1) passes steps 1–3 — the proof and its labels are intact — and fails step 4
+  const sample = JSON.parse(readFileSync(join(__dirname, '../app/verify/sample.json'), 'utf8'));
+  for (const edit of [{ amount: String(BigInt(sample.action.amount) + 1n) }, { recipient: '9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf' }, { mint: '9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf' }, { sourceAuthority: '9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf' }, { targetProgram: '9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf' }]) {
+    const edited = JSON.stringify({ ...sample, action: { ...sample.action, ...edit } });
+    await page.evaluate((j) => (window as any).S03.verifyText(j, 'edited.json'), edited);
+    await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'fail', { timeout: 20_000 });
+    await expect(page.locator('#vf-banner .vf-banner__sub')).toContainText('Failed at step 4, Action matches the proof.');
+    await expect(page.locator('#vf-checks .check').nth(2)).toHaveAttribute('data-state', 'pass');
+    await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'fail');
+    await expect(page.locator('#vf-checks .check').nth(3)).toContainText('action fields hash to');
+    await expect(page.locator('#vf-checks .check').nth(4)).toHaveAttribute('data-state', 'skip');
+  }
+  // a file without action fields: step 4 is skipped with a reason, the proof still verifies
+  const { action: _a, ...noAction } = sample;
+  await page.evaluate((j) => (window as any).S03.verifyText(j, 'no-action.json'), JSON.stringify(noAction));
+  await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
+  await expect(page.locator('#vf-banner .vf-banner__end')).toHaveText('3 of 4');
+  await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'skip');
+  await expect(page.locator('#vf-checks .check').nth(3)).toContainText('no action fields');
   await page.getByRole('button', { name: 'Try an altered proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'fail', { timeout: 20_000 });
   await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Does not verify');
-  // The real Groth16 verifier ran: a flipped proof fails the on-curve check at step 2; 3 and 4 are skipped.
+  // The real Groth16 verifier ran: a flipped proof fails the on-curve check at step 2; 3, 4 and 5 are skipped.
   await expect(page.locator('#vf-checks .check').nth(1)).toHaveAttribute('data-state', 'fail');
   await expect(page.locator('#vf-checks .check').nth(1)).toContainText('NotOnCurve');
   await expect(page.locator('#vf-checks .check').nth(2)).toHaveAttribute('data-state', 'skip');
+  await expect(page.locator('#vf-checks .check').nth(3)).toHaveAttribute('data-state', 'skip');
+  await expect(page.locator('#vf-checks .check').nth(4)).toHaveAttribute('data-state', 'skip');
   // a pasted disclosure.json is accepted too (ed25519 + chain recompute, in the browser)
   const disclosure = readFileSync(join(__dirname, '../app/verify/disclosure-sample.json'), 'utf8');
   await page.locator('#vf-text').fill(disclosure);
@@ -61,6 +86,7 @@ test('verify: sample valid, tampered invalid, disclosure accepted, nothing store
   await expect(page.locator('#vf-checks .check').nth(2)).toHaveAttribute('data-state', 'pass', { timeout: 15_000 });
   await expect(page.locator('#vf-checks .check').nth(2)).toContainText('recomputed from their six fields');
   await expect(page.locator('#vf-banner .vf-banner__title')).toHaveText('Valid disclosure');
+  await expect(page.locator('#vf-checks .check')).toHaveCount(4); // a disclosure has its own four steps
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
   expect(off, `off-host: ${off.join(', ')}`).toEqual([]);
 });
@@ -82,27 +108,27 @@ test.describe('javascript disabled', () => {
 });
 
 // ── a Nullifier consumed DIRECTLY (consumer_program = Pubkey::default()) is not "by 1111…" ──
-test('verify step 4: a direct consumption reads "consumed directly (no gated program)"', async ({ page }) => {
+test('verify step 5: a direct consumption reads "consumed directly (no gated program)"', async ({ page }) => {
   await page.route('**/verify/nullifier*', (r) => r.fulfill({ json: { nullifier: '0x' + '00'.repeat(32), consumed: true, pda: 'x', consumedAtSlot: 460579127, consumerProgram: '11111111111111111111111111111111', direct: true, cluster: 'mainnet-beta', rpc: 'configured' } }));
   await page.goto('/verify');
-  await expect(page.locator('#vf-checks .check')).toHaveCount(4);
+  await expect(page.locator('#vf-checks .check')).toHaveCount(5);
   await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
   await page.locator('#vf-checks [data-n4]').click();
-  const step4 = page.locator('#vf-checks .check').nth(3);
+  const step4 = page.locator('#vf-checks .check').nth(4);
   await expect(step4).toHaveAttribute('data-state', 'pass', { timeout: 10_000 });
   await expect(step4).toContainText('consumed directly (no gated program)');
   await expect(step4).not.toContainText('by');
   await expect(step4.locator('.hash')).toHaveCount(0);
 });
-test('verify step 4: a gated consumption still names its program', async ({ page }) => {
+test('verify step 5: a gated consumption still names its program', async ({ page }) => {
   await page.route('**/verify/nullifier*', (r) => r.fulfill({ json: { nullifier: '0x' + '00'.repeat(32), consumed: true, pda: 'x', consumedAtSlot: 460579127, consumerProgram: '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa', cluster: 'mainnet-beta', rpc: 'configured' } }));
   await page.goto('/verify');
-  await expect(page.locator('#vf-checks .check')).toHaveCount(4);
+  await expect(page.locator('#vf-checks .check')).toHaveCount(5);
   await page.getByRole('button', { name: 'Try a valid proof', exact: true }).click();
   await expect(page.locator('#vf-banner')).toHaveAttribute('data-tone', 'pass', { timeout: 20_000 });
   await page.locator('#vf-checks [data-n4]').click();
-  const step4 = page.locator('#vf-checks .check').nth(3);
+  const step4 = page.locator('#vf-checks .check').nth(4);
   await expect(step4).toHaveAttribute('data-state', 'pass', { timeout: 10_000 });
   await expect(step4).toContainText('by');
   await expect(step4.locator('.hash')).toHaveAttribute('data-hash', '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa');

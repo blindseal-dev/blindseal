@@ -1,6 +1,7 @@
 'use client';
 import { usePageKit, type BSAny } from '../use-page-kit';
 import { schemaCheck, verifyProof, decodePublicInputs, verifyDisclosureSteps, tamper, type AttestationDoc, type Decoded } from './verifier';
+import { checkActionBinding } from './action-binding';
 import type { Disclosure } from './disclosure';
 import { CLEAN_VERDICT } from './verdict';
 import { isDirectConsumer } from '@blindseal/chain-reads/consumers';
@@ -12,10 +13,13 @@ import sample from './sample.json';
      1  Schema valid           schemaCheck(text)            (running ≥ 240 ms)
      2  Proof verifies         verifyProof(text) — the groth16 check in the wasm (held ≥ 600 ms, sweep)
      3  Public inputs decoded  the 168-byte blob → six fields, cross-checked with the file; the .kv grid
-     4  Nullifier status       NOT automatic: "Check on mainnet" in the row → GET /verify/nullifier
+     4  Action matches         the file's action fields + nonce rehashed over the committed inputs (WebCrypto,
+                               action-binding.ts) must equal the committed actionHash; the nullifier must derive
+                               from it. An edited amount/recipient/mint/source/program fails here. (held ≥ 220 ms)
+     5  Nullifier status       NOT automatic: "Check on mainnet" in the row → GET /verify/nullifier
                                (a same-origin server read, held ≥ 900 ms) → unused / consumed at slot …,
                                or "RPC unavailable · try again"
-     5  "What this does not reveal" — a panel, shown once step 1 passes, kept through every later failure.
+     +  "What this does not reveal" — a panel, shown once step 1 passes, kept through every later failure.
    A pasted disclosure.json runs its own four steps (schema, ed25519 signature, hash chain, clean window).
    A failed step stops the ones after it (they go to "skip"), never panel 5.
    Nothing touches storage; the attestation lives in this tab's memory only.
@@ -29,7 +33,8 @@ const STEPS: Step[] = [
   { n: 1, title: 'Schema valid', idle: 'Version 1, groth16 on bn254, every required field present.' },
   { n: 2, title: 'Proof verifies', idle: 'In this tab, via blindseal-verifier-wasm (the real groth16 check).' },
   { n: 3, title: 'Public data decoded', idle: 'Fingerprints of the request, the rules, the software version and the action; the reuse marker; the time limit.' },
-  { n: 4, title: 'Already used on Solana?', idle: 'Optional · reads mainnet through this site · the only step that touches the network.' },
+  { n: 4, title: 'Action matches the proof', idle: 'The file’s action fields and nonce, rehashed in this tab, must give the fingerprint the proof commits to.' },
+  { n: 5, title: 'Already used on Solana?', idle: 'Optional · reads mainnet through this site · the only step that touches the network.' },
 ];
 const DSTEPS: Step[] = [
   { n: 1, title: 'Schema valid', idle: 'A disclosure window: head, entries, signer and signature present.' },
@@ -84,13 +89,14 @@ export function VerifyClient() {
     function paintIdle(set: Step[] = STEPS) {
       steps = set;
       list.innerHTML = set.map((s) => ui.checkItem({ n: s.n, title: s.title, detail: s.idle, state: 'pending' })).join('');
-      // step 3 gets its kv slot; step 4 gets its on-demand button row
+      // attestation steps: step 3 gets its kv slot; step 5 gets its on-demand button row
+      if (set !== STEPS) return;
       const main3 = $('.check__main', li(2));
       const kv = document.createElement('div'); kv.className = 'kv vf-kv'; kv.hidden = true; main3.appendChild(kv);
-      const main4 = $('.check__main', li(3));
+      const main5 = $('.check__main', li(4));
       const row = document.createElement('div'); row.className = 'vf-n4'; row.hidden = true;
       row.innerHTML = '<button type="button" class="btn secondary sm" data-n4>' + ico('radio') + '<span>Check whether this proof was used on Solana</span></button>';
-      main4.appendChild(row);
+      main5.appendChild(row);
       $('[data-n4]', row).addEventListener('click', checkNullifier);
     }
     paintIdle();
@@ -188,13 +194,13 @@ export function VerifyClient() {
     const stale = (tok: number) => tok !== runTok;
     /* a step's running hold is a timer, not an animation: under reduce it keeps its unscaled length */
     const hold = (ms: number): Promise<void> => (reduced() ? new Promise((r) => later(r, ms)) : M.wait(ms));
-    const skipFrom = (from: number, why: string) => { for (let i = from; i < 4; i++) setCheck(i, 'skip', { detail: why }); };
+    const skipFrom = (from: number, why: string) => { for (let i = from; i < steps.length; i++) setCheck(i, 'skip', { detail: why }); };
 
     async function run(json: string, kind: string, label: string) {
       const tok = resetResults(false);
       setSource(kind, label);
       running = true; syncGate(); btnVerify.setAttribute('aria-busy', 'true');
-      setBanner('running', 'Verifying in this tab', 'Step 1 of 3 · Schema valid', '');
+      setBanner('running', 'Verifying in this tab', 'Step 1 of 4 · Schema valid', '');
 
       // 1 · schema
       setCheck(0, 'running');
@@ -215,7 +221,7 @@ export function VerifyClient() {
 
       // 2 · proof — the wasm groth16 check, held ≥ 600 ms so the sweep reads
       setCheck(1, 'running');
-      setBanner('running', 'Verifying in this tab', 'Step 2 of 3 · Proof verifies', '');
+      setBanner('running', 'Verifying in this tab', 'Step 2 of 4 · Proof verifies', '');
       let t0 = now();
       const [res] = await Promise.all([verifyProof(json), hold(600)]);
       if (stale(tok)) return;
@@ -229,7 +235,7 @@ export function VerifyClient() {
 
       // 3 · decode
       setCheck(2, 'running');
-      setBanner('running', 'Verifying in this tab', 'Step 3 of 3 · Public data decoded', '');
+      setBanner('running', 'Verifying in this tab', 'Step 3 of 4 · Public data decoded', '');
       await hold(220);
       if (stale(tok)) return;
       const dec = decodePublicInputs(att);
@@ -243,10 +249,24 @@ export function VerifyClient() {
       decoded = dec;
       setCheck(2, 'pass', { detail: 'Six fields from one blob, exactly as the on-chain program reads them; each matches the file.' });
       renderKv(dec);
-      // 4 · on demand
-      $('.vf-n4', li(3)).hidden = false;
-      setCheck(3, 'pending', { detail: STEPS[3].idle });
-      done(tok, true);
+
+      // 4 · the action fields rehashed over the committed inputs (WebCrypto, in this tab)
+      setCheck(3, 'running');
+      setBanner('running', 'Verifying in this tab', 'Step 4 of 4 · Action matches the proof', '');
+      const [ab] = await Promise.all([checkActionBinding(att, dec), hold(220)]);
+      if (stale(tok)) return;
+      if (ab.reasons.length) {
+        const more = ab.reasons.length > 1 ? ' (+' + (ab.reasons.length - 1) + ' more)' : '';
+        setCheck(3, 'fail', { detail: 'The action written in the file is not the one this proof was made for.', reason: ab.reasons[0] + more });
+        skipFrom(4, 'Skipped: the action did not match.');
+        return done(tok, false, 4, 'Action matches the proof');
+      }
+      if (!ab.checked) setCheck(3, 'skip', { detail: 'The file carries no action fields, so there is nothing to rehash. The proof still commits to an action fingerprint; the receiving program checks it against the real action.' });
+      else setCheck(3, 'pass', { detail: 'Program, source, instruction, recipient, mint, amount, chain and nonce rehash to the committed action fingerprint; the reuse marker derives from it.' });
+      // 5 · on demand
+      $('.vf-n4', li(4)).hidden = false;
+      setCheck(4, 'pending', { detail: STEPS[4].idle });
+      done(tok, true, undefined, undefined, ab.checked ? '4 of 4' : '3 of 4');
     }
 
     async function runDisclosure(tok: number, d: Disclosure) {
@@ -287,12 +307,12 @@ export function VerifyClient() {
       setBanner('pass', 'Valid disclosure', v.clean ? 'Signature, chain and window check out. No content was disclosed.' : 'Signature and chain check out. The window is not clean: ' + nonPass + ' non-pass verdict' + (nonPass === 1 ? '' : 's') + '.', (v.clean ? '4' : '3') + ' of 4');
     }
 
-    function done(tok: number, ok: boolean, failedAt?: number, failedName?: string) {
+    function done(tok: number, ok: boolean, failedAt?: number, failedName?: string, end = '4 of 4') {
       if (stale(tok)) return;
       running = false; hasResult = true;
       btnVerify.removeAttribute('aria-busy'); syncGate();
-      if (ok) setBanner('pass', 'Proof verified', 'The proof is valid. It shows that the pattern checks passed for the request tied to this action. It does not mean the action is guaranteed safe. This browser check does not approve an action on Solana. The receiving app must also check that the proof matches its action, uses approved rules and software, has not expired, and has not already been used.', '3 of 3');
-      else setBanner('fail', 'Does not verify', 'Failed at step ' + failedAt + ', ' + failedName + '.' + ((failedAt as number) < 3 ? ' Later steps were skipped.' : ''), 'Step ' + failedAt);
+      if (ok) setBanner('pass', 'Proof verified', 'The proof is valid. It shows that the pattern checks passed for the request tied to this action. It does not mean the action is guaranteed safe. This browser check does not approve an action on Solana. The receiving app must also check that the proof matches its action, uses approved rules and software, has not expired, and has not already been used.', end);
+      else setBanner('fail', 'Does not verify', 'Failed at step ' + failedAt + ', ' + failedName + '.' + ((failedAt as number) < 4 ? ' Later steps were skipped.' : ''), 'Step ' + failedAt);
     }
 
     /* panel 5: once step 1 passes; never removed by a later failure */
@@ -344,13 +364,13 @@ export function VerifyClient() {
       BS.toast({ title: 'Saved public-inputs.txt', body: 'The six public values as text. The proof file never left this tab.', tone: 'ok', id: 'vf-dl' });
     }
 
-    /* ── step 4: the one network step, on its button (a same-origin server read) ── */
+    /* ── step 5: the one network step, on its button (a same-origin server read) ── */
     function checkNullifier() {
       if (!decoded || !decoded.nullifier) return;
       const tok = runTok;
-      const row = $('.vf-n4', li(3)), b = $<HTMLButtonElement>('[data-n4]', row);
+      const row = $('.vf-n4', li(4)), b = $<HTMLButtonElement>('[data-n4]', row);
       b.disabled = true; b.setAttribute('aria-busy', 'true');
-      setCheck(3, 'running', { detail: 'Checking Solana for this proof’s reuse marker…' });
+      setCheck(4, 'running', { detail: 'Checking Solana for this proof’s reuse marker…' });
       const t0 = now();
       const read = fetch('/verify/nullifier?n=' + encodeURIComponent(decoded.nullifier), { cache: 'no-store' })
         .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j as { consumed: boolean; consumedAtSlot?: number; consumerProgram?: string; direct?: boolean }; })
@@ -360,7 +380,7 @@ export function VerifyClient() {
         const ms = fmt.ms(Math.round(now() - t0));
         b.disabled = false; b.removeAttribute('aria-busy');
         if (!r.ok) {
-          setCheck(3, 'fail', { detail: 'The mainnet RPC did not answer. Steps 1–3 stand without it.', reason: 'RPC unavailable · try again' });
+          setCheck(4, 'fail', { detail: 'The mainnet RPC did not answer. Steps 1–4 stand without it.', reason: 'RPC unavailable · try again' });
           $('span', b).textContent = 'Try again';
           return;
         }
@@ -370,7 +390,7 @@ export function VerifyClient() {
           (r.r.direct || isDirectConsumer(r.r.consumerProgram) ? '<span>consumed directly (no gated program)</span>'
             : r.r.consumerProgram ? '<span>by</span>' + ui.hash(r.r.consumerProgram, { label: 'Consumer program', lg: true }) : '') + '</span>';
         else html = '<span class="vf-res"><span class="chip outline">unused</span><span>This proof has not been used on Solana yet.</span></span>';
-        setCheck(3, 'pass', { detail: html, html: true, end: 'mainnet · ' + ms });
+        setCheck(4, 'pass', { detail: html, html: true, end: 'mainnet · ' + ms });
         $('span', b).textContent = 'Check again';
       });
     }

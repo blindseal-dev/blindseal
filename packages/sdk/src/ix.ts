@@ -68,7 +68,7 @@ export interface ActionArgs {
   nonce: Uint8Array; // 32
 }
 
-export const hex = (s: string): Buffer => Buffer.from(s.replace(/^0x/, ''), 'hex');
+export const hex = (s: string): Buffer => Buffer.from(s.replace(/^0x/i, ''), 'hex');
 const pk = (s: string): PublicKey => (s ? new PublicKey(s) : PublicKey.default);
 
 export function actionArgsFrom(att: Attestation): ActionArgs {
@@ -106,6 +106,75 @@ export function computeActionHash(a: ActionArgs, payloadHash: Uint8Array, policy
 }
 export const computeNullifier = (actionHash: Uint8Array): Buffer =>
   createHash('sha256').update(NULLIFIER_DOMAIN).update(actionHash).digest();
+
+// ---- action binding: the labelled action fields vs what the proof commits to ----
+export type ActionBindingField = 'actionHash' | 'nullifier';
+/**
+ * Result of `recomputeActionBinding`. The proof commits to actionHash and nullifier only as hashes;
+ * the action fields (`action.*`, `chainId`, `nonce`) in the file are labels. Recomputing the hash from
+ * them, over the COMMITTED payloadHash / policyRoot / detectorVersion / expirySlot, shows whether the
+ * file's action is the one that was proven — an edited amount or recipient hashes to something else.
+ */
+export interface ActionBinding {
+  /** false when the file carries no `action` object: there is nothing to recompute. */
+  checked: boolean;
+  /** sha256(ACTION_DOMAIN ‖ chainId ‖ action fields ‖ committed inputs ‖ nonce), when the fields were usable. */
+  actionHash?: string;
+  /** sha256(NULLIFIER_DOMAIN ‖ committed actionHash): what the nullifier must be. */
+  nullifier?: string;
+  /** `actionHash` when the recomputed hash differs from the committed one; `nullifier` when the committed nullifier does not derive from the committed actionHash. */
+  mismatches: ActionBindingField[];
+  /** why the action fields could not be hashed (missing nonce, malformed pubkey, hex or amount); a failure like a mismatch. */
+  error?: string;
+}
+
+const U64_MAX = (1n << 64n) - 1n;
+
+/** The action fields as the prover wrote them, validated byte-for-byte to what `computeActionHash` hashes. */
+export function actionArgsStrict(att: Pick<Attestation, 'chainId' | 'nonce' | 'action'>): ActionArgs {
+  const a = att.action;
+  if (!a || typeof a !== 'object') throw new Error('action is missing');
+  if (!Number.isInteger(att.chainId) || att.chainId < 0 || att.chainId > 0xffff) throw new Error(`chainId must be a u16, got ${String(att.chainId)}`);
+  if (typeof att.nonce !== 'string' || !/^(0x)?[0-9a-f]{64}$/i.test(att.nonce)) throw new Error('nonce must be 32 bytes of hex');
+  if (typeof a.instruction !== 'string' || !/^(0x)?[0-9a-f]{16}$/i.test(a.instruction)) throw new Error('action.instruction must be 8 bytes of hex');
+  if (typeof a.amount !== 'string' || !/^\d+$/.test(a.amount) || BigInt(a.amount) > U64_MAX) throw new Error('action.amount must be a decimal u64 string');
+  for (const k of ['targetProgram', 'sourceAuthority', 'recipient', 'mint'] as const) {
+    if (typeof a[k] !== 'string') throw new Error(`action.${k} must be a base58 string ('' for none)`);
+    if (a[k]) { try { new PublicKey(a[k]); } catch { throw new Error(`action.${k} is not a valid public key`); } }
+  }
+  return actionArgsFrom(att as Attestation);
+}
+
+/**
+ * Recompute actionHash from the file's action fields and nonce over the COMMITTED public inputs, and the
+ * nullifier from the committed actionHash; compare both to the committed values. Hex is compared
+ * case-insensitively. Never throws: unusable fields are reported in `error`.
+ */
+export function recomputeActionBinding(att: Partial<Pick<Attestation, 'chainId' | 'nonce' | 'action'>>, decoded: DecodedPublicInputs): ActionBinding {
+  if (att.action === undefined || att.action === null) return { checked: false, mismatches: [] };
+  const out: ActionBinding = { checked: true, mismatches: [] };
+  try {
+    const args = actionArgsStrict(att as Pick<Attestation, 'chainId' | 'nonce' | 'action'>);
+    const h = computeActionHash(args, hex(decoded.payloadHash), hex(decoded.policyRoot), hex(decoded.detectorVersion), BigInt(decoded.expirySlot));
+    out.actionHash = '0x' + h.toString('hex');
+  } catch (e) {
+    out.error = e instanceof Error ? e.message : String(e);
+  }
+  out.nullifier = '0x' + computeNullifier(hex(decoded.actionHash)).toString('hex');
+  if (out.actionHash !== undefined && out.actionHash !== decoded.actionHash.toLowerCase()) out.mismatches.push('actionHash');
+  if (out.nullifier !== decoded.nullifier.toLowerCase()) out.mismatches.push('nullifier');
+  return out;
+}
+
+/** One sentence per problem in an `ActionBinding`, or null when it is fine (or unchecked). */
+export function actionBindingReason(b: ActionBinding, decoded: DecodedPublicInputs): string | null {
+  if (!b.checked) return null;
+  const parts: string[] = [];
+  if (b.error) parts.push(`action fields unusable: ${b.error}`);
+  if (b.mismatches.includes('actionHash')) parts.push(`action mismatch: the action fields hash to ${b.actionHash} but the proof commits to actionHash ${decoded.actionHash}`);
+  if (b.mismatches.includes('nullifier')) parts.push(`nullifier mismatch: derived from the committed actionHash it is ${b.nullifier} but the proof commits to ${decoded.nullifier}`);
+  return parts.length ? parts.join('; ') : null;
+}
 
 // ---- the committed public-input blob ----
 // `publicInputs[0]` is the guest's public values in commit order (crates/guest/src/main.rs):
