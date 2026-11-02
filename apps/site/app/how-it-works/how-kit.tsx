@@ -2,6 +2,7 @@
 import { usePageKit, decorate } from '../use-page-kit';
 import disclosure from '../verify/disclosure-sample.json';
 import { canonicalJson } from '../verify/disclosure';
+import './figures.css';
 
 // S02 · How it works — the mockup's page.js (design/mockups/mockups/S02/page.js), run once the kit
 // has mounted the chrome (use-page-kit.ts). page.tsx renders the mockup's static markup; this fills
@@ -29,6 +30,40 @@ export interface HowData {
 type Entry = { index: number; hash: string; prevHash: string; ts: string; verdict: string; decisionId: string; payloadHash: string };
 const AUDIT_DOMAIN = 'blindseal.audit.v1';
 const WINDOW: [number, number] = [194, 197];
+/* the figure GIFs already fetched into the HTTP cache in this page's lifetime (one warm-up per file) */
+const warmed = new Set<string>();
+
+/** The description the kit's render gives each figure's svg (diagrams.js: the aria text of architecture,
+ *  layers, lifecycle and chain, built from the same options), used as the GIF's alt. */
+function figLabel(name: string, o: Record<string, unknown>): string {
+  if (name === 'architecture') {
+    return 'Architecture. The agent calls its tools through the proxy on the same machine; the proxy screens every call ' +
+      'with four layers (L0 decode, L1 patterns, L2 similarity, L3 judge), redacting secrets and PII before L2. The proof covers L1 today; L0 runs in the proxy and is not in the proof yet. ' +
+      'Every decision is written to a hash-chained audit log. The prover makes a zero-knowledge attestation; ' +
+      'only the proof and its public inputs cross to the public side, where the Solana verifier checks it in one instruction.';
+  }
+  if (name === 'layers') {
+    const paint: Record<string, string> = {};
+    ((o.results as { layer: string; verdict: string }[] | undefined) || []).forEach((r) => {
+      if (r && ['pass', 'block', 'flag', 'skip'].includes(r.verdict)) paint[r.layer] = r.verdict;
+    });
+    return 'Four screening layers. L0 decode and L1 patterns see the raw payload and are deterministic; the proof covers L1 today, and L0 runs in the proxy but is not in the proof yet. ' +
+      'Secrets and PII are redacted before L2 similarity and L3 judge, which see the redacted payload and are model-based, so they are attested.' +
+      Object.keys(paint).map((k) => ' ' + k + ': ' + paint[k] + '.').join('');
+  }
+  if (name === 'lifecycle') {
+    return 'Attestation lifecycle: decision, requested, generating, generated, submitted, consumed. ' +
+      'Valid until its expiry slot; consuming it spends the nullifier, so it is single-use. Current status: ' + String(o.status || 'consumed') + '.';
+  }
+  /* chain: the entries (or ten from #1) and the disclosed window; no break is ever passed here */
+  const given = (o.entries as { index: number }[] | undefined) || [];
+  const idx = given.length ? given.slice(0, 10).map((e) => e.index) : Array.from({ length: 10 }, (_, i) => i + 1);
+  const first = idx[0]!, last = idx[idx.length - 1]!, w = o.window as [number, number] | undefined;
+  let win = w && w.length === 2 ? [Math.max(first, Math.min(w[0], w[1])), Math.min(last, Math.max(w[0], w[1]))] : null;
+  if (win && win[0]! > win[1]!) win = null;
+  return 'Audit chain of ' + idx.length + ' entries, #' + first + ' to #' + last + ', each linked to the hash of the one before.' +
+    (win ? ' Disclosed range #' + win[0] + ' to #' + win[1] + ', content-free.' : '');
+}
 
 /** Walk the disclosure's entries from the first one up to the head, recomputing every link
  *  (apps/site/app/verify/disclosure.ts, the chain part): each hash reproduces from its six-field
@@ -186,7 +221,14 @@ export function HowKit({ data: D }: { data: HowData }) {
       });
     });
 
-    /* ── the four figures (round 2: they loop under html.bs-site; no replay control) ─────── */
+    /* ── the four figures ─────────────────────────────────────────────────────────────────
+       Below 720 px (the kit's NARROW_Q) the kit draws its vertical figures (round 2: they loop under
+       html.bs-site; no replay control). From 720 px up each figure is an animated GIF on the canvas
+       colour with the same draw → hold → fade cycle baked in: its box is reserved from the file's size,
+       the file is fetched into the HTTP cache one viewport ahead (a plain fetch: a detached Image could
+       start the animation early), and src is set when the figure crosses the kit's draw-in line, so it
+       plays from its first frame where the draw would have started. Reduced motion shows the drawn
+       frame as a still and never requests the GIF. Crossing 720 px swaps the two. */
     const entries = entriesAll.slice(0, 10).map((e) => ({ index: e.index, hash: e.hash }));
     const FIGS: Array<[string, string, Record<string, unknown>]> = [
       ['#fig-architecture', 'architecture', {}],
@@ -195,15 +237,108 @@ export function HowKit({ data: D }: { data: HowData }) {
       ['#fig-lifecycle', 'lifecycle', { status: att.status }],
       ['#fig-chain', 'chain', entries.length ? { window: WINDOW, entries } : { window: WINDOW }],
     ];
-    FIGS.forEach((f) => {
-      const el = $(f[0]); if (!el) return;
-      const host = BS.diagrams.render(f[1], el, f[2]) as HTMLElement | null;
+    /* each GIF's pixel size, and the caption the kit renders for that figure (diagrams.js), word for word */
+    const GIFS: Record<string, { w: number; h: number; caption: string }> = {
+      architecture: { w: 960, h: 455, caption: 'Left of the rule stays on the machine. The verifier sees a proof and five public inputs, never the call.' },
+      layers: { w: 476, h: 246, caption: 'L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally (TEE mode planned), and are attested.' },
+      lifecycle: { w: 960, h: 198, caption: 'One attestation, one action, one use. Consuming it spends the nullifier; after the expiry slot it is worthless.' },
+      chain: { w: 960, h: 147, caption: 'Each entry commits to the hash of the one before it. A disclosure proves a range without its content.' },
+    };
+    type FigHost = HTMLElement & { __dg?: { stop?: () => void } };
+    type Fig = { el: FigHost; name: string; opts: Record<string, unknown>; mode: '' | 'kit' | 'gif' | 'still'; stop: () => void };
+    const narrowMq = window.matchMedia('(max-width: 719.98px)');
+    const want = () => (narrowMq.matches ? 'kit' : reduced() ? 'still' : 'gif');
+
+    function kitFig(f: Fig) {
+      const host = BS.diagrams.render(f.name, f.el, f.opts) as HTMLElement | null;
       if (!host) return;
       const cap = host.querySelector(':scope > figcaption');
       if (cap) cap.setAttribute('data-n', host.getAttribute('data-fig-n') || '');
+      f.mode = 'kit';
       /* the loop is the kit's (diagrams.js startLoop); stop it with the figure on route change */
-      cleanups.push(() => { try { BS.diagrams.loopOf?.(host)?.stop?.(); } catch { /* already gone */ } });
+      f.stop = () => { try { BS.diagrams.loopOf?.(host)?.stop?.(); } catch { /* already gone */ } };
+    }
+    /* back to the server's empty figure: observers and the kit's loop and draw-in stopped, and the kit's
+       record dropped so its own 720 px watcher leaves the host alone */
+    function clearFig(f: Fig) {
+      const el = f.el;
+      f.stop(); f.stop = () => {};
+      try { BS.diagrams.loopOf?.(el)?.stop?.(); } catch { /* already gone */ }
+      try { el.__dg?.stop?.(); } catch { /* already gone */ }
+      delete el.__dg;
+      el.querySelectorAll(':scope > .fig__art, :scope > figcaption').forEach((n) => n.remove());
+      el.classList.remove('is-armed', 'is-drawn', 'is-settled', 'is-dg-fading', 'is-nofx', 'is-paused', 'is-visible');
+      ['data-dg-ready', 'data-dg-rate', 'data-dg-engine', 'data-dg-loop', 'data-dg-phase', 'data-fig-mode'].forEach((a) => el.removeAttribute(a));
+      ['--labels-delay', '--labels-at', '--dg-loop-fade'].forEach((p) => el.style.removeProperty(p));
+      f.mode = '';
+    }
+    function gifFig(f: Fig, still: boolean) {
+      const el = f.el, g = GIFS[f.name]!;
+      const src = '/kit/brand/fig-' + f.name + (still ? '-still.webp' : '.gif');
+      /* what the kit gives its host, so the .fig and .hiw-fig rules apply unchanged */
+      el.classList.add('fig');
+      el.setAttribute('data-diagram', f.name);
+      el.setAttribute('data-fig-mode', still ? 'still' : 'gif');
+      const art = document.createElement('div');
+      art.className = 'fig__art';
+      const img = document.createElement('img');
+      img.className = 'hiw-fig__img';
+      img.alt = figLabel(f.name, f.opts);
+      img.decoding = 'async';
+      img.draggable = false;
+      img.width = g.w;
+      img.height = g.h;
+      art.appendChild(img);
+      const cap = document.createElement('figcaption');
+      cap.className = 'fig__caption';
+      cap.setAttribute('data-n', el.getAttribute('data-fig-n') || '');
+      cap.textContent = g.caption;
+      el.append(art, cap);
+      f.mode = still ? 'still' : 'gif';
+      if (still) { img.src = src; return; }
+      let live = true, started = false;
+      const root: HTMLElement | null = M.scrollRoot ? M.scrollRoot() : null;
+      const ios: IntersectionObserver[] = [];
+      const once = (rootMargin: string, fn: () => void) => {
+        const io = new IntersectionObserver((es) => {
+          if (!es.some((e) => e.isIntersecting)) return;
+          io.disconnect();
+          fn();
+        }, { root, rootMargin });
+        io.observe(el);
+        ios.push(io);
+      };
+      once('0px 0px -12% 0px', () => {
+        started = true;
+        Promise.resolve(M.whenUncovered ? M.whenUncovered() : undefined).then(() => { if (live) img.src = src; });
+      });
+      once('0px 0px 100% 0px', () => {
+        /* a figure already across the start line (in view on mount) is loaded by the start itself */
+        const top = el.getBoundingClientRect().top - (root ? root.getBoundingClientRect().top : 0);
+        if (started || warmed.has(src) || top < (root ? root.clientHeight : window.innerHeight) * 0.88) return;
+        warmed.add(src);
+        fetch(src).then((r) => r.arrayBuffer()).catch(() => { warmed.delete(src); /* the start loads it anyway */ });
+      });
+      f.stop = () => { live = false; ios.forEach((io) => io.disconnect()); };
+    }
+    function build(f: Fig) {
+      const w = want();
+      if (w === f.mode) return;
+      clearFig(f);
+      if (w === 'kit') kitFig(f); else gifFig(f, w === 'still');
+    }
+    const figs: Fig[] = [];
+    FIGS.forEach((d) => {
+      const el = $<FigHost>(d[0]); if (!el) return;
+      const f: Fig = { el, name: d[1], opts: d[2], mode: '', stop: () => {} };
+      /* a re-run on a figure the kit already drew updates it in place, as before */
+      if (el.__dg && want() === 'kit') kitFig(f); else build(f);
+      figs.push(f);
     });
+    const rebuild = () => figs.forEach(build);
+    on(narrowMq, 'change', rebuild);
+    on(document, 'bs:motion', rebuild);
+    cleanups.push(() => figs.forEach((f) => { if (f.mode === 'kit') f.stop(); else clearFig(f); }));
     decorate($('.hiw') || document);
 
     /* ── the TOC: progress fill + scroll-spy + navigation ────────────────── */

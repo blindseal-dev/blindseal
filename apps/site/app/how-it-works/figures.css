@@ -1,0 +1,5 @@
+/* How it works · the four figures from 720 px up (how-kit.tsx): each is an animated GIF on the canvas
+   colour, never wider than its own pixels. The img's width and height attributes reserve its box before
+   src is set, so nothing below moves when it starts. Below 720 px the kit's vertical figures stay.
+   Tokens only; no colour literal. */
+.hiw-fig .fig__art > .hiw-fig__img { display: block; max-width: 100%; height: auto; }

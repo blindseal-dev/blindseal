@@ -115,3 +115,103 @@ html[data-motion="reduce"] .hm-light__video { transition: none; }
   .hm-light__plate > img { object-fit: cover; object-position: 70% 46%; }
   .hm-light__scrim, .hm-light::after { background: none; }
 }
+
+/* Section artwork: banner1 behind 02 + 03 (one layer on the .hm-art wrapper), banner2 behind the FAQ (the section's
+   ::after). Full-bleed, absolutely positioned, static; cut edges sit on the viewport edge or fade through a mask sized
+   to the image. Soft canvas washes sit under the muted copy the art crosses. */
+.hm-art { position: relative; isolation: isolate; margin-top: 32px; }   /* the gap .site-section + .site-section gave 02 */
+.hm-art + .site-section { margin-top: 32px; }                          /* … and the section after 03 */
+.hm-art[data-art="flow"]::before, .site-section[data-art="wave"]::after {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  top: 0; bottom: 0; left: calc(50% - 50vw); right: calc(50% - 50vw);
+  background-repeat: no-repeat; background-size: var(--art-size); background-position: var(--art-pos);
+  opacity: var(--art-a);
+}
+/* 02 + 03: the ribbon. Its frame's left edge is fully transparent and its right edge sits on (or past) the
+   viewport's, so only the top and bottom cuts need the fade; the mask is sized and placed exactly like the image,
+   so the fade follows the image box wherever it sits (on desktop the image is the wrapper's full height). */
+.hm-art[data-art="flow"] {
+  --art-size: auto 100%; --art-pos: right 0 top 0; --art-a: .6;
+}
+.hm-art[data-art="flow"]::before {
+  background-image: url("/kit/brand/banner1.png");
+  background-image: image-set(url("/kit/brand/banner1.webp") type("image/webp"), url("/kit/brand/banner1.png") type("image/png"));
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 14%, black 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 14%, black 86%, transparent 100%);
+  -webkit-mask-size: var(--art-size); mask-size: var(--art-size);
+  -webkit-mask-position: var(--art-pos); mask-position: var(--art-pos);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+/* FAQ: the waves. The image keeps a fixed, width-based size (opening an answer never rescales it); its left
+   edge is the viewport's, its top, right and bottom fade inside the image box, and the layer's own bottom fades
+   so the section's lower edge never cuts it. */
+.site-section[data-art="wave"] {
+  --art-w: 100vw; --art-h: calc(var(--art-w) * 941 / 1672);
+  --art-size: var(--art-w) var(--art-h); --art-pos: left 0 top 0; --art-a: .38;
+}
+.site-section[data-art="wave"]::after {
+  background-image: url("/kit/brand/banner2.png");
+  background-image: image-set(url("/kit/brand/banner2.webp") type("image/webp"), url("/kit/brand/banner2.png") type("image/png"));
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0, black var(--art-fade-t, 26%), black 74%, transparent 100%),
+    linear-gradient(to right, black 0, black 76%, transparent 100%),
+    linear-gradient(to bottom, black 0, black calc(100% - 120px), transparent 100%);
+  mask-image:
+    linear-gradient(to bottom, transparent 0, black var(--art-fade-t, 26%), black 74%, transparent 100%),
+    linear-gradient(to right, black 0, black 76%, transparent 100%),
+    linear-gradient(to bottom, black 0, black calc(100% - 120px), transparent 100%);
+  -webkit-mask-size: var(--art-size), var(--art-size), 100% 100%;
+  mask-size: var(--art-size), var(--art-size), 100% 100%;
+  -webkit-mask-position: var(--art-pos), var(--art-pos), 0 0;
+  mask-position: var(--art-pos), var(--art-pos), 0 0;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-composite: source-in, source-in; mask-composite: intersect;
+}
+/* the washes: a static canvas wash under the muted copy the art can reach (02's right-hand step, 03's head copy, both
+   notes, the FAQ's open answers and its +/x glyph). At z -2 in the section's stacking context they sit above the art
+   but under the 7 % texture and every hairline, which keep their look; each feathers out past its copy (--vx sideways,
+   --vt / --vy at top / bottom). The band's art is on the wrapper, so it shows before the sections reveal. */
+.hm-art .hm-steps, .hm-art .section-head, .hm-art .hm-note, .site-section[data-art="wave"] .hm-faq__a, .site-section[data-art="wave"] .hm-faq__q { position: relative; }
+.hm-art .hm-steps::before, .hm-art .section-head:has(> .section-head__body)::before, .hm-art .hm-note::before, .site-section[data-art="wave"] .hm-faq__a::before {
+  --vx: 72px; --vt: 32px; --vy: 40px;
+  content: ""; position: absolute; z-index: -2; pointer-events: none;
+  top: calc(-1 * var(--vt)); bottom: calc(-1 * var(--vy)); left: calc(-1 * var(--vx)); right: calc(-1 * var(--vx));
+  background: color-mix(in srgb, var(--canvas) var(--wash, 75%), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black var(--vx), black calc(100% - var(--vx)), transparent 100%),
+                      linear-gradient(to bottom, transparent 0, black var(--vt), black calc(100% - var(--vy)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, black var(--vx), black calc(100% - var(--vx)), transparent 100%),
+              linear-gradient(to bottom, transparent 0, black var(--vt), black calc(100% - var(--vy)), transparent 100%);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+.hm-art .hm-steps::before { grid-area: 1 / 3; }                                  /* the third step */
+.hm-art .section-head:has(> .section-head__body)::before { grid-area: 1 / 2; }  /* 03's copy column */
+.site-section[data-art="wave"] .hm-faq__a::before { --vx: 140px; --vt: 44px; --vy: 28px; }   /* under the hairlines too: z -2 sits below every border */
+.site-section[data-art="wave"] .hm-faq__q::before {   /* a small soft spot under the +/x glyph only */
+  content: ""; position: absolute; z-index: -2; pointer-events: none;
+  right: -22px; top: 50%; width: 56px; height: 56px; margin-top: -28px;
+  background: radial-gradient(circle closest-side,
+    color-mix(in srgb, var(--canvas) var(--wash, 75%), transparent) 11px,
+    color-mix(in srgb, var(--canvas) 30%, transparent) 18px, transparent 28px);
+}
+.site-section[data-art="wave"]::after { z-index: -3; }
+
+/* tablets (720 – 1023 px): the wrapper grows taller as the columns narrow, so the height-sized ribbon grows wider
+   and reaches further left; both layers step down to a quieter accent */
+@media (max-width: 1023.98px) {
+  .hm-art[data-art="flow"] { --art-a: .34; }
+  .hm-art .hm-steps::before { grid-area: 1 / 2 / 2 / 4; }   /* steps 2 and 3 */
+  .site-section[data-art="wave"] { --art-a: .3; --art-fade-t: max(26%, 180px); }
+}
+/* phones (< 720 px, the kit's breakpoint): every line spans the column, so the art becomes a small, dim accent;
+   only 03's head copy, which the ribbon crosses, keeps its wash (and the FAQ answers theirs). The ribbon is sized
+   to the width (130 vw, its 2:3 kept) and set at the band's middle, across the divider, its right part cropped off
+   the screen edge; the waves are cropped harder (200 vw, only their left half with the ring shows) and start under
+   the FAQ title. */
+@media (max-width: 719.98px) {
+  .hm-art { margin-top: 20px; }                     /* narrow.css: .site-section + .site-section is 20 px here */
+  .hm-art + .site-section { margin-top: 20px; }
+  .hm-art[data-art="flow"] { --art-size: 130vw 195vw; --art-pos: left -22vw top 52%; --art-a: .26; }
+  .site-section[data-art="wave"] { --art-w: 200vw; --art-pos: left 0 top 96px; --art-a: .2; --art-fade-t: 26%; }
+  .hm-art .hm-steps::before, .hm-art .hm-note::before { display: none; }
+  .hm-art .section-head:has(> .section-head__body)::before { grid-area: 2 / 1; }   /* 03's copy, stacked under the title */
+}

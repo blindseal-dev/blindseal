@@ -70,6 +70,8 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 02 and 03 sit on one decorative artwork layer (app/home.css .hm-art) */}
+      <div className="hm-art" data-art="flow">
       <section className="site-section reveal s01-how site-section--textured" data-texture="metal" aria-labelledby="how-h">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / How it works</p><h2 className="section-head__title" id="how-h">Three steps. One private proof.</h2></div>
@@ -106,6 +108,7 @@ export default function Home() {
         </div>
         <p className="hm-note">Normal Solana transaction details, such as the receiving wallet and amount, may still be public. Blindseal hides the private details used in its checks, not the transaction itself. It does not promise that the person behind a payment cannot be identified.</p>
       </section>
+      </div>
 
       <section className="site-section reveal site-section--textured" data-texture="rock" aria-labelledby="who-h">
         <div className="section-head">
@@ -127,7 +130,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="site-section reveal site-section--textured" data-texture="halo" aria-labelledby="faq-h" id="faq">
+      {/* data-art="wave": the FAQ's own artwork layer, behind the accordion and its open answers (app/home.css) */}
+      <section className="site-section reveal site-section--textured" data-texture="halo" data-art="wave" aria-labelledby="faq-h" id="faq">
         <div className="section-head">
           <div className="section-head__lead"><p className="section-head__eyebrow">FAQ</p><h2 className="section-head__title" id="faq-h">Questions, answered plainly.</h2></div>
         </div>
