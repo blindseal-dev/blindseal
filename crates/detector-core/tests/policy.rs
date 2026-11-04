@@ -2,7 +2,7 @@
 //! rules + the zero-width threshold. The guest recomputes this and commits it as a public
 //! value; the on-chain program allowlists roots. The root is written to
 //! evals/vectors/policy-root.txt as the cross-language test vector (TS/on-chain assert it).
-use blindseal_detector_core::{policy_leaf_count, policy_root, policy_root_hex};
+use blindseal_detector_core::{policy_leaf_count, policy_root, policy_root_hex, rule_dfa_report, RULE_DFA_SIZE_LIMIT};
 
 #[test]
 fn policy_root_is_deterministic_and_nonempty() {
@@ -26,4 +26,21 @@ fn policy_root_is_deterministic_and_nonempty() {
 fn policy_root_from_serialized_matches() {
     use blindseal_detector_core::{policy_root, policy_root_from_serialized, serialize_l1};
     assert_eq!(policy_root_from_serialized(&serialize_l1()), policy_root());
+}
+
+/// Every committed rule must determinize within the per-rule cap, and the total is the input the guest
+/// deserializes on every proof — it drives proving time (docs/performance.md), so a jump here is a
+/// deliberate decision, not a surprise.
+#[test]
+fn every_rule_compiles_within_the_size_cap() {
+    let mut total = 0usize;
+    let mut over: Vec<String> = Vec::new();
+    for (name, r) in rule_dfa_report() {
+        match r {
+            Ok(n) => total += n,
+            Err(e) => over.push(format!("{name}: {e}")),
+        }
+    }
+    assert!(over.is_empty(), "rules that do not compile within {RULE_DFA_SIZE_LIMIT} bytes:\n  {}", over.join("\n  "));
+    eprintln!("serialized rule DFAs: {total} bytes over {} rules", rule_dfa_report().len());
 }
