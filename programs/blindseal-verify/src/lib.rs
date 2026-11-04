@@ -402,7 +402,9 @@ pub struct FeeChanged {
 }
 
 /// `realloc` grows a pre-0.8.0 Config (303 bytes) to the current size; on an account already at that
-/// size it is a no-op (Anchor skips a zero delta). The authority pays the rent difference once.
+/// size it is a no-op (Anchor skips a zero delta). The authority pays the rent difference once. Anchor
+/// runs `realloc` before `has_one`, so a non-authority call grows the account and then fails as a
+/// whole — the transaction reverts and nothing persists.
 #[derive(Accounts)]
 pub struct SetFee<'info> {
     #[account(

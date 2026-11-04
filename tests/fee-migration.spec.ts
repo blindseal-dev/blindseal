@@ -95,7 +95,7 @@ describe('0.8.0 Config migration: deployed verifier → new build', () => {
     const before = (await conn.getAccountInfo(PROGRAM_ID, 'confirmed'))!;
     const out = execFileSync('solana', [
       'program', 'deploy', NEW_SO!, '--program-id', PROGRAM_ID.toBase58(), '--upgrade-authority', process.env.ANCHOR_WALLET!,
-      '-k', process.env.ANCHOR_WALLET!, '-u', 'http://127.0.0.1:8899', '--commitment', 'confirmed',
+      '-k', process.env.ANCHOR_WALLET!, '-u', process.env.ANCHOR_PROVIDER_URL!, '--commitment', 'confirmed',
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
     console.log('      ' + out.trim().split('\n').join('\n      '));
     expect(out).to.match(/Program Id: 6z4Heh/);
