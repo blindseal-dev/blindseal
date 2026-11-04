@@ -24,7 +24,7 @@ SDK's pins (`CURRENT_VKEY`, `LEGACY_VKEYS`, `DEFAULT_POLICY_ROOT`, `DEMO_POLICY_
 | **Sample** | `tests/fixtures/attestation-mainnet-demo-0.8.0.json`: the 0.7.0 sample's tool call (payloadHash `0x7de7653d…47dec`, 0.001 SOL from the demo wallet `GdPZNkh4…` through transfer-gate), actionHash `0x275ee51c…4355`, nullifier `0x36b36c1b…a62d`, **expiry slot 466,872,143** (≈ 7 days after 2026-11-04 16:39 UTC). Verified off chain (CLI and SDK: proof, labels, action binding). Not submitted. |
 | CPU proof of the sample (Apple M1 Max, 32 GB, alone) | **8,366,102 ms = 2 h 19 min 26 s**; executor 104,486,030 cycles (0.7.0: 104,223,540) |
 | GPU proof | not measured (no GPU host available); procedure in `docs/gpu-proving.md` |
-| Programs (verifiable builds, `solanafoundation/solana-verifiable-build:4.3.0`, workflow `verifiable-build` at the release commit) | transfer_gate {{GATE_BYTES}} B, executable hash `{{HASH_GATE_080}}`; blindseal_verify {{VERIFY_BYTES}} B, executable hash `{{HASH_VERIFY_080}}` |
+| Programs (verifiable builds, `solanafoundation/solana-verifiable-build:4.3.0`, workflow `verifiable-build` at the release commit) | transfer_gate 188,808 B, executable hash `5d02435797e80ae99ab3600f5cae9f5b819b49de42c751ae69b0fc30c97dbc0b`; blindseal_verify 381,352 B, executable hash `95a7cd065535b73777a3ffd5b93f6e70c2d38f04021f3f1b0068f424fadc2167` |
 | SIMD-0500 (`B8JJXCy5…o83g`) | read 2026-11-04 19:18 UTC: not activated and not pending, so the 4.3.0 image (sBPF v0) still deploys. Re-check on the day. |
 | Authority, fee payer and signer | `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj` |
 
@@ -35,11 +35,11 @@ SDK's pins (`CURRENT_VKEY`, `LEGACY_VKEYS`, `DEFAULT_POLICY_ROOT`, `DEMO_POLICY_
    Each is one `register_policy_root` transaction: 899,160 lamports rent + 5,000 fee. Works on the 0.7.0
    programs. The 0.7 root stays registered, so 0.7.x attestations keep their root until c2 retires their vkey.
 2. **Upgrade transfer-gate** — `scripts/mainnet-0.7.0.sh 0` builds both programs with the verifiable image; check
-   that its local executable hash for `transfer_gate` is `{{HASH_GATE_080}}` before typing the confirmation. The
+   that its local executable hash for `transfer_gate` is `5d02435797e80ae99ab3600f5cae9f5b819b49de42c751ae69b0fc30c97dbc0b` before typing the confirmation. The
    new gate expects the default, demo and 0.7 roots and forwards the optional fee accounts; a 0.7.1 client
-   (no treasury account) keeps working. ProgramData {{GATE_GROWTH}}.
-3. **Upgrade blindseal-verify** — same step, `blindseal_verify` must hash to `{{HASH_VERIFY_080}}`.
-   ProgramData {{VERIFY_GROWTH}}. Either upgrade order works at fee 0 (the old gate's CPI omits the trailing
+   (no treasury account) keeps working. ProgramData fits: 188,808 B in the 192,720 B ProgramData, no extend.
+3. **Upgrade blindseal-verify** — same step, `blindseal_verify` must hash to `95a7cd065535b73777a3ffd5b93f6e70c2d38f04021f3f1b0068f424fadc2167`.
+   ProgramData grows 366,672 → 381,352 B: the CLI extends by 14,680 B (74,574,400 lamports ≈ 0.0746 SOL kept), with a ≈ 1.94 SOL buffer held during the deploy (sha256 of the .so `b7e8a70766112ffacbb1a422c47d502c39e9573415b6c61fa007ee2bea92df0b`; transfer_gate `3090fff0df60cc7527db4136a33c071cc9bba3d39596227b44148dc1876bc389`). Either upgrade order works at fee 0 (the old gate's CPI omits the trailing
    fee accounts, which the new verifier accepts while the fee is 0); gate first as in 0.7.0.
 4. **`set_fee(0, <treasury>)`** — `scripts/mainnet-0.7.0.sh --simulate f --treasury <pubkey>`, then `f`. Grows
    Config 303 → 343 bytes (+203,200 lamports rent, paid by the authority) and records the treasury; charges

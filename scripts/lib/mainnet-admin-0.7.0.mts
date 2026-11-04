@@ -63,8 +63,8 @@ const RELEASE_HASHES: Record<'0.7.0' | '0.8.0', Array<[string, PublicKey, string
     ['blindseal_verify', PROGRAM_ID, '5a1f0e90dd3e910ea04db2de02cff5cc7cac2de29db6925b9a6e1250ce078bed'],
   ],
   '0.8.0': [
-    ['transfer_gate', GATE_ID, '{{HASH_GATE_080}}'],
-    ['blindseal_verify', PROGRAM_ID, '{{HASH_VERIFY_080}}'],
+    ['transfer_gate', GATE_ID, '5d02435797e80ae99ab3600f5cae9f5b819b49de42c751ae69b0fc30c97dbc0b'],
+    ['blindseal_verify', PROGRAM_ID, '95a7cd065535b73777a3ffd5b93f6e70c2d38f04021f3f1b0068f424fadc2167'],
   ],
 };
 
