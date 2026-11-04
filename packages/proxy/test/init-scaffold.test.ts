@@ -23,7 +23,7 @@ describe('blindseal init — scaffold', () => {
     expect(readFileSync(path.join(home, 'identity.key'), 'utf8')).toMatch(/^302e020100300506032b657004220420[0-9a-f]{64}\n$/);
     expect(r.pubkeyHex).toMatch(/^302a300506032b6570032100[0-9a-f]{64}$/);
     const policy = JSON.parse(readFileSync(path.join(home, 'policy.json'), 'utf8'));
-    expect(policy.rules).toHaveLength(22);
+    expect(policy.rules).toHaveLength(40);
     expect(policy.root).toMatch(/^0x[0-9a-f]{64}$/);
     expect(readFileSync(path.join(home, 'dashboard.token'), 'utf8').trim().length).toBeGreaterThan(20);
     expect(r.created).toHaveLength(4);
