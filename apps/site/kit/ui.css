@@ -214,6 +214,8 @@ svg.lucide { width: 16px; height: 16px; flex: none; }
 .chip.flag    { color: var(--verdict-flag); background: var(--verdict-flag-bg); }
 /* MOCK: accent 16%, mono 10 strong (the shell's top bar) */
 .chip.mock { color: var(--accent-text); background: var(--accent-tint); font-family: var(--font-mono); letter-spacing: .06em; }
+/* "pending mainnet" (release 0.8.0, app/pending-mainnet.tsx): an outline chip set into running text; removed with the marker */
+.chip[data-pending-mainnet] { margin-left: 6px; vertical-align: 2px; font-family: var(--font-mono); letter-spacing: .04em; }
 .badge-count {
   display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-full);
   font: var(--fw-strong) var(--fs-10)/1 var(--font-sans); color: var(--accent-ink); background: var(--accent-fill);

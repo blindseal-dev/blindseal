@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { pageMeta } from '../meta';
 import Link from 'next/link';
+import { PendingMainnet } from '../pending-mainnet';
 import { HowKit, type HowData } from './how-kit';
 import { actionHash, nullifierOf, sha256Hex } from './action-hash';
 import att from './attestation-mainnet.json';
@@ -148,13 +149,13 @@ export default function HowItWorks() {
             <div className="hiw-head reveal">
               <div className="section-head">
                 <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / Four layers</p><h2 className="section-head__title" id="h-four-layers">Four ways to spot suspicious instructions</h2><p className="hiw-caption">Two layers that match, two that judge.</p></div>
-                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. Today&apos;s proof covers only the pattern checks.</p>
+                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1<PendingMainnet />. On the holdout split they catch {'{{catch_after}}'} of attacks, up from {'{{catch_before}}'} with L1 alone, at {'{{fp_rate}}'} false positives on the clean corpus.</p>
               </div>
             </div>
             <div className="hiw-layers">
               <figure className="hiw-fig hiw-fig--narrow" id="fig-layers" data-fig="layers" data-fig-n="2" />
               <ul className="hiw-flows reveal cascade" aria-label="The four layers">
-                <li><span className="hiw-flows__k"><b>L0</b>Decode</span><span className="hiw-flows__v">Decodes base64, hex, URL and HTML-entity encodings, nested, and re-screens the result. Runs in the proxy; not in the proof yet. <span data-count="L0" /></span><span className="chip neutral">Not in proof yet</span></li>
+                <li><span className="hiw-flows__k"><b>L0</b>Decode</span><span className="hiw-flows__v">Decodes base64, hex, URL and HTML-entity encodings, strips zero-width characters, folds homoglyphs and NFKC-normalises, nested to depth 3, and re-screens every form with L1. Inside the proof since 0.8.0. <span data-count="L0" /></span><span className="hiw-flows__chips"><span className="chip outline">Proven</span><PendingMainnet /></span></li>
                 <li><span className="hiw-flows__k"><b>L1</b>Patterns</span><span className="hiw-flows__v">Expressions for override phrasing, prompt extraction, hidden unicode, role tags and exfiltration links. <span data-count="L1" /></span><span className="chip outline">Proven</span></li>
                 <li><span className="hiw-flows__k"><b>L2</b>Similarity</span><span className="hiw-flows__v">Scores the redacted payload against known injections, from 0 to 1. Runs locally; TEE mode planned.</span><span className="chip neutral">Attested</span></li>
                 <li><span className="hiw-flows__k"><b>L3</b>Judge</span><span className="hiw-flows__v">Reads the redacted payload when L2 or a rule raises a doubt, and can clear an L2 flag. Off until you turn it on: runs on a local model, or at an AI provider you choose, which then receives the redacted payload. TEE mode planned.</span><span className="chip neutral">Attested</span></li>
@@ -276,7 +277,7 @@ export default function HowItWorks() {
             </div>
             <div className="hiw-claim reveal cascade">
               <div className="site-panel hiw-claim__panel">
-                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed. L0 decoding is run by the proxy but is not inside the proof yet; the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p></div>
+                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received and on every decoded form of it (L0 runs inside the proof since 0.8.0; pending mainnet until the new verifier key is allowed on chain); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.<PendingMainnet /></p></div>
               </div>
               <figure className="hiw-table" aria-label="Hidden versus public">
                 <table>
