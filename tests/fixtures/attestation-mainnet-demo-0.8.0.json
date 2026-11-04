@@ -7,24 +7,39 @@
     "sourceAuthority": "GdPZNkh4Ugt3PCauGtUdNVDXsxDHFigbGqy4gjYGNC3L",
     "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
   },
-  "actionHash": "0x34372afd1add719ee4b15a2770da4176743433a7f31fe5be6f1e4d87087ac581",
+  "actionHash": "0x275ee51cb890d7beff81c1d699035dddfc7b318324b473d2181c139539a74355",
+  "actionPolicy": {
+    "instructions": [],
+    "maxAmount": "10000000",
+    "mints": [],
+    "recipients": [
+      "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo"
+    ],
+    "targetPrograms": []
+  },
   "chainId": 1,
   "decisionId": "mainnet-demo-0.8.0",
-  "detectorVersion": "0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537",
-  "expirySlot": 465653982,
-  "nonce": "0x93eb1b2985abc6b70acb2b94760910f96270c20cf0401dba21b4dd97bfd198cb",
-  "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)",
-  "nullifier": "0x608d6a4afb135c7ca13c0b4049f04ab56571ef0a5b18860e1e872f840bc49f65",
+  "detectorVersion": "0x00bd130c8d3ccc302df81ae4a422c3bd7a9f8d56afccfa4eb934d4e4406e0378",
+  "expirySlot": 466872143,
+  "nonce": "0xc9deeb6f9592509ece22ff82a4b4cc2ad16ed42035a9698bd496efb4e7bba14b",
+  "note": "L0 (decode-then-L1) and L1 screened inside the proof, on the raw payload and every JSON string leaf (release 0.8.0)",
+  "nullifier": "0x36b36c1b95be9d22cceece2e6c2b429198b5c6e5c9d05db23bd622da99b6a62d",
   "payloadHash": "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec",
-  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "policyRoot": "0x79f11a126ef624b03a351efc79747ee6dadcac8eab71f5e24061514e6205ea8e",
   "proof": {
-    "bytes": "0xa4594c592c0520492913dd04fec224e3663f5d47cb0467f186643181efda4e5b64357aad070d61fc06bbe172fe0609ed28234c7114969e429942f07a2082d65b36d702f4285d244c1560fe24daac1340b203e075f2051e549ef47041ac09395d2f6622c7090ac7cc43797cb8093369dca9c0d95965e1afefa875a4a67f187a4547064339107290601cfb1af8bafc92aadf873ddb527a51d7d4b72d6e78b6d0eb9503b58c1b082015ca613eccbdbab0cb118c0e8bbc0bd16138c3de0cb11e00df1f445c1319c1263774848c947f84be9e6f716b64c69731262ccda14e54ade096d78735d9041c3086fa371a48cddefb6c3df89bfe0141d99eee12528c120bc029c2460c99",
+    "bytes": "0xa4594c592b4809befd961c4eb4be81ae272f53419ba90b8a0c857abe7f40265c6fcfd50a00516f7b795c64e7b3a59a01a68919451808d8fa5d4fb2dadbbaec62f96b49fd2297f14409ae66a50ec2839cbc683176213d9695fbbbd54442ad326e716b1c1307d5aaafc46d340b9455d17c17135f595de9c6693e4caa412efe18652e339b2a2d87c5768385128efe398f942cf6513ec0a74bc6951d7d2866835eb42fc4bbfb2a0ee3471fafad16c35bf68cfc2a79ac113552201b141bc1611902042369e1f41618e8dae6dab9e226369e7b9692275b8933f6dd4308524bd13dd0526c4d7fb81a0f427435252886ce96c37077dbd90506df87dce1c8d01c0683c05b123fc752",
     "curve": "bn254",
     "protocol": "groth16"
   },
-  "proveMs": 8438066,
+  "proveMs": 8366102,
+  "prover": {
+    "host": "local",
+    "mode": "cpu",
+    "version": "0.0.0"
+  },
   "publicInputs": [
-    "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c3839700e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a53734372afd1add719ee4b15a2770da4176743433a7f31fe5be6f1e4d87087ac581608d6a4afb135c7ca13c0b4049f04ab56571ef0a5b18860e1e872f840bc49f65de50c11b00000000"
+    "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec79f11a126ef624b03a351efc79747ee6dadcac8eab71f5e24061514e6205ea8e00bd130c8d3ccc302df81ae4a422c3bd7a9f8d56afccfa4eb934d4e4406e0378275ee51cb890d7beff81c1d699035dddfc7b318324b473d2181c139539a7435536b36c1b95be9d22cceece2e6c2b429198b5c6e5c9d05db23bd622da99b6a62d4fe7d31b00000000"
   ],
+  "rulesRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
   "version": 1
 }
