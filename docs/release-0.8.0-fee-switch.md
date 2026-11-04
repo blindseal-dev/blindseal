@@ -6,6 +6,20 @@ treasury, after every check has passed and in the same transaction as the Nullif
 forwards its `source` as the fee payer. Nothing is sent to mainnet by this branch; the owner signs the steps
 below later. Layouts and account lists: `programs/README.md`.
 
+**Compatibility (decision E).** `fee_payer` and `treasury` are **optional trailing accounts** of
+`verify_and_consume`, and `treasury` is an optional trailing account of `gated_transfer`, with anchor-lang's
+`allow-missing-optionals`. A client built before 0.8.0 — blindseal-sdk 0.7.1, `blindseal submit` 0.7.1, and any
+program that calls the verifier by CPI with the 0.7 account list (payout-gate does) — omits them, and the
+programs accept that while `Config.fee_lamports` is 0. With a fee above 0 both accounts are required
+(`FeeAccountsMissing`, 6017). This is sound because nothing moves at fee 0, and with a fee the treasury must still
+equal `Config.treasury`. So the upgrade does **not** have to share a window with npm 0.8.0: 0.7.1 keeps working
+until an operator turns a fee on. The localnet suite shows it with the published `blindseal-sdk@0.7.1` builder
+(reaches the verifier at fee 0; `FeeAccountsMissing` with nothing moved at fee > 0).
+
+**SIMD-0500, read 2026-11-04 19:18 UTC (slot 465,416,364):** the feature account
+`B8JJXCy5amZyWG9r7EnUYLwzXSXTxG7GZ1qZ1qggo83g` does not exist on mainnet — not activated and not pending — so the
+4.3.0 verifiable image (sBPF v0) still deploys. Re-check on the day.
+
 Numbers below come from a read-only read of live mainnet (`getAccountInfo`, `solana program show`,
 `solana program dump`), the localnet suites, and the verifiable build of this branch.
 
@@ -19,6 +33,9 @@ Numbers below come from a read-only read of live mainnet (`getAccountInfo`, `sol
 | Mainnet rent | 5,080 lamports per byte incl. the 128-byte overhead: 303 B → 2,189,480; 343 B → 2,392,680; difference **203,200 lamports**. |
 
 ## Verifiable build of this branch
+
+**The table below is from `feat/verifier-fee` before decision E and the 0.8.0 policy roots; both programs
+changed since. The current hashes are in `docs/release-0.8.0-plan.md` (step 2/3), rebuilt the same way.**
 
 Built with `solanafoundation/solana-verifiable-build:4.3.0` (`cd programs && solana-verify build -b
 solanafoundation/solana-verifiable-build:4.3.0 --library-name <lib>`, the image the deployed 0.7.0 bytes came
@@ -65,17 +82,18 @@ struct into the 303 bytes (151 bytes used with 2 vkeys). Host test:
 `programs/blindseal-verify/tests/config_layout.rs`. Localnet rehearsal of the whole sequence with the
 deployed binary: `scripts/test-fee-migration.sh` (section below).
 
-Until `set_fee` sets a treasury, clients pass their fee payer in the treasury slot (the zero key cannot be
-passed as a writable account); the SDK does this by itself (`treasuryAccount`, and `submit()` reads the
-Config). With a treasury set, any other account in that slot fails `TreasuryMismatch`, fee or no fee.
+Until `set_fee` sets a treasury, the SDK omits the treasury (the pre-0.8.0 account list); once one is set,
+`submit()` reads the Config and appends it. With a treasury set, any other account passed in that slot fails
+`TreasuryMismatch`, fee or no fee.
 
 ## Migration steps (in order)
 
 1. **Upgrade transfer-gate, then blindseal-verify** from the verifiable builds (hashes above), as in
    `docs/release-0.7.0-mainnet-plan.md` step 0 (`solana program deploy`, CLI 4.3.1, auto-extends ProgramData
-   when the binary grew; see the growth column). The old gate cannot call the new verifier (it does not pass
-   the new accounts) and the new gate cannot call the old one, so **both upgrades land before any gated
-   transaction is sent**; the SDK 0.8.0 is published after both.
+   when the binary grew; see the growth column). With the optional trailing accounts either order works at
+   fee 0: the old gate's CPI (no fee accounts) is accepted by the new verifier, and the new gate's extra
+   trailing accounts are ignored by the old one. Upgrade the gate first anyway, as in 0.7.0. 0.7.1 clients keep
+   working throughout; npm 0.8.0 can follow at any time before a fee is turned on.
 2. **`set_fee(0, <treasury>)`** — reallocs Config 303 → 343 bytes, sets the treasury, charges nothing yet.
    The treasury must be an existing rent-exempt account (a fee smaller than the rent-exempt minimum
    cannot create one); the authority itself is a fine first treasury.
