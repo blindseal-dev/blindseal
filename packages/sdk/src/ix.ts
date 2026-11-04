@@ -23,6 +23,10 @@ export const CURRENT_VKEY = '0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f
 export const LEGACY_VKEYS: readonly string[] = ['0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e'];
 /** On-chain cap on allowed_vkeys (blindseal-verify MAX_VKEYS). */
 export const MAX_VKEYS = 8;
+/** Config account size before 0.8.0 (8 disc ‖ 32 authority ‖ 4 + 8×32 vkeys ‖ 3 flags) and since
+ *  (+ u64 fee_lamports ‖ 32 treasury). `set_fee` grows a 303-byte account to 343 on its first call. */
+export const CONFIG_SIZE_LEGACY = 303;
+export const CONFIG_SIZE = 343;
 /** Default vkey allowlist for a fresh Config: the current guest + the legacy ones. */
 export const DEFAULT_ALLOWED_VKEYS: readonly string[] = [CURRENT_VKEY, ...LEGACY_VKEYS];
 /** The default policy root (detector-core's L1 rules + zero-width threshold; evals/vectors/policy-root.txt). */
@@ -253,17 +257,32 @@ export interface VerifyAccounts {
   payer: PublicKey;
   /** Pass when the program runs in allowlist mode; omit otherwise. */
   policyRoot?: PublicKey | null;
+  /** Debited `Config.fee_lamports` on a successful consume (default: `payer`). */
+  feePayer?: PublicKey;
+  /** `Config.treasury` (read it with `decodeConfig`, pick the slot with `treasuryAccount`). Default: the fee
+   *  payer, which is right only while no treasury is configured. */
+  treasury?: PublicKey;
   programId?: PublicKey;
+}
+
+/** The account to pass in the treasury slot: `Config.treasury` when one is configured, else the fee payer
+ *  (the zero key that means "none" cannot be passed as a writable account). */
+export function treasuryAccount(configTreasury: string | PublicKey | null | undefined, feePayer: PublicKey): PublicKey {
+  const t = configTreasury ? new PublicKey(configTreasury) : PublicKey.default;
+  return t.equals(PublicKey.default) ? feePayer : t;
 }
 
 /**
  * `verify_and_consume(proof, public_inputs, action)`: the account list and data a gated program
  * forwards in its CPI. The verifier accepts it ONLY as a CPI from `action.targetProgram` issued by
  * the top-level instruction — sent as a top-level instruction it fails `DirectCallNotAllowed`.
- * Accounts: config, policy_root (optional), nullifier, payer, system_program, instructions sysvar.
+ * Accounts: config, policy_root (optional), nullifier, payer, fee_payer, treasury, system_program,
+ * instructions sysvar. The fee payer and treasury are in the list whether or not a fee is set.
  */
 export function buildVerifyIx(att: Attestation, action: ActionArgs, accounts: VerifyAccounts): TransactionInstruction {
   const programId = accounts.programId ?? PROGRAM_ID;
+  const feePayer = accounts.feePayer ?? accounts.payer;
+  const treasury = accounts.treasury ?? feePayer;
   const proof = hex(att.proof.bytes);
   const blob = hex(att.publicInputs[0]);
   const { nullifier } = decodePublicInputs(blob);
@@ -277,6 +296,8 @@ export function buildVerifyIx(att: Attestation, action: ActionArgs, accounts: Ve
       { pubkey: policy ?? programId, isSigner: false, isWritable: false },
       { pubkey: nullifierPda(nullifier, programId), isSigner: false, isWritable: true },
       { pubkey: accounts.payer, isSigner: true, isWritable: true },
+      { pubkey: feePayer, isSigner: true, isWritable: true },
+      { pubkey: treasury, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
     ],
@@ -358,24 +379,67 @@ export function buildSetAuthorityIx(authority: PublicKey, newAuthority: PublicKe
   });
 }
 
-/** Decode the Config account (8 disc ‖ 32 authority ‖ vec<[u8;32]> ‖ bool allowlist ‖ bool paused ‖ u8 bump). */
-export function decodeConfig(data: Uint8Array) {
+/** `set_fee(fee_lamports, treasury)` — authority only. Sets the per-consume fee and the account that receives
+ *  it; on a Config written before 0.8.0 (303 bytes) the first call grows the account to 343 bytes, the
+ *  authority paying the rent difference. A fee above 0 with the zero-key treasury fails `TreasuryUnset`.
+ *  Data: disc ‖ u64 LE fee_lamports ‖ 32 treasury. */
+export function buildSetFeeIx(authority: PublicKey, feeLamports: bigint | number, treasury: PublicKey, programId = PROGRAM_ID): TransactionInstruction {
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: configPda(programId), isSigner: false, isWritable: true },
+      { pubkey: authority, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([discriminator('set_fee'), u64le(BigInt(feeLamports)), treasury.toBuffer()]),
+  });
+}
+
+export interface DecodedConfig {
+  authority: string;
+  allowedVkeys: string[];
+  allowlistPolicies: boolean;
+  paused: boolean;
+  bump: number;
+  /** Lamports charged to the fee payer on every consume (0 before `set_fee` is called). */
+  feeLamports: bigint;
+  /** base58; the zero key (`PublicKey.default`) means no treasury is configured. */
+  treasury: string;
+  /** false for a 303-byte account written before 0.8.0 (not yet grown by `set_fee`). */
+  hasFeeFields: boolean;
+}
+
+/** Decode the Config account: 8 disc ‖ 32 authority ‖ vec<[u8;32]> ‖ bool allowlist ‖ bool paused ‖ u8 bump
+ *  [‖ u64 fee_lamports ‖ 32 treasury since 0.8.0]. Both layouts decode: a pre-0.8.0 account (303 bytes) has
+ *  no fee fields and reads as fee 0 / no treasury, exactly as the program reads it. */
+export function decodeConfig(data: Uint8Array): DecodedConfig {
   const b = Buffer.from(data);
   const n = b.readUInt32LE(40);
   const vkeys: string[] = [];
   for (let i = 0; i < n; i++) vkeys.push('0x' + b.subarray(44 + i * 32, 76 + i * 32).toString('hex'));
   const off = 44 + n * 32;
-  return { authority: new PublicKey(b.subarray(8, 40)).toBase58(), allowedVkeys: vkeys, allowlistPolicies: b[off] === 1, paused: b[off + 1] === 1, bump: b[off + 2] };
+  const hasFeeFields = b.length >= CONFIG_SIZE;
+  const feeOff = off + 3;
+  const feeLamports = hasFeeFields ? b.readBigUInt64LE(feeOff) : 0n;
+  const treasury = hasFeeFields ? new PublicKey(b.subarray(feeOff + 8, feeOff + 40)).toBase58() : PublicKey.default.toBase58();
+  return {
+    authority: new PublicKey(b.subarray(8, 40)).toBase58(), allowedVkeys: vkeys, allowlistPolicies: b[off] === 1, paused: b[off + 1] === 1, bump: b[off + 2],
+    feeLamports, treasury, hasFeeFields,
+  };
 }
 
 // ---- transfer-gate (example gated program) ----
 /** `gated_transfer(proof, public_inputs, nonce, amount)`: the gate CPIs verify_and_consume with the
  *  action IT executes, then transfers `amount` lamports source → recipient in the same tx. Must be a
  *  top-level instruction (the verifier refuses a deeper nesting). Accounts: source, recipient,
- *  config, policy_root (optional), nullifier, verify_program, system_program, instructions sysvar. */
-export function buildGatedTransferIx(att: Attestation, accounts: { source: PublicKey; recipient: PublicKey; policyRoot?: PublicKey | null; gateId?: PublicKey; verifyId?: PublicKey }): TransactionInstruction {
+ *  config, policy_root (optional), nullifier, treasury, verify_program, system_program, instructions
+ *  sysvar. `source` pays the verifier's fee (if any) to `treasury`, which must be `Config.treasury`
+ *  (`treasuryAccount(decodeConfig(..).treasury, source)`; default: `source`, right only while no
+ *  treasury is configured — `submit()` reads it from the chain). */
+export function buildGatedTransferIx(att: Attestation, accounts: { source: PublicKey; recipient: PublicKey; policyRoot?: PublicKey | null; treasury?: PublicKey; gateId?: PublicKey; verifyId?: PublicKey }): TransactionInstruction {
   const gateId = accounts.gateId ?? TRANSFER_GATE_ID;
   const verifyId = accounts.verifyId ?? PROGRAM_ID;
+  const treasury = accounts.treasury ?? accounts.source;
   const proof = hex(att.proof.bytes);
   const blob = hex(att.publicInputs[0]);
   const { nullifier, policyRoot } = decodePublicInputs(blob);
@@ -390,6 +454,7 @@ export function buildGatedTransferIx(att: Attestation, accounts: { source: Publi
       { pubkey: configPda(verifyId), isSigner: false, isWritable: false },
       { pubkey: policy ?? gateId, isSigner: false, isWritable: false }, // Anchor optional None = program id
       { pubkey: nullifierPda(nullifier, verifyId), isSigner: false, isWritable: true },
+      { pubkey: treasury, isSigner: false, isWritable: true },
       { pubkey: verifyId, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       // forwarded to the verifier, which reads it to check that its caller is the target program

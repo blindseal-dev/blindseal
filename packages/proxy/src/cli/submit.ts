@@ -4,7 +4,8 @@
 /// executes the screened SOL transfer in the same transaction. The verifier accepts only a CPI
 /// from the attestation's target program, so attestations for any other program are refused here
 /// (submit them through that program). The SDK refuses any RPC whose genesis hash is not
-/// mainnet-beta's, so a misconfigured endpoint sends nothing.
+/// mainnet-beta's, so a misconfigured endpoint sends nothing. The verifier's per-consume fee (0 unless
+/// the operator set one; read from its Config) is paid by the wallet and printed before sending.
 ///
 /// Usage:
 ///   blindseal submit <attestation.json> --wallet <keypair.json> [--rpc <url>] [--no-policy]
@@ -24,7 +25,8 @@ Usage:
 
 For a transfer-gate attestation this sends transfer-gate's gated_transfer, signed by the
 attestation's source authority: the proof is verified on chain, the nullifier is consumed and the
-screened SOL transfer executes, all in one transaction. The verifier only accepts a CPI from the
+screened SOL transfer executes, all in one transaction. The wallet also pays the verifier's fee, if
+the operator set one (printed before sending). The verifier only accepts a CPI from the
 attestation's target program, so attestations for any other program cannot be sent from here —
 submit them through that program.
 
@@ -88,7 +90,10 @@ export async function runSubmitCli(argv: string[]): Promise<number> {
   const walletPath = o.wallet ?? process.env.BLINDSEAL_WALLET ?? path.join(os.homedir(), '.config/solana/id.json');
   const wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(walletPath, 'utf8'))));
   try {
-    const sig = await submit(att, { wallet, connection: conn, policyRoot: o.noPolicy ? null : undefined });
+    const onFee = (fee: bigint, treasury: string) => {
+      process.stdout.write(fee > 0n ? `verifier fee: ${fee} lamports → ${treasury}\n` : 'verifier fee: none\n');
+    };
+    const sig = await submit(att, { wallet, connection: conn, policyRoot: o.noPolicy ? null : undefined, onFee });
     process.stdout.write(`gated transfer: ${sig}\nnullifier ${att.nullifier} consumed on mainnet by transfer-gate (${att.action.amount} lamports → ${att.action.recipient})\n`);
     return 0;
   } catch (e) {
