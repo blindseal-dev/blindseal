@@ -13,6 +13,10 @@
 // fixtures, produced by scripts/prove-localnet-fixture.sh (a real ~2 h Groth16 prove each), add the
 // current-vkey happy path and the alternate-policy probe; without them those two cases are reported
 // as pending, never as passed.
+// Release 0.8.0 adds the fee switch: Config carries fee_lamports + treasury (set_fee, authority only), every
+// verify_and_consume carries a fee_payer and a treasury slot, and a consume moves exactly fee_lamports from
+// the fee payer to the treasury once a fee is set. The legacy fixture is consumed at fee 0 (happy path), the
+// current-vkey fixture at fee > 0 (the fee block), so both paths are exercised with real proofs.
 // Namespace imports only: the suite may load as ESM, where named imports from these CJS
 // packages are not guaranteed.
 import * as anchorNs from '@coral-xyz/anchor';
@@ -34,8 +38,8 @@ const { expect } = cjs(chaiNs) as typeof chaiNs;
 // `Option<Vec<[u8;32]>>` (set_config with allowed_vkeys = None), and the builders are what the
 // mainnet init script uses — so the suite exercises the real client path.
 import {
-  buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, buildGatedTransferIx, buildSetAuthorityIx, decodeConfig, decodeNullifier,
-  CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT,
+  buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, buildGatedTransferIx, buildSetAuthorityIx, buildSetFeeIx, decodeConfig, decodeNullifier,
+  treasuryAccount, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, CONFIG_SIZE,
 } from '../packages/sdk/src/ix';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -67,6 +71,9 @@ const ATT_ALT_POLICY = optionalFixture('attestation-test-altpolicy.json');
 
 const source = seeded('source-authority');
 const recipient = seeded('recipient');
+// the fee treasury for the fee block (0.8.0); pre-funded so a small fee keeps it rent-exempt
+const treasury = seeded('treasury');
+const FEE = 12_345;
 if (!process.env.ROGUE_CALLER_ID) throw new Error('ROGUE_CALLER_ID is not set — run the suite via scripts/test-m2.sh');
 const ROGUE = new PublicKey(process.env.ROGUE_CALLER_ID);
 
@@ -82,6 +89,11 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
   const policyPda = (root: Buffer) => PublicKey.findProgramAddressSync([Buffer.from('policy'), root], verify.programId)[0];
   const nullifierPda = (nf: Buffer) => PublicKey.findProgramAddressSync([Buffer.from('nullifier'), nf], verify.programId)[0];
   const cu = ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 });
+  // The account passed in the treasury slot: Config.treasury once set_fee has set one, else the fee payer
+  // (the zero key that means "none" cannot be passed as a writable account). The fee block moves it.
+  let treasurySlot: PublicKey = source.publicKey;
+  const balance = (k: PublicKey) => conn.getBalance(k, 'confirmed');
+  const nullifierRent = () => conn.getMinimumBalanceForRentExemption(8 + 8 + 32 + 32 + 1);
 
   // The attestation's action, as the gate will reconstruct it. Tests mutate copies.
   const baseAction = () => ({
@@ -105,6 +117,8 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
         policyRoot: withPolicy ? policyPda(blob.subarray(32, 64)) : null,
         nullifier: nullifierPda(blob.subarray(128, 160)),
         payer: source.publicKey,
+        feePayer: source.publicKey,
+        treasury: treasurySlot,
         systemProgram: SystemProgram.programId,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
@@ -155,7 +169,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     expect(got, `expected ${code}; message: ${String(err.message ?? err).slice(0, 200)}`).to.equal(code);
   };
 
-  const gatedIx = async (opts: { source?: PublicKey; recipient?: PublicKey; amount?: BN; verifyProgram?: PublicKey; proof?: Buffer; blob?: Buffer } = {}) =>
+  const gatedIx = async (opts: { source?: PublicKey; recipient?: PublicKey; amount?: BN; verifyProgram?: PublicKey; proof?: Buffer; blob?: Buffer; treasury?: PublicKey } = {}) =>
     gate.methods
       .gatedTransfer(opts.proof ?? PROOF, opts.blob ?? BLOB, Array.from(NONCE), opts.amount ?? AMOUNT)
       .accounts({
@@ -164,6 +178,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
         config: configPda,
         policyRoot: policyPda(POLICY_ROOT),
         nullifier: nullifierPda(NULLIFIER),
+        treasury: opts.treasury ?? treasurySlot,
         verifyProgram: opts.verifyProgram ?? verify.programId,
         systemProgram: SystemProgram.programId,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
@@ -188,9 +203,18 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     // the recipient must end the transfer rent-exempt; a fresh 0-lamport account receiving
     // exactly `amount` can fail the runtime's rent check — give it a floor first
     await conn.confirmTransaction(await conn.requestAirdrop(recipient.publicKey, LAMPORTS_PER_SOL / 100), 'confirmed');
+    // the same floor for the fee treasury: it receives a fee smaller than the rent-exempt minimum
+    await conn.confirmTransaction(await conn.requestAirdrop(treasury.publicKey, LAMPORTS_PER_SOL / 100), 'confirmed');
     // the SDK's default initialisation: current + legacy vkeys, approved policies ON
     await send([buildInitializeIx(authority.publicKey, undefined, undefined, verify.programId)], [authority]);
-    const cfg = decodeConfig((await conn.getAccountInfo(configPda, 'confirmed'))!.data);
+    const cfgInfo = (await conn.getAccountInfo(configPda, 'confirmed'))!;
+    expect(cfgInfo.data.length, 'a fresh Config is written at the 0.8.0 size').to.equal(CONFIG_SIZE);
+    const cfg = decodeConfig(cfgInfo.data);
+    // fee switch defaults: no fee, no treasury
+    expect(cfg.feeLamports).to.equal(0n);
+    expect(cfg.treasury).to.equal(PublicKey.default.toBase58());
+    expect(cfg.hasFeeFields).to.equal(true);
+    expect(treasuryAccount(cfg.treasury, source.publicKey).equals(source.publicKey)).to.equal(true);
     expect(cfg.paused).to.equal(false);
     expect(cfg.allowlistPolicies).to.equal(true);
     expect(cfg.allowedVkeys).to.deep.equal([CURRENT_VKEY, ...LEGACY_VKEYS]);
@@ -233,7 +257,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
       .gatedTransfer(PROOF, blob, Array.from(NONCE), AMOUNT)
       .accounts({
         source: source.publicKey, recipient: recipient.publicKey, config: configPda, policyRoot: policyPda(altRoot),
-        nullifier: nullifierPda(NULLIFIER), verifyProgram: verify.programId, systemProgram: SystemProgram.programId,
+        nullifier: nullifierPda(NULLIFIER), treasury: treasurySlot, verifyProgram: verify.programId, systemProgram: SystemProgram.programId,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .instruction();
@@ -349,7 +373,10 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     }
     console.log(`      balances: source ${await conn.getBalance(source.publicKey, 'confirmed')} recipient ${await conn.getBalance(recipient.publicKey, 'confirmed')} rent0 ${await conn.getMinimumBalanceForRentExemption(0)}`);
     const before = await conn.getBalance(recipient.publicKey, 'confirmed');
-    // the SDK's builder (what submit() sends), so its account list is exercised on chain
+    const sourceBefore = await balance(source.publicKey);
+    const treasuryBefore = await balance(treasury.publicKey);
+    // the SDK's builder (what submit() sends), so its account list is exercised on chain. No treasury is
+    // configured yet, so the builder's default (the source in the treasury slot) is what the program expects.
     const tx = new Transaction().add(cu, buildGatedTransferIx(att, { source: source.publicKey, recipient: recipient.publicKey }));
     tx.feePayer = source.publicKey;
     tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
@@ -364,6 +391,10 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     await conn.confirmTransaction(sig, 'confirmed');
     const after = await conn.getBalance(recipient.publicKey, 'confirmed');
     expect(after - before).to.equal(AMOUNT.toNumber());
+    // fee 0 (the default): the source pays the transaction fee, the Nullifier rent and the amount, nothing else
+    const landed = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
+    expect(sourceBefore - (await balance(source.publicKey))).to.equal(landed!.meta!.fee + (await nullifierRent()) + AMOUNT.toNumber());
+    expect(await balance(treasury.publicKey), 'no fee: the (future) treasury is untouched').to.equal(treasuryBefore);
 
     // Nullifier is written manually by the program (not via an Accounts struct), so it is not in
     // the IDL's account list; decode its fixed layout: 8 disc ‖ u64 slot ‖ 32 consumer ‖ 32 actionHash ‖ u8 bump.
@@ -405,26 +436,130 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     await expectError(send([await gatedIx()], [source]), 'NullifierAlreadyConsumed');
   });
 
-  it('current-vkey attestation (0.7.0 guest, payload bound to the action) executes through the gate', async function () {
-    if (!ATT_CURRENT) {
-      console.log('      PENDING: tests/fixtures/attestation-test-current.json not present (scripts/prove-localnet-fixture.sh current)');
-      return this.skip();
-    }
-    expect(ATT_CURRENT.detectorVersion).to.equal(CURRENT_VKEY);
-    expect(ATT_CURRENT.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
-    if ((await conn.getBalance(source.publicKey, 'confirmed')) < LAMPORTS_PER_SOL) {
-      await send([SystemProgram.transfer({ fromPubkey: authority.publicKey, toPubkey: source.publicKey, lamports: 2 * LAMPORTS_PER_SOL })], [authority]);
-    }
-    const before = await conn.getBalance(recipient.publicKey, 'confirmed');
-    const tx = new Transaction().add(cu, buildGatedTransferIx(ATT_CURRENT, { source: source.publicKey, recipient: recipient.publicKey }));
-    tx.feePayer = source.publicKey;
-    tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
-    tx.sign(source);
-    const sig = await conn.sendRawTransaction(tx.serialize());
-    await conn.confirmTransaction(sig, 'confirmed');
-    expect((await conn.getBalance(recipient.publicKey, 'confirmed')) - before).to.equal(Number(ATT_CURRENT.action.amount));
-    const rec = decodeNullifier((await conn.getAccountInfo(nullifierPda(hex(ATT_CURRENT.nullifier)), 'confirmed'))!.data);
-    expect(rec.consumerProgram.toBase58()).to.equal(gate.programId.toBase58());
+  // ---- fee switch (0.8.0). Negative cases that fail before the nullifier check (paused, treasury) reuse the
+  // consumed legacy fixture; the ones past it and the fee-charging consume use the current-vkey fixture.
+  describe('fee switch (set_fee, fee_payer, treasury)', () => {
+    const cfg = async () => decodeConfig((await conn.getAccountInfo(configPda, 'confirmed'))!.data);
+    const unchanged = async (f: () => Promise<unknown>) => {
+      const [s0, t0] = [await balance(source.publicKey), await balance(treasury.publicKey)];
+      await f();
+      expect(await balance(treasury.publicKey), 'treasury unchanged').to.equal(t0);
+      expect(await balance(source.publicKey), 'fee payer unchanged').to.equal(s0);
+    };
+    const gatedCurrent = (over: { proof?: string; treasury?: PublicKey } = {}) => {
+      const a = over.proof ? { ...ATT_CURRENT, proof: { ...ATT_CURRENT.proof, bytes: over.proof } } : ATT_CURRENT;
+      return buildGatedTransferIx(a, { source: source.publicKey, recipient: recipient.publicKey, treasury: over.treasury ?? treasurySlot });
+    };
+    const requireCurrent = function (this: Mocha.Context) {
+      if (!ATT_CURRENT) {
+        console.log('      PENDING: tests/fixtures/attestation-test-current.json not present (scripts/prove-localnet-fixture.sh current)');
+        this.skip();
+      }
+    };
+
+    it('default: fee 0 and no treasury', async () => {
+      const c = await cfg();
+      expect(c.feeLamports).to.equal(0n);
+      expect(c.treasury).to.equal(PublicKey.default.toBase58());
+    });
+
+    it('set_fee by a non-authority is refused (Unauthorized)', async () => {
+      const stranger = Keypair.generate();
+      await send([SystemProgram.transfer({ fromPubkey: authority.publicKey, toPubkey: stranger.publicKey, lamports: LAMPORTS_PER_SOL / 10 })], [authority]);
+      await expectError(send([buildSetFeeIx(stranger.publicKey, FEE, treasury.publicKey, verify.programId)], [stranger]), 'Unauthorized');
+      expect((await cfg()).feeLamports).to.equal(0n);
+    });
+
+    it('a fee above 0 with no treasury is refused (TreasuryUnset)', async () => {
+      await expectError(send([buildSetFeeIx(authority.publicKey, FEE, PublicKey.default, verify.programId)], [authority]), 'TreasuryUnset');
+      expect((await cfg()).feeLamports).to.equal(0n);
+    });
+
+    it('set_fee(0, treasury) by the authority: the migration call — account at the 0.8.0 size, rent-exempt, treasury set, FeeChanged emitted', async () => {
+      const sig = await send([buildSetFeeIx(authority.publicKey, 0, treasury.publicKey, verify.programId)], [authority]);
+      const info = (await conn.getAccountInfo(configPda, 'confirmed'))!;
+      expect(info.data.length).to.equal(CONFIG_SIZE);
+      expect(info.lamports).to.be.at.least(await conn.getMinimumBalanceForRentExemption(CONFIG_SIZE));
+      const c = decodeConfig(info.data);
+      expect(c.feeLamports).to.equal(0n);
+      expect(c.treasury).to.equal(treasury.publicKey.toBase58());
+      expect(c.allowedVkeys, 'the rest of the config is untouched').to.deep.equal([CURRENT_VKEY, ...LEGACY_VKEYS]);
+      expect(c.allowlistPolicies).to.equal(true);
+      const t = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
+      const parser = new anchor.EventParser(verify.programId, new anchor.BorshCoder(verify.idl));
+      const ev = [...parser.parseLogs(t!.meta!.logMessages!)].find((e) => e.name === 'feeChanged');
+      expect(ev, 'FeeChanged event').to.not.equal(undefined);
+      expect(Number(ev!.data.feeLamports)).to.equal(0);
+      expect((ev!.data.treasury as PublicKey).toBase58()).to.equal(treasury.publicKey.toBase58());
+      treasurySlot = treasuryAccount(c.treasury, source.publicKey);
+      expect(treasurySlot.equals(treasury.publicKey)).to.equal(true);
+    });
+
+    it('with a treasury set, any other account in the treasury slot is refused (TreasuryMismatch) — fee 0 or not', async () => {
+      await unchanged(async () => expectError(send([await gatedIx({ treasury: source.publicKey })], [source]), 'TreasuryMismatch'));
+      await unchanged(async () => expectError(send([await gatedIx({ treasury: Keypair.generate().publicKey })], [source]), 'TreasuryMismatch'));
+    });
+
+    it('set_fee(FEE, treasury): the fee is recorded', async () => {
+      await send([buildSetFeeIx(authority.publicKey, FEE, treasury.publicKey, verify.programId)], [authority]);
+      const c = await cfg();
+      expect(c.feeLamports).to.equal(BigInt(FEE));
+      expect(c.treasury).to.equal(treasury.publicKey.toBase58());
+    });
+
+    it('paused + fee > 0: Paused, nothing moves', async () => {
+      await send([buildSetConfigIx(authority.publicKey, { paused: true }, verify.programId)], [authority]);
+      await unchanged(async () => expectError(send([await gatedIx()], [source]), 'Paused'));
+      if (ATT_CURRENT) await unchanged(() => expectError(send([gatedCurrent()], [source]), 'Paused'));
+      await send([buildSetConfigIx(authority.publicKey, { paused: false }, verify.programId)], [authority]);
+    });
+
+    it('wrong treasury + fee > 0: TreasuryMismatch, nothing moves', async () => {
+      await unchanged(async () => expectError(send([await gatedIx({ treasury: Keypair.generate().publicKey })], [source]), 'TreasuryMismatch'));
+    });
+
+    it('invalid proof + fee > 0: InvalidProof, nothing moves (the fee is charged only after every check)', async function () {
+      requireCurrent.call(this);
+      const bad = Buffer.from(hex(ATT_CURRENT.proof.bytes)); bad[bad.length - 1] ^= 0x01;
+      await unchanged(() => expectError(send([gatedCurrent({ proof: '0x' + bad.toString('hex') })], [source]), 'InvalidProof'));
+      expect(await conn.getAccountInfo(nullifierPda(hex(ATT_CURRENT.nullifier)))).to.equal(null);
+    });
+
+    it('consume with fee > 0 (current-vkey attestation): exactly FEE lamports source → treasury, transfer executed, nullifier consumed', async function () {
+      requireCurrent.call(this);
+      expect(ATT_CURRENT.detectorVersion).to.equal(CURRENT_VKEY);
+      expect(ATT_CURRENT.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
+      if ((await balance(source.publicKey)) < LAMPORTS_PER_SOL) {
+        await send([SystemProgram.transfer({ fromPubkey: authority.publicKey, toPubkey: source.publicKey, lamports: 2 * LAMPORTS_PER_SOL })], [authority]);
+      }
+      const [s0, t0, r0] = [await balance(source.publicKey), await balance(treasury.publicKey), await balance(recipient.publicKey)];
+      const tx = new Transaction().add(cu, gatedCurrent());
+      tx.feePayer = source.publicKey;
+      tx.recentBlockhash = (await conn.getLatestBlockhash()).blockhash;
+      tx.sign(source);
+      const sig = await conn.sendRawTransaction(tx.serialize());
+      await conn.confirmTransaction(sig, 'confirmed');
+      const amount = Number(ATT_CURRENT.action.amount);
+      expect((await balance(treasury.publicKey)) - t0, 'treasury receives exactly the fee').to.equal(FEE);
+      expect((await balance(recipient.publicKey)) - r0).to.equal(amount);
+      const landed = await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
+      expect(s0 - (await balance(source.publicKey)), 'source pays tx fee + nullifier rent + amount + fee').to.equal(landed!.meta!.fee + (await nullifierRent()) + amount + FEE);
+      const rec = decodeNullifier((await conn.getAccountInfo(nullifierPda(hex(ATT_CURRENT.nullifier)), 'confirmed'))!.data);
+      expect(rec.consumerProgram.toBase58()).to.equal(gate.programId.toBase58());
+      expect(rec.actionHash).to.equal(ATT_CURRENT.actionHash);
+    });
+
+    it('replay with fee > 0: NullifierAlreadyConsumed, nothing moves', async function () {
+      requireCurrent.call(this);
+      await unchanged(() => expectError(send([gatedCurrent()], [source]), 'NullifierAlreadyConsumed'));
+    });
+
+    it('set_fee(0, treasury) turns the fee off again; the treasury stays', async () => {
+      await send([buildSetFeeIx(authority.publicKey, 0, treasury.publicKey, verify.programId)], [authority]);
+      const c = await cfg();
+      expect(c.feeLamports).to.equal(0n);
+      expect(c.treasury).to.equal(treasury.publicKey.toBase58());
+    });
   });
 
   // ---- config-authority handover (0.7.0). Last: it moves the authority away from the provider wallet.

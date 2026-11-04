@@ -9,7 +9,8 @@
 # The suite initializes the localnet Config with the SDK defaults: BOTH guest vkeys (the current one and
 # the legacy one the committed localnet proof was made with) and approved policies on.
 # BLINDSEAL_SO_DIR overrides where the program binaries are loaded from (default target/deploy), e.g.
-# to run this suite against an older build.
+# to run this suite against an older build. With BLINDSEAL_OLD_VERIFY_SO set (the deployed verifier
+# binary), the 0.8.0 Config migration rehearsal (scripts/test-fee-migration.sh) runs afterwards.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -37,3 +38,10 @@ solana airdrop 10 "$(solana-keygen pubkey "$WALLET")" -u http://127.0.0.1:8899 >
 export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 ANCHOR_WALLET="$WALLET" ROGUE_CALLER_ID
 pnpm exec ts-mocha -p ./tests/tsconfig.json -t 1000000 tests/m2.spec.ts
 echo; cat tests/m2-metrics.json
+if [ -n "${BLINDSEAL_OLD_VERIFY_SO:-}" ]; then
+  kill $VPID 2>/dev/null; wait $VPID 2>/dev/null || true; trap - EXIT
+  echo; echo "→ 0.8.0 Config migration rehearsal (scripts/test-fee-migration.sh)"
+  scripts/test-fee-migration.sh
+else
+  echo "(migration rehearsal skipped: set BLINDSEAL_OLD_VERIFY_SO to the deployed verifier binary to run scripts/test-fee-migration.sh)"
+fi
