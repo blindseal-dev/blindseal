@@ -1,13 +1,14 @@
-// S05 · Explorer (/explorer) — the mainnet reader. A server component: the read happens here via
+// S05 · Explorer (/explorer) — the mainnet reader. A server component: the reads happen here via
 // @blindseal/chain-reads (BLINDSEAL_RPC_URL, else the public mainnet RPC; cached 60 s in module
-// memory), so the visitor's browser never contacts an RPC. The first snapshot travels as props; the
+// memory), so the visitor's browser never contacts an RPC. The first snapshots travel as props; the
 // server HTML is the mockup's loading state (skeletons, odometers at "0") and never depends on the
 // clock, so hydration is deterministic. The page.js port (explorer-view.tsx) paints the data once
-// the kit has mounted; Retry (offline) re-reads through /explorer/snapshot.
+// the kit has mounted; Retry (offline) re-reads through /explorer/snapshot and /explorer/treasury.
+// Two tabs: Attestations (the verifier program) and Treasury (?tab=treasury; treasury-view.tsx).
 import type { Metadata } from 'next';
 import { pageMeta } from '../meta';
-import { getExplorerSnapshot } from '@blindseal/chain-reads';
-import { ExplorerView } from './explorer-view';
+import { getExplorerSnapshot, getTreasurySnapshot } from '@blindseal/chain-reads';
+import { ExplorerView, type ExplorerTab } from './explorer-view';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,10 +16,12 @@ export const revalidate = 0;
 export const metadata: Metadata = pageMeta({
   path: '/explorer',
   title: 'Explorer · Blindseal',
-  description: 'Attestations consumed on mainnet. Counts and hashes only: no content, no agents, no operators.',
+  description: 'Attestations consumed on mainnet, and the treasury\'s USDC activity. Counts and hashes only: no content, no agents, no operators.',
 });
 
-export default async function Explorer() {
-  const snapshot = await getExplorerSnapshot();
-  return (<ExplorerView snapshot={snapshot} />);
+export default async function Explorer({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const tab: ExplorerTab = sp.tab === 'treasury' ? 'treasury' : 'attestations';
+  const [snapshot, treasury] = await Promise.all([getExplorerSnapshot(), getTreasurySnapshot()]);
+  return (<ExplorerView snapshot={snapshot} treasury={treasury} tab={tab} />);
 }

@@ -240,6 +240,16 @@
   .ex-alt--error { padding: 32px 20px; }
   .ex-alt__actions { flex-wrap: wrap; justify-content: center; }
   .ex-foot { text-align: left; }
+  .ex-tabs { width: calc(100% - 2 * var(--gutter)); margin-top: 16px; }
+  .ex-tabs + .ex { margin-top: 16px; }
+  .ex-tr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ex-tr-stats .ex-stat { min-height: 0; padding: 16px; }
+  .ex-tr-stats .stat__d { white-space: normal; }
+  .ex-tx-cols { display: none; }
+  /* the row stacks: kind and amount, then the transaction and its time, then the counterparty */
+  .ex-tx { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "kind amt" "sig when" "who who"; row-gap: 4px; padding: 10px 4px; }
+  .ex-tx__kind { grid-area: kind; } .ex-tx__amt { grid-area: amt; } .ex-tx__sig { grid-area: sig; } .ex-tx__when { grid-area: when; } .ex-tx__who { grid-area: who; flex-wrap: wrap; }
+  .ex-tx__sig .hash, .ex-tx__who .hash { margin-left: 0; }
 }
 /* … then 1 × 4: the four totals stack, the ranked lists put the meter on its own line under the id so
    the abbreviated hash (BS.ui.hash) is never clipped */
