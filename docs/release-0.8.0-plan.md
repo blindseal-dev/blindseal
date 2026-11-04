@@ -19,9 +19,9 @@ Nothing was sent to mainnet or devnet while preparing this release.
 | New vkey (`CURRENT_VKEY`) | `0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537` |
 | Previous vkey (now `LEGACY_VKEYS[0]`) | `0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967` (0.7.0) |
 | Policy root the new sample commits | `0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397` (the registered default root; the widened L1 rules of `feat/l1-rules-0.8` produce a NEW root that is registered separately, see "Sign list") |
-| Executor cycles, mainnet sample | {{CYCLES}} (0.7.0 guest: 104,223,540) |
-| CPU proof of the mainnet sample (M1 Max, 32 GB, alone) | {{PROVE_HUMAN}} ({{PROVE_MS}} ms; 0.7.0: 8,740,766 ms) |
-| New sample | `tests/fixtures/attestation-mainnet-demo-0.8.0.json`: the same tool call as the 0.7.0 sample (`tests/fixtures/mainnet-toolcall-demo.json`, payloadHash `0x7de7653d…47dec`), expiry slot {{EXPIRY}}, nonce fresh. Verified off chain with `blindseal verify` (proof, labels, action binding). NOT submitted. |
+| Executor cycles, mainnet sample | 104,291,669 (0.7.0 guest: 104,223,540) |
+| CPU proof of the mainnet sample (M1 Max, 32 GB, alone) | 2 h 20 min 38 s (8,438,066 ms; 0.7.0: 8,740,766 ms) |
+| New sample | `tests/fixtures/attestation-mainnet-demo-0.8.0.json`: the same tool call as the 0.7.0 sample (`tests/fixtures/mainnet-toolcall-demo.json`, payloadHash `0x7de7653d…47dec`), expiry slot 465,653,982, nonce fresh. Verified off chain with `blindseal verify` (proof, labels, action binding). NOT submitted. |
 | Authority, fee payer and signer | `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj` |
 
 ## What the proof now claims
@@ -40,18 +40,25 @@ committed guest on encoded injections and checks it refuses each one with "L0 di
    (it re-pins `DEFAULT_POLICY_ROOT`; the step registers whatever the SDK pins and is a no-op if already
    registered). Rent 899,160 lamports + 5,000 fee. The old root stays registered, so attestations under it
    (including the 0.8.0 sample proven tonight) stay consumable.
-2. **Upgrade the verifier with the fee switch (fee 0)** — per `docs/release-0.8.0-fee-switch.md` (both
-   programs; `set_fee(0, treasury)` performs the Config realloc). Independent of the vkey change; can also
-   run after step 5.
+2. **Upgrade the verifier with the fee switch (fee 0)** — per `docs/release-0.8.0-fee-switch.md` (branch
+   `feat/verifier-fee`): transfer-gate first, then blindseal-verify, from the verifiable builds
+   (`solanafoundation/solana-verifiable-build:4.3.0`): transfer_gate 188,008 B, executable hash
+   `7e43df38dd14e1ab923e2bfa871269cee05882285770174b2a8e414349f88703` (fits the current ProgramData);
+   blindseal_verify 380,712 B, executable hash `90796b66d413adea876bdfb66360c8c094b6c58772c33cecde6bbca6754fad1f`
+   (ProgramData extends by 14,040 B, ≈ 0.0713 SOL; ≈ 1.93 SOL buffer held during the deploy). Then
+   `set_fee(0, <treasury>)` performs the Config realloc (303 → 343 B, +203,200 lamports rent; data
+   `129a1812edd61350` ‖ u64le 0 ‖ treasury). Check `solana feature status | grep B8JJ` (SIMD-0500) before
+   deploying: if it has activated, the verifiable toolchain must move and the hashes change. Independent of
+   the vkey change; can also run after step 5.
 3. **c1: allow the new vkey** — `scripts/mainnet-0.7.0.sh --simulate c1`, then `c1`. Sends one
    `set_config(allowed_vkeys = [0x00cdf40c…, 0x00e9807a…a537])`:
    - program `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, accounts Config `9je2jP…` (writable), authority
      `88sR7X…` (signer); data `6c9e9aafd4623442 01 02000000 <0.7.0 vkey> <new vkey> 00 00`; fee 5,000
      lamports, no rent (Config is fixed size).
-4. **Re-prove and consume** — if the sample's expiry slot {{EXPIRY}} is still ahead of the current slot,
+4. **Re-prove and consume** — if the sample's expiry slot 465,653,982 is still ahead of the current slot,
    consume `tests/fixtures/attestation-mainnet-demo-0.8.0.json` directly: `blindseal submit <file>`
    (through transfer-gate, the demo wallet `GdPZNkh4…` signs the 0.001 SOL transfer as in 0.7.0). If it
-   has expired, re-prove the same tool call first (`blindseal attest`, GPU: minutes; CPU: {{PROVE_HUMAN}})
+   has expired, re-prove the same tool call first (`blindseal attest`, GPU: minutes; CPU: 2 h 20 min 38 s)
    and consume that. Then `blindseal submit --check` must report CONSUMED.
 5. **c2: drop the 0.7.0 vkey** — `scripts/mainnet-0.7.0.sh --simulate c2 --new-sample <consumed 0.8.0
    attestation>`, then `c2`. The step refuses unless the sample is under the new vkey and consumed, and

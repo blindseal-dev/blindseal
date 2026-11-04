@@ -31,9 +31,9 @@ describe('init helpers turn approved policies on by default', () => {
     expect(anyIx.LEGACY_POLICY_ROOTS).toEqual(['0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397']);
     expect(anyIx.LEGACY_POLICY_ROOTS).not.toContain(anyIx.DEFAULT_POLICY_ROOT);
   });
-  it('CURRENT_VKEY is the 0.8.0 guest (L0 in the proof); legacy keeps the 0.7.0 key until c2, not the 0.6.0 key', () => {
+  it('CURRENT_VKEY is the 0.8.0 guest (L0 in the proof); legacy keeps the 0.7.0 key (until c2) and the 0.6.0 key (localnet fixtures)', () => {
     expect(anyIx.CURRENT_VKEY).toBe('0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537');
-    expect(anyIx.LEGACY_VKEYS).toEqual(['0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967']);
+    expect(anyIx.LEGACY_VKEYS).toEqual(['0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967', '0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e']);
     expect(anyIx.LEGACY_VKEYS).not.toContain(anyIx.CURRENT_VKEY);
   });
 });

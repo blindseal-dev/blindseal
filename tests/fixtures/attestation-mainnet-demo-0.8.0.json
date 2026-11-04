@@ -1,0 +1,30 @@
+{
+  "action": {
+    "amount": "1000000",
+    "instruction": "0x981894646560fc2b",
+    "mint": "",
+    "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+    "sourceAuthority": "GdPZNkh4Ugt3PCauGtUdNVDXsxDHFigbGqy4gjYGNC3L",
+    "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
+  },
+  "actionHash": "0x34372afd1add719ee4b15a2770da4176743433a7f31fe5be6f1e4d87087ac581",
+  "chainId": 1,
+  "decisionId": "mainnet-demo-0.8.0",
+  "detectorVersion": "0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537",
+  "expirySlot": 465653982,
+  "nonce": "0x93eb1b2985abc6b70acb2b94760910f96270c20cf0401dba21b4dd97bfd198cb",
+  "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)",
+  "nullifier": "0x608d6a4afb135c7ca13c0b4049f04ab56571ef0a5b18860e1e872f840bc49f65",
+  "payloadHash": "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec",
+  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "proof": {
+    "bytes": "0xa4594c592c0520492913dd04fec224e3663f5d47cb0467f186643181efda4e5b64357aad070d61fc06bbe172fe0609ed28234c7114969e429942f07a2082d65b36d702f4285d244c1560fe24daac1340b203e075f2051e549ef47041ac09395d2f6622c7090ac7cc43797cb8093369dca9c0d95965e1afefa875a4a67f187a4547064339107290601cfb1af8bafc92aadf873ddb527a51d7d4b72d6e78b6d0eb9503b58c1b082015ca613eccbdbab0cb118c0e8bbc0bd16138c3de0cb11e00df1f445c1319c1263774848c947f84be9e6f716b64c69731262ccda14e54ade096d78735d9041c3086fa371a48cddefb6c3df89bfe0141d99eee12528c120bc029c2460c99",
+    "curve": "bn254",
+    "protocol": "groth16"
+  },
+  "proveMs": 8438066,
+  "publicInputs": [
+    "0x7de7653d813c022fbf4fb0ca7a8909f5325fbd54895bd87b2d878bfbfdf47dec36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c3839700e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a53734372afd1add719ee4b15a2770da4176743433a7f31fe5be6f1e4d87087ac581608d6a4afb135c7ca13c0b4049f04ab56571ef0a5b18860e1e872f840bc49f65de50c11b00000000"
+  ],
+  "version": 1
+}

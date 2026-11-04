@@ -228,7 +228,7 @@ fn main() {
         "publicInputs": [hex_str(&pub_blob)],
         "proof": { "protocol": "groth16", "curve": "bn254", "bytes": hex_str(&proof_bytes) },
         "proveMs": prove_ms,
-        "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)"
+        "note": "L0 (decode-then-L1) and L1 screened inside the proof (release 0.8.0)"
     });
     std::fs::write(&args.out, serde_json::to_string_pretty(&att).unwrap()).unwrap();
     println!("PROVE_MS {prove_ms}");
