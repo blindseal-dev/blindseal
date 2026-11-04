@@ -48,10 +48,18 @@ SDK's pins (`CURRENT_VKEY`, `LEGACY_VKEYS`, `DEFAULT_POLICY_ROOT`, `DEMO_POLICY_
 5. **c1: allow the new vkey** — `--simulate c1`, then `c1`. One `set_config(allowed_vkeys = [0x00cdf40c…,
    0x00bd130c…])`: data `6c9e9aafd4623442 01 02000000 <0.7.0 vkey> <0.8.0 vkey> 00 00`, 5,000 lamports, no rent.
 6. **Consume the sample** — `blindseal submit tests/fixtures/attestation-mainnet-demo-0.8.0.json` (the demo wallet
-   signs; either the 0.7.1 or the 0.8.0 CLI works at fee 0), then `blindseal submit --check` → CONSUMED. Must land
-   before slot 466,872,143.
+   signs), then `blindseal submit --check` → CONSUMED. Must land before slot 466,872,143. The published 0.7.1 CLI
+   works at fee 0, with or without a treasury set (localnet suite: the 0.7.1 builder reaches the verifier after
+   `set_fee(0, treasury)`). The 0.8.0 CLI from this branch: `pnpm install --frozen-lockfile && pnpm -C
+   packages/sdk build && pnpm -C packages/proxy build`, then `node packages/proxy/dist/index.js submit <file>`.
 7. **npm 0.8.0** — `blindseal-sdk` then `blindseal` (`cd packages/<p> && pnpm publish --access public
    --no-git-checks`); `scripts/npm-pack-audit.sh` clean first; fresh-install check as in 0.7.1.
+   **Consequence of this order:** the `blindseal` package carries `packages/proxy/src/prover/manifest.json`, which
+   pins prover **0.7.0** until step 8. A `blindseal@0.8.0` published here downloads the 0.7.0 prover, whose proofs
+   use the old guest and ignore `--action-policy`; `blindseal attest` 0.8.0 checks the produced detector version
+   and policy root and **refuses** such a proof ("the prover binary is from another release"). So until a
+   republish with the step-8 manifest (0.8.1), `blindseal attest` from npm cannot produce an attestation. If that
+   is not acceptable, do step 8 before step 7 (the prover release does not depend on npm).
 8. **prover-v0.8.0 + manifest** — tag `prover-v0.8.0` at the release commit: darwin-arm64 built on the Mac,
    linux-x64 and linux-x64-cuda by the `prover-linux` workflow; set `packages/proxy/src/prover/manifest.json`
    (`version`, `release`, each asset's sha256, `guestElf` = sha256 `859af59d…729c` / 503,880 bytes). CI's
@@ -64,6 +72,14 @@ SDK's pins (`CURRENT_VKEY`, `LEGACY_VKEYS`, `DEFAULT_POLICY_ROOT`, `DEMO_POLICY_
     sample (with its consume signature), remove the "pending mainnet" markers, deploy.
 
 Then, separately: fund the dogfood wallet and start its timer (`services/dogfood/README.md`).
+
+## Before signing
+
+- The Config migration rehearsal (`scripts/test-fee-migration.sh` with `BLINDSEAL_OLD_VERIFY_SO` = the
+  mainnet-dumped verifier) last ran on `feat/verifier-fee`, before the fee accounts became optional trailing
+  accounts. Rerun it against the 0.8.0 builds before step 3.
+- The live 0.7.x site and the 0.7.1 SDK read the Config by offset, so the 343-byte Config after step 4 does not
+  break them.
 
 ## What is not in this release
 

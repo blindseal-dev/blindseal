@@ -24,9 +24,9 @@
 #   a    set_config(allowlist_policies = true)                        (refuses unless the default root is registered)
 #   c1   set_config(allowed_vkeys += CURRENT_VKEY 0x00cdf40c…)        (keeps the old vkey 0x006a0d1e…;
 #                                                                      refuses unless a is done)
-#   c2   LATER: set_config(allowed_vkeys −= old vkey). Preconditions (the step checks both): a 0.7.0
-#        prover release is published and packages/proxy/src/prover/manifest.json points at it (until
-#        then `blindseal attest` downloads prover 0.5.1 — old guest, old vkey — whose proofs c2 makes
+#   c2   LATER: set_config(allowed_vkeys −= old vkey). Preconditions (the step checks both): a 0.8.0
+#        prover release embedding the committed guest is published and packages/proxy/src/prover/manifest.json points at it (until
+#        then `blindseal attest` downloads the previous prover — old guest, old vkey — whose proofs c2 makes
 #        unconsumable), and a new-vkey sample has landed on mainnet:
 #          scripts/mainnet-0.7.0.sh c2 --new-sample <attestation.json>
 #   d    optional, LAST (refuses while the old vkey is allowed, i.e. before c2): set_authority(<Ledger pubkey>)
@@ -175,18 +175,24 @@ case "$STEP" in
   a|b|b2|f|c1|c2|d)
     case "$STEP" in
       b)  what="register the default policy root" ;;
+      b2) what="register the demo policy root (the 0.8.0 sample's)" ;;
+      f)  what="set_fee(0, treasury): Config realloc, nothing charged" ;;
       a)  what="turn approved policies on" ;;
-      c1) what="allow the 0.7.0 vkey (keep the old one)" ;;
+      c1) what="allow the SDK's CURRENT_VKEY (keep the previous one)" ;;
       c2) what="remove the old vkey" ;;
       d)  what="hand the config authority to the Ledger" ;;
     esac
     echo "→ step $STEP: $what"
     if [ "$STEP" = c2 ]; then
+      # c2 makes every proof under the previous guest unconsumable, so the prover `blindseal attest` downloads
+      # must already embed the CURRENT guest: manifest version ≥ 0.8.0 and its guestElf = the committed ELF.
       pv=$(node -p 'require("./packages/proxy/src/prover/manifest.json").version')
-      if node -e 'const [a,b]=process.argv[1].split(".").map(Number); process.exit(a>0||b>=7?0:1)' "$pv"; then
-        echo "   prover manifest $pv (≥ 0.7.0)"
+      pe=$(node -p 'require("./packages/proxy/src/prover/manifest.json").guestElf.sha256')
+      ce=$( (command -v sha256sum >/dev/null && sha256sum crates/guest/elf/blindseal-guest || shasum -a 256 crates/guest/elf/blindseal-guest) | cut -d' ' -f1)
+      if node -e 'const [a,b]=process.argv[1].split(".").map(Number); process.exit(a>0||b>=8?0:1)' "$pv" && [ "$pe" = "$ce" ]; then
+        echo "   prover manifest $pv (≥ 0.8.0), its guest ELF is the committed one ($ce)"
       else
-        msg="c2: the proxy's prover manifest is $pv — publish prover 0.7.0 (new guest) and update packages/proxy/src/prover/manifest.json first"
+        msg="c2: the proxy's prover manifest is $pv with guest ELF $pe (committed: $ce) — publish prover-v0.8.0 from this commit and update packages/proxy/src/prover/manifest.json first"
         if [ -n "$SIM$LOCAL" ]; then echo "   PRECONDITION NOT MET (a real mainnet send would refuse here): $msg"; else echo "$msg"; exit 1; fi
       fi
     fi

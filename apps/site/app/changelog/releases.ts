@@ -17,7 +17,7 @@ export const RELEASES: { v: string; date: string; added: string[]; changed: stri
       'The 0.8.0 mainnet sample is re-proven under the fixed guest with the demo action policy (the demo recipient only, at most 0.01 SOL): 2 h 19 min on an Apple M1 Max',
     ],
     fixed: [
-      'Every proof made before 0.8.0 (0.5.x through 0.7.x) screened the serialized tool call as raw text only. In that text a control character is a two-character escape, so an argument such as `ignore\\nprevious instructions` (also `\\t`, `\\r\\n`, `\\u000b`, or a `\\u0069`-style escape of a letter) passed L0 and L1 in the guest and in `blindseal attest`. The 0.8.0 guest and `attest` also screen every JSON string in the call, unescaped. The live proxy was not affected: it screens each string of a call. Step c2 removes the 0.7.0 detector version from the on-chain allowlist, after which 0.7.x proofs cannot be consumed',
+      'Every proof made before 0.8.0 (0.5.x through 0.7.x) screened the serialized tool call as raw text only. In that text a control character is a two-character escape, so an argument such as `ignore\\nprevious instructions` (also `\\t`, `\\r\\n`, `\\u000b`, or a `\\u0069`-style escape of a letter) passed L0 and L1 in the guest and in `blindseal attest`. The 0.8.0 guest and `attest` also screen every JSON string in the call, unescaped. The live proxy of 0.7.x was not affected: since 0.7.0 it screens each string of a call’s arguments (before 0.7.0 it did not screen outgoing arguments at all). Step c2 removes the 0.7.0 detector version from the on-chain allowlist, after which 0.7.x proofs cannot be consumed',
     ],
   },
   {

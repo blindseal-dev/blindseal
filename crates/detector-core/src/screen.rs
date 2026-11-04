@@ -4,8 +4,8 @@
 //! serialization control characters and other escapable characters become two-character escapes
 //! (`\n`, `\t`, `\u000b`, `i`, `\"`), so L1 and L0 run on the raw text alone miss an injection
 //! that only reads as one once unescaped — "ignore\nprevious instructions" in an argument. Releases
-//! before 0.8.0 screened the raw text only; the live proxy, which screens each string of the parsed
-//! call, was not affected.
+//! before 0.8.0 screened the raw text only; the 0.7.x live proxy, which screens each string of the
+//! parsed call's arguments, was not affected (before 0.7.0 it did not screen arguments at all).
 //!
 //! The proof now asserts L1 and L0 pass on:
 //!  1. the raw payload text, and

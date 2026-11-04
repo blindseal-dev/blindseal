@@ -30,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { screenPayload } from '../detection/proven.js';
 import { PublicKey } from '@solana/web3.js';
-import { checkActionPolicy, EMPTY_ACTION_POLICY, parseActionPolicy, policyRootFor, type ActionPolicy } from 'blindseal-sdk';
+import { checkActionPolicy, CURRENT_VKEY, EMPTY_ACTION_POLICY, parseActionPolicy, policyRootFor, type ActionPolicy } from 'blindseal-sdk';
 import { BindError, GATED_TRANSFER_DISC, TRANSFER_GATE_ID, actionFromPayload, checkActionBinding, type BoundAction } from '../chain/action-binding.js';
 import { openAudit, toChainVerdict } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
@@ -340,6 +340,19 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     const status = await runProver(prover.path, proverArgs(tmpPayload), track);
     if (status !== 0) { process.stderr.write(`blindseal attest: prover exited ${status}\n`); return 1; }
     recordProofSeconds((Date.now() - t0) / 1000);
+    // The prover must be the release this CLI expects: its guest (detectorVersion = CURRENT_VKEY) screens every
+    // string of the call, and its policy root commits the action policy asked for. An older prover ignores
+    // --action-policy and produces a proof under the previous guest, which step c2 makes unconsumable.
+    let produced: { detectorVersion?: string; policyRoot?: string };
+    try { produced = JSON.parse(readFileSync(o.out, 'utf8')); } catch (e) { process.stderr.write(`blindseal attest: the prover wrote no readable ${o.out} (${(e as Error).message})\n`); return 1; }
+    const wantRoot = policyRootFor(policy);
+    if (produced.detectorVersion !== CURRENT_VKEY || produced.policyRoot !== wantRoot) {
+      process.stderr.write(`blindseal attest: the prover made a proof under detector version ${produced.detectorVersion} and policy root ${produced.policyRoot}; ` +
+        `this release expects ${CURRENT_VKEY} and ${wantRoot}. The prover binary is from another release (check --prover, $BLINDSEAL_PROVER, ` +
+        `~/.blindseal/bin and packages/proxy/src/prover/manifest.json). ${o.out} was not accepted\n`);
+      rmSync(o.out, { force: true });
+      return 1;
+    }
     // A copy beside the audit chain, where `blindseal run` (the local dashboard) lists attestations.
     try {
       const dir = path.join(o.auditDir, 'attestations');

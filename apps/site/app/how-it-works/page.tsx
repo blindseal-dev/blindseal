@@ -149,7 +149,7 @@ export default function HowItWorks() {
             <div className="hiw-head reveal">
               <div className="section-head">
                 <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / Four layers</p><h2 className="section-head__title" id="h-four-layers">Four ways to spot suspicious instructions</h2><p className="hiw-caption">Two layers that match, two that judge.</p></div>
-                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1<PendingMainnet />. On attacks held out from writing the rules they catch 2.5 % (2 of 80), and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples. The meaning-based checks are what catch most of the rest; they are attested, not proven.</p>
+                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1<PendingMainnet />. On attacks held out from writing the rules they catch 2.5 % (2 of 80), and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples. Detection in practice leans on the meaning-based checks, which are attested, not proven.</p>
               </div>
             </div>
             <div className="hiw-layers">

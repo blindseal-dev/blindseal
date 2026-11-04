@@ -7,6 +7,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CURRENT_VKEY, DEFAULT_POLICY_ROOT } from 'blindseal-sdk';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PROXY_ENTRY = path.resolve(here, '../src/index.ts');
@@ -14,6 +15,10 @@ const FIX = path.resolve(here, '../../../tests/fixtures');
 const TOOLCALL = path.join(FIX, 'mainnet-toolcall.json');
 const REAL_ATTESTATION = path.join(FIX, 'attestation-mainnet.json');
 const TARGET = (JSON.parse(readFileSync(REAL_ATTESTATION, 'utf8')) as { action: { targetProgram: string } }).action.targetProgram;
+// What the stub prover "produces": the real attestation relabelled as this release's (attest checks the
+// detector version and the policy root it expects after proving; the bytes are not verified here).
+const PRODUCED = path.join(os.tmpdir(), `bs-attest-produced-${process.pid}.json`);
+writeFileSync(PRODUCED, JSON.stringify({ ...JSON.parse(readFileSync(REAL_ATTESTATION, 'utf8')), detectorVersion: CURRENT_VKEY, policyRoot: DEFAULT_POLICY_ROOT }));
 
 let root: string;   // per-test sandbox
 let tmp: string;    // TMPDIR for the attest process: os.tmpdir() inside it resolves here
@@ -21,7 +26,7 @@ let marker: string; // the stub prover writes what it observed here
 
 /// A prover stand-in that records the payload file's and dir's modes and its own pid, then
 /// behaves per `mode`: ok (copy the real attestation), fail (exit 3), hang (sleep).
-function stubProver(mode: 'ok' | 'fail' | 'hang'): string {
+function stubProver(mode: 'ok' | 'old' | 'fail' | 'hang'): string {
   const p = path.join(root, `prover-${mode}.mjs`);
   writeFileSync(p, `#!/usr/bin/env node
 import { statSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
@@ -33,7 +38,8 @@ writeFileSync(${JSON.stringify(path.join('MARKER'))}.replace('MARKER', process.e
   fileMode: statSync(payload).mode & 0o777, dirMode: statSync(path.dirname(payload)).mode & 0o777,
   content: readFileSync(payload, 'utf8'),
 }));
-if (${JSON.stringify(mode)} === 'ok') copyFileSync(${JSON.stringify(REAL_ATTESTATION)}, a[a.indexOf('--out') + 1]);
+if (${JSON.stringify(mode)} === 'ok') copyFileSync(${JSON.stringify(PRODUCED)}, a[a.indexOf('--out') + 1]);
+if (${JSON.stringify(mode)} === 'old') copyFileSync(${JSON.stringify(REAL_ATTESTATION)}, a[a.indexOf('--out') + 1]);
 if (${JSON.stringify(mode)} === 'fail') process.exit(3);
 if (${JSON.stringify(mode)} === 'hang') setTimeout(() => {}, 60_000);
 `);
@@ -116,4 +122,12 @@ describe('attest temp-file handling (audit #8)', () => {
     await new Promise((res) => setTimeout(res, 300));
     expect(alive(o.pid)).toBe(false);
   }, 60_000);
+  it('refuses a proof from another release (old detector version / policy root) and removes it', async () => {
+    const { done } = attest(stubProver('old'));
+    const r = await done;
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/from another release/);
+    expect(existsSync(path.join(root, 'attestation.json'))).toBe(false);
+    expect(leftovers()).toEqual([]);
+  });
 });

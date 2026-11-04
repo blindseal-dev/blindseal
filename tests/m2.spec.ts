@@ -519,6 +519,12 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
       await unchanged(async () => expectError(send([await gatedIx({ treasury: Keypair.generate().publicKey })], [source]), 'TreasuryMismatch'));
     });
 
+    it('a 0.7.1 client (no treasury account) after set_fee(0, treasury): still reaches the verifier at fee 0', async () => {
+      expect((await cfg()).treasury).to.equal(treasury.publicKey.toBase58());
+      expect((await cfg()).feeLamports).to.equal(0n);
+      await unchanged(() => expectError(send([gated071(att)], [source]), 'NullifierAlreadyConsumed'));
+    });
+
     it('set_fee(FEE, treasury): the fee is recorded', async () => {
       await send([buildSetFeeIx(authority.publicKey, FEE, treasury.publicKey, verify.programId)], [authority]);
       const c = await cfg();

@@ -1,8 +1,9 @@
 # Blindseal Red Team — scoreboard
 
-> **The `blindseal-l1` row below is withdrawn.** This table was carried over from the base project when the
-> repository was created and was not regenerated. On these 31 attacks this repository's L1 rules catch 9 (29.0 %),
-> the same as the proof's own method (`evals/catch-rate.ts`, `evals/results/catch-rate-0.8.0.md`).
+> **Every row below is an unverified run of the base project, not of this repository.** The table was carried over
+> when the repository was created and was never regenerated here. The one row re-checked, `blindseal-l1`, does not
+> reproduce: this repository's L1 rules catch 9 of these 31 attacks (29.0 %), the same as the proof's own method
+> (`evals/catch-rate.ts`, `evals/results/catch-rate-0.8.0.md`).
 
 Corpus: 31 attack samples + 32 clean samples = 63 total.
 

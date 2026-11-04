@@ -5,8 +5,8 @@
 /// serialization control characters and other escapable characters become two-character escapes
 /// (`\n`, `\t`, `\u000b`), so the proven layers run on the raw text alone miss an injection that only
 /// reads as one unescaped — "ignore\nprevious instructions" in an argument. Releases before 0.8.0
-/// screened the raw text only; the proxy's live screening, which reads each string of the parsed call,
-/// was not affected.
+/// screened the raw text only; the 0.7.x proxy's live screening, which reads each string of the parsed
+/// call's arguments, was not affected (before 0.7.0 the proxy did not screen arguments at all).
 ///
 /// The proof asserts L1 and L0 pass on the raw payload AND on every JSON string leaf (object keys and
 /// string values, any depth, unescaped), each screened as its own text. The payload must parse as JSON

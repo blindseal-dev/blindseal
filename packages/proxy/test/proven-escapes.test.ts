@@ -4,7 +4,7 @@
 //   1. raw-text screening (what every guest before 0.8.0 asserted) misses each case — the gap;
 //   2. screenPayload (what the 0.8.0 guest asserts and attest checks) refuses each case;
 //   3. the live proxy's request screening (inspectToolCallArguments, which also reads the string leaves)
-//      blocked each case before and after this release — the proxy was not affected;
+//      blocked each case before and after this release — the 0.7.x proxy was not affected;
 //   4. `blindseal attest` refuses each case and never starts the prover; an action outside --action-policy
 //      is refused the same way.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
