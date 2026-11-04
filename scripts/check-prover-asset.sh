@@ -14,7 +14,11 @@
 # The release is treated as untrusted input: downloads land in their own directory, nothing is run
 # from inside it, and the embed check runs python3 -I with paths as arguments.
 #
-#   scripts/check-prover-asset.sh [linux-x64|darwin-arm64] [workdir]     (default: host platform, mktemp)
+# linux-x64-cuda is the prover built with the cuda feature: the executor and the embed check need no GPU, so
+# the same three steps apply. While the manifest pins its sha256 as TBD (no release yet) the check is skipped
+# (exit 0 with a note), so CI stays green until the asset exists.
+#
+#   scripts/check-prover-asset.sh [linux-x64|linux-x64-cuda|darwin-arm64] [workdir]     (default: host platform, mktemp)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 MANIFEST=packages/proxy/src/prover/manifest.json
@@ -22,9 +26,9 @@ FIX_ATT=tests/fixtures/attestation-mainnet-demo-0.7.0.json
 FIX_CALL=tests/fixtures/mainnet-toolcall-demo.json
 
 case "${1:-}" in
-  linux-x64|darwin-arm64) PLATFORM=$1 ;;
-  "") case "$(uname -s)-$(uname -m)" in Linux-x86_64) PLATFORM=linux-x64 ;; Darwin-arm64) PLATFORM=darwin-arm64 ;; *) echo "unsupported host $(uname -s)-$(uname -m); pass linux-x64 or darwin-arm64"; exit 2 ;; esac ;;
-  *) echo "usage: $0 [linux-x64|darwin-arm64] [workdir]"; exit 2 ;;
+  linux-x64|linux-x64-cuda|darwin-arm64) PLATFORM=$1 ;;
+  "") case "$(uname -s)-$(uname -m)" in Linux-x86_64) PLATFORM=linux-x64 ;; Darwin-arm64) PLATFORM=darwin-arm64 ;; *) echo "unsupported host $(uname -s)-$(uname -m); pass linux-x64, linux-x64-cuda or darwin-arm64"; exit 2 ;; esac ;;
+  *) echo "usage: $0 [linux-x64|linux-x64-cuda|darwin-arm64] [workdir]"; exit 2 ;;
 esac
 WORK="${2:-$(mktemp -d)}"; DL="$WORK/dl"; mkdir -p "$DL"
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
@@ -34,6 +38,10 @@ RELEASE=$(j $MANIFEST 'm.release'); VERSION=$(j $MANIFEST 'm.version')
 ASSET=$(j $MANIFEST "m.assets['$PLATFORM'].name"); PINNED=$(j $MANIFEST "m.assets['$PLATFORM'].sha256")
 echo "manifest: prover $VERSION, $PLATFORM asset $ASSET"
 echo "release:  $RELEASE"
+if [ "$PINNED" = "TBD" ]; then
+  echo "skip: the manifest pins no sha256 for $ASSET yet (TBD: not released); nothing to check"
+  exit 0
+fi
 
 # 1 · download + sha256 (SHA256SUMS line and manifest pin). The release carries SHA256SUMS (written with the
 # darwin build) and SHA256SUMS.linux-x64 (written by the prover-linux workflow); the asset must be in one of them.

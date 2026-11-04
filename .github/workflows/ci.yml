@@ -243,12 +243,18 @@ jobs:
         run: scripts/test-m2.sh
 
   prover-asset:
-    name: pinned prover asset (download, sha256, guest ELF, execute)
+    name: pinned prover asset ${{ matrix.platform }} (download, sha256, guest ELF, execute)
     # The released prover binary that packages/proxy/src/prover/manifest.json pins is what `blindseal attest`
     # downloads. scripts/check-prover-asset.sh downloads the linux-x64 asset, checks its sha256 against the
     # release's SHA256SUMS and the manifest, checks the committed guest ELF is embedded verbatim, and runs it
     # in execute-only mode (SP1 executor, no proof) on the mainnet sample: every public value must reproduce.
+    # linux-x64-cuda (the cuda-feature build) runs the same checks: the executor needs no GPU. The script skips
+    # it with a note while the manifest pins its sha256 as TBD (no release yet).
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux-x64, linux-x64-cuda]
     steps:
       - uses: actions/checkout@v5
 
@@ -256,8 +262,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: check the pinned linux-x64 prover
-        run: scripts/check-prover-asset.sh linux-x64 "$RUNNER_TEMP/prover-asset"
+      - name: check the pinned ${{ matrix.platform }} prover
+        run: scripts/check-prover-asset.sh ${{ matrix.platform }} "$RUNNER_TEMP/prover-asset"
 
   identity-sweep:
     name: identity sweep
