@@ -43,6 +43,9 @@ for i in $(seq 1 60); do solana cluster-version -u "$URL" >/dev/null 2>&1 && bre
 echo "validator up (${i}s): $(solana --version)"
 solana airdrop 10 "$(solana-keygen pubkey "$WALLET")" -u "$URL" >/dev/null  # the RPC forwards to its own faucet
 export ANCHOR_PROVIDER_URL="$URL" ANCHOR_WALLET="$WALLET" ROGUE_CALLER_ID
+# One @solana/web3.js copy for the suite and for Anchor: with two, a Transaction built by the suite fails the
+# Connection's instanceof check (TypeError ... numRequiredSignatures) — a lockfile problem, reported as one.
+node -e "const fs=require('fs'),path=require('path'); const a=fs.realpathSync(require.resolve('@solana/web3.js')); const b=fs.realpathSync(require.resolve('@solana/web3.js',{paths:[path.dirname(require.resolve('@coral-xyz/anchor'))]})); if(a!==b){console.error('two @solana/web3.js copies (regenerate pnpm-lock.yaml):\\n '+a+'\\n '+b);process.exit(1)}"
 # payout-gate.spec.ts runs after m2.spec.ts on the same validator (it reuses the Config and policy root
 # the M2 suite set up, and initialises them itself when run alone).
 pnpm exec ts-mocha -p ./tests/tsconfig.json -t 1000000 tests/m2.spec.ts tests/payout-gate.spec.ts

@@ -119,6 +119,9 @@ pub mod payout_gate {
             .try_into()
             .expect("8-byte discriminator");
 
+        // Staged accounts are closed after the loop: closing one moves its rent to the payer, and a lamport
+        // change to the payer between two verify_and_consume CPIs fails the next CPI (UnbalancedInstruction).
+        let mut spent: Vec<Account<'info, Staged>> = Vec::with_capacity(payouts.len());
         for (i, p) in payouts.iter().enumerate() {
             let staged_info = &rem[i * ACCOUNTS_PER_PAYOUT];
             let dest_info = &rem[i * ACCOUNTS_PER_PAYOUT + 1];
@@ -181,7 +184,10 @@ pub mod payout_gate {
                 &[ctx.accounts.source_token.to_account_info(), dest_info.clone(), ctx.accounts.payer.to_account_info()],
             )?;
 
-            // 3) the staged attestation is spent: close it and return the rent to the payer.
+            spent.push(staged);
+        }
+        // 3) every staged attestation is spent: close them and return the rent to the payer.
+        for staged in spent {
             staged.close(ctx.accounts.payer.to_account_info())?;
         }
         Ok(())
