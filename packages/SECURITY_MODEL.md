@@ -128,8 +128,10 @@ Run but not proven yet:
 Not covered:
 
 - Traffic that does not pass through the proxy.
-- Attacks the committed rules miss. The proven layer alone catches a minority of the published red-team
-  corpus; detection in practice leans on L2/L3. The numbers are in `LIMITATIONS.md`.
+- Attacks the committed rules miss. Measured as the proof sees them, the proven layers (L0 + L1) catch 2.5 %
+  of the true holdout (2 of 80) and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210
+  benign samples (`evals/results/catch-rate-0.8.0.md`); detection in practice leans on L2/L3. Known gaps are in
+  `LIMITATIONS.md`.
 - The correctness of the gated program beyond the fields it forwards.
 - A compromised operator machine.
 

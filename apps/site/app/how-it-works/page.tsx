@@ -149,7 +149,7 @@ export default function HowItWorks() {
             <div className="hiw-head reveal">
               <div className="section-head">
                 <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / Four layers</p><h2 className="section-head__title" id="h-four-layers">Four ways to spot suspicious instructions</h2><p className="hiw-caption">Two layers that match, two that judge.</p></div>
-                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1<PendingMainnet />. On the holdout split they catch {'{{catch_after}}'} of attacks, up from {'{{catch_before}}'} with L1 alone, at {'{{fp_rate}}'} false positives on the clean corpus.</p>
+                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1<PendingMainnet />. On attacks held out from writing the rules they catch 2.5 % (2 of 80), and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples. The meaning-based checks are what catch most of the rest; they are attested, not proven.</p>
               </div>
             </div>
             <div className="hiw-layers">
@@ -277,7 +277,7 @@ export default function HowItWorks() {
             </div>
             <div className="hiw-claim reveal cascade">
               <div className="site-panel hiw-claim__panel">
-                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received and on every decoded form of it (L0 runs inside the proof since 0.8.0; pending mainnet until the new verifier key is allowed on chain); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.<PendingMainnet /></p></div>
+                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received, on every string in it and on every decoded form of each, and that the action fits the committed action policy (L0, string screening and action policies are inside the proof since 0.8.0; pending mainnet until the new verifier key is allowed on chain); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.<PendingMainnet /></p></div>
               </div>
               <figure className="hiw-table" aria-label="Hidden versus public">
                 <table>

@@ -28,15 +28,24 @@ Today's proof covers checks for known attack patterns. It does not guarantee tha
 
 The proof covers **L0 and L1** from release 0.8.0 (pending mainnet: the new detector version is allowed on chain
 once the owner signs step c1 of `docs/release-0.8.0-plan.md`; until then proofs carry the 0.7.0 guest, which covers
-L1 only). It states: *this payload (by hash) was screened by this detector version under the policy with this root,
-the committed L1 rules found it clean — on the raw text and on every decoded variant of it (base64, hex, URL,
-HTML entities, zero-width strip, NFKC, homoglyph fold, nested to depth 3) — and the screening is bound to one
-on-chain action, one expiry and one nonce — usable once.* The
-model-based layers **L2/L3** (embeddings, LLM judge) are **attested, not proven**: embeddings run locally, and the judge
-is off unless you turn it on (locally, or at a provider you choose); a TEE mode is planned.
-Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.
-Proving takes hours on CPU: the sample attestation took 2 h 16 min on an Apple M1 Max (32 GB). The honest numbers
-are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is proven" page.
+L1 only). It states: *this payload (by hash) was screened by this detector version under the policy with this root;
+the committed L1 rules found it clean on the raw text, on every JSON string in it (keys and values, unescaped) and
+on every decoded variant of each (base64, hex, URL, HTML entities, zero-width strip, NFKC, homoglyph fold, nested to
+depth 3); the bound action satisfies the action policy the root commits to (allowed recipients, programs,
+instructions and mints, a maximum amount — any of them optional); and the screening is bound to one on-chain
+action, one expiry and one nonce — usable once.* Proofs made before 0.8.0 screened the serialized call as raw text
+only, so an injection hidden behind a JSON escape (`\n`, `\t`, `\u0069`) in an argument could pass them; the live
+proxy, which reads each string of the call, was not affected.
+
+What the proof alone catches, measured as the proof sees it: **2.5 % of the true holdout** (2 of 80 attacks never
+used to write the rules) and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples
+(`evals/results/catch-rate-0.8.0.md`). The model-based layers **L2/L3** (embeddings, LLM judge) catch most of the
+rest but are **attested, not proven**: embeddings run locally, and the judge is off unless you turn it on (locally,
+or at a provider you choose); a TEE mode is planned. Blindseal does not prove an agent is safe, and it does not cover
+traffic that does not pass through the proxy. Proving takes hours on CPU — the 0.8.0 mainnet sample took 2 h 19 min
+on an Apple M1 Max (32 GB) — so v1 is prove-then-act, not real-time gating; local GPU proving (`--mode cuda`) is the
+fast path. The honest numbers are in `packages/LIMITATIONS.md`, `docs/performance.md` and on the docs "What is
+proven" page.
 
 ## Quickstart
 

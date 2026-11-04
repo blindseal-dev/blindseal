@@ -3,6 +3,24 @@
 // {{sig:<base58>}} for a program id / transaction signature (rendered as a copyable, truncated hash).
 export const RELEASES: { v: string; date: string; added: string[]; changed: string[]; fixed: string[] }[] = [
   {
+    v: '0.8.0', date: '2026-11-04',
+    added: [
+      'L0 runs inside the proof: the guest decodes the payload (base64, hex, URL, HTML entities, zero-width strip, NFKC, homoglyph fold; nested to depth 3) and runs L1 on every variant, exactly as the proxy’s L0 does. Pending mainnet until step c1 allows detector version `0x00bd130c…0378`',
+      'A stateless action policy inside the proof: allowed recipients, a maximum amount per action, allowed target programs, instructions and mints, each optional. The guest refuses an action outside it, and the policy root commits to it: `policyRoot = sha256("blindseal.policy.v2" ‖ rulesRoot ‖ actionPolicyHash)` (Canonical hashing page). `blindseal attest --action-policy <file>` checks it before proving',
+      'A verifier fee switch (`set_fee`, default 0) and a hosted prover service with per-proof x402 billing, payload and cycle caps, and local or rented-GPU backends; proving stays on the operator’s hardware',
+      'Local GPU proving (`--mode cuda`), reference consumers (payout-gate, an x402 facilitator gate, an agent-kit plugin), a dogfood service and the explorer’s treasury tab',
+      'CI rebuilds the guest ELF from source in the pinned SP1 image and fails if the committed ELF differs',
+    ],
+    changed: [
+      'One catch-rate method, as the proof sees it (each sample inside a tool call, screened raw and string by string): the proven layers catch 2.5 % of the true holdout (2 of 80) and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples. The scoreboard’s 32.3 % for L1 is withdrawn: it was carried over from the base project and this repository’s rules give 9 of 31',
+      'The verifier’s fee accounts are optional trailing accounts: a 0.7.1 client, and any program that calls the verifier with the 0.7 account list, keeps working while the fee is 0',
+      'The 0.8.0 mainnet sample is re-proven under the fixed guest with the demo action policy (the demo recipient only, at most 0.01 SOL): 2 h 19 min on an Apple M1 Max',
+    ],
+    fixed: [
+      'Every proof made before 0.8.0 (0.5.x through 0.7.x) screened the serialized tool call as raw text only. In that text a control character is a two-character escape, so an argument such as `ignore\\nprevious instructions` (also `\\t`, `\\r\\n`, `\\u000b`, or a `\\u0069`-style escape of a letter) passed L0 and L1 in the guest and in `blindseal attest`. The 0.8.0 guest and `attest` also screen every JSON string in the call, unescaped. The live proxy was not affected: it screens each string of a call. Step c2 removes the 0.7.0 detector version from the on-chain allowlist, after which 0.7.x proofs cannot be consumed',
+    ],
+  },
+  {
     v: '0.7.1', date: '2026-10-31',
     added: [
       'Off-chain verification binds the action. `blindseal verify`, the SDK’s `verifyOffchain` and the verify page recompute the action hash from the file’s action fields (program, source, instruction, recipient, mint, amount), chain id and nonce over the committed public inputs, and the nullifier from the committed action hash; any difference is INVALID with the recomputed and committed values shown. Before, an attestation whose action was edited after proving read VALID off chain and failed only on chain with `ActionHashMismatch`. The verify page shows this as step 4, Action matches the proof; a file without action fields says so instead of passing silently',

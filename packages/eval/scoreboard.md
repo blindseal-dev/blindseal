@@ -1,5 +1,9 @@
 # Blindseal Red Team — scoreboard
 
+> **The `blindseal-l1` row below is withdrawn.** This table was carried over from the base project when the
+> repository was created and was not regenerated. On these 31 attacks this repository's L1 rules catch 9 (29.0 %),
+> the same as the proof's own method (`evals/catch-rate.ts`, `evals/results/catch-rate-0.8.0.md`).
+
 Corpus: 31 attack samples + 32 clean samples = 63 total.
 
 Each competitor classifies every sample as flagged (likely injection) or clean.
