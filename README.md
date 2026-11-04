@@ -26,10 +26,12 @@ Today's proof covers checks for known attack patterns. It does not guarantee tha
 
 ## What is proven — and what is not
 
-The proof covers **L1 today** — the committed deterministic rule automata. It states: *this payload (by hash) was
-screened by this detector version under the policy with this root, the committed L1 rules found it clean, and the
-screening is bound to one on-chain action, one expiry and one nonce — usable once.* **L0** (decode-then-L1) runs in
-the proxy but is **not inside the proof yet**; it is the next increment and will change the detector version. The
+The proof covers **L0 and L1** from release 0.8.0 (pending mainnet: the new detector version is allowed on chain
+once the owner signs step c1 of `docs/release-0.8.0-plan.md`; until then proofs carry the 0.7.0 guest, which covers
+L1 only). It states: *this payload (by hash) was screened by this detector version under the policy with this root,
+the committed L1 rules found it clean — on the raw text and on every decoded variant of it (base64, hex, URL,
+HTML entities, zero-width strip, NFKC, homoglyph fold, nested to depth 3) — and the screening is bound to one
+on-chain action, one expiry and one nonce — usable once.* The
 model-based layers **L2/L3** (embeddings, LLM judge) are **attested, not proven**: embeddings run locally, and the judge
 is off unless you turn it on (locally, or at a provider you choose); a TEE mode is planned.
 Blindseal does not prove an agent is safe, and it does not cover traffic that does not pass through the proxy. CPU proving takes hours, so v1 is prove-then-act, not real-time gating; faster proving is M4.
@@ -106,7 +108,7 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
              │
              ├─ checks tool-call arguments (L0 + L1) and tool replies (all four layers)
              ├─ L1 rules (committed DFAs — PROVEN)
-             ├─ L0 decode-then-L1 (deterministic; in the proxy, not in the proof yet)
+             ├─ L0 decode-then-L1 (deterministic — PROVEN from 0.8.0, pending mainnet)
              ├─ best-effort redaction (listed secret keys, key/token shapes, common PII)
              ├─ L2 embeddings (local) + L3 judge (off unless BLINDSEAL_LAYER3_PROVIDER is set) — ATTESTED
              ├─ hash-chained audit log (fingerprints + verdicts; content encrypted locally; signed disclosures)
