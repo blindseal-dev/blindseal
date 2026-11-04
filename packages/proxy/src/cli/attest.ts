@@ -1,7 +1,8 @@
 /// `blindseal attest` — a REAL screened decision → a Groth16 attestation.
 ///
-/// 1. Screens the tool call with the proven layers (L0 decode-then-L1, L1 heuristics) — the same
-///    code the proxy runs. A non-clean verdict stops here: there is no proof for a blocked call.
+/// 1. Screens the tool call with the proven layers exactly as the guest asserts them (release 0.8.0,
+///    detection/proven.ts): L1 and L0 on the serialized call AND on every JSON string leaf of it (keys and
+///    values, unescaped, any depth). A non-clean verdict stops here: there is no proof for a blocked call.
 /// 2. Appends the decision to the hash-chained audit log (~/.blindseal/audit.log): content-free,
 ///    just decisionId / verdict / payloadHash. That entry is the decision the attestation names.
 /// 3. Derives the on-chain action from the payload (chain/action-binding.ts — the same rule the guest
@@ -10,6 +11,8 @@
 ///    equal what the payload describes; a payload that is not an on-chain action, or that describes
 ///    a different one, is refused here — before the prover is resolved or started — since the guest
 ///    would refuse it anyway.
+///    With `--action-policy <file>` the action must also satisfy that stateless action policy (allowed
+///    recipients, max amount, programs, instructions, mints), which the proof's policy root commits to.
 /// 4. Runs the local prover (crates/prover) with that payload + action → attestation.json. On linux-x64
 ///    with an NVIDIA GPU and a released cuda asset the cuda prover runs (`--mode cuda`); still local.
 ///
@@ -25,8 +28,9 @@ import { redactValue } from '@blindseal/redactor';
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { runLayer0, makeLayer0Result } from '../detection/layer0-decoder.js';
-import { runLayer1 } from '../detection/layer1-heuristics.js';
+import { screenPayload } from '../detection/proven.js';
+import { PublicKey } from '@solana/web3.js';
+import { checkActionPolicy, EMPTY_ACTION_POLICY, parseActionPolicy, policyRootFor, type ActionPolicy } from 'blindseal-sdk';
 import { BindError, GATED_TRANSFER_DISC, TRANSFER_GATE_ID, actionFromPayload, checkActionBinding, type BoundAction } from '../chain/action-binding.js';
 import { openAudit, toChainVerdict } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
@@ -50,6 +54,10 @@ Flags
                              downloaded from the GitHub release on first use; on linux-x64 with an
                              NVIDIA GPU the cuda build is picked when it is released; a --prover or
                              $BLINDSEAL_PROVER binary runs in its own default mode, cpu)
+  --action-policy <file>     stateless action policy the action must satisfy and the proof's policy root
+                             commits to: {"recipients": [...], "maxAmount": "<lamports>" | null,
+                             "targetPrograms": [...], "instructions": ["0x…"], "mints": [...]}
+                             (every key optional; empty = no constraint; default: no policy)
   --audit-dir <dir>          audit base dir (default ~/.blindseal)
   --help, -h                 this help
 
@@ -145,6 +153,7 @@ interface Opts {
   expiry?: string;
   noExpiry: boolean;
   prover?: string;
+  actionPolicy?: string;
   auditDir: string;
   help?: boolean;
 }
@@ -161,6 +170,7 @@ function parse(argv: string[]): Opts {
     else if (a === '--no-expiry') o.noExpiry = true;
     else if (a === '--prover') o.prover = argv[++i];
     else if (a === '--audit-dir') o.auditDir = argv[++i]!;
+    else if (a === '--action-policy') o.actionPolicy = argv[++i]!;
     else if (a.startsWith('--')) throw new Error(`unknown flag: ${a}`);
     else o.file = a;
   }
@@ -245,6 +255,29 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     return 1;
   }
 
+  // The stateless action policy (release 0.8.0): the guest refuses an action that breaks it, so check here.
+  let policy: ActionPolicy = EMPTY_ACTION_POLICY;
+  if (o.actionPolicy !== undefined) {
+    try {
+      policy = parseActionPolicy(JSON.parse(readFileSync(o.actionPolicy, 'utf8')));
+    } catch (e) {
+      process.stderr.write(`blindseal attest: --action-policy ${o.actionPolicy}: ${(e as Error).message}\n`);
+      return 2;
+    }
+    const why = checkActionPolicy(policy, {
+      targetProgram: new PublicKey(action.targetProgram).toBytes(),
+      instruction: Uint8Array.from(Buffer.from(action.instruction.replace(/^0x/, ''), 'hex')),
+      recipient: new PublicKey(action.recipient).toBytes(),
+      mint: new PublicKey(action.mint).toBytes(),
+      amount: BigInt(action.amount),
+    });
+    if (why) {
+      process.stderr.write(`blindseal attest: refused (${why}): the action does not satisfy the action policy ${o.actionPolicy}; nothing was proved\n`);
+      return 1;
+    }
+    process.stdout.write(`action policy ${o.actionPolicy}: satisfied; policy root ${policyRootFor(policy)}\n`);
+  }
+
   // Resolve the prover and the expiry slot before touching the audit log, so a missing binary or
   // an unreachable RPC leaves no half-done decision behind.
   let prover: ResolvedProver;
@@ -266,10 +299,9 @@ export async function runAttestCli(argv: string[]): Promise<number> {
 
   const payloadHash = '0x' + createHash('sha256').update(payload).digest('hex');
 
-  // 1) screen with the proven layers (what the guest re-runs and asserts clean)
-  const l0 = runLayer0(payload);
-  const result = l0.fired ? makeLayer0Result(l0) : runLayer1(payload);
-  const verdict = result.verdict;
+  // 1) screen with the proven layers as the guest asserts them: the raw payload and every JSON string leaf
+  const screened = screenPayload(payload);
+  const verdict = screened.verdict;
 
   // 2) record the decision in the hash-chained audit log, clean or not
   const decisionId = 'd_' + randomBytes(8).toString('hex');
@@ -279,12 +311,12 @@ export async function runAttestCli(argv: string[]): Promise<number> {
   const entry = audit.chain.append({ decisionId, verdict: toChainVerdict(verdict), payloadHash });
   // What the decision was about, for the local dashboard: redacted, encrypted (like the proxy's).
   audit.content.put(decisionId, {
-    type: 'attest', direction: 'request', toolName: call.toolName, verdict, patterns: result.detectedPatterns,
+    type: 'attest', direction: 'request', toolName: call.toolName, verdict, patterns: screened.patterns,
     args: redactValue(call.args ?? null).redacted,
   });
   process.stdout.write(`decision ${decisionId}: ${verdict} → ${entry.verdict} (audit #${entry.index} ${entry.hash.slice(0, 18)}…)\n`);
   if (verdict !== 'clean') {
-    process.stderr.write(`blindseal attest: verdict is ${verdict} (${result.detectedPatterns.join(', ')}); no attestation for a non-clean call\n`);
+    process.stderr.write(`blindseal attest: verdict is ${verdict} (${screened.patterns.join(', ')}); no attestation for a non-clean call\n`);
     return 1;
   }
 
@@ -296,6 +328,7 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     '--target-program', action.targetProgram, '--source-authority', action.sourceAuthority,
     '--recipient', action.recipient, '--mint', action.mint === NATIVE_MINT_B58 ? '' : action.mint, '--amount', action.amount,
     '--instruction', action.instruction, '--expiry', expiry,
+    ...(o.actionPolicy !== undefined ? ['--action-policy', o.actionPolicy] : []),
     // the cuda asset is the only one told its mode; every other binary keeps its default (cpu)
     ...(prover.mode === 'cuda' ? ['--mode', 'cuda'] : []),
   ];

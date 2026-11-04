@@ -23,6 +23,10 @@ export const UNPARSEABLE = 'unparseable-payload';
 /// objects inside one another. Calibrated by the parity vectors `parse:depth-*`.
 export const SERDE_MAX_DEPTH = 127;
 
+/// A lone surrogate (half of a UTF-16 pair with no partner): serde_json refuses a `\udXXX` escape like this.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+const wellFormed = (s: string) => !LONE_SURROGATE.test(s);
+
 export interface PayloadScreen {
   verdict: Verdict;
   /// Sorted union of L1 pattern names over every screened text (L1 directly and the L1 match of the
@@ -48,7 +52,7 @@ export function strictJsonLeaves(payload: string): Set<string> | null {
   const walk = (x: unknown, depth: number): void => {
     if (!ok) return;
     if (typeof x === 'string') {
-      if (!x.isWellFormed()) ok = false;
+      if (!wellFormed(x)) ok = false;
       else out.add(x);
     } else if (typeof x === 'number') {
       if (!Number.isFinite(x)) ok = false;
@@ -58,7 +62,7 @@ export function strictJsonLeaves(payload: string): Set<string> | null {
     } else if (x !== null && typeof x === 'object') {
       if (depth + 1 > SERDE_MAX_DEPTH) { ok = false; return; }
       for (const [k, e] of Object.entries(x as Record<string, unknown>)) {
-        if (!k.isWellFormed()) { ok = false; return; }
+        if (!wellFormed(k)) { ok = false; return; }
         out.add(k);
         walk(e, depth + 1);
       }
