@@ -5,6 +5,8 @@
 //   --step c1   set_config(allowed_vkeys = on-chain list + CURRENT_VKEY)       (keeps the old vkey; refused unless a is done)
 //   --step c2   set_config(allowed_vkeys = on-chain list − LEGACY_VKEYS)       (needs --new-sample <attestation.json>:
 //               an attestation under CURRENT_VKEY whose nullifier is already consumed on mainnet)
+//   --step f    set_fee(0, <treasury>)  (0.8.0: needs --treasury <pubkey>; only after the 0.8.0 program upgrade —
+//               reallocs Config 303 → 343 bytes and records the treasury; charges nothing)
 //   --step d    set_authority(<ledger pubkey>)                                  (needs --ledger-pubkey; the Ledger co-signs)
 //   --dry-run   build and print the transaction (program, accounts, data, unsigned message) — nothing is signed or sent
 //   --simulate  build the transaction UNSIGNED and run simulateTransaction (sigVerify off, blockhash replaced) — prints
@@ -29,7 +31,7 @@ import {
 } from '@solana/web3.js';
 import {
   MAINNET_GENESIS_HASH, DEFAULT_RPC_URL, PROGRAM_ID, MAX_VKEYS, configPda, policyRootPda, decodeConfig, hex, isConsumed,
-  buildSetConfigIx, buildRegisterPolicyRootIx, buildSetAuthorityIx, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, DEMO_POLICY_ROOT,
+  buildSetConfigIx, buildRegisterPolicyRootIx, buildSetAuthorityIx, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, DEMO_POLICY_ROOT, buildSetFeeIx,
   type Attestation,
 } from 'blindseal-sdk';
 
@@ -53,10 +55,18 @@ const ORDER = ['b', 'a', 'c1', 'c2'] as const; // b2 and d are independent
 /// get-program-hash: ProgramData after its 45-byte header, trailing zero padding removed).
 const UPGRADEABLE_LOADER = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 const GATE_ID = new PublicKey('9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa');
-const RELEASE_HASHES: Array<[string, PublicKey, string]> = [
-  ['transfer_gate', GATE_ID, 'a0d51e460d88919e137bd02d77a97d63def0e78c6bef1112df777c658107fb86'],
-  ['blindseal_verify', PROGRAM_ID, '5a1f0e90dd3e910ea04db2de02cff5cc7cac2de29db6925b9a6e1250ce078bed'],
-];
+/// Verifiable-build executable hashes per release. Config steps are sent only while the deployed programs are one
+/// of these builds (0.8.0's from the verifiable-build workflow at the release commit; docs/release-0.8.0-plan.md).
+const RELEASE_HASHES: Record<'0.7.0' | '0.8.0', Array<[string, PublicKey, string]>> = {
+  '0.7.0': [
+    ['transfer_gate', GATE_ID, 'a0d51e460d88919e137bd02d77a97d63def0e78c6bef1112df777c658107fb86'],
+    ['blindseal_verify', PROGRAM_ID, '5a1f0e90dd3e910ea04db2de02cff5cc7cac2de29db6925b9a6e1250ce078bed'],
+  ],
+  '0.8.0': [
+    ['transfer_gate', GATE_ID, '{{HASH_GATE_080}}'],
+    ['blindseal_verify', PROGRAM_ID, '{{HASH_VERIFY_080}}'],
+  ],
+};
 
 async function deployedProgramHash(conn: Connection, programId: PublicKey): Promise<string | null> {
   const [programData] = PublicKey.findProgramAddressSync([programId.toBuffer()], UPGRADEABLE_LOADER);
@@ -67,14 +77,19 @@ async function deployedProgramHash(conn: Connection, programId: PublicKey): Prom
   return createHash('sha256').update(acc.data.subarray(45, end)).digest('hex');
 }
 
-async function requireStep0(conn: Connection): Promise<void> {
-  for (const [name, id, want] of RELEASE_HASHES) {
-    const got = await deployedProgramHash(conn, id);
-    if (got !== want) {
-      throw new Error(`step 0 has not landed: ${name} (${id.toBase58()}) deployed hash is ${got ?? 'missing'}, the 0.7.0 build is ${want}. Run step 0 first.`);
-    }
+/// Which release's verifiable builds are deployed: '0.7.0', '0.8.0', or throws (a mix, or unknown bytes).
+async function deployedRelease(conn: Connection): Promise<'0.7.0' | '0.8.0'> {
+  const got = await Promise.all(RELEASE_HASHES['0.7.0'].map(([, id]) => deployedProgramHash(conn, id)));
+  for (const rel of ['0.8.0', '0.7.0'] as const) {
+    if (RELEASE_HASHES[rel].every(([, , want], i) => got[i] === want)) return rel;
   }
-  console.log('step 0 landed: both programs are the 0.7.0 verifiable builds');
+  throw new Error(`the deployed programs are not one release's verifiable builds (transfer_gate ${got[0] ?? 'missing'}, blindseal_verify ${got[1] ?? 'missing'}); finish step 0 first`);
+}
+
+async function requireStep0(conn: Connection, step: string): Promise<void> {
+  const rel = await deployedRelease(conn);
+  if (step === 'f' && rel !== '0.8.0') throw new Error('f: set_fee exists only in the 0.8.0 programs — upgrade transfer-gate and blindseal-verify first');
+  console.log(`deployed programs: the ${rel} verifiable builds`);
 }
 
 /// The typed confirmation lives here, not only in the shell wrapper, so running this helper
@@ -134,6 +149,14 @@ async function plan(step: string, cfg: Cfg, ctx: Ctx): Promise<Planned> {
       if (!ctx.rootRegistered) throw new Error('a: the default policy root is not registered — run step b first, or every attestation would be refused');
       if (cfg.allowlistPolicies) { console.log('a: allowlist_policies is already true — nothing to send'); return base; }
       return { ...base, ix: buildSetConfigIx(ctx.authority, { allowlistPolicies: true }), next: { ...cfg, allowlistPolicies: true } };
+    case 'f': {
+      const t = flag('--treasury');
+      if (!t) throw new Error('f: pass --treasury <pubkey> — an existing rent-exempt account (the authority itself is a fine first treasury)');
+      const treasury = new PublicKey(t);
+      if (cfg.hasFeeFields && cfg.treasury === treasury.toBase58() && cfg.feeLamports === 0n) { console.log(`f: fee 0 and treasury ${t} already set — nothing to send`); return base; }
+      console.log(`f: set_fee(0, ${t}) — Config ${cfg.hasFeeFields ? 'already 343 bytes' : 'grows 303 → 343 bytes (authority pays the rent difference)'}; nothing is charged`);
+      return { ...base, ix: buildSetFeeIx(ctx.authority, 0, treasury) };
+    }
     case 'c1': {
       if (!cfg.allowlistPolicies) throw new Error('c1: allowlist_policies is still false — run step a first (order 0 → b → a → c1)');
       if (cfg.allowedVkeys.includes(CURRENT_VKEY)) { console.log(`c1: ${CURRENT_VKEY} already allowed — nothing to send`); return base; }
@@ -194,7 +217,7 @@ async function simulate(conn: Connection, payer: PublicKey, ixs: TransactionInst
 }
 
 async function main() {
-  if (!STEP || !['a', 'b', 'b2', 'c1', 'c2', 'd'].includes(STEP)) throw new Error('usage: --step a|b|b2|c1|c2|d [--dry-run|--simulate] [--new-sample <file>] [--ledger-pubkey <pk>]');
+  if (!STEP || !['a', 'b', 'b2', 'f', 'c1', 'c2', 'd'].includes(STEP)) throw new Error('usage: --step a|b|b2|f|c1|c2|d [--dry-run|--simulate] [--new-sample <file>] [--treasury <pk>] [--ledger-pubkey <pk>]');
   const conn = new Connection(RPC, 'confirmed');
   const where = await cluster(conn);
   if (where === 'local') console.log('LOCAL REHEARSAL cluster (localhost, not a public cluster)');
@@ -212,7 +235,7 @@ async function main() {
     // Prepend earlier steps that have not landed yet, so the simulation runs against the state the step will meet.
     const ixs: TransactionInstruction[] = [];
     let cur = cfg; let signers = [authority.publicKey];
-    const chain = STEP === 'd' || STEP === 'b2' ? [STEP] : ORDER.slice(0, ORDER.indexOf(STEP as (typeof ORDER)[number]) + 1);
+    const chain = STEP === 'd' || STEP === 'b2' || STEP === 'f' ? [STEP] : ORDER.slice(0, ORDER.indexOf(STEP as (typeof ORDER)[number]) + 1);
     for (const s of chain) {
       const p = await plan(s, cur, { ...ctx, rootRegistered: ctx.rootRegistered });
       ctx.rootRegistered = p.rootRegistered; cur = p.next; signers = p.signers;
@@ -232,7 +255,7 @@ async function main() {
   const p = await plan(STEP, cfg, ctx);
   if (!p.ix) return;
   const ix = p.ix;
-  if (!DRY) await requireStep0(conn);
+  if (!DRY) await requireStep0(conn, STEP);
   const extraSigners: Array<(tx: Transaction) => Promise<void>> = [];
   if (STEP === 'd' && !DRY) {
     const kpFile = flag('--new-authority-keypair');

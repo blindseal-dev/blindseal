@@ -1,90 +1,73 @@
 # Release 0.8.0: mainnet plan (read before signing)
 
-Release 0.8.0 moves L0 (decode-then-L1) into the proof. The guest changed, so the proof's verifier key
-(`detectorVersion`) changed; the on-chain allowlist has to admit the new key before an 0.8.0 attestation
-can be consumed. Nothing in this release changes the public-input layout, the action hash, the nullifier,
-the Config / PolicyRoot / Nullifier accounts or the gate's CPI, so no program upgrade is needed for the
-new key. (The fee switch, branch `feat/verifier-fee`, is a separate upgrade with its own document,
-`docs/release-0.8.0-fee-switch.md`.)
+Release 0.8.0 changes what the proof asserts and adds a fee switch to the verifier:
 
-The steps reuse `scripts/mainnet-0.7.0.sh` (helper `scripts/lib/mainnet-admin-0.7.0.mts`): its `c1`
-adds the SDK's `CURRENT_VKEY` to the on-chain list and its `c2` removes `LEGACY_VKEYS`, both read from
-`packages/sdk/src/ix.ts`, which this release re-pins. Run every step with `--simulate` first.
+- **The guest** runs L0 (decode-then-L1) and L1 on the raw payload **and on every JSON string in it** (keys and
+  values, unescaped, any depth), and checks the bound action against a **stateless action policy** (allowed
+  recipients, a maximum amount, allowed programs, instructions and mints). New detector version (vkey), new
+  policy roots: `policyRoot = sha256("blindseal.policy.v2" ‖ rulesRoot ‖ actionPolicyHash)`.
+- **The verifier** gains `set_fee` and optional trailing fee accounts; a 0.7.1 client keeps working at fee 0
+  (`docs/release-0.8.0-fee-switch.md`). **transfer-gate** expects the new roots and forwards the fee accounts.
 
-Nothing was sent to mainnet or devnet while preparing this release.
+Every step goes through `scripts/mainnet-0.7.0.sh` (helper `scripts/lib/mainnet-admin-0.7.0.mts`), which reads the
+SDK's pins (`CURRENT_VKEY`, `LEGACY_VKEYS`, `DEFAULT_POLICY_ROOT`, `DEMO_POLICY_ROOT`). Run each config step with
+`--simulate` first. Nothing in this document was sent to mainnet or devnet.
 
 | | |
 |---|---|
-| Guest ELF (`crates/guest/elf/blindseal-guest`) | sha256 `3363ab04a899e8eb1d519ea75d7bbe630c5b3d2bce850fb6b8ddde91f64b464f`, 463,876 bytes, built with `cargo prove build --docker --tag v5.0.0` |
-| New vkey (`CURRENT_VKEY`) | `0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537` |
-| Previous vkey (now `LEGACY_VKEYS[0]`) | `0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967` (0.7.0) |
-| Policy root the new sample commits | `0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397` (the registered default root; the widened L1 rules of `feat/l1-rules-0.8` produce a NEW root that is registered separately, see "Sign list") |
-| Executor cycles, mainnet sample | 104,291,669 (0.7.0 guest: 104,223,540) |
-| CPU proof of the mainnet sample (M1 Max, 32 GB, alone) | 2 h 20 min 38 s (8,438,066 ms; 0.7.0: 8,740,766 ms) |
-| New sample | `tests/fixtures/attestation-mainnet-demo-0.8.0.json`: the same tool call as the 0.7.0 sample (`tests/fixtures/mainnet-toolcall-demo.json`, payloadHash `0x7de7653d…47dec`), expiry slot 465,653,982, nonce fresh. Verified off chain with `blindseal verify` (proof, labels, action binding). NOT submitted. |
+| Guest ELF (`crates/guest/elf/blindseal-guest`) | sha256 `859af59ddb7b9ec47fc48c11e9fa6155d038d837e3c991d18caf2af95461729c`, 503,880 bytes; CI's `guest ELF reproduces from source` job rebuilds it byte for byte with `cargo prove build --docker --tag v5.0.0` |
+| **New vkey** (`CURRENT_VKEY`) | `0x00bd130c8d3ccc302df81ae4a422c3bd7a9f8d56afccfa4eb934d4e4406e0378` |
+| Still allowed until c2 (`LEGACY_VKEYS`) | `0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967` (0.7.0). The 0.6.0 key is listed for the localnet fixtures only; it is not on chain. Last night's `0x00e9807a…a537` (before string screening) is discarded and never allowed. |
+| Rules root (unchanged: the 22 committed L1 rules) | `0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397` — also the registered 0.7 policy root |
+| **New default policy root** (empty action policy) | `0x78bb3bab1765304373a6af9de2d7c081ce57bc862c039f6dd682c74e939eb10a` |
+| **Demo policy root** (the sample's) | `0x79f11a126ef624b03a351efc79747ee6dadcac8eab71f5e24061514e6205ea8e` = rules root + `tests/fixtures/action-policy-demo.json` (the demo recipient `6HwAr9…mXo` only, at most 10,000,000 lamports = 0.01 SOL); actionPolicyHash `0xe8914f8815f52443ef2c046006f50f5cf3cb45c4671745f95d6f0bcb6377d9f9` |
+| **Sample** | `tests/fixtures/attestation-mainnet-demo-0.8.0.json`: the 0.7.0 sample's tool call (payloadHash `0x7de7653d…47dec`, 0.001 SOL from the demo wallet `GdPZNkh4…` through transfer-gate), actionHash `0x275ee51c…4355`, nullifier `0x36b36c1b…a62d`, **expiry slot 466,872,143** (≈ 7 days after 2026-11-04 16:39 UTC). Verified off chain (CLI and SDK: proof, labels, action binding). Not submitted. |
+| CPU proof of the sample (Apple M1 Max, 32 GB, alone) | **8,366,102 ms = 2 h 19 min 26 s**; executor 104,486,030 cycles (0.7.0: 104,223,540) |
+| GPU proof | not measured (no GPU host available); procedure in `docs/gpu-proving.md` |
+| Programs (verifiable builds, `solanafoundation/solana-verifiable-build:4.3.0`, workflow `verifiable-build` at the release commit) | transfer_gate {{GATE_BYTES}} B, executable hash `{{HASH_GATE_080}}`; blindseal_verify {{VERIFY_BYTES}} B, executable hash `{{HASH_VERIFY_080}}` |
+| SIMD-0500 (`B8JJXCy5…o83g`) | read 2026-11-04 19:18 UTC: not activated and not pending, so the 4.3.0 image (sBPF v0) still deploys. Re-check on the day. |
 | Authority, fee payer and signer | `88sR7XCxG3BGwxnPbMKnbjmcitpTBkMquMrwqGVa6bJj` |
-
-## What the proof now claims
-
-Before 0.8.0 the guest asserted L1 on the raw payload. From 0.8.0 it also asserts L1 on every decoded
-variant of the payload: base64 blobs, hex runs, URL-percent runs, HTML numeric entity runs, the text with
-zero-width characters removed, its NFKC normalization, and a homoglyph fold (Cyrillic/Greek look-alikes to
-ASCII), nested to depth 3 — exactly what the proxy's `runLayer0` checks before `blindseal attest` starts
-the prover. The parity gate (`evals/vectors/parity.json`, 718 vectors) ties the TypeScript reference, the
-Rust host path and the guest's serialized-DFA path together; `crates/prover/tests/guest_l0.rs` executes the
-committed guest on encoded injections and checks it refuses each one with "L0 did not pass".
 
 ## Sign list, in order
 
-1. **Register the widened policy root** — `scripts/mainnet-0.7.0.sh b` after merging `feat/l1-rules-0.8`
-   (it re-pins `DEFAULT_POLICY_ROOT`; the step registers whatever the SDK pins and is a no-op if already
-   registered). Rent 899,160 lamports + 5,000 fee. The old root stays registered, so attestations under it
-   (including the 0.8.0 sample proven tonight) stay consumable.
-2. **Upgrade the verifier with the fee switch (fee 0)** — per `docs/release-0.8.0-fee-switch.md` (branch
-   `feat/verifier-fee`): transfer-gate first, then blindseal-verify, from the verifiable builds
-   (`solanafoundation/solana-verifiable-build:4.3.0`): transfer_gate 188,008 B, executable hash
-   `7e43df38dd14e1ab923e2bfa871269cee05882285770174b2a8e414349f88703` (fits the current ProgramData);
-   blindseal_verify 380,712 B, executable hash `90796b66d413adea876bdfb66360c8c094b6c58772c33cecde6bbca6754fad1f`
-   (ProgramData extends by 14,040 B, ≈ 0.0713 SOL; ≈ 1.93 SOL buffer held during the deploy). Then
-   `set_fee(0, <treasury>)` performs the Config realloc (303 → 343 B, +203,200 lamports rent; data
-   `129a1812edd61350` ‖ u64le 0 ‖ treasury). Check `solana feature status | grep B8JJ` (SIMD-0500) before
-   deploying: if it has activated, the verifiable toolchain must move and the hashes change. Independent of
-   the vkey change; can also run after step 5.
-3. **c1: allow the new vkey** — `scripts/mainnet-0.7.0.sh --simulate c1`, then `c1`. Sends one
-   `set_config(allowed_vkeys = [0x00cdf40c…, 0x00e9807a…a537])`:
-   - program `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, accounts Config `9je2jP…` (writable), authority
-     `88sR7X…` (signer); data `6c9e9aafd4623442 01 02000000 <0.7.0 vkey> <new vkey> 00 00`; fee 5,000
-     lamports, no rent (Config is fixed size).
-4. **Re-prove and consume** — if the sample's expiry slot 465,653,982 is still ahead of the current slot,
-   consume `tests/fixtures/attestation-mainnet-demo-0.8.0.json` directly: `blindseal submit <file>`
-   (through transfer-gate, the demo wallet `GdPZNkh4…` signs the 0.001 SOL transfer as in 0.7.0). If it
-   has expired, re-prove the same tool call first (`blindseal attest`, GPU: minutes; CPU: 2 h 20 min 38 s)
-   and consume that. Then `blindseal submit --check` must report CONSUMED.
-5. **c2: drop the 0.7.0 vkey** — `scripts/mainnet-0.7.0.sh --simulate c2 --new-sample <consumed 0.8.0
-   attestation>`, then `c2`. The step refuses unless the sample is under the new vkey and consumed, and
-   unless the prover manifest points at an 0.8.0 release — so **publish the prover-v0.8.0 release and
-   re-pin `packages/proxy/src/prover/manifest.json` (version, assets, `guestElf`) before c2**; until then
-   `blindseal attest` downloads prover 0.7.0 (old guest, old vkey) whose proofs c2 would make unconsumable.
-   After c2 every 0.7.0 attestation fails with `DisallowedVkey` (6001), including the site's current sample —
-   swap `/verify`'s sample and the how-it-works fixture to the 0.8.0 attestation in the same site release.
-6. **Fund the dogfood wallet and start the timer** — per `services/dogfood/README.md` (branch
-   `feat/dogfood`): create the wallet outside the repo, fund it with the daily caps' worth of SOL and USDC,
-   set `BLINDSEAL_DOGFOOD_WALLET` for the site so the explorer labels and excludes it, start the loop.
+1. **Register the policy roots** — `scripts/mainnet-0.7.0.sh --simulate b`, then `b` (registers
+   `DEFAULT_POLICY_ROOT` 0x78bb3bab…), then the same for `b2` (`DEMO_POLICY_ROOT` 0x79f11a12…, the sample's root).
+   Each is one `register_policy_root` transaction: 899,160 lamports rent + 5,000 fee. Works on the 0.7.0
+   programs. The 0.7 root stays registered, so 0.7.x attestations keep their root until c2 retires their vkey.
+2. **Upgrade transfer-gate** — `scripts/mainnet-0.7.0.sh 0` builds both programs with the verifiable image; check
+   that its local executable hash for `transfer_gate` is `{{HASH_GATE_080}}` before typing the confirmation. The
+   new gate expects the default, demo and 0.7 roots and forwards the optional fee accounts; a 0.7.1 client
+   (no treasury account) keeps working. ProgramData {{GATE_GROWTH}}.
+3. **Upgrade blindseal-verify** — same step, `blindseal_verify` must hash to `{{HASH_VERIFY_080}}`.
+   ProgramData {{VERIFY_GROWTH}}. Either upgrade order works at fee 0 (the old gate's CPI omits the trailing
+   fee accounts, which the new verifier accepts while the fee is 0); gate first as in 0.7.0.
+4. **`set_fee(0, <treasury>)`** — `scripts/mainnet-0.7.0.sh --simulate f --treasury <pubkey>`, then `f`. Grows
+   Config 303 → 343 bytes (+203,200 lamports rent, paid by the authority) and records the treasury; charges
+   nothing. The step refuses unless the deployed programs are the 0.8.0 builds. The treasury must be an existing
+   rent-exempt account; the authority itself is a fine first treasury.
+5. **c1: allow the new vkey** — `--simulate c1`, then `c1`. One `set_config(allowed_vkeys = [0x00cdf40c…,
+   0x00bd130c…])`: data `6c9e9aafd4623442 01 02000000 <0.7.0 vkey> <0.8.0 vkey> 00 00`, 5,000 lamports, no rent.
+6. **Consume the sample** — `blindseal submit tests/fixtures/attestation-mainnet-demo-0.8.0.json` (the demo wallet
+   signs; either the 0.7.1 or the 0.8.0 CLI works at fee 0), then `blindseal submit --check` → CONSUMED. Must land
+   before slot 466,872,143.
+7. **npm 0.8.0** — `blindseal-sdk` then `blindseal` (`cd packages/<p> && pnpm publish --access public
+   --no-git-checks`); `scripts/npm-pack-audit.sh` clean first; fresh-install check as in 0.7.1.
+8. **prover-v0.8.0 + manifest** — tag `prover-v0.8.0` at the release commit: darwin-arm64 built on the Mac,
+   linux-x64 and linux-x64-cuda by the `prover-linux` workflow; set `packages/proxy/src/prover/manifest.json`
+   (`version`, `release`, each asset's sha256, `guestElf` = sha256 `859af59d…729c` / 503,880 bytes). CI's
+   `prover-asset` job must then reproduce the sample's public values with the released binary.
+9. **c2: drop the 0.7.0 vkey** — `--simulate c2 --new-sample tests/fixtures/attestation-mainnet-demo-0.8.0.json`,
+   then `c2`. Refuses unless the sample is under `CURRENT_VKEY` and consumed and the manifest is ≥ 0.8.0. Data
+   `6c9e9aafd4623442 01 01000000 <0.8.0 vkey> 00 00`. After it every 0.7.x attestation fails with
+   `DisallowedVkey` (6001) — which retires the JSON-escape gap of all proofs before 0.8.0.
+10. **Site sample** — swap `/verify`'s "Try a sample proof" and the how-it-works fixture to the consumed 0.8.0
+    sample (with its consume signature), remove the "pending mainnet" markers, deploy.
 
-## Preconditions the script checks
+Then, separately: fund the dogfood wallet and start its timer (`services/dogfood/README.md`).
 
-- `c1` refuses unless `allowlist_policies` is true (done in 0.7.0) and the list stays within 8 keys (it
-  will hold 2).
-- `c2` refuses unless `c1` landed, the sample is under `CURRENT_VKEY` and consumed, and the manifest is
-  at least 0.8.0.
-- Both steps are plain `set_config` calls signed by the config authority; 5,000 lamports each.
+## What is not in this release
 
-## After the morning
-
-- Release `prover-v0.8.0`: darwin-arm64 built on the Mac from the release commit, linux-x64 (and
-  linux-x64-cuda, branch `feat/gpu-prover`) from the `prover-linux` workflow on the tag; update
-  `manifest.json` (`version`, `release`, each asset's sha256, `guestElf.sha256`/`bytes` = the committed
-  ELF). CI's `prover-asset` job then checks the committed ELF is the embedded one again.
-- Publish `blindseal` / `blindseal-sdk` 0.8.0 (not tonight).
-- Site: numbers marked "pending mainnet" (scope, how-it-works) lose the marker once c1 and the register
-  step have landed.
+- The widened L1 rule set (PR #9) is closed: about 20-hour proofs, and its 93.5 % was measured on the set its
+  rules were written against. The 22 rules stay; the honest numbers, measured as the proof sees them, are in
+  `evals/results/catch-rate-0.8.0.md` (true holdout 2.5 %, red-team set 29.0 %, benign false positives 0.5 %).
+- Per-owner policy roots: a 0.9 design (`docs/design/per-owner-policy-roots.md`), no program change now.

@@ -20,6 +20,7 @@
 #        (solana-verify, solanafoundation/solana-verifiable-build:4.3.0), and check each deployed hash
 #   b    register_policy_root(SDK DEFAULT_POLICY_ROOT; 0.8.0: 0x78bb3bab…, empty action policy) (no-op if registered)
 #   b2   register_policy_root(SDK DEMO_POLICY_ROOT 0x79f11a12…, the 0.8.0 mainnet sample's root) (no-op if registered)
+#   f    0.8.0, after the program upgrade: set_fee(0, --treasury <pubkey>) (Config realloc 303 → 343; charges nothing)
 #   a    set_config(allowlist_policies = true)                        (refuses unless the default root is registered)
 #   c1   set_config(allowed_vkeys += CURRENT_VKEY 0x00cdf40c…)        (keeps the old vkey 0x006a0d1e…;
 #                                                                      refuses unless a is done)
@@ -64,8 +65,8 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY=1 ;;
     --simulate) SIM=1; DRY=1 ;;   # simulate implies: nothing is sent
     --url) RPC="${2:?--url needs a value}"; shift ;;
-    0|a|b|b2|c1|c2|d) STEP="$1" ;;
-    --new-sample|--ledger-pubkey|--new-authority-keypair) EXTRA+=("$1" "${2:?$1 needs a value}"); shift ;;
+    0|a|b|b2|f|c1|c2|d) STEP="$1" ;;
+    --new-sample|--ledger-pubkey|--new-authority-keypair|--treasury) EXTRA+=("$1" "${2:?$1 needs a value}"); shift ;;
     *) sed -n '2,42p' "$0"; exit 2 ;;
   esac
   shift
@@ -171,7 +172,7 @@ case "$STEP" in
     done
     echo "   record the two 'Signature:' lines above in the release notes"
     ;;
-  a|b|b2|c1|c2|d)
+  a|b|b2|f|c1|c2|d)
     case "$STEP" in
       b)  what="register the default policy root" ;;
       a)  what="turn approved policies on" ;;
