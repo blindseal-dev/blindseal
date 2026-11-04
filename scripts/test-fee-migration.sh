@@ -28,8 +28,12 @@ WALLET="${ANCHOR_WALLET:-$HOME/.config/solana/id.json}"
 [ -f "$WALLET" ] || solana-keygen new --no-bip39-passphrase -s -o "$WALLET" >/dev/null
 WALLET_PK="$(solana-keygen pubkey "$WALLET")"
 LEDGER="${TMPDIR:-/tmp}/blindseal-fee-migration-ledger-$PORT"; rm -rf "$LEDGER"
-# the verifier as deployed, upgradeable by the test wallet; the gate from the new build
+# The verifier as deployed, upgradeable by the test wallet; the gate from the new build. The verifiable-build
+# image emits sBPF v0 ELFs (the deployed binaries are v0 too); a fresh test validator activates every feature,
+# including SIMD-0500 (B8JJ…, "disable deployment of SBPF v0/v1/v2 programs"), which mainnet has not
+# activated — deactivate it so the in-place upgrade behaves as on mainnet today.
 solana-test-validator -q -r --ledger "$LEDGER" "${PORT_FLAGS[@]}" \
+  --deactivate-feature B8JJXCy5amZyWG9r7EnUYLwzXSXTxG7GZ1qZ1qggo83g \
   --upgradeable-program 6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx "$OLD" "$WALLET_PK" \
   --bpf-program 9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa "$SO/transfer_gate.so" > /dev/null 2>&1 &
 VPID=$!
