@@ -35,7 +35,7 @@ const { expect } = cjs(chaiNs) as typeof chaiNs;
 // mainnet init script uses — so the suite exercises the real client path.
 import {
   buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, buildGatedTransferIx, buildSetAuthorityIx, decodeConfig, decodeNullifier,
-  CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT,
+  CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, LEGACY_POLICY_ROOTS,
 } from '../packages/sdk/src/ix';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -195,7 +195,8 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     expect(cfg.allowlistPolicies).to.equal(true);
     expect(cfg.allowedVkeys).to.deep.equal([CURRENT_VKEY, ...LEGACY_VKEYS]);
     expect(cfg.allowedVkeys, 'the localnet fixture vkey stays recognised').to.include(att.detectorVersion);
-    expect(att.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
+    // the fixture proofs were made under the 0.7 rule set; its root stays recognised as a legacy root
+    expect([DEFAULT_POLICY_ROOT, ...LEGACY_POLICY_ROOTS], 'the fixture policy root stays recognised').to.include(att.policyRoot);
   });
 
   it('paused: verify_and_consume is refused while paused', async () => {
@@ -252,7 +253,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
       console.log('      PENDING: tests/fixtures/attestation-test-altpolicy.json not present (scripts/prove-localnet-fixture.sh altpolicy)');
       return this.skip();
     }
-    expect(ATT_ALT_POLICY.policyRoot).to.not.equal(DEFAULT_POLICY_ROOT);
+    expect([DEFAULT_POLICY_ROOT, ...LEGACY_POLICY_ROOTS]).to.not.include(ATT_ALT_POLICY.policyRoot);
     // not registered with the verifier, and not in the gate's expected set: the gate refuses first
     await expectError(send([buildGatedTransferIx(ATT_ALT_POLICY, { source: source.publicKey, recipient: recipient.publicKey })], [source]), 'UnexpectedPolicyRoot');
     // registered with the verifier, the gate's own set still refuses it
@@ -411,7 +412,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
       return this.skip();
     }
     expect(ATT_CURRENT.detectorVersion).to.equal(CURRENT_VKEY);
-    expect(ATT_CURRENT.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
+    expect([DEFAULT_POLICY_ROOT, ...LEGACY_POLICY_ROOTS]).to.include(ATT_CURRENT.policyRoot);
     if ((await conn.getBalance(source.publicKey, 'confirmed')) < LAMPORTS_PER_SOL) {
       await send([SystemProgram.transfer({ fromPubkey: authority.publicKey, toPubkey: source.publicKey, lamports: 2 * LAMPORTS_PER_SOL })], [authority]);
     }

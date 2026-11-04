@@ -18,15 +18,18 @@ describe('init helpers turn approved policies on by default', () => {
     expect(vkeys).toEqual([anyIx.CURRENT_VKEY, ...anyIx.LEGACY_VKEYS]);
     expect(d[12 + 32 * n], 'allowlist_policies byte').toBe(1);
   });
-  it('buildDefaultInitIxs: initialize(allowlist on) then register the default policy root', () => {
-    const [init, reg] = anyIx.buildDefaultInitIxs(auth) as ReturnType<typeof sdk.buildInitializeIx>[];
+  it('buildDefaultInitIxs: initialize(allowlist on), then register the default policy root and the legacy roots', () => {
+    const [init, reg, ...legacy] = anyIx.buildDefaultInitIxs(auth) as ReturnType<typeof sdk.buildInitializeIx>[];
     expect(init.data[init.data.length - 1]).toBe(1);
     expect(reg.data.subarray(0, 8)).toEqual(sdk.discriminator('register_policy_root'));
     expect('0x' + reg.data.subarray(8).toString('hex')).toBe(anyIx.DEFAULT_POLICY_ROOT);
+    expect(legacy.map((ix) => '0x' + ix.data.subarray(8).toString('hex'))).toEqual(anyIx.LEGACY_POLICY_ROOTS);
   });
-  it('DEFAULT_POLICY_ROOT is the shared policy-root vector', () => {
+  it('DEFAULT_POLICY_ROOT is the shared policy-root vector; the 0.7 root is legacy', () => {
     const v = readFileSync(join(__dirname, '../../../evals/vectors/policy-root.txt'), 'utf8');
     expect(v).toContain(anyIx.DEFAULT_POLICY_ROOT);
+    expect(anyIx.LEGACY_POLICY_ROOTS).toEqual(['0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397']);
+    expect(anyIx.LEGACY_POLICY_ROOTS).not.toContain(anyIx.DEFAULT_POLICY_ROOT);
   });
   it('CURRENT_VKEY is the 0.8.0 guest (L0 in the proof); legacy keeps the 0.7.0 key until c2, not the 0.6.0 key', () => {
     expect(anyIx.CURRENT_VKEY).toBe('0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537');

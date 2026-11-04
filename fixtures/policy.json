@@ -1,9 +1,9 @@
 {
-  "root": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "root": "0x62f5ee2247afea22a4d5100189b7b47fa802950bc24c7693bba7cb1d41464774",
   "version": 2,
   "updatedAt": "2026-10-20T09:00:01.026Z",
   "detectorVersion": "0x726faa56c0857bbace50727feedf504a76f37a98c975f565e44bf341fb29851d",
-  "leafCount": 23,
+  "leafCount": 41,
   "parameters": {
     "zeroWidthDensityThreshold": 0.1
   },
@@ -208,6 +208,168 @@
       "layer": "L1",
       "kind": "dfa",
       "name": "task-reassignment-directive",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "ai-addressed-note",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "ai-addressed-note",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "ai-directive-field",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "ai-directive-field",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "treat-as-instructions",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "treat-as-instructions",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
+    },
+    {
+      "id": "prior-instructions-voided",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "prior-instructions-voided",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
+    },
+    {
+      "id": "from-now-on-directive",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "from-now-on-directive",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "persona-adoption",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "persona-adoption",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
+    },
+    {
+      "id": "safety-restrictions-removed",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "safety-restrictions-removed",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "unrestricted-persona",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "unrestricted-persona",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "exfil-to-destination",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "exfil-to-destination",
+      "severity": "Malicious",
+      "verdict": "block",
+      "enabled": true
+    },
+    {
+      "id": "prompt-exfiltration",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "prompt-exfiltration",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "decode-and-execute",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "decode-and-execute",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "concealment-directive",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "concealment-directive",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "persistent-hidden-goal",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "persistent-hidden-goal",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "dual-output-jailbreak",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "dual-output-jailbreak",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "authority-claim",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "authority-claim",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "reply-format-hijack",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "reply-format-hijack",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "prompt-boundary-spoof",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "prompt-boundary-spoof",
+      "severity": "Suspicious",
+      "verdict": "flag",
+      "enabled": true
+    },
+    {
+      "id": "tool-abuse-directive",
+      "layer": "L1",
+      "kind": "dfa",
+      "name": "tool-abuse-directive",
       "severity": "Suspicious",
       "verdict": "flag",
       "enabled": true

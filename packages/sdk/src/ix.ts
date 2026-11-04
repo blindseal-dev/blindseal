@@ -27,8 +27,14 @@ export const LEGACY_VKEYS: readonly string[] = ['0x00cdf40c21b14717fd783bdecb539
 export const MAX_VKEYS = 8;
 /** Default vkey allowlist for a fresh Config: the current guest + the legacy ones. */
 export const DEFAULT_ALLOWED_VKEYS: readonly string[] = [CURRENT_VKEY, ...LEGACY_VKEYS];
-/** The default policy root (detector-core's L1 rules + zero-width threshold; evals/vectors/policy-root.txt). */
-export const DEFAULT_POLICY_ROOT = '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397';
+/** The default policy root (detector-core's L1 rules + zero-width threshold; evals/vectors/policy-root.txt).
+ *  Release 0.8 widened the rule set from 22 rules to 40, which changes the root: this is the new one. */
+export const DEFAULT_POLICY_ROOT = '0x62f5ee2247afea22a4d5100189b7b47fa802950bc24c7693bba7cb1d41464774';
+/** Policy roots of earlier committed rule sets. Existing attestations (the mainnet samples, the localnet
+ *  fixtures, history) were screened under them and keep verifying, so a fresh Config registers them too;
+ *  the owner removes one from the on-chain allowlist when its attestations no longer need to verify. The
+ *  0x36a9e945… root is the 22-rule set that shipped through 0.7.1. */
+export const LEGACY_POLICY_ROOTS: readonly string[] = ['0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397'];
 
 export const ACTION_DOMAIN = 'blindseal.action.v1';
 export const NULLIFIER_DOMAIN = 'blindseal.nullifier.v1';
@@ -337,12 +343,14 @@ export function buildRegisterPolicyRootIx(authority: PublicKey, root: Uint8Array
   });
 }
 
-/** The default initialisation: `initialize(current + legacy vkeys, allowlist_policies = true)` then
- *  `register_policy_root(DEFAULT_POLICY_ROOT)` — approved policies on, the default policy approved. */
+/** The default initialisation: `initialize(current + legacy vkeys, allowlist_policies = true)`, then
+ *  `register_policy_root` for the default policy and for each legacy root — approved policies on, the
+ *  default policy approved, and attestations under an earlier rule set still consumable. */
 export function buildDefaultInitIxs(authority: PublicKey, programId = PROGRAM_ID): TransactionInstruction[] {
   return [
     buildInitializeIx(authority, DEFAULT_ALLOWED_VKEYS.map(hex), true, programId),
     buildRegisterPolicyRootIx(authority, hex(DEFAULT_POLICY_ROOT), programId),
+    ...LEGACY_POLICY_ROOTS.map((r) => buildRegisterPolicyRootIx(authority, hex(r), programId)),
   ];
 }
 

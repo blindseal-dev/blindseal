@@ -35,8 +35,15 @@ solana_security_txt::security_txt! {
 pub const CHAIN_ID_SOLANA_MAINNET: u16 = 1;
 
 /// The default Blindseal policy root: the merkle root over detector-core's L1 rules + the zero-width
-/// threshold (evals/vectors/policy-root.txt; 23 leaves). Unchanged by the 0.7.0 guest.
+/// threshold (evals/vectors/policy-root.txt; 41 leaves since release 0.8 widened L1 to 40 rules).
 pub const DEFAULT_POLICY_ROOT: [u8; 32] = [
+    0x62, 0xf5, 0xee, 0x22, 0x47, 0xaf, 0xea, 0x22, 0xa4, 0xd5, 0x10, 0x01, 0x89, 0xb7, 0xb4, 0x7f,
+    0xa8, 0x02, 0x95, 0x0b, 0xc2, 0x4c, 0x76, 0x93, 0xbb, 0xa7, 0xcb, 0x1d, 0x41, 0x46, 0x47, 0x74,
+];
+
+/// The root of the 22-rule policy that shipped through 0.7.1 (23 leaves). Attestations proved under it
+/// are still accepted so existing ones remain consumable; drop it once none need to verify.
+pub const LEGACY_POLICY_ROOT: [u8; 32] = [
     0x36, 0xa9, 0xe9, 0x45, 0x7d, 0xb6, 0xec, 0xfd, 0x75, 0x2a, 0x37, 0x9f, 0xc9, 0x27, 0x9a, 0xd6,
     0xa0, 0xac, 0xfe, 0xa0, 0x79, 0x28, 0xf6, 0x1e, 0x2f, 0x36, 0x38, 0xa6, 0x85, 0xc3, 0x83, 0x97,
 ];
@@ -44,7 +51,7 @@ pub const DEFAULT_POLICY_ROOT: [u8; 32] = [
 /// The policy roots THIS gated program accepts. INTEGRATORS: this is yours to set — list the
 /// policy root(s) of the rule set(s) you require your agents' tool calls to be screened under
 /// (a custom policy has its own root), and rebuild. The verifier's allowlist is checked as well.
-pub const EXPECTED_POLICY_ROOTS: &[[u8; 32]] = &[DEFAULT_POLICY_ROOT];
+pub const EXPECTED_POLICY_ROOTS: &[[u8; 32]] = &[DEFAULT_POLICY_ROOT, LEGACY_POLICY_ROOT];
 
 #[program]
 pub mod transfer_gate {
