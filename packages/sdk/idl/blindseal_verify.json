@@ -392,7 +392,6 @@
         {
           "name": "treasury",
           "docs": [
-            "CHECK: must be `Config.treasury` (checked in the handler); while no treasury is configured the",
             "slot carries the fee payer. Must be writable because a fee may be credited to it."
           ],
           "writable": true

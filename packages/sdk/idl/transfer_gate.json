@@ -22,7 +22,7 @@
         {
           "name": "source",
           "docs": [
-            "The authority the transfer debits \u2014 also pays for the Nullifier PDA."
+            "The authority the transfer debits — also pays for the Nullifier PDA and the verifier's fee."
           ],
           "writable": true,
           "signer": true
@@ -45,7 +45,6 @@
         {
           "name": "treasury",
           "docs": [
-            "CHECK: blindseal-verify's fee treasury (`Config.treasury`; the source while none is configured),",
             "validated by the verifier, which credits the fee to it."
           ],
           "writable": true
