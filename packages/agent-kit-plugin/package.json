@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Solana Agent Kit (v2) plugin: wraps the agent's wallet so a SOL or SPL transfer is signed only with a valid, unconsumed Blindseal attestation for exactly that transfer. Depends on the plugin interface shape only, not on the kit.",
+  "description": "Solana Agent Kit (v2) plugin: wraps the agent's wallet so a SOL or SPL transfer is signed only with a valid, unconsumed Blindseal attestation for exactly that transfer. Depends on the plugin interface shape only, not on the kit; zod is a peer (the kit's own instance).",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -17,12 +17,15 @@
   "dependencies": {
     "@blindseal/attestation-check": "workspace:*",
     "@solana/web3.js": "1.98.4",
-    "blindseal-sdk": "workspace:*",
-    "zod": "3.25.76"
+    "blindseal-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "22.9.0",
     "typescript": "5.6.3",
-    "vitest": "2.1.8"
+    "vitest": "2.1.8",
+    "zod": "3.25.76"
   }
 }

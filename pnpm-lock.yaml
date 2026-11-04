@@ -117,9 +117,6 @@ importers:
       blindseal-sdk:
         specifier: workspace:*
         version: link:../sdk
-      zod:
-        specifier: 3.25.76
-        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: 22.9.0
@@ -130,6 +127,9 @@ importers:
       vitest:
         specifier: 2.1.8
         version: 2.1.8(@types/node@22.9.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
 
   packages/attestation-check:
     dependencies:

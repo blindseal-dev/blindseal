@@ -48,8 +48,11 @@ and sends (or with `config.signOnly` signs) it through the guarded wallet.
 `solana-agent-kit` is NOT a dependency. Its `Plugin`, `Action` and `BaseWallet` shapes (v2,
 `packages/core/src/types`) are copied here as structural TypeScript interfaces, so the plugin type-checks
 against the real kit's `agent.use()` without pulling its runtime tree (LangChain, OpenAI agents, the
-Vercel AI SDK) into this package. The one runtime dependency is `zod` (pinned), because the kit's
-`Action.schema` is a zod schema that its framework adapters introspect.
+Vercel AI SDK) into this package. `zod` is a peer dependency (`^3.24.1`, the kit's own range): the kit's
+`Action.schema` is a zod schema that its framework adapters introspect with `instanceof`, so the plugin
+must build it with the same zod instance the kit uses. The package pins `zod@3.25.76` only as a
+devDependency for its own tests. (GHSA-mrhx-c7xc-m3w5, unbounded-array issue accumulation in zod < 4.6.6,
+does not reach this schema: it has no array.)
 
 Tests: `pnpm test` (vitest; a fake wallet whose key is the 0.7.0 fixture's source authority so the real
 proof covers a real transfer, and a fake chain).
