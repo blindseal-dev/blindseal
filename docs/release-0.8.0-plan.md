@@ -40,9 +40,16 @@ committed guest on encoded injections and checks it refuses each one with "L0 di
    (it re-pins `DEFAULT_POLICY_ROOT`; the step registers whatever the SDK pins and is a no-op if already
    registered). Rent 899,160 lamports + 5,000 fee. The old root stays registered, so attestations under it
    (including the 0.8.0 sample proven tonight) stay consumable.
-2. **Upgrade the verifier with the fee switch (fee 0)** — per `docs/release-0.8.0-fee-switch.md` (both
-   programs; `set_fee(0, treasury)` performs the Config realloc). Independent of the vkey change; can also
-   run after step 5.
+2. **Upgrade the verifier with the fee switch (fee 0)** — per `docs/release-0.8.0-fee-switch.md` (branch
+   `feat/verifier-fee`): transfer-gate first, then blindseal-verify, from the verifiable builds
+   (`solanafoundation/solana-verifiable-build:4.3.0`): transfer_gate 188,008 B, executable hash
+   `7e43df38dd14e1ab923e2bfa871269cee05882285770174b2a8e414349f88703` (fits the current ProgramData);
+   blindseal_verify 380,712 B, executable hash `90796b66d413adea876bdfb66360c8c094b6c58772c33cecde6bbca6754fad1f`
+   (ProgramData extends by 14,040 B, ≈ 0.0713 SOL; ≈ 1.93 SOL buffer held during the deploy). Then
+   `set_fee(0, <treasury>)` performs the Config realloc (303 → 343 B, +203,200 lamports rent; data
+   `129a1812edd61350` ‖ u64le 0 ‖ treasury). Check `solana feature status | grep B8JJ` (SIMD-0500) before
+   deploying: if it has activated, the verifiable toolchain must move and the hashes change. Independent of
+   the vkey change; can also run after step 5.
 3. **c1: allow the new vkey** — `scripts/mainnet-0.7.0.sh --simulate c1`, then `c1`. Sends one
    `set_config(allowed_vkeys = [0x00cdf40c…, 0x00e9807a…a537])`:
    - program `6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, accounts Config `9je2jP…` (writable), authority
