@@ -1,9 +1,9 @@
 # Blindseal prover, GPU build (--features cuda,native-gnark), for a rented NVIDIA box.
 #
-# How the pieces fit (sp1-sdk 5.0.0 with the lockfile's sp1-cuda 5.2.4):
+# How the pieces fit (sp1-sdk 5.0.0 with the lockfile's sp1-cuda` 5.0.0):
 #   - the prover's CUDA client talks to SP1's Moongate GPU prover server over HTTP (twirp, port 3000).
 #     Left to itself sp1-cuda starts that server as a docker container (image $SP1_GPU_IMAGE, default
-#     public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7), which needs docker on the host. A rented GPU
+#     public.ecr.aws/succinct-labs/moongate:v5.0.0), which needs docker on the host. A rented GPU
 #     instance is usually itself a container with no docker inside, so this image takes the other path:
 #     the final stage IS the Moongate image, the prover binary is copied in, and the entrypoint starts
 #     moongate-server in the background and points the prover at it (BLINDSEAL_MOONGATE_URL).
@@ -21,7 +21,7 @@
 # Without docker on the box (the Vast.ai case, docs/gpu-proving.md): run the same two steps by hand —
 # start the sp1-gpu image's moongate-server, build the prover with the two features, export
 # BLINDSEAL_MOONGATE_URL=http://127.0.0.1:3000 and run `blindseal-prover --mode cuda ...`.
-ARG MOONGATE_IMAGE=public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7
+ARG MOONGATE_IMAGE=public.ecr.aws/succinct-labs/moongate:v5.0.0
 
 FROM rust:1.90-bookworm AS build
 ARG GO_VERSION=1.22.12

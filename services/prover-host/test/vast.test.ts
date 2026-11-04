@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 function cfg(over: Partial<VastConfig> = {}): VastConfig {
-  return { apiKeyFile: path.join(tmp, 'key'), gpu: 'RTX_4090', maxPriceUsdPerHour: 0.6, maxInstanceAgeMinutes: 90, image: 'public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7', diskGb: 100, proverBinary: path.join(tmp, 'prover'), sshTimeoutMs: 5000, ...over };
+  return { apiKeyFile: path.join(tmp, 'key'), gpu: 'RTX_4090', maxPriceUsdPerHour: 0.6, maxInstanceAgeMinutes: 90, image: 'public.ecr.aws/succinct-labs/moongate:v5.0.0', diskGb: 100, proverBinary: path.join(tmp, 'prover'), sshTimeoutMs: 5000, ...over };
 }
 
 /// A fake Vast: records every call, "runs" the prover by writing the attestation, and can be made to fail at any step.
@@ -72,7 +72,7 @@ describe('VastBackend', () => {
     expect(att.prover).toEqual({ mode: 'cuda', host: 'vast', version: '0.0.0' });
     expect(JSON.parse(readFileSync(job.out, 'utf8')).proveMs).toBe(1234);
     expect(d.calls[0]).toBe('search dph_total');
-    expect(d.calls[1]).toBe('create 7 public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7 100 blindseal-j1');
+    expect(d.calls[1]).toBe('create 7 public.ecr.aws/succinct-labs/moongate:v5.0.0 100 blindseal-j1');
     expect(d.calls).toContain('scpTo prover /work/blindseal-prover');
     expect(d.calls).toContain('scpTo payload.json /work/payload.json');
     expect(d.calls).toContain('scpFrom /work/attestation.json');

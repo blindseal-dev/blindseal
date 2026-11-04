@@ -528,7 +528,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
 
     it('fee > 0 and a 0.7.1 client (no fee accounts): FeeAccountsMissing, nothing moves, nullifier not consumed', async function () {
       requireCurrent.call(this);
-      await unchanged(() => expectError(send([cu, gated071(ATT_CURRENT)], [source]), 'FeeAccountsMissing'));
+      await unchanged(() => expectError(send([gated071(ATT_CURRENT)], [source]), 'FeeAccountsMissing'));
       expect(await conn.getAccountInfo(nullifierPda(hex(ATT_CURRENT.nullifier)))).to.equal(null);
     });
 

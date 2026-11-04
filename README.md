@@ -85,21 +85,17 @@ if nothing is listening).
 
 ### Proving modes
 
-`blindseal attest` makes the proof on your machine by default. The prover has three modes (`--mode`, or the env
-`BLINDSEAL_PROVER_MODE`; `attest` passes the right one):
+`blindseal attest` makes the proof on your machine. The prover has two modes (`--mode`, or the env
+`BLINDSEAL_PROVER_MODE`; `attest` passes the right one), and the payload never leaves the machine in either:
 
-| mode | where the proof is made | what leaves your machine |
-|---|---|---|
-| `cpu` (default) | this machine, CPU | nothing |
-| `cuda` | this machine, an NVIDIA GPU (the prover built with the `cuda` feature plus SP1's Moongate GPU server; `attest` picks it on linux-x64 when `nvidia-smi` works and the cuda asset is released) | nothing |
-| `network` | Succinct's prover network | the payload (the screened tool call) and the policy |
+| mode | where the proof is made |
+|---|---|
+| `cpu` (default) | this machine, CPU |
+| `cuda` | this machine, an NVIDIA GPU (the prover built with the `cuda` feature plus SP1's Moongate GPU server; `attest` picks it on linux-x64 when `nvidia-smi` works and the cuda asset is released) |
 
-In `network` mode the prover network receives the payload and the policy, so it is never the default and no
-environment variable alone turns it on: the binary must be built with the `network` feature, run with `--mode network`,
-and have `BLINDSEAL_NETWORK_ACKNOWLEDGED=1` set, plus the network account's `NETWORK_PRIVATE_KEY` (what sp1-sdk reads;
-`NETWORK_RPC_URL` overrides the endpoint). It prints a one-line warning that the payload leaves the machine. Local
-proving is the private option; `cuda` is local too. Every attestation records how it was made under
-`prover: { mode, host, version }`. `crates/prover/Dockerfile.cuda` is the GPU build for a rented box (`docs/gpu-proving.md`).
+Every attestation records how it was made under `prover: { mode, host, version }`. `crates/prover/Dockerfile.cuda` is
+the GPU build for a rented box (`docs/gpu-proving.md`). The hosted prover (`services/prover-host`) is a separate,
+opt-in service: it proves on its operator's hardware and therefore sees the payload you send it.
 
 ### From source
 

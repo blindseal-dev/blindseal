@@ -1,18 +1,26 @@
 {
   "name": "@blindseal/prover-host",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Hosted prover: proof backends (local, a rented Vast.ai GPU, the Succinct network) behind one interface.",
-  "main": "src/backends/types.ts",
+  "description": "Hosted Blindseal prover: screens a tool call with the proven layers, proves it on a configured backend, and bills one x402 USDC payment per proof.",
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@payai/facilitator": "2.4.6",
+    "@x402/core": "2.29.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "@types/node": "22.9.0",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

@@ -9,7 +9,7 @@ is the first thing to do with a Vast.ai key; the steps below are what to run and
 
 sp1-sdk 5.0.0's CUDA prover is a client: the zkVM executor, `setup` and the final Groth16 wrap run on the CPU, the
 STARK proving (core, compress, shrink, wrap) runs in SP1's **Moongate** GPU prover server, reached over HTTP on port
-3000. With the prover's lockfile (`sp1-cuda` 5.2.4) the server image is `public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7`
+3000. With the prover's lockfile (`sp1-cuda` 5.0.0) the server image is `public.ecr.aws/succinct-labs/moongate:v5.0.0`
 (env `SP1_GPU_IMAGE` overrides it): Ubuntu 22.04 + CUDA 12.5.1 runtime + `/usr/local/bin/moongate-server`. Left alone,
 sp1-cuda starts that image itself with `docker run --gpus all -p 3000:3000`, which needs docker and the NVIDIA
 container toolkit on the host. A rented GPU instance is usually itself a container without docker, so the prover also
@@ -24,7 +24,7 @@ The Groth16 circuit artifacts (~1 GB) download on first use into `~/.sp1/circuit
 ```sh
 export VAST_API_KEY="$(cat ~/.blindseal/gpu-box)"      # read into the environment only; never print it
 vastai search offers 'gpu_name=RTX_4090 num_gpus=1 rentable=true rented=false cpu_ram>=32 disk_space>=100 reliability>=0.98 dph<=0.60' -o dph_total
-vastai create instance <offer id> --image public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7 --disk 100 --ssh --direct \
+vastai create instance <offer id> --image public.ecr.aws/succinct-labs/moongate:v5.0.0 --disk 100 --ssh --direct \
   --onstart-cmd 'nohup moongate-server > /var/log/moongate.log 2>&1 &'
 vastai show instances                                     # wait for actual_status running, note ssh_host / ssh_port
 ssh -p <port> root@<host>

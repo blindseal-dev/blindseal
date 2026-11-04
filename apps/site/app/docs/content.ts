@@ -321,6 +321,44 @@ $ solana-verify get-program-hash 6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx   
       ] },
     ],
   },
+  {
+    slug: 'hosted-prover', path: '/docs/hosted-prover', group: 'Hosted prover', title: 'Hosted prover',
+    summary: 'The hosted prover sees the payload: the tool call it screens and proves reaches it in clear text, so it is for calls you would send to a third party anyway. Local proving with `blindseal attest` is the default and the private option. The service costs one USDC payment per proof (the operator sets the price; the 402 response states it) and returns the same `attestation.json` the local prover writes, verifiable with `blindseal verify` and consumable by a gated program.',
+    sections: [
+      { id: 'what', heading: 'What it is', blocks: [
+        p('A CPU proof takes about 2.5 hours; a GPU proof takes minutes. `services/prover-host` is an HTTP service for integrators without a GPU: it runs the same proven layers `blindseal attest` runs (the payload/action binding, then L0 decode → L1), refuses what the guest would refuse before anyone pays, proves the rest on its configured backend, and hands back the attestation. The code is in the repository; anyone can run one. There is no Blindseal-operated instance you must trust.'),
+        { kind: 'callout', title: 'It sees the payload', body: 'The screened tool call is the input to the proof, so the host has it in clear text while the job runs, and keeps it on disk (owner-only) until the job finishes. Nothing about the attestation itself reveals the payload, but the host is a party that saw it. Prove locally when that matters.' },
+      ] },
+      { id: 'flow', heading: 'One proof, one payment', blocks: [
+        code(`$ curl -s -X POST https://prover.example.com/jobs -H 'content-type: application/json' \\
+    -d '{ "call": { "tool": "transfer_sol", "args": { "to": "…", "lamports": 1000000, "from": "…" } }, "noExpiry": true }'
+HTTP 402 Payment Required
+PAYMENT-REQUIRED: <base64 JSON: scheme exact, network solana:5eykt…, asset <USDC mint>, amount 500000, payTo …, extra.feePayer …>
+
+# an x402 client signs the USDC transfer and retries with PAYMENT-SIGNATURE
+HTTP 202 Accepted
+{ "id": "j_…", "status": "queued", "payloadHash": "0x…", "payment": { "status": "settled", "transaction": "…" }, … }
+
+$ curl -s https://prover.example.com/jobs/j_…                 # queued | running | done | failed
+$ curl -s https://prover.example.com/jobs/j_…/attestation > attestation.json
+$ blindseal verify attestation.json`, 'shell'),
+        p('Payment is x402 (HTTP 402) in USDC on Solana, through a facilitator that verifies and settles. The order inside `POST /jobs` is fixed: parse → binding and proven layers (a refusal is `422`, free) → expiry slot → verify, then settle (a bad or unsettleable payment is `402`, nothing charged) → queue (`202`). Settlement happens before the proof because a Solana payment transaction expires within about a minute; a proof that fails after settlement is reported as `payment.status: "charged-failed"` with the payer recorded, and the operator refunds by hand.'),
+        list([
+          '`POST /jobs` takes what the prover CLI takes: `call` (`{ tool, args }`) or `payload` (the exact bytes, base64), optional `targetProgram` and `instruction` (the payload decides them; a disagreement is refused), `expirySlot` or `noExpiry`, optional `decisionId` and `nonce`.',
+          '`GET /jobs/:id` is the record: status, the bound action, the payment, the error if any. It never contains the payload.',
+          '`GET /jobs/:id/attestation` is the result once `done`; `GET /healthz` says what a proof costs.',
+          'A price of 0 turns billing off; the operator then needs their own authentication in front.',
+        ]),
+      ] },
+      { id: 'run', heading: 'Running one', blocks: [
+        code(`$ pnpm -C services/prover-host start -- --config prover-host.json
+# prover-host.json: port, dataDir, backend (local | vast | network), proverPath, concurrency,
+#   priceUsdc ("0" = free), payTo, facilitatorUrl, paymentNetwork (solana | solana-devnet), rpcUrl`, 'shell'),
+        p('The `local` backend spawns the prover binary on the host. Jobs are a FIFO with configurable concurrency; records and finished attestations are JSON files under `dataDir`, so a restart loses nothing finished and re-queues what was unfinished. `services/prover-host/README.md` has every config field, the API in full, and the reasons for the SDK choice.'),
+        { kind: 'links', links: [{ href: 'https://github.com/blindseal-dev/blindseal/tree/main/services/prover-host', label: 'services/prover-host on GitHub', external: true }, { href: '/docs/scope', label: 'What is proven — and what is not' }] },
+      ] },
+    ],
+  },
 ];
 
 export const PAGES: DocPage[] = PAGE_LIST.map((pg, i) => ({
