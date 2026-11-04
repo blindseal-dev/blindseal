@@ -155,9 +155,10 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 | `packages/sdk` | build the verify instruction, submit, verify off-chain (`blindseal-sdk`) |
 | `packages/verifier-wasm` | the Groth16 verifier compiled to WebAssembly (`blindseal-verifier-wasm`) |
 | `packages/redactor`, `packages/audit`, `packages/chain-reads` | redaction, audit chain + disclosures, mainnet reads |
+| `packages/attestation-check`, `packages/x402-gate`, `packages/agent-kit-plugin` | reference consumers: the shared off-chain check (proof, action, expiry, nullifier), an x402 facilitator gate, a Solana Agent Kit plugin that guards transfer signing |
 | `packages/dashboard` | the local dashboard the proxy serves |
 | `crates/` | detector core (Rust, DFA rules), SP1 guest, prover, verifier |
-| `programs/` | Anchor programs: `blindseal-verify`, `transfer-gate` |
+| `programs/` | Anchor programs: `blindseal-verify`, `transfer-gate`, `payout-gate` (batch SPL payouts, one attestation each) |
 | `apps/site` | the public site (Next.js) |
 | `docs/` | performance numbers, the local API data contract, release plans; `docs/design/` holds proposals that are not built (session proofs, a prover network) |
 

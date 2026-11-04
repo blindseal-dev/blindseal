@@ -13,6 +13,7 @@ skip-lint = false
 [programs.localnet]
 blindseal_verify = "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx"
 transfer_gate = "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
+payout_gate = "EPgeMVvpCDaCGoav5NDFBySPTxASBQfVEvaUY6KPKL4k"
 
 [programs.mainnet]
 blindseal_verify = "6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx"
@@ -47,3 +48,8 @@ program = "target/deploy/blindseal_verify.so"
 [[test.genesis]]
 address = "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
 program = "target/deploy/transfer_gate.so"
+
+# payout-gate (programs/payout-gate): example batch consumer, localnet only so far (not deployed to mainnet).
+[[test.genesis]]
+address = "EPgeMVvpCDaCGoav5NDFBySPTxASBQfVEvaUY6KPKL4k"
+program = "target/deploy/payout_gate.so"

@@ -1,0 +1,26 @@
+{
+  "name": "@blindseal/attestation-check",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "The one check a Blindseal consumer runs before it acts: proof + action binding (blindseal-sdk verifyOffchain), the action equals the transfer about to happen, not expired, nullifier not consumed on chain. Shared by x402-gate and agent-kit-plugin.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@solana/web3.js": "1.98.4",
+    "blindseal-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}

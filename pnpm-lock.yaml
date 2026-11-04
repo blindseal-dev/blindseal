@@ -109,6 +109,50 @@ importers:
         specifier: 5.6.3
         version: 5.6.3
 
+  packages/agent-kit-plugin:
+    dependencies:
+      '@blindseal/attestation-check':
+        specifier: workspace:*
+        version: link:../attestation-check
+      '@solana/web3.js':
+        specifier: 1.98.4
+        version: 1.98.4(bufferutil@4.1.0)(typescript@5.6.3)(utf-8-validate@6.0.6)
+      blindseal-sdk:
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@types/node':
+        specifier: 22.9.0
+        version: 22.9.0
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.9.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+
+  packages/attestation-check:
+    dependencies:
+      '@solana/web3.js':
+        specifier: 1.98.4
+        version: 1.98.4(bufferutil@4.1.0)(typescript@5.6.3)(utf-8-validate@6.0.6)
+      blindseal-sdk:
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@types/node':
+        specifier: 22.9.0
+        version: 22.9.0
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.9.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+
   packages/audit:
     dependencies:
       '@noble/ciphers':
@@ -291,6 +335,28 @@ importers:
         version: 2.1.8(@types/node@22.9.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
 
   packages/verifier-wasm: {}
+
+  packages/x402-gate:
+    dependencies:
+      '@blindseal/attestation-check':
+        specifier: workspace:*
+        version: link:../attestation-check
+      '@solana/web3.js':
+        specifier: 1.98.4
+        version: 1.98.4(bufferutil@4.1.0)(typescript@5.6.3)(utf-8-validate@6.0.6)
+      blindseal-sdk:
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@types/node':
+        specifier: 22.9.0
+        version: 22.9.0
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.9.0)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))
 
   services/dogfood:
     dependencies:

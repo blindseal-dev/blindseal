@@ -1,0 +1,27 @@
+# Blindseal example gated program: a BATCH of SPL token payouts, each one gated by its own
+# attestation (one verify_and_consume CPI per payout, actionHash recomputed from the payout that is
+# executed). Ships as an example, not a published crate. The token transfer and the token-account
+# layout are hand-encoded (a 3-byte instruction and two 32-byte fields) so this isolated on-chain
+# workspace takes no new dependency; see src/lib.rs.
+[package]
+name = "payout-gate"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "payout_gate"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "blindseal-verify/idl-build"]
+
+[dependencies]
+anchor-lang = "=0.31.1"
+solana-security-txt = "=1.1.1"   # neodyme security.txt (readable by explorers)
+blindseal-verify = { path = "../blindseal-verify", features = ["cpi"] }

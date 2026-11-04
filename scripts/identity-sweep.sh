@@ -36,7 +36,7 @@ if [ -n "$B_RE" ]; then
   if [ -n "$hitsB" ]; then echo "base-project names outside allowed paths:"; echo "$hitsB" | sed 's/^/  /'; fail=1; fi
 fi
 # shipped binaries: no identity strings or home paths inside
-for b in packages/verifier-wasm/pkg/blindseal_verifier_bg.wasm target/deploy/blindseal_verify.so target/deploy/transfer_gate.so; do
+for b in packages/verifier-wasm/pkg/blindseal_verifier_bg.wasm target/deploy/blindseal_verify.so target/deploy/transfer_gate.so target/deploy/payout_gate.so; do
   [ -f "$b" ] && strings "$b" | grep -qiE "$A_RE|/Users/|/home/" && { echo "identity string inside $b"; fail=1; }
 done
 # commit metadata (authors, committers, messages)

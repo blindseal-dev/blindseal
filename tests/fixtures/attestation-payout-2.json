@@ -1,0 +1,30 @@
+{
+  "action": {
+    "amount": "750000",
+    "instruction": "0x19eef5f04d0d4e44",
+    "mint": "BianqHwTNRqBFDu4FjNVgNaJADMLRWgbiM8sLT3Es3cM",
+    "recipient": "FvD47iqapuVfnHgFkMu5qbPwfktucUSyufLE7vEDRxzV",
+    "sourceAuthority": "i5cyemNLcZvjNpC6Td1BkinrXDc9krCAU6UFA5i7q9w",
+    "targetProgram": "EPgeMVvpCDaCGoav5NDFBySPTxASBQfVEvaUY6KPKL4k"
+  },
+  "actionHash": "0x2b222bb19db3ff523fadb21ca10a0b7314569e65b60a1975a4b94b264882344d",
+  "chainId": 1,
+  "decisionId": "localnet-payout-2",
+  "detectorVersion": "0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967",
+  "expirySlot": 2000000000,
+  "nonce": "0xf58c7a963fb7b2d9cfa44fe4dc20b2c635711a25034409c6e60e42dfaf736426",
+  "note": "L1-only screening (L0 decode-then-L1 in-guest is the next increment)",
+  "nullifier": "0xa3bb7e1fa80916c0cda658443393dc1a4f9afe8ab30b67c0f4c99139a38d2655",
+  "payloadHash": "0xabf1bb45e109fdc51fbfc4ab23408df0b4b86335c2dc6d914dde2a4b65f411a1",
+  "policyRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "proof": {
+    "bytes": "0xa4594c5901c9bb2ba190c27efd1c331603c881b5874afc8ff47fd333028076b82d5d4cd628396b7b7ae1f6b6ea2b2758a03cc5d5b0bd5463513886b82a69ec18a28930fb097622e764a898826db21350b88219c0dceba9f45f93dcd40530adbdf0a6a45a1794caabb4392674d21b4789335edf60621e16ea468c8709655366075b07b08100334e7ba63d95718dd4dfd651de7e834f6cb3dfdcf7073a5da5a12c7b0aa3a1123f6ed7c19a14d84f7aebd6d48bf118498794915734a96c3e8b49d3ab71a4e62b62b2025bf9446c468b3491fb2362bffee54bc871ce34f64e4ed7a7c4cc115d19ee048e4c0892bc88e12b72a252c74d6cab16ddfb4c4956c477032961b00b67",
+    "curve": "bn254",
+    "protocol": "groth16"
+  },
+  "proveMs": 7631042,
+  "publicInputs": [
+    "0xabf1bb45e109fdc51fbfc4ab23408df0b4b86335c2dc6d914dde2a4b65f411a136a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c3839700cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f29672b222bb19db3ff523fadb21ca10a0b7314569e65b60a1975a4b94b264882344da3bb7e1fa80916c0cda658443393dc1a4f9afe8ab30b67c0f4c99139a38d26550094357700000000"
+  ],
+  "version": 1
+}
