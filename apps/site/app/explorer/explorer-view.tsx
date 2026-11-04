@@ -87,7 +87,7 @@ export function ExplorerView({ snapshot, treasury, tab }: { snapshot: ExplorerSn
       /* the chart was laid out while hidden (width 0): redraw at its real width once it shows */
       if (t === 'attestations') window.dispatchEvent(new Event('resize'));
     };
-    const tabsCtl = ui.tabs(tabsEl, { value: tab, onChange: (v: string) => showTab(v, true) });
+    ui.tabs(tabsEl, { value: tab, onChange: (v: string) => showTab(v, true) });   /* nothing to destroy: its listeners go with the elements */
     /* the tabs are links for the no-JS page; with the kit mounted the click switches in place */
     const onTabClick = (e: Event) => { if ((e.target as Element).closest?.('a.tab-text')) e.preventDefault(); };
     tabsEl.addEventListener('click', onTabClick);
@@ -436,7 +436,6 @@ export function ExplorerView({ snapshot, treasury, tab }: { snapshot: ExplorerSn
       plotSvg.removeEventListener('blur', hideTip);
       alt.removeEventListener('click', onAltClick);
       tabsEl.removeEventListener('click', onTabClick);
-      void tabsCtl;
       try { seg?.destroy?.(); } catch {}
       try { space?.stop?.(); } catch {}
     };
