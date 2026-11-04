@@ -83,6 +83,24 @@ Or drop `attestation.json` on the site's verify page — the same verifier runs 
 `blindseal audit verify` checks the local audit chain; `blindseal dashboard` opens the dashboard (starting `blindseal run`
 if nothing is listening).
 
+### Proving modes
+
+`blindseal attest` makes the proof on your machine by default. The prover has three modes (`--mode`, or the env
+`BLINDSEAL_PROVER_MODE`; `attest` passes the right one):
+
+| mode | where the proof is made | what leaves your machine |
+|---|---|---|
+| `cpu` (default) | this machine, CPU | nothing |
+| `cuda` | this machine, an NVIDIA GPU (the prover built with the `cuda` feature plus SP1's Moongate GPU server; `attest` picks it on linux-x64 when `nvidia-smi` works and the cuda asset is released) | nothing |
+| `network` | Succinct's prover network | the payload (the screened tool call) and the policy |
+
+In `network` mode the prover network receives the payload and the policy, so it is never the default and no
+environment variable alone turns it on: the binary must be built with the `network` feature, run with `--mode network`,
+and have `BLINDSEAL_NETWORK_ACKNOWLEDGED=1` set, plus the network account's `NETWORK_PRIVATE_KEY` (what sp1-sdk reads;
+`NETWORK_RPC_URL` overrides the endpoint). It prints a one-line warning that the payload leaves the machine. Local
+proving is the private option; `cuda` is local too. Every attestation records how it was made under
+`prover: { mode, host, version }`. `crates/prover/Dockerfile.cuda` is the GPU build for a rented box (`docs/gpu-proving.md`).
+
 ### From source
 
 ```sh
@@ -96,6 +114,7 @@ Rust / Solana / Anchor toolchains are needed only for these:
 ```sh
 scripts/build-programs.sh                      # the Anchor programs (cargo build-sbf + anchor idl build)
 cargo build --release --manifest-path crates/prover/Cargo.toml   # the prover → crates/prover/target/release/blindseal-prover; pass it to `blindseal attest --prover`
+#   add --features cuda (GPU, see "Proving modes") or --features network (remote proving, opt-in at run time)
 cd programs && solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name blindseal_verify   # reproduce the deployed bytes (also transfer_gate)
 ```
 

@@ -2,6 +2,9 @@ name: prover-linux
 # Builds the blindseal prover for linux-x64 on a tag push `prover-v*` (or by hand for an existing tag),
 # publishes the binary + sha256 to that tag's GitHub release, and prints the sha256 to paste into
 # packages/proxy/src/prover/manifest.json (assets.linux-x64.sha256).
+# The second job builds the cuda variant (features cuda + native-gnark: the Moongate GPU client and the
+# Groth16 wrapper compiled in, so the binary needs neither docker nor a GPU to build; proving needs both a
+# GPU and a Moongate server, see crates/prover/Dockerfile.cuda) as blindseal-prover-linux-x64-cuda.
 on:
   push:
     tags: ['prover-v*']
@@ -40,3 +43,45 @@ jobs:
         run: |
           gh release upload "$TAG" blindseal-prover-linux-x64 SHA256SUMS.linux-x64 --clobber -R "$GITHUB_REPOSITORY"
           echo "manifest.assets.linux-x64.sha256 = $(cut -d' ' -f1 SHA256SUMS.linux-x64)" >> "$GITHUB_STEP_SUMMARY"
+
+  build-cuda:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/prover
+          key: cuda
+      - name: deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq pkg-config libssl-dev clang cmake
+      - name: build (cuda + native-gnark)
+        working-directory: crates/prover
+        run: cargo build --release --locked --features cuda,native-gnark 2>&1 | tail -3
+      - name: executor smoke (no GPU needed)
+        run: |
+          # the cuda binary must run the executor on the mainnet sample like the CPU one
+          node -e "const c=require('./tests/fixtures/mainnet-toolcall-demo.json'); process.stdout.write(JSON.stringify({ tool: c.toolName, args: c.args }))" > "$RUNNER_TEMP/payload.json"
+          att() { node -e "const m=require('./tests/fixtures/attestation-mainnet-demo-0.7.0.json'); console.log(($1))"; }
+          BLINDSEAL_EXECUTE=1 crates/prover/target/release/blindseal-prover --payload "$RUNNER_TEMP/payload.json" --out "$RUNNER_TEMP/unused.json" \
+            --chain-id "$(att m.chainId)" --target-program "$(att m.action.targetProgram)" --source-authority "$(att m.action.sourceAuthority)" \
+            --recipient "$(att m.action.recipient)" --mint "$(att m.action.mint)" --amount "$(att m.action.amount)" --instruction "$(att m.action.instruction)" \
+            --expiry "$(att m.expirySlot)" --nonce "$(att m.nonce)" | grep -E '^(VKEY|CYCLES) '
+      - name: package
+        run: |
+          cp crates/prover/target/release/blindseal-prover blindseal-prover-linux-x64-cuda
+          sha256sum blindseal-prover-linux-x64-cuda | tee SHA256SUMS.linux-x64-cuda
+      - name: attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" blindseal-prover-linux-x64-cuda SHA256SUMS.linux-x64-cuda --clobber -R "$GITHUB_REPOSITORY"
+          echo "manifest.assets.linux-x64-cuda.sha256 = $(cut -d' ' -f1 SHA256SUMS.linux-x64-cuda)" >> "$GITHUB_STEP_SUMMARY"

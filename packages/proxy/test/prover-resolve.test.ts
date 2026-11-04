@@ -3,16 +3,20 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PROVER_MANIFEST, ProverUnavailableError, proverUnavailableMessage, resolveProver, type ProverManifest } from '../src/prover/resolve.js';
+import { PROVER_MANIFEST, ProverUnavailableError, assetAvailable, proverUnavailableMessage, resolveProver, resolveProverBinary, selectProverAsset, type ProverManifest } from '../src/prover/resolve.js';
 
 const BIN = Buffer.from('#!/bin/sh\necho fake prover\n');
 const SHA = createHash('sha256').update(BIN).digest('hex');
 
-function manifest(sha: string = SHA): ProverManifest {
+function manifest(sha: string = SHA, cudaSha: string = 'TBD'): ProverManifest {
   return {
     version: '9.9.9',
     release: 'https://example.invalid/releases/download/prover-v9.9.9',
-    assets: { 'darwin-arm64': { name: 'blindseal-prover-darwin-arm64', sha256: sha }, 'linux-x64': { name: 'blindseal-prover-linux-x64', sha256: sha } },
+    assets: {
+      'darwin-arm64': { name: 'blindseal-prover-darwin-arm64', sha256: sha },
+      'linux-x64': { name: 'blindseal-prover-linux-x64', sha256: sha },
+      'linux-x64-cuda': { name: 'blindseal-prover-linux-x64-cuda', sha256: cudaSha },
+    },
   };
 }
 
@@ -35,8 +39,10 @@ describe('prover resolution', () => {
   it('ships a manifest with the release shape (sha256 values may still be TBD)', () => {
     expect(PROVER_MANIFEST.version).toBe('0.7.0');
     expect(PROVER_MANIFEST.release).toBe('https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.7.0');
-    expect(Object.keys(PROVER_MANIFEST.assets).sort()).toEqual(['darwin-arm64', 'linux-x64']);
+    expect(Object.keys(PROVER_MANIFEST.assets).sort()).toEqual(['darwin-arm64', 'linux-x64', 'linux-x64-cuda']);
     expect(PROVER_MANIFEST.assets['darwin-arm64']!.name).toBe('blindseal-prover-darwin-arm64');
+    expect(PROVER_MANIFEST.assets['linux-x64-cuda']!.name).toBe('blindseal-prover-linux-x64-cuda');
+    expect(PROVER_MANIFEST.guestElf?.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('--prover wins over $BLINDSEAL_PROVER and the installed binary', async () => {
@@ -87,5 +93,57 @@ describe('prover resolution', () => {
     );
     await expect(resolveProver({ env: {}, home, manifest: manifest(), platform: 'win32-x64', cwd: tmp, fetchImpl: fakeFetch(BIN) })).rejects.toThrow(msg);
     await expect(resolveProver({ env: {}, home, manifest: manifest(), platform: 'linux-x64', cwd: tmp, fetchImpl: fakeFetch(BIN, 404) })).rejects.toThrow(proverUnavailableMessage('linux-x64'));
+  });
+
+  describe('cuda variant selection (mocked GPU probe)', () => {
+    const gpu = () => true;
+    const noGpu = () => false;
+
+    it('linux-x64 + GPU + released cuda asset → the cuda asset, mode cuda', () => {
+      expect(selectProverAsset('linux-x64', manifest(SHA, SHA), gpu)).toEqual({ key: 'linux-x64-cuda', mode: 'cuda' });
+    });
+
+    it('no GPU → the CPU asset, and the probe decides nothing else', () => {
+      expect(selectProverAsset('linux-x64', manifest(SHA, SHA), noGpu)).toEqual({ key: 'linux-x64', mode: 'cpu' });
+    });
+
+    it('a TBD cuda sha is "not released": the CPU asset with one explanatory line', () => {
+      const log: string[] = [];
+      expect(selectProverAsset('linux-x64', manifest(SHA, 'TBD'), gpu, (l) => log.push(l))).toEqual({ key: 'linux-x64', mode: 'cpu' });
+      expect(log).toHaveLength(1);
+      expect(log[0]).toMatch(/cuda prover 9\.9\.9 is not released yet .*TBD.*; using the CPU prover/);
+      expect(assetAvailable({ name: 'x', sha256: 'TBD' })).toBe(false);
+      expect(assetAvailable({ name: 'x', sha256: SHA })).toBe(true);
+    });
+
+    it('darwin-arm64 never picks cuda, even with a probe that says yes', () => {
+      let probed = 0;
+      expect(selectProverAsset('darwin-arm64', manifest(SHA, SHA), () => { probed++; return true; })).toEqual({ key: 'darwin-arm64', mode: 'cpu' });
+      expect(probed).toBe(0);
+    });
+
+    it('downloads the cuda asset to its own installed name and reports mode cuda', async () => {
+      const fetchImpl = fakeFetch(BIN);
+      const r = await resolveProverBinary({ env: {}, home, manifest: manifest(SHA, SHA), platform: 'linux-x64', cwd: tmp, fetchImpl, gpuProbe: gpu, log: () => {} });
+      expect(r).toEqual({ path: path.join(home, 'bin', 'blindseal-prover-9.9.9-cuda'), mode: 'cuda' });
+      expect((fetchImpl as unknown as { calls: string[] }).calls).toEqual(['https://example.invalid/releases/download/prover-v9.9.9/blindseal-prover-linux-x64-cuda']);
+      // second call: installed, no download
+      const again = await resolveProverBinary({ env: {}, home, manifest: manifest(SHA, SHA), platform: 'linux-x64', cwd: tmp, fetchImpl: fakeFetch(BIN, 500), gpuProbe: gpu });
+      expect(again.path).toBe(r.path);
+    });
+
+    it('an explicit binary (--prover / $BLINDSEAL_PROVER) is mode cpu whatever the GPU says', async () => {
+      const explicit = path.join(tmp, 'explicit'); writeFileSync(explicit, BIN);
+      expect(await resolveProverBinary({ explicit, env: {}, home, manifest: manifest(SHA, SHA), platform: 'linux-x64', cwd: tmp, gpuProbe: gpu })).toEqual({ path: explicit, mode: 'cpu' });
+      expect(await resolveProverBinary({ env: { BLINDSEAL_PROVER: explicit }, home, manifest: manifest(SHA, SHA), platform: 'linux-x64', cwd: tmp, gpuProbe: gpu })).toEqual({ path: explicit, mode: 'cpu' });
+    });
+
+    it('resolveProver (path only) keeps working and never probes without a cuda asset', async () => {
+      const m = manifest(); delete m.assets['linux-x64-cuda'];
+      let probed = 0;
+      const p = await resolveProver({ env: {}, home, manifest: m, platform: 'linux-x64', cwd: tmp, fetchImpl: fakeFetch(BIN), gpuProbe: () => { probed++; return true; }, log: () => {} });
+      expect(p).toBe(path.join(home, 'bin', 'blindseal-prover-9.9.9'));
+      expect(probed).toBe(0);
+    });
   });
 });
