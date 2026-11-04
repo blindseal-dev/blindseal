@@ -20,9 +20,13 @@ export const VERIFY_CU_LIMIT = 400_000;
 export const CURRENT_VKEY = '0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537';
 /** Earlier guests still recognised so existing attestations (the mainnet samples, history) keep
  *  verifying. The 0.7.0 guest proved L1 only (L0 ran in the proxy, unproven); the owner removes it from
- *  the on-chain allowlist (step c2) once a sample under CURRENT_VKEY has landed. The 0.6.0 key
- *  (0x006a0d1e…) was removed from the allowlist in 0.7.0 and is not listed any more. */
-export const LEGACY_VKEYS: readonly string[] = ['0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967'];
+ *  the on-chain allowlist (step c2) once a sample under CURRENT_VKEY has landed. The 0.6.0 key was
+ *  already removed from mainnet in 0.7.0's c2 (c2 only removes keys that are on chain); it stays listed
+ *  because the localnet suite's fixtures were proven under it. */
+export const LEGACY_VKEYS: readonly string[] = [
+  '0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967', // 0.7.0
+  '0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e', // 0.6.0
+];
 /** On-chain cap on allowed_vkeys (blindseal-verify MAX_VKEYS). */
 export const MAX_VKEYS = 8;
 /** Default vkey allowlist for a fresh Config: the current guest + the legacy ones. */
