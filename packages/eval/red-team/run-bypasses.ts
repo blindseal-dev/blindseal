@@ -68,7 +68,7 @@ function zwSplit(s: string): string {
 
 // --- attempts --------------------------------------------------------------
 
-const ATTEMPTS: Attempt[] = [
+export const ATTEMPTS: Attempt[] = [
   // ============ ENCODING (10) ============
   {
     id: 'rt-001',
@@ -551,7 +551,11 @@ async function main(): Promise<void> {
   writeFileSync(path.join(outDir, `${dateStr}.json`), JSON.stringify(jsonOut, null, 2));
 }
 
-main().catch((err) => {
-  process.stderr.write(`red-team runner failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
-  process.exit(1);
-});
+// Run only when invoked directly: evals/deterministic-rate.ts imports ATTEMPTS to measure the
+// proven layers over the same payloads, and must not start the L2 run.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    process.stderr.write(`red-team runner failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+    process.exit(1);
+  });
+}
