@@ -215,3 +215,48 @@ body[data-motion="reduce"] :is(.ex-mast__eyebrow, .ex-mast__title, .ex-mast__led
   animation: none !important; opacity: 1 !important; transform: none !important;
 }
 body[data-motion="reduce"] .ex-tip { transition: none; }
+
+/* ══ the tabs (Attestations · Treasury): the kit's text tabs on a hairline ═══ */
+.ex-tabs { width: min(var(--site-max-w), calc(100% - 96px)); margin: 24px auto 0; border-bottom: var(--hairline); }
+.ex-tabs .tabs-text { gap: 24px; }
+.ex-tabs .tab-text { padding: 10px 0 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; transition: color var(--d-150) var(--ease-in-out), border-color var(--d-150) var(--ease-in-out); }
+.ex-tabs .tab-text.is-active, .ex-tabs .tab-text[aria-selected="true"] { border-bottom-color: var(--ink); }
+.ex-tabs + .ex { margin-top: 24px; }
+
+/* ══ the Treasury panel: five totals, then the transaction rows ═════════════
+   Built on the attestations panel's idiom (.ex-stats / .ex-stat, .ex-list, .ex-rows); the row is a
+   five-column flat list (kind · transaction · when · amount · counterparty). INVENTED values: columns
+   112 / 1.1fr / 168 / 132 / 1fr; the external-link glyph 22 × 22 beside the hash. */
+.ex-tr-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.ex-tr-stats .ex-stat { min-height: 140px; padding: 20px; }
+.ex-tr-stats .ex-stat__v { font-size: var(--fs-28); line-height: 32px; }
+.ex-tr-stats .ex-stat__v--lg { font-size: var(--fs-36); line-height: 40px; }
+.ex-tr-stats .stat__d { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-tx-cols, .ex-tx { display: grid; grid-template-columns: 112px minmax(0, 1.1fr) 168px 132px minmax(0, 1fr); align-items: center; column-gap: 12px; }
+.ex-tx {
+  min-height: 48px; padding: 6px 8px; border-radius: var(--r-row);
+  transition: background-color var(--d-150) var(--ease-in-out);
+}
+.ex-tx + .ex-tx { box-shadow: inset 0 1px 0 var(--line); }
+@media (hover: hover) and (pointer: fine) { .ex-tx:hover { background-color: var(--surface-hover); box-shadow: none; } .ex-tx:hover + .ex-tx { box-shadow: none; } }
+.ex-tx__kind .chip { text-transform: none; }
+.ex-tx__sig, .ex-tx__who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ex-tx__sig .hash, .ex-tx__who .hash { margin-left: -4px; flex: none; }
+.ex-tx__ext {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--r-chip); color: var(--muted);
+  transition: color var(--d-150) var(--ease-in-out), background-color var(--d-150) var(--ease-in-out);
+}
+.ex-tx__ext svg { width: 14px; height: 14px; }
+@media (hover: hover) and (pointer: fine) { .ex-tx__ext:hover { color: var(--ink); background: var(--surface-hover); } }
+.ex-tx__ext:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; color: var(--ink); }
+.ex-tx__when { font: var(--fw-body) var(--fs-12)/16px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ex-tx__amt { text-align: right; font: var(--fw-medium) var(--fs-14)/20px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ex-tx__amt.is-out, .ex-tx__amt.is-burn { color: var(--muted); }
+.ex-tx__unit { font: var(--fw-body) var(--fs-12)/16px var(--font-sans); color: var(--muted); }
+.ex-tx__who-k { font: var(--fw-medium) var(--fs-11)/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.ex-tx__internal { flex: none; }
+.ex-tx.is-internal .ex-tx__amt { color: var(--muted); }
+.ex-tx-rows.is-entering .ex-tx { animation: rise-8 var(--d-220) var(--ease-out-cubic) both; animation-delay: calc(var(--i, 0) * var(--stagger-fine)); }
+.ex-tr .ex-alt .empty { min-height: 280px; }
+.ex-tr .ex-alt--error { min-height: 280px; }
+body[data-motion="reduce"] :is(.ex-tx) { animation: none !important; opacity: 1 !important; transform: none !important; }

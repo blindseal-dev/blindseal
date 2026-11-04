@@ -38,7 +38,7 @@ const warmed = new Set<string>();
 function figLabel(name: string, o: Record<string, unknown>): string {
   if (name === 'architecture') {
     return 'Architecture. The agent calls its tools through the proxy on the same machine; the proxy screens every call ' +
-      'with four layers (L0 decode, L1 patterns, L2 similarity, L3 judge), redacting secrets and PII before L2. The proof covers L1 today; L0 runs in the proxy and is not in the proof yet. ' +
+      'with four layers (L0 decode, L1 patterns, L2 similarity, L3 judge), redacting secrets and PII before L2. The proof covers L0 and L1 (pending mainnet: the 0.8.0 verifier key is not yet allowed on chain). ' +
       'Every decision is written to a hash-chained audit log. The prover makes a zero-knowledge attestation; ' +
       'only the proof and its public inputs cross to the public side, where the Solana verifier checks it in one instruction.';
   }
@@ -47,7 +47,7 @@ function figLabel(name: string, o: Record<string, unknown>): string {
     ((o.results as { layer: string; verdict: string }[] | undefined) || []).forEach((r) => {
       if (r && ['pass', 'block', 'flag', 'skip'].includes(r.verdict)) paint[r.layer] = r.verdict;
     });
-    return 'Four screening layers. L0 decode and L1 patterns see the raw payload and are deterministic; the proof covers L1 today, and L0 runs in the proxy but is not in the proof yet. ' +
+    return 'Four screening layers. L0 decode and L1 patterns see the raw payload and are deterministic; both run inside the proof (pending mainnet: the 0.8.0 verifier key is not yet allowed on chain). ' +
       'Secrets and PII are redacted before L2 similarity and L3 judge, which see the redacted payload and are model-based, so they are attested.' +
       Object.keys(paint).map((k) => ' ' + k + ': ' + paint[k] + '.').join('');
   }
@@ -240,7 +240,7 @@ export function HowKit({ data: D }: { data: HowData }) {
     /* each GIF's pixel size, and the caption the kit renders for that figure (diagrams.js), word for word */
     const GIFS: Record<string, { w: number; h: number; caption: string }> = {
       architecture: { w: 960, h: 455, caption: 'Left of the rule stays on the machine. The verifier sees a proof and five public inputs, never the call.' },
-      layers: { w: 476, h: 246, caption: 'L0 and L1 are deterministic; the proof covers L1 today and L0 next. L2 and L3 are model-based, run locally (TEE mode planned), and are attested.' },
+      layers: { w: 476, h: 246, caption: 'L0 and L1 are deterministic and both run inside the proof, pending mainnet. L2 and L3 are model-based, run locally (TEE mode planned), and are attested.' },
       lifecycle: { w: 960, h: 198, caption: 'One attestation, one action, one use. Consuming it spends the nullifier; after the expiry slot it is worthless.' },
       chain: { w: 960, h: 147, caption: 'Each entry commits to the hash of the one before it. A disclosure proves a range without its content.' },
     };

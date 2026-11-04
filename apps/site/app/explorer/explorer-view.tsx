@@ -5,10 +5,21 @@
 // reads without JS, and nothing in it depends on the clock or the viewport, so hydration always agrees;
 // the kit then animates the same values (odometers roll, the chart is drawn into #ex-plot-svg, the lists
 // are repainted from the same strings). Offline: the error panel; Retry re-reads /explorer/snapshot.
+// Two tabs under the masthead (the kit's .tabs-text, BS.ui.tabs): Attestations (this file's panel, #ex)
+// and Treasury (treasury-view.tsx, #ex-treasury). Both panels are server-rendered; the tab only toggles
+// `hidden`, so without JS the tabs are plain links (?tab=treasury) and with it the switch is in place.
 import { useRouter } from 'next/navigation';
-import type { ExplorerSnapshot } from '@blindseal/chain-reads';
+import type { ExplorerSnapshot, TreasurySnapshot } from '@blindseal/chain-reads';
 import { usePageKit, decorate, type BSAny } from '../use-page-kit';
 import { listsHtml, tableCaption, tableRowsHtml } from './rows';
+import { TreasuryView } from './treasury-view';
+
+export type ExplorerTab = 'attestations' | 'treasury';
+/* the masthead per tab; the server renders the active tab's, the switch swaps the text */
+const MAST: Record<ExplorerTab, { title: string; lede: string }> = {
+  attestations: { title: 'Attestations on mainnet.', lede: 'What the verifier program has consumed. No content, no agents, no operators.' },
+  treasury: { title: 'Treasury on mainnet.', lede: 'What the project treasury received and spent, in USDC. Read from the chain; nothing here names a buyer.' },
+};
 
 const DAY = 86_400_000;
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -21,7 +32,7 @@ const PAD_L = 40, PAD_T = 12, PAD_B = 28, H = 248, GAP = 2, BAR_MAX = 24, R = 4;
 const fmtInt = (n: number) => n.toLocaleString('en-US');   /* fixed locale: the server string must equal the client's */
 const ERR_TITLE: Record<string, string> = { RPC_RATE_LIMITED: 'Mainnet RPC rate-limited', RPC_OFF: 'Mainnet reads are off', RPC_UNAVAILABLE: 'Mainnet RPC unavailable' };
 
-export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
+export function ExplorerView({ snapshot, treasury, tab }: { snapshot: ExplorerSnapshot; treasury: TreasurySnapshot; tab: ExplorerTab }) {
   /* the server renders the state it already knows — ready numbers, the empty block or the offline panel
      with the RPC error code — so the page never shows "reading" / 0 when the read succeeded or the
      RPC refused; the effect below then animates the same values (odometers, chart, rows). Nothing here
@@ -55,14 +66,31 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
     const rangeEl = $('#ex-range')!, sumEl = $('#ex-sum')!, sumLabel = $('#ex-sum-label')!;
     const alt = $('#ex-alt')!;
     const rootsRows = $('#ex-roots-rows')!, rootsFoot = $('#ex-roots-foot')!, progRows = $('#ex-programs-rows')!, progFoot = $('#ex-programs-foot')!, progDirect = $('#ex-programs-direct')!;
+    const tabsEl = $('#ex-tabs')!, treasuryEl = $('#ex-treasury')!, mastTitle = $('#ex-title')!, mastLede = $('#ex-lede')!;
 
     /* ── masthead field + the entrance (S02 / S03 ladder) ────────────────── */
     const space = BS.mountSpace ? BS.mountSpace($('.ex-mast__space'), { intensity: 'faint', fade: false }) : null;
     $$('.ex-enter').forEach((el, i) => { el.style.setProperty('--e', String(Math.min(i, 6))); });
     if (!reduced()) {
-      mast.classList.add('is-rising'); page.classList.add('is-rising');
-      later(() => { page.classList.remove('is-rising'); }, M.scale(260 + 2 * 40 + 400 + 80));
+      mast.classList.add('is-rising'); page.classList.add('is-rising'); treasuryEl.classList.add('is-rising');
+      later(() => { page.classList.remove('is-rising'); treasuryEl.classList.remove('is-rising'); }, M.scale(260 + 2 * 40 + 400 + 80));
     }
+
+    /* ── the tabs: the kit's tablist over two server-rendered panels ─────── */
+    const showTab = (v: string, fromUser: boolean) => {
+      const t: ExplorerTab = v === 'treasury' ? 'treasury' : 'attestations';
+      page.hidden = t !== 'attestations'; treasuryEl.hidden = t !== 'treasury';
+      mastTitle.textContent = MAST[t].title; mastLede.textContent = MAST[t].lede;
+      if (!fromUser) return;
+      /* the URL keeps the tab (a reload or a shared link lands on it); never a navigation */
+      try { history.replaceState(history.state, '', t === 'treasury' ? '/explorer?tab=treasury' : '/explorer'); } catch {}
+      /* the chart was laid out while hidden (width 0): redraw at its real width once it shows */
+      if (t === 'attestations') window.dispatchEvent(new Event('resize'));
+    };
+    ui.tabs(tabsEl, { value: tab, onChange: (v: string) => showTab(v, true) });   /* nothing to destroy: its listeners go with the elements */
+    /* the tabs are links for the no-JS page; with the kit mounted the click switches in place */
+    const onTabClick = (e: Event) => { if ((e.target as Element).closest?.('a.tab-text')) e.preventDefault(); };
+    tabsEl.addEventListener('click', onTabClick);
 
     /* ── odometers (tick mode) ───────────────────────────────────────────── */
     const intOrDash = (v: unknown) => (v == null ? '—' : typeof v === 'string' ? v : (fmt.int(v) as string));
@@ -407,6 +435,7 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
       plotSvg.removeEventListener('keydown', onKey);
       plotSvg.removeEventListener('blur', hideTip);
       alt.removeEventListener('click', onAltClick);
+      tabsEl.removeEventListener('click', onTabClick);
       try { seg?.destroy?.(); } catch {}
       try { space?.stop?.(); } catch {}
     };
@@ -419,8 +448,8 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
         <div className="ex-mast__space" aria-hidden="true"></div>
         <div className="ex-mast__copy">
           <p className="ex-mast__eyebrow">Explorer</p>
-          <h1 className="ex-mast__title" id="ex-title">Attestations on mainnet.</h1>
-          <p className="ex-mast__lede">What the verifier program has consumed. No content, no agents, no operators.</p>
+          <h1 className="ex-mast__title" id="ex-title">{MAST[tab].title}</h1>
+          <p className="ex-mast__lede" id="ex-lede">{MAST[tab].lede}</p>
         </div>
         <div className="ex-mast__end">
           <p className="ex-cluster" id="ex-cluster" data-state={live ? 'live' : 'offline'} aria-live="polite">
@@ -434,7 +463,15 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
         </div>
       </header>
 
-      <div className="ex" id="ex" data-view={view} aria-busy="false">
+      {/* ══ the tabs: links without JS (?tab=treasury), the kit's tablist with it ══ */}
+      <div className="ex-tabs">
+        <nav className="tabs-text" id="ex-tabs" role="tablist" aria-label="Explorer views">
+          <a className={'tab-text' + (tab === 'attestations' ? ' is-active' : '')} role="tab" id="ex-tab-attestations" aria-selected={tab === 'attestations'} aria-controls="ex" tabIndex={tab === 'attestations' ? 0 : -1} href="/explorer" data-value="attestations">Attestations</a>
+          <a className={'tab-text' + (tab === 'treasury' ? ' is-active' : '')} role="tab" id="ex-tab-treasury" aria-selected={tab === 'treasury'} aria-controls="ex-treasury" tabIndex={tab === 'treasury' ? 0 : -1} href="/explorer?tab=treasury" data-value="treasury">Treasury</a>
+        </nav>
+      </div>
+
+      <div className="ex" id="ex" role="tabpanel" aria-labelledby="ex-tab-attestations" data-view={view} aria-busy="false" hidden={tab !== 'attestations'}>
 
         {/* ══ the four totals ═══════════════════════════════════════════════ */}
         <section className="ex-stats ex-enter" aria-label="Totals on mainnet">
@@ -526,6 +563,9 @@ export function ExplorerView({ snapshot }: { snapshot: ExplorerSnapshot }) {
 
         <p className="ex-foot">Nothing here can identify an agent or an operator. Policy roots are hashes; program ids are public.</p>
       </div>
+
+      {/* ══ the Treasury tab ══════════════════════════════════════════════════ */}
+      <TreasuryView snapshot={treasury} hidden={tab !== 'treasury'} />
     </>
   );
 }
