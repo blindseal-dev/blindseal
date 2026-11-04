@@ -10,7 +10,8 @@
 ///    equal what the payload describes; a payload that is not an on-chain action, or that describes
 ///    a different one, is refused here — before the prover is resolved or started — since the guest
 ///    would refuse it anyway.
-/// 4. Runs the local prover (crates/prover) with that payload + action → attestation.json.
+/// 4. Runs the local prover (crates/prover) with that payload + action → attestation.json. On linux-x64
+///    with an NVIDIA GPU and a released cuda asset the cuda prover runs (`--mode cuda`); still local.
 ///
 /// Usage:
 ///   blindseal attest <toolcall.json> --out <attestation.json> [--target-program <id>]
@@ -29,7 +30,7 @@ import { runLayer1 } from '../detection/layer1-heuristics.js';
 import { BindError, GATED_TRANSFER_DISC, TRANSFER_GATE_ID, actionFromPayload, checkActionBinding, type BoundAction } from '../chain/action-binding.js';
 import { openAudit, toChainVerdict } from '@blindseal/audit';
 import { rpcUrl } from '@blindseal/chain-reads';
-import { ProverUnavailableError, resolveProver } from '../prover/resolve.js';
+import { ProverUnavailableError, resolveProverBinary, type ResolvedProver } from '../prover/resolve.js';
 import { blindsealHome } from '../paths.js';
 
 const HELP = `blindseal attest — screen a tool call, record the decision, prove it
@@ -46,7 +47,9 @@ Flags
   --expiry <slot>            expirySlot (default: current slot + 40000 ≈ 4.4 h, fetched from the RPC; proving takes hours)
   --no-expiry                write the "no expiry" sentinel (2000000000) instead of fetching a slot
   --prover <path>            prover binary (default: $BLINDSEAL_PROVER, then ~/.blindseal/bin/,
-                             downloaded from the GitHub release on first use)
+                             downloaded from the GitHub release on first use; on linux-x64 with an
+                             NVIDIA GPU the cuda build is picked when it is released; a --prover or
+                             $BLINDSEAL_PROVER binary runs in its own default mode, cpu)
   --audit-dir <dir>          audit base dir (default ~/.blindseal)
   --help, -h                 this help
 
@@ -244,9 +247,9 @@ export async function runAttestCli(argv: string[]): Promise<number> {
 
   // Resolve the prover and the expiry slot before touching the audit log, so a missing binary or
   // an unreachable RPC leaves no half-done decision behind.
-  let prover: string;
+  let prover: ResolvedProver;
   try {
-    prover = await resolveProver({ explicit: o.prover });
+    prover = await resolveProverBinary({ explicit: o.prover });
   } catch (e) {
     if (e instanceof ProverUnavailableError) { process.stderr.write(e.message + '\n'); return 1; }
     process.stderr.write(`blindseal attest: ${(e as Error).message}\n`);
@@ -293,13 +296,15 @@ export async function runAttestCli(argv: string[]): Promise<number> {
     '--target-program', action.targetProgram, '--source-authority', action.sourceAuthority,
     '--recipient', action.recipient, '--mint', action.mint === NATIVE_MINT_B58 ? '' : action.mint, '--amount', action.amount,
     '--instruction', action.instruction, '--expiry', expiry,
+    // the cuda asset is the only one told its mode; every other binary keeps its default (cpu)
+    ...(prover.mode === 'cuda' ? ['--mode', 'cuda'] : []),
   ];
   return withPrivateTempDir(async (tmpDir, track) => {
     const tmpPayload = path.join(tmpDir, 'payload.json');
     writePrivateFile(tmpPayload, payload);
-    process.stdout.write(`proving (this takes a while on CPU)…\n`);
+    process.stdout.write(prover.mode === 'cuda' ? `proving on the GPU (cuda)…\n` : `proving (this takes a while on CPU)…\n`);
     const t0 = Date.now();
-    const status = await runProver(prover, proverArgs(tmpPayload), track);
+    const status = await runProver(prover.path, proverArgs(tmpPayload), track);
     if (status !== 0) { process.stderr.write(`blindseal attest: prover exited ${status}\n`); return 1; }
     recordProofSeconds((Date.now() - t0) / 1000);
     // A copy beside the audit chain, where `blindseal run` (the local dashboard) lists attestations.
