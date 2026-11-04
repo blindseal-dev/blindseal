@@ -1,0 +1,48 @@
+# Blindseal prover, GPU build (--features cuda,native-gnark), for a rented NVIDIA box.
+#
+# How the pieces fit (sp1-sdk 5.0.0 with the lockfile's sp1-cuda 5.2.4):
+#   - the prover's CUDA client talks to SP1's Moongate GPU prover server over HTTP (twirp, port 3000).
+#     Left to itself sp1-cuda starts that server as a docker container (image $SP1_GPU_IMAGE, default
+#     public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7), which needs docker on the host. A rented GPU
+#     instance is usually itself a container with no docker inside, so this image takes the other path:
+#     the final stage IS the Moongate image, the prover binary is copied in, and the entrypoint starts
+#     moongate-server in the background and points the prover at it (BLINDSEAL_MOONGATE_URL).
+#   - the Groth16 wrap normally runs in the sp1-gnark docker image; native-gnark compiles the gnark
+#     FFI into the binary instead (Go at build time), so no docker is needed at run time either.
+#   - execution (the zkVM executor), setup and the wrap run on the CPU; core/compress/shrink/wrap-STARK
+#     proving runs on the GPU. The Groth16 circuit artifacts (~1 GB) download on first use into
+#     /root/.sp1; mount a volume there to keep them across runs.
+#
+# Build ON the GPU box (amd64; emulating this on an arm64 laptop is slow and pointless):
+#   docker build -f crates/prover/Dockerfile.cuda -t blindseal-prover-cuda .
+# Run (needs the NVIDIA container toolkit):
+#   docker run --rm --gpus all -v $PWD/work:/work -v sp1:/root/.sp1 blindseal-prover-cuda \
+#     --payload /work/payload.json --out /work/attestation.json --target-program ... (the usual flags)
+# Without docker on the box (the Vast.ai case, docs/gpu-proving.md): run the same two steps by hand —
+# start the sp1-gpu image's moongate-server, build the prover with the two features, export
+# BLINDSEAL_MOONGATE_URL=http://127.0.0.1:3000 and run `blindseal-prover --mode cuda ...`.
+ARG MOONGATE_IMAGE=public.ecr.aws/succinct-labs/sp1-gpu:8fd1ef7
+
+FROM rust:1.90-bookworm AS build
+ARG GO_VERSION=1.22.12
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends pkg-config libssl-dev clang cmake curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -sSfL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
+ENV PATH=/usr/local/go/bin:$PATH
+WORKDIR /src
+# the prover reads ../guest/elf/blindseal-guest and ../detector-core at build time
+COPY crates/prover crates/prover
+COPY crates/guest/elf crates/guest/elf
+COPY crates/detector-core crates/detector-core
+RUN cargo build --release --locked --manifest-path crates/prover/Cargo.toml --features cuda,native-gnark \
+ && crates/prover/target/release/blindseal-prover --help >/dev/null 2>&1 || true
+
+FROM ${MOONGATE_IMAGE}
+# moongate-server (the GPU prover) is already at /usr/local/bin in this image
+COPY --from=build /src/crates/prover/target/release/blindseal-prover /usr/local/bin/blindseal-prover
+COPY crates/prover/docker/entrypoint-cuda.sh /usr/local/bin/entrypoint-cuda.sh
+RUN chmod 0755 /usr/local/bin/entrypoint-cuda.sh
+ENV BLINDSEAL_MOONGATE_URL=http://127.0.0.1:3000
+ENV BLINDSEAL_PROVER_MODE=cuda
+VOLUME /root/.sp1
+ENTRYPOINT ["/usr/local/bin/entrypoint-cuda.sh"]
