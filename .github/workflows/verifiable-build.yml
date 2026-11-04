@@ -1,0 +1,41 @@
+name: verifiable-build
+# Verifiable builds of the on-chain programs: `solana-verify build` in the pinned image
+# solanafoundation/solana-verifiable-build:4.3.0 (the image the deployed 0.7.0 bytes came from), on a native
+# amd64 runner. Prints each program's `solana-verify get-executable-hash`, sha256 and size to the job summary
+# and uploads the .so files, so the hashes a release plan cites can be reproduced without a local Docker build.
+# Runs on pushes to release branches that touch programs/, and by hand.
+on:
+  push:
+    branches: ['release/**']
+    paths: ['programs/**', '.github/workflows/verifiable-build.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        program: [transfer_gate, blindseal_verify]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install solana-verify 0.5.2
+        run: cargo install solana-verify --version 0.5.2 --locked 2>&1 | tail -2
+      - name: verifiable build of ${{ matrix.program }}
+        working-directory: programs
+        run: solana-verify build -b solanafoundation/solana-verifiable-build:4.3.0 --library-name ${{ matrix.program }} 2>&1 | tail -15
+      - name: hashes
+        working-directory: programs
+        run: |
+          SO=target/deploy/${{ matrix.program }}.so
+          HASH=$(solana-verify get-executable-hash "$SO")
+          SHA=$(sha256sum "$SO" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "$SO")
+          echo "${{ matrix.program }}  executable-hash $HASH  sha256 $SHA  bytes $SIZE"
+          echo "| ${{ matrix.program }} | \`$HASH\` | \`$SHA\` | $SIZE | ${GITHUB_SHA} |" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.program }}.so
+          path: programs/target/deploy/${{ matrix.program }}.so
