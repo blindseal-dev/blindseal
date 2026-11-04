@@ -242,6 +242,37 @@ jobs:
       - name: M2 suite on a local validator
         run: scripts/test-m2.sh
 
+  guest-elf:
+    name: guest ELF reproduces from source
+    # The committed crates/guest/elf/blindseal-guest is what the prover embeds and what CURRENT_VKEY pins
+    # (crates/prover/tests/vkey_pin.rs). This rebuilds it from crates/guest + crates/detector-core in the
+    # pinned SP1 docker image (cargo prove build --docker --tag v5.0.0, the command crates/README.md gives)
+    # and fails if the bytes differ, so the committed ELF is always the one the source produces.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: install cargo-prove v5.0.0
+        run: |
+          curl -sSfL https://sp1up.succinct.xyz | bash
+          "$HOME/.sp1/bin/sp1up" --version v5.0.0
+          "$HOME/.sp1/bin/cargo-prove" prove --version
+
+      - name: rebuild the guest in the pinned docker image
+        working-directory: crates/guest
+        run: |
+          cp elf/blindseal-guest "$RUNNER_TEMP/committed-guest"
+          "$HOME/.sp1/bin/cargo-prove" prove build --docker --tag v5.0.0 --workspace-directory .. --output-directory elf
+
+      - name: compare with the committed ELF
+        run: |
+          sha256sum "$RUNNER_TEMP/committed-guest" crates/guest/elf/blindseal-guest
+          if ! cmp -s "$RUNNER_TEMP/committed-guest" crates/guest/elf/blindseal-guest; then
+            echo "FAIL: crates/guest/elf/blindseal-guest is not what the source builds; rebuild it with the command above and re-pin CURRENT_VKEY"
+            exit 1
+          fi
+          echo "ok: the committed guest ELF reproduces byte for byte"
+
   prover-asset:
     name: pinned prover asset ${{ matrix.platform }} (download, sha256, guest ELF, execute)
     # The released prover binary that packages/proxy/src/prover/manifest.json pins is what `blindseal attest`
