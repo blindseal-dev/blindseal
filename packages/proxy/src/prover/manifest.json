@@ -13,6 +13,10 @@
     "linux-x64": {
       "name": "blindseal-prover-linux-x64",
       "sha256": "798b214502c85b98364f1db9ed6e012965317fba137f65fc28c26907d2f07a35"
+    },
+    "linux-x64-cuda": {
+      "name": "blindseal-prover-linux-x64-cuda",
+      "sha256": "TBD"
     }
   }
 }
