@@ -26,7 +26,7 @@ import { TocToggle } from './toc-toggle';
 //                             high_entropy catch-all (×2). Reproduce with
 //                             `redact(JSON.stringify({ tool: call.toolName, args: call.args }))`.
 //   RULES                     the committed policy snapshot the proxy serves (fixtures/policy.json,
-//                             root 0x36a9e945…8397 = this attestation's policyRoot): 22 L1 rules,
+//                             root 0x36a9e945…8397 = this attestation's policyRoot, the 0.7 rule set): 22 L1 rules then, 40 since 0.8,
 //                             4 L0 decoders — the same lists crates/detector-core compiles.
 //   the audit chain           apps/site/app/verify/disclosure-sample.json (a real signed
 //                             disclosure, #190–#199), recomputed client-side in how-kit.tsx.
@@ -42,7 +42,7 @@ const PROGRAM_NAMES: Record<string, string> = {
   '6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx': 'blindseal-verify',
   '11111111111111111111111111111111': 'System Program',
 };
-const RULES = { L0: 4, L1: 22 };
+const RULES = { L0: 4, L1: 40 };
 const REDACTED_PAYLOAD = '{"tool":"transfer_sol","args":{"to":"[REDACTED:high_entropy:1]","lamports":1000000,"from":"[REDACTED:high_entropy:2]","memo":"blindseal m2 mainnet acceptance: one gated 0.001 SOL transfer"}}';
 const REDACTIONS = [{ kind: 'high_entropy', count: 2 }];
 

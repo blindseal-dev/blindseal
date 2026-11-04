@@ -70,10 +70,10 @@ equals the vkey it verified with. It is **not** a semver like `"det-2026.10.1"` 
 
 The committed policy root is a Merkle tree over **serialized `regex-automata` DFA bytes**, one leaf
 per committed L1 rule, plus one leaf for the zero-width-density threshold parameter. For the default
-policy that is **22 rule leaves + 1 threshold leaf = 23 leaves**, giving:
+policy that is **40 rule leaves + 1 threshold leaf = 41 leaves** (release 0.8; it was 22 + 1 before), giving:
 
 ```
-0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397
+0x62f5ee2247afea22a4d5100189b7b47fa802950bc24c7693bba7cb1d41464774
 ```
 
 (`evals/vectors/policy-root.txt`; detector-core `policy.rs` asserts it; TS and on-chain must match.)
@@ -83,10 +83,10 @@ policy that is **22 rule leaves + 1 threshold leaf = 23 leaves**, giving:
   (`PUT /policy` → `{ root, version, … }`); it must not compute a root in JS.
 - Rule domain: `blindseal.rule.v1`; empty-policy domain: `blindseal.policy.empty.v1`.
 
-> `fixtures.js` guessed 25 rules and an in-browser `sha256(canonical(rule))` Merkle. Both wrong: 22
+> `fixtures.js` guessed 25 rules and an in-browser `sha256(canonical(rule))` Merkle. Both wrong: 40
 > rules, DFA-byte leaves, root from the backend.
 
-### 3.1 The 22 committed L1 rules
+### 3.1 The 40 committed L1 rules
 
 All layer `L1`, `kind: "dfa"`. `severity` → dashboard verdict: **Malicious → block**, **Suspicious → flag**.
 Full list in `fixtures/policy.json` and `crates/detector-core/src/lib.rs` (`RULES`). L0 is

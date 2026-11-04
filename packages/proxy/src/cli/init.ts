@@ -1,6 +1,6 @@
 /// `blindseal init` — scaffold ~/.blindseal so every other command has what it needs:
 ///   identity.key     the proxy's ed25519 identity (signs audit disclosures)
-///   policy.json      the committed default policy (the 22 L1 rules the detector ships)
+///   policy.json      the committed default policy (the 40 L1 rules the detector ships)
 ///   dashboard.token  the bearer token `blindseal run` and the dashboard share
 /// Idempotent: existing files are kept, never rewritten.
 ///

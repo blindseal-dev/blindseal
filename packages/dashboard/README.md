@@ -33,7 +33,7 @@ pnpm -C packages/proxy dev run --mock --port 4831
 - **State switches** for every UI state: `BLINDSEAL_MOCK_STATE=<state>` or `?state=<state>` —
   `empty, unauthorized, offline, reconnecting, prover-down, chain-broken, tee, upstream-down`
   (the mockups' `?state=` set; `no-action, not-found, loading` are data/UI-side).
-- Fixtures mirror the real engine: 22 committed L1 rules, real policy root `0x36a9e9…`, attestation
+- Fixtures mirror the real engine: 40 committed L1 rules, real policy root `0x62f5ee22…`, attestation
   public inputs in guest-commit order, `sourceAuthority` on actions.
 
 The off-chain verifier the verify page needs is `crates/verifier-wasm` (confirmed to compile to

@@ -19,6 +19,14 @@ Numbers cited below come from:
 - The 2026-05-19 self red-team (`packages/eval/red-team/attempts/2026-05-20.md`):
   38 hand-crafted bypass attempts, 9 of which got through L1+L2 after trivial
   fixes were applied.
+- The proven layers alone (L0 then L1, release 0.8 rule set, 40 rules;
+  `evals/results/deterministic-rate-after.md`, before/after in the same
+  directory): on the true holdout (v2 novel + paraphrase, 80 samples) 12.5%
+  caught, up from 2.5% with the 22-rule set; 93.5% of the 31 red-team
+  scoreboard attacks, up from 29.0%; the false-positive rate on the 210 clean
+  samples stayed at 0.5% (one base64 blob, unchanged). The novel-domain half
+  (exfiltration disguised as DevOps tool output) is still almost entirely
+  missed by the proven layers: 1 of 50.
 
 ## Architectural gaps (will not be fully closed by a pattern tweak)
 

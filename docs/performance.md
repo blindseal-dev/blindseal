@@ -101,11 +101,23 @@ First end-to-end proof from the real guest (minimal: L1 only, commits payloadHas
 | Field | Value |
 |---|---|
 | detectorVersion (guest vkey) | 0x007e7ae67b43fa8e96f6e5f6e8af5daaf9f9c40007ea1901cb23adbd6b5bc552 |
-| policyRoot | 0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397 (matches detector-core::policy_root) |
+| policyRoot | 0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397 (the 22-rule policy this run used; detector-core::policy_root is now the 40-rule root) |
 | Proof size | 260 bytes |
 | Public-input size | 32 bytes (payloadHash) |
 | **Proving time** | **~4,396,765 ms (~73 min)** — see concern |
 | Peak host RSS | 11.6 GB |
+
+**Concern — the 0.8 rule set makes this worse, and it has not been re-measured.** Release 0.8 widens L1 from
+22 rules to 40. The serialized forward-DFA bytes the guest reads grow from **4,480,552 to 52,164,020** (11.6x;
+`cargo run --release --example dfa_sizes` in crates/detector-core prints the per-rule sizes, and
+`tests/policy.rs::every_rule_compiles_within_the_size_cap` keeps every rule under an 8 MiB cap). Since the
+numbers below attribute the bulk of the cost to per-rule `from_bytes` plus the in-zkVM policy-root merkle over
+the DFA blobs, both of which scale with those bytes, proving time and peak RSS should be expected to rise
+materially — the 73-minute figure below is for the 22-rule policy and is NOT valid for the 0.8 policy. No new
+end-to-end prove has been run for the 40-rule set; whoever runs the next one should record it here. If it is
+too slow, the lever is the rule set itself: six rules (sleeper-trigger-setup, exfil-to-destination,
+prompt-exfiltration, tool-abuse-directive, prompt-boundary-spoof, decode-and-execute) account for ~26 MB of
+the 52 MB, and a sparse-DFA representation was measured at 42.7 MB — not enough better to matter.
 
 **Concern — proving is slow.** Running 22 serialized DFAs in-zkVM is ~17x the trivial M0.5 guest (~4 min). The likely bulk is `dense::DFA::from_bytes` validation per rule. Mitigations before adding L0 (which adds decoder DFAs + nested runs): use `from_bytes_unchecked` (sound — the policy DFAs are our own committed bytes), and iterate guest logic with `ProverClient::execute` (cycle count, no proof) rather than full proves. The spec (§3.5) anticipates slow async proving and the M4 TEE prover; 73 min still argues for the matcher optimization.
 
