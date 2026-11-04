@@ -14,13 +14,15 @@ export const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
  *  action (the transfer-gate transaction measures ~269k on localnet, docs/performance.md). */
 export const VERIFY_CU_LIMIT = 400_000;
 
-/** detectorVersion (= SP1 vkey hash of the guest ELF) of the CURRENT guest: release 0.7.0, which binds
- *  the screened payload to the action before hashing (crates/guest/elf; `cargo prove vkey --elf`). */
-export const CURRENT_VKEY = '0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967';
+/** detectorVersion (= SP1 vkey hash of the guest ELF) of the CURRENT guest: release 0.8.0, which runs L0
+ *  (decode-then-L1: base64, hex, URL, HTML entities, zero-width strip, NFKC, homoglyph fold, nested to
+ *  depth 3) inside the proof as well as L1 (crates/guest/elf; `cargo prove vkey --elf`). */
+export const CURRENT_VKEY = '0x00e9807a48c66829ce5297a0c3b423cf724b8e47d21fbd98f50b5fcb51e4a537';
 /** Earlier guests still recognised so existing attestations (the mainnet samples, history) keep
- *  verifying. Pre-0.7.0 guests did NOT bind the payload to the action; the owner removes these from
- *  the on-chain allowlist once a sample under CURRENT_VKEY has landed. */
-export const LEGACY_VKEYS: readonly string[] = ['0x006a0d1e62646623f1d2b9af7f3792c4d15aa7d6107bdb089a0760fd5b29331e'];
+ *  verifying. The 0.7.0 guest proved L1 only (L0 ran in the proxy, unproven); the owner removes it from
+ *  the on-chain allowlist (step c2) once a sample under CURRENT_VKEY has landed. The 0.6.0 key
+ *  (0x006a0d1e…) was removed from the allowlist in 0.7.0 and is not listed any more. */
+export const LEGACY_VKEYS: readonly string[] = ['0x00cdf40c21b14717fd783bdecb539b762094b3b0da75a567f4b6cc088e9f2967'];
 /** On-chain cap on allowed_vkeys (blindseal-verify MAX_VKEYS). */
 export const MAX_VKEYS = 8;
 /** Default vkey allowlist for a fresh Config: the current guest + the legacy ones. */

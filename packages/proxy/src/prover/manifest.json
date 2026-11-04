@@ -1,6 +1,10 @@
 {
   "version": "0.7.0",
   "release": "https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.7.0",
+  "guestElf": {
+    "sha256": "dd3c49340646af0a249851d6f14afccc21d52bf1cd40610308420ced241899db",
+    "bytes": 298596
+  },
   "assets": {
     "darwin-arm64": {
       "name": "blindseal-prover-darwin-arm64",

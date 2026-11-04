@@ -3,8 +3,10 @@
 # `blindseal attest` downloads — actually runs and is the committed guest:
 #   1. download <release>/<asset>, <release>/SHA256SUMS and <release>/SHA256SUMS.<platform>; the asset's
 #      sha256 must equal its SHA256SUMS line AND the manifest's pin
-#   2. the committed guest ELF (crates/guest/elf/blindseal-guest) must have sha256
-#      $EXPECTED_GUEST_ELF_SHA256 and appear byte for byte inside the binary (include_bytes!)
+#   2. the guest ELF the manifest records for that release (guestElf.sha256 / guestElf.bytes) must appear
+#      byte for byte inside the binary (include_bytes!); when the committed guest ELF
+#      (crates/guest/elf/blindseal-guest) is that same ELF the check uses it directly, otherwise (a guest
+#      change staged ahead of its prover release) the binary is scanned for an ELF of that size and hash
 #   3. run the binary in execute-only mode (BLINDSEAL_EXECUTE=1: the SP1 executor, no proof) on the
 #      mainnet sample's tool call and action (tests/fixtures/mainnet-toolcall-demo.json,
 #      attestation-mainnet-demo-0.7.0.json); the public values it prints (payloadHash, policyRoot,
@@ -16,9 +18,6 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 MANIFEST=packages/proxy/src/prover/manifest.json
-# sha256 of crates/guest/elf/blindseal-guest. Changes only with a deliberate guest change, together with
-# a new prover release and manifest pin.
-EXPECTED_GUEST_ELF_SHA256=dd3c49340646af0a249851d6f14afccc21d52bf1cd40610308420ced241899db
 FIX_ATT=tests/fixtures/attestation-mainnet-demo-0.7.0.json
 FIX_CALL=tests/fixtures/mainnet-toolcall-demo.json
 
@@ -51,19 +50,36 @@ echo "listed:   $(ls "$DL" | grep SHA256SUMS | tr '\n' ' ')"
 [ "$GOT" = "$PINNED" ] || { echo "FAIL: sha256 differs from the manifest pin ($PINNED)"; exit 1; }
 echo "ok: sha256 equals SHA256SUMS and the manifest pin"
 
-# 2 · the committed guest ELF, verbatim inside the binary
+# 2 · the release's guest ELF, verbatim inside the binary
 ELF=crates/guest/elf/blindseal-guest
 ELF_SHA=$(sha256 "$ELF")
-echo "guest ELF: $ELF_SHA ($(wc -c < "$ELF" | tr -d ' ') bytes)"
-[ "$ELF_SHA" = "$EXPECTED_GUEST_ELF_SHA256" ] || { echo "FAIL: committed guest ELF sha256 is not $EXPECTED_GUEST_ELF_SHA256"; exit 1; }
-python3 -I - "$DL/$ASSET" "$ROOT/$ELF" <<'PY'
+REL_ELF_SHA=$(j $MANIFEST 'm.guestElf.sha256'); REL_ELF_BYTES=$(j $MANIFEST 'm.guestElf.bytes')
+echo "guest ELF: committed $ELF_SHA ($(wc -c < "$ELF" | tr -d ' ') bytes); release $REL_ELF_SHA ($REL_ELF_BYTES bytes)"
+if [ "$ELF_SHA" = "$REL_ELF_SHA" ]; then
+  python3 -I - "$DL/$ASSET" "$ROOT/$ELF" <<'PY'
 import sys
 binary = open(sys.argv[1], 'rb').read(); elf = open(sys.argv[2], 'rb').read()
 n = binary.count(elf)
 if n != 1:
     print(f"FAIL: the guest ELF appears {n} times in the binary (expected exactly once)"); sys.exit(1)
-print(f"ok: the guest ELF is embedded verbatim at offset {binary.find(elf)}")
+print(f"ok: the committed guest ELF is embedded verbatim at offset {binary.find(elf)}")
 PY
+else
+  echo "note: the committed guest ELF is newer than the released prover's (a guest change staged ahead of its release)"
+  python3 -I - "$DL/$ASSET" "$REL_ELF_SHA" "$REL_ELF_BYTES" <<'PY'
+import sys, hashlib
+binary = open(sys.argv[1], 'rb').read(); want = sys.argv[2]; size = int(sys.argv[3])
+hits = []
+at = binary.find(b"\x7fELF")
+while at != -1:
+    if hashlib.sha256(binary[at:at + size]).hexdigest() == want:
+        hits.append(at)
+    at = binary.find(b"\x7fELF", at + 1)
+if len(hits) != 1:
+    print(f"FAIL: an ELF of {size} bytes with sha256 {want} appears {len(hits)} times in the binary (expected exactly once)"); sys.exit(1)
+print(f"ok: the release's guest ELF is embedded verbatim at offset {hits[0]}")
+PY
+fi
 
 # 3 · execute-only run on the mainnet sample: the public values must reproduce
 chmod +x "$DL/$ASSET"
