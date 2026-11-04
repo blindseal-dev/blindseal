@@ -1,6 +1,7 @@
 # Blindseal prover (M1): runs the SP1 guest, Groth16-wraps locally, writes attestation.json.
 # Standalone package (own Cargo.lock) — excluded from the host workspace so the SP1 tree
-# doesn't pollute it (same isolation as m05-spike). Local CPU prover only; never the network.
+# doesn't pollute it (same isolation as m05-spike). The default build is the local CPU prover; the
+# `cuda` and `network` features add the other two modes (src/main.rs, README "Proving modes").
 [package]
 name = "blindseal-prover"
 version = "0.0.0"
@@ -11,8 +12,23 @@ license = "MIT"
 name = "blindseal-prover"
 path = "src/main.rs"
 
+[features]
+default = []
+# Local GPU proving through a Moongate server (sp1-sdk's CUDA prover). Compiles without a GPU.
+cuda = ["sp1-sdk/cuda"]
+# Groth16 wrap through the gnark FFI compiled in (needs Go >= 1.22 at build time) instead of the
+# sp1-gnark docker image: for hosts without docker, such as a rented GPU container.
+native-gnark = ["sp1-sdk/native-gnark"]
+# Remote proving on the Succinct prover network. Opt-in twice at run time (--mode network and
+# BLINDSEAL_NETWORK_ACKNOWLEDGED=1): the payload leaves the machine. Known gap with this lockfile: the
+# feature pulls alloy-consensus 0.14 (sp1-sdk 5.0.0's network deps), which uses a serde private module
+# that serde >= 1.0.220 no longer has, and serde_json 1.0.154 (pinned by detector-core) needs that serde.
+# Building it needs a lockfile with serde <= 1.0.219 and an older serde_json, or sp1-sdk >= 5.2 (alloy 1.x).
+network = ["sp1-sdk/network"]
+
 [dependencies]
 sp1-sdk = { version = "=5.0.0", default-features = false }
+anyhow = "1"
 blindseal-detector-core = { path = "../detector-core" }
 sha2 = "=0.10.8"
 serde_json = "1"
