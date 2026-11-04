@@ -3,7 +3,7 @@
 //   node fixtures/generate.mjs
 // Re-run anytime; output is stable for a fixed SEED.
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -59,8 +59,8 @@ const SERVERS = [
 ];
 const REDACT_KINDS = ['api_key', 'private_key', 'seed_phrase', 'jwt', 'email', 'phone', 'card', 'ssn', 'high_entropy'];
 
-// The 22 committed L1 rules, verbatim from crates/detector-core (name + severity). The policy
-// root is a Merkle over these 22 DFA leaves + 1 zero-width-threshold leaf = 23 leaves; it is NOT
+// The 40 committed L1 rules, verbatim from crates/detector-core (name + severity). The policy
+// root is a Merkle over these 40 DFA leaves + 1 zero-width-threshold leaf = 41 leaves; it is NOT
 // reproducible in JS (leaves are serialized regex-automata DFA bytes), so it is pinned to the real
 // value emitted by detector-core's policy.rs test. See docs/FRONTEND-CONTRACT.md.
 const L1_RULE_DEFS = [
@@ -86,13 +86,32 @@ const L1_RULE_DEFS = [
   ['dan-dual-label', 'Malicious'],
   ['affirmative-prefix-elicitation', 'Suspicious'],
   ['task-reassignment-directive', 'Suspicious'],
+  // release 0.8 (the red-team / burned-holdout review)
+  ['ai-addressed-note', 'Suspicious'],
+  ['ai-directive-field', 'Suspicious'],
+  ['treat-as-instructions', 'Malicious'],
+  ['prior-instructions-voided', 'Malicious'],
+  ['from-now-on-directive', 'Suspicious'],
+  ['persona-adoption', 'Malicious'],
+  ['safety-restrictions-removed', 'Suspicious'],
+  ['unrestricted-persona', 'Suspicious'],
+  ['exfil-to-destination', 'Malicious'],
+  ['prompt-exfiltration', 'Suspicious'],
+  ['decode-and-execute', 'Suspicious'],
+  ['concealment-directive', 'Suspicious'],
+  ['persistent-hidden-goal', 'Suspicious'],
+  ['dual-output-jailbreak', 'Suspicious'],
+  ['authority-claim', 'Suspicious'],
+  ['reply-format-hijack', 'Suspicious'],
+  ['prompt-boundary-spoof', 'Suspicious'],
+  ['tool-abuse-directive', 'Suspicious'],
 ];
 const L1_RULES = L1_RULE_DEFS.map((r) => r[0]);
 // L0 is decode-then-L1: a decoder surfaces hidden text that an L1 rule then catches.
 const L0_RULES = ['base64-decoded-run', 'hex-decoded-run', 'url-decoded-run', 'html-entity-decoded-run'];
 
-// Real committed policy root (detector-core default policy, 23 leaves) — see evals/vectors/policy-root.txt.
-const POLICY_ROOT = '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397';
+// Real committed policy root (detector-core default policy, 41 leaves) — see evals/vectors/policy-root.txt.
+const POLICY_ROOT = '0x62f5ee2247afea22a4d5100189b7b47fa802950bc24c7693bba7cb1d41464774';
 const DETECTOR_VERSION = hex(32, 'detectorVersion'); // sp1 vkey (0x+64hex); real value is the guest vkey
 
 // ---------- decisions ----------
@@ -173,12 +192,31 @@ for (let i = 0; i < N; i++) {
 
 // ---------- audit chain (matches decisions) ----------
 const AUDIT_DOMAIN = 'blindseal.audit.v1';
+/// Deterministic JSON: object keys sorted recursively, arrays in order. Mirrors
+/// `canonicalJson` in packages/audit/src/hash.ts.
+function canonicalJson(value) {
+  const sort = (v) => {
+    if (Array.isArray(v)) return v.map(sort);
+    if (v && typeof v === 'object') {
+      const out = {};
+      for (const k of Object.keys(v).sort()) out[k] = sort(v[k]);
+      return out;
+    }
+    return v;
+  };
+  return JSON.stringify(sort(value));
+}
 const GENESIS = sha('blindseal.audit.genesis.v1' + hex(32, 'proxyIdentityPubkey'));
 const entries = [];
 let prevHash = GENESIS;
 for (const d of decisions) {
   const entryCore = { index: d.auditIndex, ts: d.ts, decisionId: d.id, verdict: d.verdict, payloadHash: d.payloadHash, prevHash };
-  const h = sha(AUDIT_DOMAIN + JSON.stringify(entryCore));
+  // The chain must verify with the real hasher (@blindseal/audit `hashEntry`), which hashes CANONICAL
+  // JSON — keys sorted, not insertion order. Hashing JSON.stringify(entryCore) instead produced a chain
+  // that POST /api/audit/verify reported as broken at #0. This file is plain .mjs run by node, so the
+  // package's TS source cannot be imported here, so canonicalJson is mirrored below; the proxy's
+  // mock-api audit test (POST /api/audit/verify over these fixtures) is what keeps the two in step.
+  const h = sha(AUDIT_DOMAIN + canonicalJson(entryCore));
   d.auditHash = h;
   entries.push({ index: d.auditIndex, hash: h, prevHash, ts: d.ts, verdict: d.verdict, decisionId: d.id, payloadHash: d.payloadHash });
   prevHash = h;
@@ -186,10 +224,10 @@ for (const d of decisions) {
 const head = { index: entries.length - 1, hash: prevHash, ts: entries[entries.length - 1].ts };
 const audit = { head, genesis: GENESIS, entries };
 
-// ---------- policy (22 committed L1 rules + zero-width threshold parameter) ----------
-// Mirrors crates/detector-core exactly: 22 L1 rules, each a DFA leaf; severity Malicious -> block
-// verdict, Suspicious -> flag. The committed root is over these 22 leaves + the zero-width
-// threshold leaf (23 leaves total), pinned to the real detector-core value.
+// ---------- policy (40 committed L1 rules + zero-width threshold parameter) ----------
+// Mirrors crates/detector-core exactly: 40 L1 rules, each a DFA leaf; severity Malicious -> block
+// verdict, Suspicious -> flag. The committed root is over these 40 leaves + the zero-width
+// threshold leaf (41 leaves total), pinned to the real detector-core value.
 const SEV_VERDICT = { Malicious: 'block', Suspicious: 'flag' };
 const rules = L1_RULE_DEFS.map(([name, severity]) => ({
   id: name,
@@ -205,7 +243,7 @@ const policy = {
   version: 2,
   updatedAt: iso(0),
   detectorVersion: DETECTOR_VERSION,
-  leafCount: 23,
+  leafCount: 41,
   parameters: { zeroWidthDensityThreshold: 0.1 },
   l0Decoders: L0_RULES,
   rules,
@@ -253,6 +291,12 @@ tampered.publicInputs[3] = hex(32, 'tampered-actionHash'); // flip actionHash
 tampered.status = 'rejected';
 
 // ---------- write ----------
+// KEEP: these three are hand-maintained in the repo. Their first entry carries a REAL Groth16 proof with
+// single-blob publicInputs (168 bytes) and a `payloadHash`, which the dashboard's publicinputs test and
+// the verify page decode, under the policy root it was actually proved against. This generator emits
+// synthetic 6-element publicInputs with no payloadHash, so writing them would swap real fixtures for
+// synthetic ones and break those tests. Delete a file first if you really do want it regenerated.
+const KEEP = new Set(['attestations.json', 'attestation-sample.json', 'attestation-tampered.json']);
 const files = {
   'decisions.json': decisions,
   'policy.json': policy,
@@ -261,11 +305,17 @@ const files = {
   'attestation-sample.json': sample,
   'attestation-tampered.json': tampered,
 };
+const written = [];
+const kept = [];
 for (const [name, data] of Object.entries(files)) {
-  writeFileSync(path.join(OUT, name), JSON.stringify(data, null, 2) + '\n');
+  const dest = path.join(OUT, name);
+  if (KEEP.has(name) && existsSync(dest)) { kept.push(name); continue; }
+  writeFileSync(dest, JSON.stringify(data, null, 2) + '\n');
+  written.push(name);
 }
 const counts = decisions.reduce((a, d) => ((a[d.verdict] = (a[d.verdict] || 0) + 1), a), {});
-console.log('wrote fixtures:', Object.keys(files).join(', '));
+console.log('wrote fixtures:', written.join(', '));
+if (kept.length) console.log('kept (hand-maintained, see KEEP):', kept.join(', '));
 console.log('decisions:', decisions.length, counts, '| with action:', decisions.filter((d) => d.action).length);
 console.log('audit entries:', entries.length, '| head.index:', head.index);
 console.log('attestations:', attestations.length, 'statuses:', attestations.map((a) => a.status).join(','));
