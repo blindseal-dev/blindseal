@@ -140,7 +140,12 @@ describe('guardWallet', () => {
   it('one attestation covers one transfer: two identical transfers in a transaction need two attestations', async () => {
     const store = new AttestationStore(); store.add(FIXTURE);
     const tx = solTransfer().add(SystemProgram.transfer({ fromPubkey: SOURCE, toPubkey: RECIPIENT, lamports: AMOUNT }));
-    await expect(guardTransaction(tx, SOURCE, { chain: chainAt(LIVE), store })).rejects.toThrow(/already covers another transfer/);
+    await expect(guardTransaction(tx, SOURCE, { chain: chainAt(LIVE), store })).rejects.toThrow(/one attestation covers one transfer/);
+    // a refused signing leaves the attestation in place; a failing inner wallet does too
+    expect(store.size).toBe(1);
+    const failing: BaseWallet = { ...fakeWallet().wallet, async signTransaction() { throw new Error('declined'); } };
+    await expect(guardWallet(failing, { chain: chainAt(LIVE), store }).signTransaction(solTransfer())).rejects.toThrow(/declined/);
+    expect(store.size).toBe(1);
   });
 
   it('refuses a transaction it cannot read (address lookup tables)', async () => {

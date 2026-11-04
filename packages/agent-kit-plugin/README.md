@@ -33,8 +33,10 @@ one: `action_mismatch (amount)`, `action_mismatch (recipient)`, `action_mismatch
 `no_attestation`, `consumed`, `expired`, `invalid_proof`, `chain_unavailable`, `unreadable` (address
 lookup tables, an SPL destination that does not exist), `other_instruction` (with
 `otherInstructions: 'refuse'`). Transfers authorised by another key are not this wallet's to gate and pass;
-instructions that are not transfers (compute budget, memo, swaps, program calls) pass by default — set
-`otherInstructions: 'refuse'` to sign nothing but attested transfers.
+instructions that are not transfers pass by default — compute budget, memo, swaps, program calls, and
+also System `CreateAccount`, spl-token `Approve`, `CloseAccount` and `SetAuthority`, which can move or
+delegate funds without being a transfer. Set `otherInstructions: 'refuse'` to sign nothing but attested
+transfers (plus compute budget, memo and ATA creation).
 
 The plugin exposes the methods `blindsealProvideAttestation`, `blindsealTransfer`,
 `blindsealHeldAttestations` and the action `BLINDSEAL_GUARDED_TRANSFER` (`to`, `amount`, `mint?`,

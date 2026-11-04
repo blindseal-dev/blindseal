@@ -212,12 +212,13 @@ describe('payout-gate — batch of SPL payouts, one attestation each', () => {
   });
 
   it('stage_attestation: the PDA holds payer, proof and public inputs; a nullifier that is not the committed one is refused', async () => {
-    await send([await stageIx(LEGACY[0]), await stageIx(LEGACY[1])], [payer]);
+    // one stage per transaction: two proofs plus two blobs do not fit one (the reason staging exists)
+    for (const att of LEGACY) await send([await stageIx(att)], [payer]);
     for (const att of LEGACY) {
       const info = await conn.getAccountInfo(stagedPda(payer.publicKey, hex(att.nullifier)), 'confirmed');
       expect(info, 'staged PDA exists').to.not.equal(null);
       expect(info!.owner.equals(gate.programId)).to.equal(true);
-      const s = gate.coder.accounts.decode('staged', info!.data) as any;
+      const s = gate.coder.accounts.decode('Staged', info!.data) as any;
       expect((s.payer as PublicKey).toBase58()).to.equal(payer.publicKey.toBase58());
       expect(Buffer.from(s.proof)).to.deep.equal(hex(att.proof.bytes));
       expect(Buffer.from(s.publicInputs)).to.deep.equal(hex(att.publicInputs[0]));
@@ -239,11 +240,17 @@ describe('payout-gate — batch of SPL payouts, one attestation each', () => {
 
   it('a batch whose attestations were screened for another program (transfer-gate) is refused by the verifier: ActionHashMismatch, nothing moves', async () => {
     const before = await Promise.all(recipients.map((r) => tokenBalance(ata(r.publicKey, mint))));
+    // the verifier's actionHash check (step 7) comes before the nullifier check (step 8), so this is the error
+    // whether or not m2.spec.ts, run first on this validator, has already consumed these attestations through
+    // transfer-gate; the nullifier accounts must simply be unchanged by the attempt.
+    const nullifiersBefore = await Promise.all(LEGACY.map((att) => conn.getAccountInfo(nullifierPda(hex(att.nullifier)), 'confirmed')));
     const payouts: Payout[] = LEGACY.map((att, i) => ({ att, amount: new BN(att.action.amount), recipientToken: ata(recipients[i].publicKey, mint) }));
     await expectError(send([await batchIx(payouts)], [payer]), 'ActionHashMismatch');
     expect(await Promise.all(recipients.map((r) => tokenBalance(ata(r.publicKey, mint))))).to.deep.equal(before);
-    for (const att of LEGACY) {
-      expect(await conn.getAccountInfo(nullifierPda(hex(att.nullifier)), 'confirmed'), 'nullifier not consumed').to.equal(null);
+    for (const [i, att] of LEGACY.entries()) {
+      const after = await conn.getAccountInfo(nullifierPda(hex(att.nullifier)), 'confirmed');
+      expect(after?.data.toString('hex') ?? null, 'nullifier account unchanged').to.equal(nullifiersBefore[i]?.data.toString('hex') ?? null);
+      if (after) expect(decodeNullifier(after.data).consumerProgram.toBase58(), 'consumed earlier by transfer-gate, never by payout-gate').to.not.equal(gate.programId.toBase58());
       expect(await conn.getAccountInfo(stagedPda(payer.publicKey, hex(att.nullifier)), 'confirmed'), 'staged account kept').to.not.equal(null);
     }
   });
@@ -281,7 +288,7 @@ describe('payout-gate — batch of SPL payouts, one attestation each', () => {
     const before = await conn.getBalance(payer.publicKey, 'confirmed');
     await send([await cancelIx(LEGACY[1])], [payer]);
     expect(await conn.getAccountInfo(staged, 'confirmed')).to.equal(null);
-    expect((await conn.getBalance(payer.publicKey, 'confirmed')) - before).to.be.greaterThan(rent - 20_000); // minus the fee
+    expect((await conn.getBalance(payer.publicKey, 'confirmed')) - before).to.equal(rent); // the provider wallet pays the fee
   });
 
   it('one payout with the wrong amount fails the whole batch (ActionHashMismatch); the other payout\'s nullifier stays unconsumed', async function () {
@@ -292,7 +299,7 @@ describe('payout-gate — batch of SPL payouts, one attestation each', () => {
       await expectError(send([await batchIx([wrong])], [payer]), 'ActionHashMismatch');
       return this.skip();
     }
-    await send(await Promise.all(PAYOUT.map((att) => stageIx(att))), [payer]);
+    for (const att of PAYOUT) await send([await stageIx(att)], [payer]);
     const payouts: Payout[] = PAYOUT.map((att, i) => ({ att, amount: PAYOUT_AMOUNTS[i], recipientToken: ata(recipients[i].publicKey, mint) }));
     payouts[1].amount = PAYOUT_AMOUNTS[1].addn(1);
     const before = await Promise.all(recipients.map((r) => tokenBalance(ata(r.publicKey, mint))));

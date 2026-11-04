@@ -113,7 +113,10 @@ export async function transfersOf(ixs: DecodedIx[], chain: ChainReader): Promise
   // ATAs created in this transaction: ata → { owner, mint }
   const created = new Map<string, { owner: PublicKey; mint: PublicKey }>();
   for (const ix of ixs) {
-    if (ix.programId.equals(ASSOCIATED_TOKEN_ID) && ix.keys.length >= 4) created.set(ix.keys[1]!.toBase58(), { owner: ix.keys[2]!, mint: ix.keys[3]! });
+    if (!ix.programId.equals(ASSOCIATED_TOKEN_ID) || ix.keys.length < 6) continue;
+    const [, ata, owner, mint, , tokenProgram] = ix.keys as [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey];
+    // only a create whose address really derives from (owner, mint) says who the account belongs to
+    if (ata.equals(associatedTokenAddress(owner, mint, tokenProgram))) created.set(ata.toBase58(), { owner, mint });
   }
   for (const ix of ixs) {
     const d = Buffer.from(ix.data);
@@ -164,9 +167,10 @@ export class AttestationStore {
    * The stored attestation whose action equals `expected`, or the closest one (fewest differing fields,
    * ties to the first stored) with its first mismatch — so a refusal can name the field.
    */
-  find(expected: ExpectedAction): { match: Attestation } | { match: null; closest?: { attestation: Attestation; field: ActionField; expected: string; got: string } } {
+  find(expected: ExpectedAction, exclude: ReadonlySet<string> = new Set()): { match: Attestation } | { match: null; closest?: { attestation: Attestation; field: ActionField; expected: string; got: string } } {
     let closest: { attestation: Attestation; field: ActionField; expected: string; got: string; rank: number } | undefined;
-    for (const att of this.byNullifier.values()) {
+    for (const [nf, att] of this.byNullifier) {
+      if (exclude.has(nf)) continue; // already covering another transfer in this transaction
       const mm = actionMismatch(att, expected);
       if (!mm) return { match: att };
       const rank = ACTION_RANK[mm.field];
@@ -219,13 +223,12 @@ export async function guardTransaction(tx: Transaction | VersionedTransaction, s
   const usedNullifiers = new Set<string>();
   for (const t of decoded.transfers.filter((t) => t.authority.equals(signer))) {
     const expected: ExpectedAction = { sourceAuthority: signer.toBase58(), recipient: t.recipient.toBase58(), mint: t.mint?.toBase58() ?? '', amount: t.amount, ...(opts.consumer ?? {}) };
-    const found = store.find(expected);
+    const found = store.find(expected, usedNullifiers);
     if (!found.match) {
       if (found.closest) throw new TransferRefusedError(t, 'action_mismatch', found.closest.field, `no attestation for ${describe(t)}; the closest one has ${found.closest.field} ${found.closest.got || '(none)'} where the transfer has ${found.closest.expected || '(none)'}`);
-      throw new TransferRefusedError(t, 'no_attestation', undefined, `no attestation for ${describe(t)}`);
+      throw new TransferRefusedError(t, 'no_attestation', undefined, `no attestation for ${describe(t)}${usedNullifiers.size ? ' (one attestation covers one transfer)' : ''}`);
     }
     const nf = nullifierOf(found.match).nullifier;
-    if (usedNullifiers.has(nf)) throw new TransferRefusedError(t, 'no_attestation', undefined, `attestation ${nf} already covers another transfer in this transaction`);
     const r = await checkAttestation(found.match, expected, opts.chain, { verifyProgramId: opts.verifyProgramId });
     if (!r.ok) throw new TransferRefusedError(t, r.code, r.field, r.reason);
     usedNullifiers.add(nf);
@@ -238,18 +241,24 @@ export async function guardTransaction(tx: Transaction | VersionedTransaction, s
 export function guardWallet(wallet: BaseWallet, opts: GuardOptions): BaseWallet {
   const store = opts.store ?? new AttestationStore();
   const o = { ...opts, store };
+  // the attestations a transaction used are forgotten only once the inner wallet has signed: a declined or
+  // failed signing leaves them in place for a retry
   const consume = (used: Attestation[]) => { if (o.consumeOnSign ?? true) for (const a of used) store.remove(a); };
-  const guard = async (tx: Transaction | VersionedTransaction) => consume(await guardTransaction(tx, wallet.publicKey, o));
+  const guard = (tx: Transaction | VersionedTransaction) => guardTransaction(tx, wallet.publicKey, o);
   const guarded: BaseWallet = {
     get publicKey() { return wallet.publicKey; },
-    async signTransaction(tx) { await guard(tx); return wallet.signTransaction(tx); },
-    async signAllTransactions(txs) { for (const tx of txs) await guard(tx); return wallet.signAllTransactions(txs); },
-    signAndSendTransaction: async (tx, options) => { await guard(tx); return wallet.signAndSendTransaction(tx, options); },
+    async signTransaction(tx) { const used = await guard(tx); const out = await wallet.signTransaction(tx); consume(used); return out; },
+    async signAllTransactions(txs) {
+      const used: Attestation[] = [];
+      for (const tx of txs) used.push(...await guard(tx));
+      const out = await wallet.signAllTransactions(txs); consume(used); return out;
+    },
+    signAndSendTransaction: async (tx, options) => { const used = await guard(tx); const out = await wallet.signAndSendTransaction(tx, options); consume(used); return out; },
     signMessage: (m) => wallet.signMessage(m),
   };
   if (wallet.sendTransaction) {
     const send = wallet.sendTransaction;
-    guarded.sendTransaction = async (tx) => { await guard(tx); return send(tx); };
+    guarded.sendTransaction = async (tx) => { const used = await guard(tx); const out = await send(tx); consume(used); return out; };
   }
   return guarded;
 }

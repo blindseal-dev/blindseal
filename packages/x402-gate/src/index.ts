@@ -83,10 +83,14 @@ export function createGate(opts: GateOptions): Gate {
 
   return async (req) => {
     let payment: Payment | null;
-    try { payment = await extract(req); } catch (e) { return { allow: false, status: 400, code: 'no_payment', reason: `payment could not be read: ${(e as Error).message}` }; }
-    if (!payment) return { allow: false, status: 400, code: 'no_payment', reason: 'no payment in the request' };
+    let mintKey: string;
+    try {
+      payment = await extract(req);
+      if (!payment) return { allow: false, status: 400, code: 'no_payment', reason: 'no payment in the request' };
+      mintKey = normMint(payment.mint); // a custom extractor may hand back a malformed mint
+    } catch (e) { return { allow: false, status: 400, code: 'no_payment', reason: `payment could not be read: ${(e as Error).message}` }; }
 
-    const threshold = thresholds.get(normMint(payment.mint));
+    const threshold = thresholds.get(mintKey);
     if (threshold === undefined) {
       if (unlisted === 'allow') return { allow: true, gated: false, code: 'ungated_mint', payment, reason: `no threshold for mint ${payment.mint || 'SOL'}` };
     } else if (payment.amount < threshold) {
