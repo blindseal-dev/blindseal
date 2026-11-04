@@ -6,5 +6,8 @@ the on-chain suite runs on a local validator with `scripts/test-m2.sh`.
 - `blindseal-verify` — Groth16 verify (sp1-solana) + nullifier set + vkey/policy allowlists; CPI-only.
   The exact check order is documented in the header of `blindseal-verify/src/lib.rs`.
 - `transfer-gate` — example gated native-SOL transfer that requires an attestation.
+- `payout-gate` — example gated BATCH of SPL token payouts: one attestation per payout, staged in a PDA first
+  (two proofs do not fit one transaction), one `verify_and_consume` CPI each; localnet only so far
+  (`payout-gate/README.md`).
 - `rogue-caller` — TEST-ONLY native forwarder for the M2 suite (a CPI from a program other than the
   attestation's target must fail); loaded at an id generated per test run, never deployed.
