@@ -97,13 +97,13 @@ describe('set_fee builder', () => {
 });
 
 describe('the fee accounts in the gated transfer', () => {
-  it('buildGatedTransferIx puts the given treasury after the nullifier, writable, not a signer', () => {
+  it('buildGatedTransferIx appends the given treasury last (optional trailing account), writable, not a signer', () => {
     const treasury = Keypair.generate().publicKey;
     const ix = sdk.buildGatedTransferIx(FIXTURE, { source: SOURCE.publicKey, recipient: new PublicKey(FIXTURE.action.recipient), treasury });
     const idl = JSON.parse(readFileSync(join(__dirname, '../idl/transfer_gate.json'), 'utf8'));
     const names = idl.instructions.find((i: any) => i.name === 'gated_transfer').accounts.map((a: any) => a.name);
     const slot = names.indexOf('treasury');
-    expect(slot).toBe(names.indexOf('nullifier') + 1);
+    expect(slot).toBe(names.length - 1);
     expect(ix.keys[slot].pubkey.equals(treasury)).toBe(true);
     expect(ix.keys[slot].isWritable).toBe(true);
     expect(ix.keys[slot].isSigner).toBe(false);
@@ -112,9 +112,11 @@ describe('the fee accounts in the gated transfer', () => {
   it('buildVerifyIx: an explicit fee payer and treasury land in the fee_payer / treasury slots', () => {
     const payer = Keypair.generate().publicKey, feePayer = Keypair.generate().publicKey, treasury = Keypair.generate().publicKey;
     const ix = sdk.buildVerifyIx(FIXTURE, sdk.actionArgsFrom(FIXTURE), { payer, feePayer, treasury });
-    expect(ix.keys.map((k) => k.pubkey.toBase58()).slice(3, 6)).toEqual([payer, feePayer, treasury].map((k) => k.toBase58()));
-    expect(ix.keys[4].isSigner && ix.keys[4].isWritable).toBe(true);
-    expect(!ix.keys[5].isSigner && ix.keys[5].isWritable).toBe(true);
+    expect(ix.keys[3].pubkey.equals(payer)).toBe(true);
+    expect(ix.keys.map((k) => k.pubkey.toBase58()).slice(6, 8)).toEqual([feePayer, treasury].map((k) => k.toBase58()));
+    expect(ix.keys[6].isSigner && ix.keys[6].isWritable).toBe(true);
+    expect(!ix.keys[7].isSigner && ix.keys[7].isWritable).toBe(true);
+    expect(ix.keys).toHaveLength(8);
   });
   it('submit() reads Config and passes its treasury; reports the fee', async () => {
     const treasury = Keypair.generate().publicKey;
@@ -139,7 +141,7 @@ describe('the fee accounts in the gated transfer', () => {
     expect(seen).toEqual([[777n, treasury.toBase58()]]);
     const { Transaction } = await import('@solana/web3.js');
     const gated = Transaction.from(raw!).instructions.find((i) => i.programId.equals(sdk.TRANSFER_GATE_ID))!;
-    expect(gated.keys[5].pubkey.equals(treasury)).toBe(true);
-    expect(gated.keys[5].isWritable).toBe(true);
+    expect(gated.keys.at(-1)!.pubkey.equals(treasury)).toBe(true);
+    expect(gated.keys.at(-1)!.isWritable).toBe(true);
   });
 });

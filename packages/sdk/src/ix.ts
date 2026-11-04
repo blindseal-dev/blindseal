@@ -36,8 +36,15 @@ export const CONFIG_SIZE_LEGACY = 303;
 export const CONFIG_SIZE = 343;
 /** Default vkey allowlist for a fresh Config: the current guest + the legacy ones. */
 export const DEFAULT_ALLOWED_VKEYS: readonly string[] = [CURRENT_VKEY, ...LEGACY_VKEYS];
-/** The default policy root (detector-core's L1 rules + zero-width threshold; evals/vectors/policy-root.txt). */
-export const DEFAULT_POLICY_ROOT = '0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397';
+/** The 0.8.0 default policy root: sha256("blindseal.policy.v2" ‖ RULES_ROOT ‖ actionPolicyHash(empty policy))
+ *  — the committed L1 rules, no action constraint (policy.ts `policyRootFor()`; evals/vectors/action-policy.json). */
+export const DEFAULT_POLICY_ROOT = '0x78bb3bab1765304373a6af9de2d7c081ce57bc862c039f6dd682c74e939eb10a';
+/** The mainnet demo sample's policy root: the committed rules + tests/fixtures/action-policy-demo.json (the
+ *  demo recipient only, at most 0.01 SOL per action). */
+export const DEMO_POLICY_ROOT = '0x79f11a126ef624b03a351efc79747ee6dadcac8eab71f5e24061514e6205ea8e';
+/** Policy roots from before action policies: the 0.7 root is the bare rules root (RULES_ROOT). Attestations
+ *  made by a 0.7.x prover carry it; it is registered on mainnet and transfer-gate still accepts it. */
+export const LEGACY_POLICY_ROOTS: readonly string[] = ['0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397'];
 
 export const ACTION_DOMAIN = 'blindseal.action.v1';
 export const NULLIFIER_DOMAIN = 'blindseal.nullifier.v1';
@@ -283,11 +290,13 @@ export function treasuryAccount(configTreasury: string | PublicKey | null | unde
  * `verify_and_consume(proof, public_inputs, action)`: the account list and data a gated program
  * forwards in its CPI. The verifier accepts it ONLY as a CPI from `action.targetProgram` issued by
  * the top-level instruction — sent as a top-level instruction it fails `DirectCallNotAllowed`.
- * Accounts: config, policy_root (optional), nullifier, payer, fee_payer, treasury, system_program,
- * instructions sysvar. The fee payer and treasury are in the list whether or not a fee is set.
+ * Accounts: config, policy_root (optional), nullifier, payer, system_program, instructions sysvar, then
+ * the optional trailing fee_payer and treasury (0.8.0). With neither `feePayer` nor `treasury` given they
+ * are omitted — the pre-0.8.0 layout, accepted while the fee is 0.
  */
 export function buildVerifyIx(att: Attestation, action: ActionArgs, accounts: VerifyAccounts): TransactionInstruction {
   const programId = accounts.programId ?? PROGRAM_ID;
+  const withFee = accounts.feePayer !== undefined || accounts.treasury !== undefined;
   const feePayer = accounts.feePayer ?? accounts.payer;
   const treasury = accounts.treasury ?? feePayer;
   const proof = hex(att.proof.bytes);
@@ -303,10 +312,11 @@ export function buildVerifyIx(att: Attestation, action: ActionArgs, accounts: Ve
       { pubkey: policy ?? programId, isSigner: false, isWritable: false },
       { pubkey: nullifierPda(nullifier, programId), isSigner: false, isWritable: true },
       { pubkey: accounts.payer, isSigner: true, isWritable: true },
-      { pubkey: feePayer, isSigner: true, isWritable: true },
-      { pubkey: treasury, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
+      ...(withFee
+        ? [{ pubkey: feePayer, isSigner: true, isWritable: true }, { pubkey: treasury, isSigner: false, isWritable: true }]
+        : []),
     ],
     data,
   });
@@ -364,11 +374,11 @@ export function buildRegisterPolicyRootIx(authority: PublicKey, root: Uint8Array
 }
 
 /** The default initialisation: `initialize(current + legacy vkeys, allowlist_policies = true)` then
- *  `register_policy_root(DEFAULT_POLICY_ROOT)` — approved policies on, the default policy approved. */
+ *  `register_policy_root` for the default root, the demo root and the legacy roots — approved policies on. */
 export function buildDefaultInitIxs(authority: PublicKey, programId = PROGRAM_ID): TransactionInstruction[] {
   return [
     buildInitializeIx(authority, DEFAULT_ALLOWED_VKEYS.map(hex), true, programId),
-    buildRegisterPolicyRootIx(authority, hex(DEFAULT_POLICY_ROOT), programId),
+    ...[DEFAULT_POLICY_ROOT, DEMO_POLICY_ROOT, ...LEGACY_POLICY_ROOTS].map((r) => buildRegisterPolicyRootIx(authority, hex(r), programId)),
   ];
 }
 
@@ -439,14 +449,13 @@ export function decodeConfig(data: Uint8Array): DecodedConfig {
 /** `gated_transfer(proof, public_inputs, nonce, amount)`: the gate CPIs verify_and_consume with the
  *  action IT executes, then transfers `amount` lamports source → recipient in the same tx. Must be a
  *  top-level instruction (the verifier refuses a deeper nesting). Accounts: source, recipient,
- *  config, policy_root (optional), nullifier, treasury, verify_program, system_program, instructions
- *  sysvar. `source` pays the verifier's fee (if any) to `treasury`, which must be `Config.treasury`
- *  (`treasuryAccount(decodeConfig(..).treasury, source)`; default: `source`, right only while no
- *  treasury is configured — `submit()` reads it from the chain). */
+ *  config, policy_root (optional), nullifier, verify_program, system_program, instructions sysvar, then
+ *  the optional trailing treasury (0.8.0). `source` pays the verifier's fee (if any) to `treasury`, which
+ *  must be `Config.treasury` (`treasuryAccount(decodeConfig(..).treasury, source)`; `submit()` reads it from
+ *  the chain). Without `treasury` the account is omitted — the pre-0.8.0 layout, accepted while the fee is 0. */
 export function buildGatedTransferIx(att: Attestation, accounts: { source: PublicKey; recipient: PublicKey; policyRoot?: PublicKey | null; treasury?: PublicKey; gateId?: PublicKey; verifyId?: PublicKey }): TransactionInstruction {
   const gateId = accounts.gateId ?? TRANSFER_GATE_ID;
   const verifyId = accounts.verifyId ?? PROGRAM_ID;
-  const treasury = accounts.treasury ?? accounts.source;
   const proof = hex(att.proof.bytes);
   const blob = hex(att.publicInputs[0]);
   const { nullifier, policyRoot } = decodePublicInputs(blob);
@@ -461,11 +470,11 @@ export function buildGatedTransferIx(att: Attestation, accounts: { source: Publi
       { pubkey: configPda(verifyId), isSigner: false, isWritable: false },
       { pubkey: policy ?? gateId, isSigner: false, isWritable: false }, // Anchor optional None = program id
       { pubkey: nullifierPda(nullifier, verifyId), isSigner: false, isWritable: true },
-      { pubkey: treasury, isSigner: false, isWritable: true },
       { pubkey: verifyId, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       // forwarded to the verifier, which reads it to check that its caller is the target program
       { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
+      ...(accounts.treasury !== undefined ? [{ pubkey: accounts.treasury, isSigner: false, isWritable: true }] : []),
     ],
     data,
   });

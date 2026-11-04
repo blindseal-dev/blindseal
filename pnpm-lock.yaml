@@ -41,6 +41,9 @@ importers:
       blindseal-sdk:
         specifier: workspace:*
         version: link:packages/sdk
+      blindseal-sdk-0.7.1:
+        specifier: npm:blindseal-sdk@0.7.1
+        version: blindseal-sdk@0.7.1(bufferutil@4.1.0)(typescript@5.6.3)(utf-8-validate@6.0.6)
       chai:
         specifier: 4.5.0
         version: 4.5.0
@@ -1781,6 +1784,13 @@ packages:
 
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
+
+  blindseal-sdk@0.7.1:
+    resolution: {integrity: sha512-xfCu9i62Zjmb3aBvXue5F6wz0P7edFqzWEkE2r+FCcVdApBxCnFvxCAsN4LRqR2RX0R9uU/+ZeuJHwHYmPmP+A==}
+    engines: {node: '>=20'}
+
+  blindseal-verifier-wasm@0.5.2:
+    resolution: {integrity: sha512-FH7k18mo5Bm0a5h7fK82kQsaTFkd9M2bO3yNWkNohlExVtLAKbwoz1wz5ZUjivxSteNzJNjEmzXyk9zM5Svh7g==}
 
   bn.js@5.2.5:
     resolution: {integrity: sha512-Vq886eXykuP5E6HcKSSStP3bJgrE6In5WKxVUvJ8XGpWWYs2xZHWqUwzCtGgEtBcxyd57KBFDPFoUfNzdaHCNg==}
@@ -4463,6 +4473,18 @@ snapshots:
       buffer: 5.7.1
       inherits: 2.0.4
       readable-stream: 3.6.2
+
+  blindseal-sdk@0.7.1(bufferutil@4.1.0)(typescript@5.6.3)(utf-8-validate@6.0.6):
+    dependencies:
+      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.6.3)(utf-8-validate@6.0.6)
+      blindseal-verifier-wasm: 0.5.2
+    transitivePeerDependencies:
+      - bufferutil
+      - encoding
+      - typescript
+      - utf-8-validate
+
+  blindseal-verifier-wasm@0.5.2: {}
 
   bn.js@5.2.5: {}
 

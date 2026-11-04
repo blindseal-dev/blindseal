@@ -39,8 +39,10 @@ const { expect } = cjs(chaiNs) as typeof chaiNs;
 // mainnet init script uses — so the suite exercises the real client path.
 import {
   buildInitializeIx, buildSetConfigIx, buildRegisterPolicyRootIx, buildGatedTransferIx, buildSetAuthorityIx, buildSetFeeIx, decodeConfig, decodeNullifier,
-  treasuryAccount, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, CONFIG_SIZE,
+  treasuryAccount, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, LEGACY_POLICY_ROOTS, CONFIG_SIZE,
 } from '../packages/sdk/src/ix';
+// The published 0.7.1 client: its gated_transfer account list predates the fee accounts (release 0.8.0 E).
+import { buildGatedTransferIx as buildGatedTransferIx071 } from 'blindseal-sdk-0.7.1';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -219,7 +221,7 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
     expect(cfg.allowlistPolicies).to.equal(true);
     expect(cfg.allowedVkeys).to.deep.equal([CURRENT_VKEY, ...LEGACY_VKEYS]);
     expect(cfg.allowedVkeys, 'the localnet fixture vkey stays recognised').to.include(att.detectorVersion);
-    expect(att.policyRoot).to.equal(DEFAULT_POLICY_ROOT);
+    expect(LEGACY_POLICY_ROOTS, 'the localnet fixture carries the 0.7 policy root').to.include(att.policyRoot);
   });
 
   it('paused: verify_and_consume is refused while paused', async () => {
@@ -463,6 +465,23 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
       expect(c.treasury).to.equal(PublicKey.default.toBase58());
     });
 
+    // The published 0.7.1 SDK's gated transfer (no treasury account) through the 0.8.0 programs, rebuilt with
+    // this suite's web3.js classes. The fixture was consumed by the happy path, so reaching
+    // NullifierAlreadyConsumed proves the old account list deserialized and every check before it ran.
+    const gated071 = (a: any) => {
+      const ix = buildGatedTransferIx071(a, { source: source.publicKey, recipient: recipient.publicKey, gateId: gate.programId, verifyId: verify.programId } as any);
+      return new web3.TransactionInstruction({
+        programId: new web3.PublicKey(ix.programId.toBase58()),
+        keys: ix.keys.map((k: any) => ({ pubkey: new web3.PublicKey(k.pubkey.toBase58()), isSigner: k.isSigner, isWritable: k.isWritable })),
+        data: Buffer.from(ix.data),
+      });
+    };
+    it('a 0.7.1 client (no fee accounts) still reaches the verifier at fee 0: the old account list deserializes', async () => {
+      const ix = gated071(att);
+      expect(ix.keys.length, '0.7.1 sends 8 accounts').to.equal(8);
+      await expectError(send([ix], [source]), 'NullifierAlreadyConsumed');
+    });
+
     it('set_fee by a non-authority is refused (Unauthorized)', async () => {
       const stranger = Keypair.generate();
       await send([SystemProgram.transfer({ fromPubkey: authority.publicKey, toPubkey: stranger.publicKey, lamports: LAMPORTS_PER_SOL / 10 })], [authority]);
@@ -505,6 +524,12 @@ describe('M2 — blindseal-verify + transfer-gate', () => {
       const c = await cfg();
       expect(c.feeLamports).to.equal(BigInt(FEE));
       expect(c.treasury).to.equal(treasury.publicKey.toBase58());
+    });
+
+    it('fee > 0 and a 0.7.1 client (no fee accounts): FeeAccountsMissing, nothing moves, nullifier not consumed', async function () {
+      requireCurrent.call(this);
+      await unchanged(() => expectError(send([cu, gated071(ATT_CURRENT)], [source]), 'FeeAccountsMissing'));
+      expect(await conn.getAccountInfo(nullifierPda(hex(ATT_CURRENT.nullifier)))).to.equal(null);
     });
 
     it('paused + fee > 0: Paused, nothing moves', async () => {

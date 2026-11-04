@@ -1,5 +1,6 @@
 // Config steps of the 0.7.0 mainnet upgrade, driven by scripts/mainnet-0.7.0.sh (one step per run).
 //   --step b    register_policy_root(DEFAULT_POLICY_ROOT)                     (skipped if registered)
+//   --step b2   register_policy_root(DEMO_POLICY_ROOT)  (0.8.0: the mainnet sample's root; skipped if registered)
 //   --step a    set_config(allowlist_policies = true)                          (refused unless b is done)
 //   --step c1   set_config(allowed_vkeys = on-chain list + CURRENT_VKEY)       (keeps the old vkey; refused unless a is done)
 //   --step c2   set_config(allowed_vkeys = on-chain list − LEGACY_VKEYS)       (needs --new-sample <attestation.json>:
@@ -28,7 +29,7 @@ import {
 } from '@solana/web3.js';
 import {
   MAINNET_GENESIS_HASH, DEFAULT_RPC_URL, PROGRAM_ID, MAX_VKEYS, configPda, policyRootPda, decodeConfig, hex, isConsumed,
-  buildSetConfigIx, buildRegisterPolicyRootIx, buildSetAuthorityIx, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT,
+  buildSetConfigIx, buildRegisterPolicyRootIx, buildSetAuthorityIx, CURRENT_VKEY, LEGACY_VKEYS, DEFAULT_POLICY_ROOT, DEMO_POLICY_ROOT,
   type Attestation,
 } from 'blindseal-sdk';
 
@@ -45,7 +46,7 @@ const SIM = argv.includes('--simulate');
 const RPC = process.env.BLINDSEAL_RPC_URL ?? DEFAULT_RPC_URL;
 const AUTH = process.env.BLINDSEAL_MAINNET_AUTHORITY ?? path.join(os.homedir(), '.blindseal', 'mainnet-authority.json');
 const LEDGER_PATH = "44'/501'/0'"; // = usb://ledger?key=0
-const ORDER = ['b', 'a', 'c1', 'c2'] as const; // d is independent
+const ORDER = ['b', 'a', 'c1', 'c2'] as const; // b2 and d are independent
 
 /// Step 0 (the program upgrades) must have landed before any config step is SENT: the executable
 /// hashes of the deployed programs must be the 0.7.0 verifiable builds (solana-verify's
@@ -111,7 +112,7 @@ async function cluster(conn: Connection): Promise<'mainnet' | 'local'> {
   throw new Error(`the RPC is neither mainnet-beta nor a local validator (genesis ${genesis}); refusing`);
 }
 
-interface Ctx { authority: PublicKey; rootRegistered: boolean; local: boolean; lenient: boolean; conn: Connection }
+interface Ctx { authority: PublicKey; rootRegistered: boolean; demoRegistered: boolean; local: boolean; lenient: boolean; conn: Connection }
 interface Planned { ix?: TransactionInstruction; next: Cfg; rootRegistered: boolean; signers: PublicKey[] }
 
 /** The instruction step `step` sends against Config `cfg` (none = already done), and the Config it leaves.
@@ -126,6 +127,9 @@ async function plan(step: string, cfg: Cfg, ctx: Ctx): Promise<Planned> {
     case 'b':
       if (ctx.rootRegistered) { console.log(`b: default policy root ${DEFAULT_POLICY_ROOT} already registered (${policyRootPda(hex(DEFAULT_POLICY_ROOT)).toBase58()}) — nothing to send`); return base; }
       return { ...base, ix: buildRegisterPolicyRootIx(ctx.authority, hex(DEFAULT_POLICY_ROOT)), rootRegistered: true };
+    case 'b2':
+      if (ctx.demoRegistered) { console.log(`b2: demo policy root ${DEMO_POLICY_ROOT} already registered (${policyRootPda(hex(DEMO_POLICY_ROOT)).toBase58()}) — nothing to send`); return base; }
+      return { ...base, ix: buildRegisterPolicyRootIx(ctx.authority, hex(DEMO_POLICY_ROOT)) };
     case 'a':
       if (!ctx.rootRegistered) throw new Error('a: the default policy root is not registered — run step b first, or every attestation would be refused');
       if (cfg.allowlistPolicies) { console.log('a: allowlist_policies is already true — nothing to send'); return base; }
@@ -190,7 +194,7 @@ async function simulate(conn: Connection, payer: PublicKey, ixs: TransactionInst
 }
 
 async function main() {
-  if (!STEP || !['a', 'b', 'c1', 'c2', 'd'].includes(STEP)) throw new Error('usage: --step a|b|c1|c2|d [--dry-run|--simulate] [--new-sample <file>] [--ledger-pubkey <pk>]');
+  if (!STEP || !['a', 'b', 'b2', 'c1', 'c2', 'd'].includes(STEP)) throw new Error('usage: --step a|b|b2|c1|c2|d [--dry-run|--simulate] [--new-sample <file>] [--ledger-pubkey <pk>]');
   const conn = new Connection(RPC, 'confirmed');
   const where = await cluster(conn);
   if (where === 'local') console.log('LOCAL REHEARSAL cluster (localhost, not a public cluster)');
@@ -201,13 +205,14 @@ async function main() {
   console.log(`Config before: ${JSON.stringify(cfg)}`);
   if (cfg.authority !== authority.publicKey.toBase58()) throw new Error(`config authority is ${cfg.authority}, not ${authority.publicKey.toBase58()}`);
   const rootRegistered = (await conn.getAccountInfo(policyRootPda(hex(DEFAULT_POLICY_ROOT)), 'confirmed')) !== null;
-  const ctx: Ctx = { authority: authority.publicKey, rootRegistered, local: where === 'local', lenient: SIM || where === 'local', conn };
+  const demoRegistered = (await conn.getAccountInfo(policyRootPda(hex(DEMO_POLICY_ROOT)), 'confirmed')) !== null;
+  const ctx: Ctx = { authority: authority.publicKey, rootRegistered, demoRegistered, local: where === 'local', lenient: SIM || where === 'local', conn };
 
   if (SIM) {
     // Prepend earlier steps that have not landed yet, so the simulation runs against the state the step will meet.
     const ixs: TransactionInstruction[] = [];
     let cur = cfg; let signers = [authority.publicKey];
-    const chain = STEP === 'd' ? ['d'] : ORDER.slice(0, ORDER.indexOf(STEP as (typeof ORDER)[number]) + 1);
+    const chain = STEP === 'd' || STEP === 'b2' ? [STEP] : ORDER.slice(0, ORDER.indexOf(STEP as (typeof ORDER)[number]) + 1);
     for (const s of chain) {
       const p = await plan(s, cur, { ...ctx, rootRegistered: ctx.rootRegistered });
       ctx.rootRegistered = p.rootRegistered; cur = p.next; signers = p.signers;

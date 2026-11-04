@@ -37,6 +37,7 @@
     "pngjs": "7.0.0",
     "@types/pngjs": "6.0.5",
     "@types/pixelmatch": "5.2.6",
-    "playwright": "1.55.1"
+    "playwright": "1.55.1",
+    "blindseal-sdk-0.7.1": "npm:blindseal-sdk@0.7.1"
   }
 }

@@ -73,7 +73,10 @@ export async function submit(att: Attestation, opts: SubmitOptions): Promise<str
   const cfg = await readConfig(conn);
   const treasury = treasuryAccount(cfg.treasury, opts.wallet.publicKey);
   opts.onFee?.(cfg.feeLamports, treasury.toBase58());
-  const ix = buildGatedTransferIx(att, { source: opts.wallet.publicKey, recipient: action.recipient, policyRoot: opts.policyRoot, treasury });
+  // No treasury configured (fee 0): send the pre-0.8.0 account list, which the verifier accepts while the
+  // fee is 0. Otherwise append Config.treasury as the optional trailing account.
+  const configured = !treasury.equals(opts.wallet.publicKey);
+  const ix = buildGatedTransferIx(att, { source: opts.wallet.publicKey, recipient: action.recipient, policyRoot: opts.policyRoot, ...(configured ? { treasury } : {}) });
   const tx = new Transaction().add(ComputeBudgetProgram.setComputeUnitLimit({ units: opts.computeUnits ?? VERIFY_CU_LIMIT }), ix);
   tx.feePayer = opts.wallet.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash('confirmed')).blockhash;

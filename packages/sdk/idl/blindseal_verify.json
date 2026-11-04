@@ -381,28 +381,30 @@
           "signer": true
         },
         {
-          "name": "fee_payer",
-          "docs": [
-            "Debited `Config.fee_lamports` on a successful consume (the gated program forwards its own",
-            "signer; nothing is read from it when the fee is 0)."
-          ],
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "treasury",
-          "docs": [
-            "slot carries the fee payer. Must be writable because a fee may be credited to it."
-          ],
-          "writable": true
-        },
-        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
           "name": "instructions",
           "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "fee_payer",
+          "docs": [
+            "Debited `Config.fee_lamports` on a successful consume (the gated program forwards its own",
+            "signer; nothing is read from it when the fee is 0)."
+          ],
+          "writable": true,
+          "signer": true,
+          "optional": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "slot carries the fee payer. Must be writable because a fee may be credited to it."
+          ],
+          "writable": true,
+          "optional": true
         }
       ],
       "args": [
@@ -579,6 +581,11 @@
       "code": 6016,
       "name": "TreasuryUnset",
       "msg": "a fee above 0 needs a treasury: Config.treasury is the zero key"
+    },
+    {
+      "code": 6017,
+      "name": "FeeAccountsMissing",
+      "msg": "a fee is set: pass the fee_payer and treasury accounts"
     }
   ],
   "types": [

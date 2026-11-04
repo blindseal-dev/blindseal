@@ -21,9 +21,11 @@
 //!  11. create the Nullifier PDA (payer = caller), record the calling program as
 //!      `consumer_program`, emit `Consumed`
 //!
-//! The treasury account is part of the fixed account list whether or not a fee is set. It must be
-//! `Config.treasury` (step 3, right after `paused`), except while no treasury is configured — the
-//! zero key, which cannot be passed as a writable account — when the slot carries the fee payer.
+//! `fee_payer` and `treasury` are OPTIONAL trailing accounts (anchor-lang `allow-missing-optionals`), so a
+//! caller built before 0.8.0 — which passes neither — keeps working while the fee is 0. When a treasury
+//! account is passed it must be `Config.treasury` (step 3, right after `paused`), except while no
+//! treasury is configured — the zero key, which cannot be passed as a writable account — when any
+//! account may stand in. With a fee above 0 both accounts are required (`FeeAccountsMissing`).
 //!
 //! Steps 1–2 close a griefing path: before them, anyone who copied a submitted proof could call
 //! `verify_and_consume` directly with the same action fields and burn the nullifier before the
@@ -185,12 +187,11 @@ pub mod blindseal_verify {
         let nullifier: [u8; 32] = public_inputs[128..160].try_into().unwrap();
         let expiry_slot = u64::from_le_bytes(public_inputs[160..168].try_into().unwrap());
 
-        // 3. paused, then the treasury slot: Config.treasury when one is configured; while none is
-        //    (the zero key, which cannot be passed writable) the slot carries the fee payer.
+        // 3. paused, then the treasury slot when one is passed: Config.treasury when one is configured;
+        //    while none is (the zero key, which cannot be passed writable) any account may stand in.
         require!(!config.paused, VerifyError::Paused);
-        let treasury = &ctx.accounts.treasury;
-        if config.treasury != Pubkey::default() {
-            require_keys_eq!(treasury.key(), config.treasury, VerifyError::TreasuryMismatch);
+        if let (Some(t), true) = (ctx.accounts.treasury.as_ref(), config.treasury != Pubkey::default()) {
+            require_keys_eq!(t.key(), config.treasury, VerifyError::TreasuryMismatch);
         }
 
         // 4. vkey allowlist
@@ -232,13 +233,13 @@ pub mod blindseal_verify {
         let fee = config.fee_lamports;
         if fee > 0 {
             require!(config.treasury != Pubkey::default(), VerifyError::TreasuryUnset);
+            let (Some(fee_payer), Some(treasury)) = (ctx.accounts.fee_payer.as_ref(), ctx.accounts.treasury.as_ref()) else {
+                return err!(VerifyError::FeeAccountsMissing);
+            };
             anchor_lang::system_program::transfer(
                 CpiContext::new(
                     ctx.accounts.system_program.to_account_info(),
-                    anchor_lang::system_program::Transfer {
-                        from: ctx.accounts.fee_payer.to_account_info(),
-                        to: treasury.to_account_info(),
-                    },
+                    anchor_lang::system_program::Transfer { from: fee_payer.to_account_info(), to: treasury.to_account_info() },
                 ),
                 fee,
             )?;
@@ -445,18 +446,19 @@ pub struct VerifyAndConsume<'info> {
     pub nullifier: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// Debited `Config.fee_lamports` on a successful consume (the gated program forwards its own
-    /// signer; nothing is read from it when the fee is 0).
-    #[account(mut)]
-    pub fee_payer: Signer<'info>,
-    /// CHECK: must be `Config.treasury` (checked in the handler); while no treasury is configured the
-    /// slot carries the fee payer. Must be writable because a fee may be credited to it.
-    #[account(mut)]
-    pub treasury: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     /// CHECK: the instructions sysvar (address-constrained); read to identify the calling program.
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions: UncheckedAccount<'info>,
+    // ---- 0.8.0, OPTIONAL and LAST: a caller built before 0.8.0 passes neither (allow-missing-optionals).
+    /// Debited `Config.fee_lamports` on a successful consume (the gated program forwards its own signer).
+    /// Required only while the fee is above 0.
+    #[account(mut)]
+    pub fee_payer: Option<Signer<'info>>,
+    /// CHECK: must be `Config.treasury` when passed and one is configured (checked in the handler).
+    /// Writable because a fee may be credited to it. Required only while the fee is above 0.
+    #[account(mut)]
+    pub treasury: Option<UncheckedAccount<'info>>,
 }
 
 #[error_code]
@@ -498,4 +500,6 @@ pub enum VerifyError {
     TreasuryMismatch,
     #[msg("a fee above 0 needs a treasury: Config.treasury is the zero key")]
     TreasuryUnset,
+    #[msg("a fee is set: pass the fee_payer and treasury accounts")]
+    FeeAccountsMissing,
 }

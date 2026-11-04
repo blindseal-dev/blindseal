@@ -22,7 +22,7 @@
         {
           "name": "source",
           "docs": [
-            "The authority the transfer debits — also pays for the Nullifier PDA and the verifier's fee."
+            "The authority the transfer debits \u2014 also pays for the Nullifier PDA and the verifier's fee."
           ],
           "writable": true,
           "signer": true
@@ -43,13 +43,6 @@
           "writable": true
         },
         {
-          "name": "treasury",
-          "docs": [
-            "validated by the verifier, which credits the fee to it."
-          ],
-          "writable": true
-        },
-        {
           "name": "verify_program",
           "docs": [
             "Typed: a direct call that passes any other program here fails before the transfer."
@@ -66,6 +59,14 @@
             "reads it to check that the calling program is the attestation's target program."
           ],
           "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "validated by the verifier, which credits the fee to it."
+          ],
+          "writable": true,
+          "optional": true
         }
       ],
       "args": [

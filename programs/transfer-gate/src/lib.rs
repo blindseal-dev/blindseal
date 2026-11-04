@@ -39,17 +39,32 @@ solana_security_txt::security_txt! {
 
 pub const CHAIN_ID_SOLANA_MAINNET: u16 = 1;
 
-/// The default Blindseal policy root: the merkle root over detector-core's L1 rules + the zero-width
-/// threshold (evals/vectors/policy-root.txt; 23 leaves). Unchanged by the 0.7.0 guest.
+/// The 0.8.0 default policy root: sha256("blindseal.policy.v2" ‖ rulesRoot ‖ actionPolicyHash(empty policy))
+/// — the committed L1 rules with no action constraint (evals/vectors/action-policy.json, "empty").
 pub const DEFAULT_POLICY_ROOT: [u8; 32] = [
+    0x78, 0xbb, 0x3b, 0xab, 0x17, 0x65, 0x30, 0x43, 0x73, 0xa6, 0xaf, 0x9d, 0xe2, 0xd7, 0xc0, 0x81,
+    0xce, 0x57, 0xbc, 0x86, 0x2c, 0x03, 0x9f, 0x6d, 0xd6, 0x82, 0xc7, 0x4e, 0x93, 0x9e, 0xb1, 0x0a,
+];
+
+/// The policy root of the mainnet demo sample: the committed L1 rules plus the demo action policy
+/// (tests/fixtures/action-policy-demo.json: the demo recipient only, at most 0.01 SOL per action).
+pub const DEMO_POLICY_ROOT: [u8; 32] = [
+    0x79, 0xf1, 0x1a, 0x12, 0x6e, 0xf6, 0x24, 0xb0, 0x3a, 0x35, 0x1e, 0xfc, 0x79, 0x74, 0x7e, 0xe6,
+    0xda, 0xdc, 0xac, 0x8e, 0xab, 0x71, 0xf5, 0xe2, 0x40, 0x61, 0x51, 0x4e, 0x62, 0x05, 0xea, 0x8e,
+];
+
+/// The 0.7 policy root (the bare L1 rules root, before action policies). Kept so attestations made with
+/// the 0.7.x prover stay consumable through this gate until step c2 retires their detector version.
+pub const LEGACY_POLICY_ROOT: [u8; 32] = [
     0x36, 0xa9, 0xe9, 0x45, 0x7d, 0xb6, 0xec, 0xfd, 0x75, 0x2a, 0x37, 0x9f, 0xc9, 0x27, 0x9a, 0xd6,
     0xa0, 0xac, 0xfe, 0xa0, 0x79, 0x28, 0xf6, 0x1e, 0x2f, 0x36, 0x38, 0xa6, 0x85, 0xc3, 0x83, 0x97,
 ];
 
 /// The policy roots THIS gated program accepts. INTEGRATORS: this is yours to set — list the
-/// policy root(s) of the rule set(s) you require your agents' tool calls to be screened under
-/// (a custom policy has its own root), and rebuild. The verifier's allowlist is checked as well.
-pub const EXPECTED_POLICY_ROOTS: &[[u8; 32]] = &[DEFAULT_POLICY_ROOT];
+/// policy root(s) of the rule set(s) and action policies you require your agents' tool calls to be
+/// screened under (each action policy has its own root), and rebuild. The verifier's allowlist is
+/// checked as well.
+pub const EXPECTED_POLICY_ROOTS: &[[u8; 32]] = &[DEFAULT_POLICY_ROOT, DEMO_POLICY_ROOT, LEGACY_POLICY_ROOT];
 
 #[program]
 pub mod transfer_gate {
@@ -90,10 +105,10 @@ pub mod transfer_gate {
             policy_root: ctx.accounts.policy_root.as_ref().map(|a| a.to_account_info()),
             nullifier: ctx.accounts.nullifier.to_account_info(),
             payer: ctx.accounts.source.to_account_info(),
-            fee_payer: ctx.accounts.source.to_account_info(),
-            treasury: ctx.accounts.treasury.to_account_info(),
             system_program: ctx.accounts.system_program.to_account_info(),
             instructions: ctx.accounts.instructions.to_account_info(),
+            fee_payer: Some(ctx.accounts.source.to_account_info()),
+            treasury: ctx.accounts.treasury.as_ref().map(|a| a.to_account_info()),
         };
         blindseal_verify::cpi::verify_and_consume(
             CpiContext::new(ctx.accounts.verify_program.to_account_info(), cpi_accounts),
@@ -133,10 +148,6 @@ pub struct GatedTransfer<'info> {
     /// CHECK: blindseal-verify's Nullifier PDA, created by the verifier.
     #[account(mut)]
     pub nullifier: UncheckedAccount<'info>,
-    /// CHECK: blindseal-verify's fee treasury (`Config.treasury`; the source while none is configured),
-    /// validated by the verifier, which credits the fee to it.
-    #[account(mut)]
-    pub treasury: UncheckedAccount<'info>,
     /// Typed: a direct call that passes any other program here fails before the transfer.
     pub verify_program: Program<'info, BlindsealVerify>,
     pub system_program: Program<'info, System>,
@@ -144,6 +155,11 @@ pub struct GatedTransfer<'info> {
     /// reads it to check that the calling program is the attestation's target program.
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions: UncheckedAccount<'info>,
+    /// CHECK: 0.8.0, OPTIONAL and LAST — blindseal-verify's fee treasury (`Config.treasury`), validated by
+    /// the verifier, which credits the fee to it. A client built before 0.8.0 omits it; that works while
+    /// the verifier's fee is 0 (allow-missing-optionals).
+    #[account(mut)]
+    pub treasury: Option<UncheckedAccount<'info>>,
 }
 
 /// Gate errors are numbered from 7000 so they never collide with blindseal-verify's (6000+), which
