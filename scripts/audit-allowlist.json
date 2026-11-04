@@ -34,5 +34,17 @@
     "package": "react-router",
     "reason": "react-router@6.30 in the local dashboard. Fixed only in v7. Affects only Framework/Data Mode apps doing SSR hydration (deserializeErrors); the dashboard uses Declarative Mode (HashRouter), with no SSR and no hydrationData.",
     "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-3gc7-fjrx-p6mg",
+    "package": "bigint-buffer",
+    "reason": "bigint-buffer@1.1.5 via services/dogfood > x402-solana > @solana/spl-token > @solana/buffer-layout-utils (no patched release). The overflow is in the native addon's toBigIntLE(); this install never builds the addon (pnpm onlyBuiltDependencies), so the pure-JS implementation runs, and spl-token only ever passes it fixed 8-byte slices from its account layouts. The dogfood service is private and not published.",
+    "expires": "2027-04-30"
+  },
+  {
+    "id": "GHSA-mrhx-c7xc-m3w5",
+    "package": "zod",
+    "reason": "zod@3.25 via services/dogfood > x402-solana > @x402/core@2.21.0 (pinned there). The memory exhaustion is in array-schema parsing. The only @x402/core entry the x402-solana client loads is @x402/core/utils (base64 helpers); the zod schemas live in a chunk only the server/facilitator entries import, which the dogfood service never does, so no zod schema parses any input here.",
+    "expires": "2027-04-30"
   }
 ]
