@@ -3,6 +3,7 @@
 //     Rust binding the guest runs is held to the same file (crates/detector-core/tests).
 //  2. `blindseal attest` refuses a payload whose action disagrees with the action it would prove —
 //     before the prover is started (a stub prover records whether it ran).
+import { CURRENT_VKEY, DEFAULT_POLICY_ROOT } from 'blindseal-sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +52,8 @@ describe('blindseal attest refuses a mismatched payload before proving', () => {
   const prover = path.join(dir, 'stub-prover.sh');
   const home = process.env.HOME;
   beforeAll(() => {
-    writeFileSync(prover, `#!/bin/sh\nprintf '%s\\n' "$@" > '${marker}'\n`);
+    // it also writes a minimal attestation labelled as this release's, which attest checks after proving
+    writeFileSync(prover, `#!/bin/sh\nprintf '%s\\n' "$@" > '${marker}'\nwhile [ $# -gt 0 ]; do [ "$1" = --out ] && printf '%s' '${JSON.stringify({ detectorVersion: CURRENT_VKEY, policyRoot: DEFAULT_POLICY_ROOT })}' > "$2"; shift; done\n`);
     chmodSync(prover, 0o755);
     process.env.HOME = dir; // recordProofSeconds writes under ~/.blindseal
   });

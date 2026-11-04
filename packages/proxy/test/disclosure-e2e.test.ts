@@ -16,8 +16,12 @@ import * as site from '../../../apps/site/app/verify/disclosure.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIX = path.resolve(here, '../../../tests/fixtures');
-const TOOLCALL = path.join(FIX, 'mainnet-toolcall.json');
-const REAL_ATTESTATION = path.join(FIX, 'attestation-mainnet.json');
+const TOOLCALL = path.join(FIX, 'mainnet-toolcall-demo.json');
+const POLICY = path.join(FIX, 'action-policy-demo.json');
+// The real 0.8.0 sample: proven under the current guest with the demo action policy, so the mock prover can
+// hand back a genuine Groth16 proof that attest's release check and `blindseal verify` both accept.
+const REAL_ATTESTATION = path.join(FIX, 'attestation-mainnet-demo-0.8.0.json');
+const PRODUCED = REAL_ATTESTATION;
 
 let dir: string;
 const savedHome = process.env.HOME;
@@ -36,7 +40,7 @@ beforeAll(() => {
   writeFileSync(prover, `#!/usr/bin/env node
 import { copyFileSync } from 'node:fs';
 const a = process.argv.slice(2);
-copyFileSync(${JSON.stringify(REAL_ATTESTATION)}, a[a.indexOf('--out') + 1]);
+copyFileSync(${JSON.stringify(PRODUCED)}, a[a.indexOf('--out') + 1]);
 `);
   chmodSync(prover, 0o755);
 });
@@ -53,7 +57,7 @@ describe('attest → disclose → verify (CLI + browser) agree on the clean verd
 
     const a = await capture(() => runAttestCli([
       TOOLCALL, '--out', att, '--target-program', real.action.targetProgram,
-      '--expiry', String(real.expirySlot), '--prover', path.join(dir, 'mock-prover.mjs'), '--audit-dir', auditDir,
+      '--expiry', String(real.expirySlot), '--action-policy', POLICY, '--prover', path.join(dir, 'mock-prover.mjs'), '--audit-dir', auditDir,
     ]));
     expect(a.code).toBe(0);
 

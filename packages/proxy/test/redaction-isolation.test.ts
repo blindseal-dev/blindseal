@@ -1,6 +1,7 @@
 // Release 0.7.0: personal-data redaction applies ONLY to what L2/L3 see. The payload the prover
 // hashes and the action it binds always come from the original tool call. A recipient value that
 // also sits under an `address` key is hidden from the judge but still bound by the attestation.
+import { CURRENT_VKEY, DEFAULT_POLICY_ROOT } from 'blindseal-sdk';
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,7 +36,7 @@ describe('redaction never changes what is hashed or bound', () => {
   const home = process.env.HOME;
   beforeAll(() => {
     // the stub prover keeps a copy of the payload file it was given and its argv
-    writeFileSync(prover, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argvFile}'\nwhile [ $# -gt 0 ]; do [ "$1" = --payload ] && cp "$2" '${kept}'; shift; done\n`);
+    writeFileSync(prover, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argvFile}'\nwhile [ $# -gt 0 ]; do [ "$1" = --payload ] && cp "$2" '${kept}'; [ "$1" = --out ] && printf '%s' '${JSON.stringify({ detectorVersion: CURRENT_VKEY, policyRoot: DEFAULT_POLICY_ROOT })}' > "$2"; shift; done\n`);
     chmodSync(prover, 0o755);
     process.env.HOME = dir;
   });
