@@ -1,0 +1,19 @@
+{
+  "dryRun": false,
+  "intervalHours": 6,
+  "dataDir": "~/.blindseal/dogfood",
+  "walletPath": "~/.blindseal/dogfood-wallet.json",
+  "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+  "transferLamports": 1000000,
+  "maxSolPerDay": 0.01,
+  "maxUsdcPerDay": 1.0,
+  "txOverheadLamports": 1100000,
+  "x402": {
+    "resourceUrl": "",
+    "maxPriceUsdc": 0.1,
+    "payToAllowlist": []
+  },
+  "prover": { "cuda": "auto" },
+  "proxy": { "allowDegraded": false, "tradeGuard": true },
+  "attest": { "noExpiry": false }
+}

@@ -77,3 +77,6 @@ docs/internal/
 /FRONTEND.md
 /POSTMORTEM-*.md
 packages/collector/
+
+# operator-local dogfood config (paths and caps; the RPC URL and the wallet never go in it)
+services/dogfood/dogfood.config.json

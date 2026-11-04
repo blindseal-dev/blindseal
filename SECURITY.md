@@ -81,9 +81,10 @@ Blindseal:
   is the pinned `Xenova/bge-small-en-v1.5` from Hugging Face, and that download is already a trust boundary
   (`packages/SECURITY_MODEL.md`, "The L2 inputs are trusted").
 
-### Not reachable, allowlisted (moderate)
+### Not reachable, allowlisted
 
-These are in `scripts/audit-allowlist.json` and expire on 2027-04-30.
+These are in `scripts/audit-allowlist.json` and expire on 2027-04-30. The first four are moderate; the last two
+(high) come with the private `services/dogfood` workspace package, which is never published.
 
 | Package | Advisory | Why it is not reachable |
 |---|---|---|
@@ -91,3 +92,5 @@ These are in `scripts/audit-allowlist.json` and expire on 2027-04-30.
 | `stream-json@1` (via `@solana/web3.js` > `jayson`) | GHSA-528h-pc64-c93x, GHSA-hqr4-qq8f-hg3x, GHSA-mjw6-4jj6-33hc | web3.js loads only `jayson/lib/client/browser`, which never requires stream-json. Only jayson's `lib/utils.js` requires stream-json, through its servers and the `jayson` package entry, and nothing in this tree loads either one. RPC responses are parsed with `JSON.parse`. |
 | `react-router@6` (dashboard) | GHSA-wrjc-x8rr-h8h6 | Fixed only in v7. It is an open redirect through attacker-supplied paths passed to `<Link>`/`navigate()`. Every navigation target in the dashboard is a constant prefix plus a route id or an audit-log id, so no attacker-supplied path is ever navigated to. The dashboard is a `HashRouter` app served on localhost. |
 | `react-router@6` (dashboard) | GHSA-337j-9hxr-rhxg | Fixed only in v7. It affects only Framework/Data Mode apps that do SSR hydration (`deserializeErrors`). The dashboard uses Declarative Mode (`HashRouter`), with no SSR and no `hydrationData`. |
+| `bigint-buffer@1.1.5` (via `services/dogfood` > `x402-solana` > `@solana/spl-token` > `@solana/buffer-layout-utils`) | GHSA-3gc7-fjrx-p6mg | No patched release. The overflow is in the native addon's `toBigIntLE()`. This install never builds the addon (it is not in `pnpm.onlyBuiltDependencies`), so the pure-JS implementation runs; and spl-token only ever hands it fixed 8-byte slices from its account layouts, never attacker-sized input. |
+| `zod@3.25` (via `services/dogfood` > `x402-solana` > `@x402/core@2.21.0`) | GHSA-mrhx-c7xc-m3w5 | Memory exhaustion while parsing an oversized array against an array schema. `x402-solana`'s client loads only `@x402/core/utils` (base64 helpers); the zod schemas sit in a chunk that only the server and facilitator entries import, which the dogfood service never does. The 402 response is parsed with `JSON.parse`, not zod. `@x402/core` pins zod 3 at that version, so an override to zod 4.6.6 is not a safe fix. |

@@ -1,0 +1,27 @@
+{
+  "name": "@blindseal/dogfood",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Timer-driven agent that uses Blindseal end to end on mainnet: an x402 purchase and a gated SOL transfer through the proxy, attest, submit, log. Dry-run mode has no network side effects.",
+  "license": "MIT",
+  "bin": { "blindseal-dogfood": "dist/main.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dogfood": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "1.98.4",
+    "x402-solana": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "blindseal": "workspace:*",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  },
+  "engines": { "node": ">=20" }
+}
