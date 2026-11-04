@@ -168,218 +168,15 @@ fn zero_width_dense(text: &str) -> bool {
     (zw as f64) / (total as f64) > 0.02
 }
 
-// ---------------- L0: decode-then-L1 ----------------
+// ---------------- L0: decode-then-L1 (src/l0.rs) ----------------
 
-const MIN_ENCODED_LEN: usize = 16;
+pub mod l0;
+pub use l0::{run_layer0_with, Decoded, L0Fire, HOMOGLYPHS};
 
-fn is_printable_ascii(s: &str) -> bool {
-    if s.is_empty() {
-        return false;
-    }
-    s.bytes().all(|c| c == 0x09 || c == 0x0a || c == 0x0b || c == 0x0c || c == 0x0d || (0x20..=0x7e).contains(&c))
-}
-
-/// A decoded candidate (decoder label + decoded text), in TS discovery order.
-struct Decoded {
-    decoder: String,
-    decoded: String,
-}
-
-fn span_re(pat: &str) -> Regex {
-    Regex::builder()
-        .syntax(syntax::Config::new().unicode(true).utf8(false))
-        .build(pat)
-        .expect("L0 blob regex compiles")
-}
-
-fn decode_base64(content: &str) -> Vec<Decoded> {
-    use base64::{engine::general_purpose::STANDARD, Engine};
-    static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| span_re(r"[A-Za-z0-9+/]{20,}={1,2}|[A-Za-z0-9/]{5,}[+][A-Za-z0-9+/]{15,}"));
-    let bytes = content.as_bytes();
-    let mut out = Vec::new();
-    for m in re.find_iter(content) {
-        let blob = &content[m.start()..m.end()];
-        let _ = bytes;
-        // Node Buffer.from(blob,'base64') is lenient: strip padding, decode what fits.
-        let cleaned: String = blob.chars().filter(|c| *c != '=').collect();
-        let decoded_bytes = STANDARD
-            .decode(&cleaned)
-            .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(cleaned.trim_end_matches('=')));
-        if let Ok(b) = decoded_bytes {
-            if let Ok(s) = String::from_utf8(b) {
-                if is_printable_ascii(&s) && s.len() >= MIN_ENCODED_LEN {
-                    out.push(Decoded { decoder: "base64".into(), decoded: s });
-                }
-            }
-        }
-    }
-    out
-}
-
-fn decode_hex(content: &str) -> Vec<Decoded> {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| span_re(r"(?:0x)?[0-9a-fA-F]{32,}"));
-    let mut out = Vec::new();
-    for m in re.find_iter(content) {
-        let mut hex = &content[m.start()..m.end()];
-        if let Some(stripped) = hex.strip_prefix("0x") {
-            hex = stripped;
-        } else if let Some(stripped) = hex.strip_prefix("0X") {
-            hex = stripped;
-        }
-        if hex.len() % 2 != 0 {
-            continue;
-        }
-        let bytes: Option<Vec<u8>> = (0..hex.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).ok())
-            .collect();
-        if let Some(b) = bytes {
-            if let Ok(s) = String::from_utf8(b) {
-                if is_printable_ascii(&s) && s.len() >= MIN_ENCODED_LEN {
-                    out.push(Decoded { decoder: "hex".into(), decoded: s });
-                }
-            }
-        }
-    }
-    out
-}
-
-fn decode_url(content: &str) -> Vec<Decoded> {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| span_re(r"(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9a-fA-F]{2}){8,}"));
-    static PCT: OnceLock<Regex> = OnceLock::new();
-    let pct = PCT.get_or_init(|| span_re(r"%[0-9a-fA-F]{2}"));
-    let mut out = Vec::new();
-    for m in re.find_iter(content) {
-        let encoded = &content[m.start()..m.end()];
-        if pct.find_iter(encoded).count() < 2 {
-            continue;
-        }
-        if let Some(decoded) = percent_decode_utf8(encoded) {
-            if decoded != encoded && is_printable_ascii(&decoded) && decoded.len() >= MIN_ENCODED_LEN {
-                out.push(Decoded { decoder: "url-percent".into(), decoded });
-            }
-        }
-    }
-    out
-}
-
-/// decodeURIComponent-style: percent sequences -> UTF-8 bytes -> String; invalid -> None.
-fn percent_decode_utf8(s: &str) -> Option<String> {
-    use percent_encoding::percent_decode_str;
-    percent_decode_str(s).decode_utf8().ok().map(|c| c.into_owned())
-}
-
-fn decode_html_entities(content: &str) -> Vec<Decoded> {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| span_re(r"(?:&#x?[0-9a-fA-F]+;){4,}"));
-    static HEXREF: OnceLock<Regex> = OnceLock::new();
-    let hexref = HEXREF.get_or_init(|| span_re(r"&#x([0-9a-fA-F]+);"));
-    static DECREF: OnceLock<Regex> = OnceLock::new();
-    let decref = DECREF.get_or_init(|| span_re(r"&#([0-9]+);"));
-    let mut out = Vec::new();
-    for m in re.find_iter(content) {
-        let run = &content[m.start()..m.end()];
-        // Two passes, matching TS: hex refs first, then decimal refs on the result.
-        let pass1 = replace_refs(run, hexref, 16);
-        let decoded = replace_refs(&pass1, decref, 10);
-        if decoded != run && is_printable_ascii(&decoded) && decoded.len() >= MIN_ENCODED_LEN {
-            out.push(Decoded { decoder: "html-entities".into(), decoded });
-        }
-    }
-    out
-}
-
-/// Replace `&#x..;` / `&#..;` refs; invalid code points are left undecoded (matches the TS fix).
-fn replace_refs(s: &str, re: &Regex, radix: u32) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut last = 0usize;
-    for m in re.find_iter(s) {
-        result.push_str(&s[last..m.start()]);
-        let whole = &s[m.start()..m.end()];
-        // digits are between the marker and the trailing ';'
-        let digits_start = if radix == 16 { whole.find(|c| c == 'x' || c == 'X').map(|i| i + 1).unwrap_or(2) } else { 2 };
-        let digits = &whole[digits_start..whole.len() - 1];
-        let replaced = u32::from_str_radix(digits, radix)
-            .ok()
-            .filter(|&cp| cp <= 0x10FFFF && !(0xD800..=0xDFFF).contains(&cp))
-            .and_then(char::from_u32)
-            .map(|c| c.to_string())
-            .unwrap_or_else(|| whole.to_string());
-        result.push_str(&replaced);
-        last = m.end();
-    }
-    result.push_str(&s[last..]);
-    result
-}
-
-fn all_decoders(content: &str) -> Vec<Decoded> {
-    let mut v = Vec::new();
-    v.extend(decode_base64(content));
-    v.extend(decode_hex(content));
-    v.extend(decode_url(content));
-    v.extend(decode_html_entities(content));
-    v
-}
-
-/// Port of TS `decodeNested` (depth up to 3, dedup by decoder:decoded), discovery order.
-fn decode_nested(content: &str) -> Vec<Decoded> {
-    let mut results: Vec<Decoded> = Vec::new();
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    fn recurse(
-        text: &str,
-        depth: usize,
-        parent: &str,
-        max_depth: usize,
-        seen: &mut std::collections::HashSet<String>,
-        results: &mut Vec<Decoded>,
-    ) {
-        if depth > max_depth {
-            return;
-        }
-        for c in all_decoders(text) {
-            let key = format!("{}:{}", c.decoder, c.decoded);
-            if !seen.insert(key) {
-                continue;
-            }
-            let label = format!("{}\u{2192}{}", parent, c.decoder);
-            let decoded = c.decoded.clone();
-            results.push(Decoded { decoder: label.clone(), decoded: decoded.clone() });
-            recurse(&decoded, depth + 1, &label, max_depth, seen, results);
-        }
-    }
-    for c in all_decoders(content) {
-        let key = format!("{}:{}", c.decoder, c.decoded);
-        if !seen.insert(key) {
-            continue;
-        }
-        recurse(&c.decoded, 2, &c.decoder, 3, &mut seen, &mut results);
-    }
-    results
-}
-
-/// Result of L0 firing: the decoder path and the L1 match on the decoded text.
-#[derive(Debug, Clone)]
-pub struct L0Fire {
-    pub decoder: String,
-    pub l1: RawResult,
-}
-
-/// Port of TS `runLayer0`: run all decoders (+ nested), return the first candidate whose
-/// decoded text trips L1 (non-clean). Candidate order = decoder order, then match order,
-/// then nested depth-first — matching TS.
+/// Port of TS `runLayer0`, host path: every decoder (and nested, depth 3), then the compiled L1 rules
+/// on each candidate; the first candidate L1 flags decides.
 pub fn run_layer0(content: &str) -> Option<L0Fire> {
-    let mut candidates = all_decoders(content);
-    candidates.extend(decode_nested(content));
-    for c in candidates {
-        let l1 = run_layer1(&c.decoded);
-        if l1.verdict != Severity::Clean {
-            return Some(L0Fire { decoder: c.decoder, l1 });
-        }
-    }
-    None
+    run_layer0_with(content, &run_layer1)
 }
 
 // ---------------- policy commitment (canonical hashing spec) ----------------
@@ -522,6 +319,12 @@ fn dfa_is_match_serialized(dfa_bytes: &[u8], text: &str) -> bool {
 pub fn run_layer1_serialized(text: &str, pol: &SerializedL1) -> RawResult {
     let matched: Vec<bool> = pol.dfas.iter().map(|b| dfa_is_match_serialized(b, text)).collect();
     combine_l1(text, &matched)
+}
+
+/// Guest-side L0: the same decoders as `run_layer0`, with L1 evaluated on the pre-serialized DFAs.
+/// Identical to `run_layer0` on every parity vector (tests/serialized.rs).
+pub fn run_layer0_serialized(content: &str, pol: &SerializedL1) -> Option<L0Fire> {
+    run_layer0_with(content, &|t| run_layer1_serialized(t, pol))
 }
 
 // ---------------- action binding: actionHash + nullifier (canonical hashing spec) ----------------

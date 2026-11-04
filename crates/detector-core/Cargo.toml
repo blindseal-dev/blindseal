@@ -12,8 +12,7 @@ rust-version = "1.85"
 
 [dependencies]
 regex-automata = "=0.4.9"
-base64 = "=0.22.1"
-percent-encoding = "=2.3.1"
+unicode-normalization = "=0.1.24"
 sha2 = "=0.10.8"
 # Payload → action binding (action_binding.rs): the guest parses the screened tool call. Pinned
 # like the rest; neither feeds policyRoot.

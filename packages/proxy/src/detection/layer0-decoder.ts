@@ -113,19 +113,94 @@ export function decodeHtmlEntities(content: string): DecodedResult[] {
   return results;
 }
 
+// Invisible characters that split a word without showing: zero-width space/non-joiner/joiner,
+// word joiner, BOM, soft hyphen.
+const INVISIBLE_RE = /[\u200B-\u200D\u2060\uFEFF\u00AD]/g;
+
+/// The text with invisible characters removed, when it had any: "ig\u200Bnore previous …" is
+/// read as the phrase it renders as, at any length (the zero-width-density ratio alone is
+/// diluted by enough surrounding text). Proven (release 0.8.0): the guest strips the same set.
+export function decodeInvisible(content: string): DecodedResult[] {
+  INVISIBLE_RE.lastIndex = 0;
+  if (!INVISIBLE_RE.test(content)) return [];
+  INVISIBLE_RE.lastIndex = 0;
+  return [{ decoder: 'zero-width-strip', decoded: content.replace(INVISIBLE_RE, ''), depth: 1 }];
+}
+
+/// Unicode NFKC: fullwidth and mathematical letters, ligatures, enclosed digits and the like read as
+/// the ASCII they render as. Emitted only when it changes the text. Proven: the guest folds with the
+/// same normalization (unicode-normalization 0.1.24, Unicode 16; Node's ICU must agree, which the
+/// parity vectors check).
+export function decodeNfkc(content: string): DecodedResult[] {
+  // eslint-disable-next-line no-control-regex
+  if (!/[^\x00-\x7f]/.test(content)) return [];
+  const folded = content.normalize('NFKC');
+  if (folded === content) return [];
+  return [{ decoder: 'nfkc', decoded: folded, depth: 1 }];
+}
+
+/// Confusable → ASCII, character by character: Cyrillic and Greek letters that render like Latin
+/// ones, plus the dotless i. Listed identically in detector-core (`HOMOGLYPHS` in src/l0.rs); the
+/// parity vectors carry the whole table.
+export const HOMOGLYPHS: ReadonlyMap<string, string> = new Map<string, string>([
+  // Cyrillic lowercase
+  ['\u0430', 'a'], ['\u0435', 'e'], ['\u043E', 'o'], ['\u0440', 'p'], ['\u0441', 'c'],
+  ['\u0443', 'y'], ['\u0445', 'x'], ['\u0456', 'i'], ['\u0458', 'j'], ['\u0455', 's'],
+  ['\u04BB', 'h'], ['\u0501', 'd'], ['\u051B', 'q'], ['\u051D', 'w'], ['\u0475', 'v'],
+  ['\u04CF', 'l'], ['\u043F', 'n'], ['\u0433', 'r'], ['\u0442', 't'], ['\u043A', 'k'],
+  ['\u0432', 'b'], ['\u043C', 'm'], ['\u0448', 'w'], ['\u0491', 'r'],
+  // Cyrillic uppercase
+  ['\u0410', 'A'], ['\u0412', 'B'], ['\u0415', 'E'], ['\u041A', 'K'], ['\u041C', 'M'],
+  ['\u041D', 'H'], ['\u041E', 'O'], ['\u0420', 'P'], ['\u0421', 'C'], ['\u0422', 'T'],
+  ['\u0425', 'X'], ['\u0423', 'Y'], ['\u0405', 'S'], ['\u0406', 'I'], ['\u0408', 'J'],
+  ['\u0500', 'D'], ['\u051A', 'Q'], ['\u051C', 'W'], ['\u0474', 'V'], ['\u0413', 'F'],
+  // Greek lowercase
+  ['\u03B1', 'a'], ['\u03B5', 'e'], ['\u03BF', 'o'], ['\u03BD', 'v'], ['\u03B9', 'i'],
+  ['\u03BA', 'k'], ['\u03C1', 'p'], ['\u03C4', 't'], ['\u03C5', 'u'], ['\u03C7', 'x'],
+  ['\u03C9', 'w'], ['\u03B3', 'y'], ['\u03C3', 'o'], ['\u03B7', 'n'],
+  // Greek uppercase
+  ['\u0391', 'A'], ['\u0392', 'B'], ['\u0395', 'E'], ['\u0396', 'Z'], ['\u0397', 'H'],
+  ['\u0399', 'I'], ['\u039A', 'K'], ['\u039C', 'M'], ['\u039D', 'N'], ['\u039F', 'O'],
+  ['\u03A1', 'P'], ['\u03A4', 'T'], ['\u03A5', 'Y'], ['\u03A7', 'X'],
+  // Latin look-alikes outside ASCII
+  ['\u0131', 'i'], ['\u0269', 'i'], ['\u0261', 'g'], ['\u0251', 'a'], ['\u0183', 'b'],
+  ['\u0188', 'c'], ['\u0256', 'd'], ['\u025B', 'e'], ['\u0283', 's'], ['\u028B', 'v'],
+  ['\u0280', 'r'], ['\u0274', 'n'], ['\u0299', 'b'], ['\u029C', 'h'], ['\u1D00', 'a'],
+  ['\u1D07', 'e'], ['\u1D0F', 'o'], ['\u1D1C', 'u'],
+]);
+
+export function decodeHomoglyph(content: string): DecodedResult[] {
+  // eslint-disable-next-line no-control-regex
+  if (!/[^\x00-\x7f]/.test(content)) return [];
+  let changed = false;
+  let out = '';
+  for (const ch of content) {
+    const to = HOMOGLYPHS.get(ch);
+    if (to !== undefined) { changed = true; out += to; } else out += ch;
+  }
+  return changed ? [{ decoder: 'homoglyph', decoded: out, depth: 1 }] : [];
+}
+
+/// Every decoder once over `content`, in candidate order (the order the guest uses).
+function allDecoders(content: string): DecodedResult[] {
+  return [
+    ...decodeBase64(content),
+    ...decodeHex(content),
+    ...decodeUrl(content),
+    ...decodeHtmlEntities(content),
+    ...decodeInvisible(content),
+    ...decodeNfkc(content),
+    ...decodeHomoglyph(content),
+  ];
+}
+
 export function decodeNested(content: string, maxDepth: number = 3): DecodedResult[] {
   const results: DecodedResult[] = [];
   const seen = new Set<string>();
 
   function recurse(text: string, depth: number, parentDecoder: string): void {
     if (depth > maxDepth) return;
-    const candidates: DecodedResult[] = [
-      ...decodeBase64(text),
-      ...decodeHex(text),
-      ...decodeUrl(text),
-      ...decodeHtmlEntities(text),
-    ];
-    for (const c of candidates) {
+    for (const c of allDecoders(text)) {
       const key = `${c.decoder}:${c.decoded}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -135,13 +210,7 @@ export function decodeNested(content: string, maxDepth: number = 3): DecodedResu
   }
 
   // Only call for nested: run all decoders on the input, then recurse.
-  const top: DecodedResult[] = [
-    ...decodeBase64(content),
-    ...decodeHex(content),
-    ...decodeUrl(content),
-    ...decodeHtmlEntities(content),
-  ];
-  for (const c of top) {
+  for (const c of allDecoders(content)) {
     const key = `${c.decoder}:${c.decoded}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -150,33 +219,17 @@ export function decodeNested(content: string, maxDepth: number = 3): DecodedResu
   return results;
 }
 
-// Invisible characters that split a word without showing: zero-width space/non-joiner/joiner,
-// word joiner, BOM, soft hyphen.
-const INVISIBLE_RE = /[\u200B-\u200D\u2060\uFEFF\u00AD]/g;
-// Patterns the stripped text may share with the raw text without the stripping having revealed
-// anything: they do not make the zero-width-strip decoder fire on their own.
-const NOT_REVEALED = new Set(['large-base64-blob', 'zero-width-density']);
 
-/// The text with invisible characters removed, when it had any: "ig\u200Bnore previous …" is
-/// read as the phrase it renders as, at any length (the zero-width-density ratio alone is
-/// diluted by enough surrounding text).
-export function decodeInvisible(content: string): DecodedResult[] {
-  INVISIBLE_RE.lastIndex = 0;
-  if (!INVISIBLE_RE.test(content)) return [];
-  INVISIBLE_RE.lastIndex = 0;
-  return [{ decoder: 'zero-width-strip', decoded: content.replace(INVISIBLE_RE, ''), depth: 1 }];
-}
-
-/// Layer 0, the PROVEN layer: decode, then Layer 1 on each candidate; the first candidate Layer 1
-/// flags decides. Must equal the Rust detector-core's result (evals/parity), so it adds nothing
-/// the guest does not have.
+/// Layer 0, the PROVEN layer: decode (base64, hex, URL, HTML entities, zero-width strip, NFKC,
+/// homoglyph fold; nested to depth 3), then Layer 1 on each candidate; the first candidate Layer 1
+/// flags decides. Must equal the Rust detector-core's result (evals/parity) — the zk guest runs the
+/// same decoders — so it adds nothing the guest does not have.
 export function runLayer0(content: string, budget?: ScanBudget): L0Result {
   return withBudget(budget, () => layer0(content, budget, false));
 }
 
 /// Layer 0 as the proxy screens with it: every candidate is checked (a base64-only hit, e.g. a
-/// decoy blob, does not end the search), and the text is also read with invisible characters
-/// removed. Only ever stricter than runLayer0.
+/// decoy blob, does not end the search). Only ever stricter than runLayer0.
 export function screenLayer0(content: string, budget?: ScanBudget): L0Result {
   return withBudget(budget, () => layer0(content, budget, true));
 }
@@ -193,13 +246,7 @@ function withBudget<T>(budget: ScanBudget | undefined, fn: () => T): T {
 
 function layer0(content: string, budget: ScanBudget | undefined, extended: boolean): L0Result {
   if (budget?.expired()) return { fired: true, decoder: 'budget', l1Match: budget.result() };
-  const candidates: DecodedResult[] = [
-    ...decodeBase64(content),
-    ...decodeHex(content),
-    ...decodeUrl(content),
-    ...decodeHtmlEntities(content),
-    ...decodeNested(content),
-  ];
+  const candidates: DecodedResult[] = [...allDecoders(content), ...decodeNested(content)];
 
   // screenLayer0 checks every candidate: one that trips only the base64-blob heuristic (a decoy
   // blob nested in base64) must not end the search before a later candidate holding the injection.
@@ -211,15 +258,6 @@ function layer0(content: string, budget: ScanBudget | undefined, extended: boole
     const hit = { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
     if (!extended || l1.detectedPatterns.some((p) => p !== 'large-base64-blob')) return hit;
     base64Only ??= hit;
-  }
-  if (!extended) return { fired: false };
-  for (const c of decodeInvisible(content)) {
-    const l1 = runLayer1(c.decoded, budget);
-    if (isBudgetResult(l1)) return { fired: true, decoder: 'budget', l1Match: l1 };
-    const revealed = l1.detectedPatterns.filter((p) => !NOT_REVEALED.has(p));
-    if (revealed.length > 0) {
-      return { fired: true, decoded: c.decoded, decoder: c.decoder, l1Match: l1 };
-    }
   }
   if (base64Only) return base64Only;
   return { fired: false };

@@ -1,4 +1,4 @@
-//! Blindseal SP1 guest (M1). Recomputes payloadHash and policyRoot, runs detector-core's L1 on
+//! Blindseal SP1 guest. Recomputes payloadHash and policyRoot, runs detector-core's L0 + L1 on
 //! pre-serialized DFAs (no regex compilation in-zkVM), asserts the deterministic layer
 //! PASSES (a proof exists only if clean), binds the on-chain action via actionHash + nullifier,
 //! and commits the public values. detectorVersion is a public INPUT (the guest cannot know its
@@ -10,14 +10,18 @@
 //! equal the action the proof binds. A payload that does not parse to an on-chain action, or that
 //! describes a different one, cannot be attested.
 //!
+//! Release 0.8.0: L0 runs in the guest too. The payload is decoded (base64, hex, URL, HTML entities,
+//! zero-width strip, NFKC, homoglyph fold; nested to depth 3) and L1 runs over every variant on the
+//! same serialized DFAs; a proof exists only if the raw text AND every decoded variant pass.
+//!
 //! Public value commit order: payloadHash, policyRoot, detectorVersion, actionHash, nullifier,
-//! expirySlot. Remaining for a later increment: L0 decode-then-L1 on serialized decoder DFAs.
+//! expirySlot.
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
 use blindseal_detector_core::{
-    action_hash, check_action_binding, nullifier, policy_root_from_serialized, run_layer1_serialized,
-    ActionFields, Commitments, SerializedL1, Severity,
+    action_hash, check_action_binding, nullifier, policy_root_from_serialized, run_layer0_serialized,
+    run_layer1_serialized, ActionFields, Commitments, SerializedL1, Severity,
 };
 use sha2::{Digest, Sha256};
 
@@ -55,10 +59,14 @@ pub fn main() {
     let pol = SerializedL1 { dfas };
     let policy_root = policy_root_from_serialized(&pol);
 
-    // 3) deterministic layer must PASS (proof exists only for a clean payload)
+    // 3) the deterministic layers must PASS (proof exists only for a clean payload): L1 on the raw
+    //    text, then L0 (decode-then-L1) on every decoded variant
     let text = String::from_utf8_lossy(&payload);
     let l1 = run_layer1_serialized(&text, &pol);
     assert!(l1.verdict == Severity::Clean, "L1 did not pass");
+    if let Some(fire) = run_layer0_serialized(&text, &pol) {
+        panic!("L0 did not pass ({})", fire.decoder);
+    }
 
     // 4) bind the action (checked against the payload in step 0)
     let commitments = Commitments { payload_hash, policy_root, detector_version, expiry_slot, nonce };
