@@ -313,3 +313,255 @@ export async function getExplorerSnapshot(): Promise<ExplorerSnapshot> {
     .finally(() => { inflight = null; });
   return inflight;
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// The treasury: what the project's USDC treasury received and spent, read from the chain.
+// Rows come from the treasury wallet's and its USDC token accounts' transaction history (SPL token
+// transfers and burns, parsed from jsonParsed instructions) and are classified by the SPL Memo in
+// the same transaction — the convention every payer follows is written down in docs/TREASURY-MEMO.md:
+//   blindseal:proof      a proof bought (USDC in)       blindseal:payout    a payout (USDC out)
+//   blindseal:buyback    a buyback (USDC out)           blindseal:burn      a burn (tokens destroyed)
+// A transfer with no memo, or an unknown one, is "other". Rows whose counterparty is the internal
+// dogfood wallet (BLINDSEAL_DOGFOOD_WALLET) are shown, labelled, and left out of every total.
+// Same posture as the explorer: server-side, read-only, cached 60 s, never throws.
+
+export const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+export const USDC_DECIMALS = 6;
+export const TREASURY_MEMO_PREFIX = 'blindseal:';
+export const TREASURY_KINDS = ['proof', 'payout', 'buyback', 'burn'] as const;
+export type TreasuryKind = (typeof TREASURY_KINDS)[number] | 'other';
+
+/// The memo's first word decides: `blindseal:<kind>`, optionally followed by a space and free text
+/// (an attestation id, a job id). Lower-case, exact. Anything else — or no memo — is "other".
+export function classifyTreasuryMemo(memo: string | null | undefined): TreasuryKind {
+  const m = (memo ?? '').trim();
+  if (!m.startsWith(TREASURY_MEMO_PREFIX)) return 'other';
+  const tag = m.slice(TREASURY_MEMO_PREFIX.length).split(/\s/)[0] ?? '';
+  return (TREASURY_KINDS as readonly string[]).includes(tag) ? (tag as TreasuryKind) : 'other';
+}
+
+export interface TreasuryRow {
+  signature: string;
+  slot: number;
+  /// unix seconds from the transaction; null when the RPC had none
+  blockTime: number | null;
+  kind: TreasuryKind;
+  /// in = USDC into the treasury · out = USDC out of it · burn = tokens destroyed by the treasury
+  direction: 'in' | 'out' | 'burn';
+  /// base units as a decimal string, with the mint's decimals (USDC: 6) and the mint
+  amount: string;
+  decimals: number;
+  mint: string;
+  /// the other party: the owner of the other token account when the transaction says, else that
+  /// account itself; on a burn, the mint that was burned
+  counterparty: string;
+  memo: string | null;
+  /// the counterparty is the internal dogfood wallet: labelled on the row, excluded from every total
+  internal: boolean;
+}
+
+export interface TreasuryTotals {
+  /// rows of kind proof, direction in (count) and their USDC sum (base units)
+  proofs: number;
+  collected: string;
+  /// USDC out on payout rows / on buyback rows (base units)
+  paidOut: string;
+  buybacks: string;
+  /// rows of kind burn (count) and, where a burn instruction carried an amount, the sum per mint
+  burns: number;
+  burned: { mint: string; amount: string; decimals: number }[];
+}
+
+export interface TreasurySnapshot {
+  /// false → BLINDSEAL_TREASURY is unset or not a valid address: nothing was read, no error
+  configured: boolean;
+  /// false → offline (see `error`), or not configured
+  live: boolean;
+  treasury: string | null;
+  dogfood: string | null;
+  mint: string;
+  cluster: 'mainnet-beta';
+  rpc: 'configured' | 'public' | 'off';
+  slot: number;
+  updatedAt: number;
+  /// newest first; internal rows included (flagged)
+  rows: TreasuryRow[];
+  /// over the non-internal rows only
+  totals: TreasuryTotals;
+  source: { tokenAccounts: number; signaturesScanned: number; transactionsRead: number; truncated: boolean };
+  error?: { code: 'RPC_OFF' | 'RPC_RATE_LIMITED' | 'RPC_UNAVAILABLE'; message: string };
+}
+
+const zeroTotals = (): TreasuryTotals => ({ proofs: 0, collected: '0', paidOut: '0', buybacks: '0', burns: 0, burned: [] });
+
+let treasuryWarned = false;
+/// BLINDSEAL_TREASURY / BLINDSEAL_DOGFOOD_WALLET, each a base58 32-byte key or null (a bad value is
+/// logged once and treated as unset).
+export function treasuryConfig(): { treasury: string | null; dogfood: string | null } {
+  const key = (name: string): string | null => {
+    const v = (process.env[name] ?? '').trim();
+    if (!v) return null;
+    try { if (bs58decode(v).length === 32) return v; } catch { /* not base58 */ }
+    if (!treasuryWarned) { treasuryWarned = true; process.stderr.write(`blindseal: ${name} is not a base58 public key — ignored\n`); }
+    return null;
+  };
+  return { treasury: key('BLINDSEAL_TREASURY'), dogfood: key('BLINDSEAL_DOGFOOD_WALLET') };
+}
+
+/// getTransaction with encoding jsonParsed: the parts the treasury reader looks at.
+export interface ParsedInstruction { program?: string; programId: string; parsed?: unknown; accounts?: string[]; data?: string }
+interface TokenBalance { accountIndex: number; mint: string; owner?: string; uiTokenAmount: { amount: string; decimals: number } }
+export interface ParsedTransaction {
+  slot: number;
+  blockTime: number | null;
+  transaction: { signatures: string[]; message: { accountKeys: { pubkey: string }[]; instructions: ParsedInstruction[] } };
+  meta: {
+    err: unknown | null;
+    innerInstructions?: { index: number; instructions: ParsedInstruction[] }[];
+    preTokenBalances?: TokenBalance[];
+    postTokenBalances?: TokenBalance[];
+  } | null;
+}
+type TokenInfo = Record<string, unknown> & { tokenAmount?: { amount: string; decimals: number } };
+
+/// One transaction → its treasury rows (none when it failed or touched no treasury account).
+/// `tokenAccounts` are the treasury's USDC token accounts; owners of other accounts come from the
+/// transaction's token balances, so no extra read is needed.
+export function parseTreasuryTransaction(tx: ParsedTransaction, ctx: { treasury: string; tokenAccounts: Set<string>; dogfood: string | null }): TreasuryRow[] {
+  if (!tx.meta || tx.meta.err != null) return [];
+  const keys = tx.transaction.message.accountKeys.map((k) => k.pubkey);
+  const acct = new Map<string, { owner?: string; mint: string; decimals: number }>();
+  for (const b of [...(tx.meta.preTokenBalances ?? []), ...(tx.meta.postTokenBalances ?? [])]) {
+    const pk = keys[b.accountIndex]; if (pk) acct.set(pk, { owner: b.owner, mint: b.mint, decimals: b.uiTokenAmount.decimals });
+  }
+  const ixs: ParsedInstruction[] = [...tx.transaction.message.instructions];
+  for (const inner of tx.meta.innerInstructions ?? []) ixs.push(...inner.instructions);
+
+  let memo: string | null = null;
+  for (const ix of ixs) if (ix.program === 'spl-memo' && typeof ix.parsed === 'string') { memo = ix.parsed; break; }
+  const kind = classifyTreasuryMemo(memo);
+  const signature = tx.transaction.signatures[0] ?? '';
+  const isTreasury = (a: string | undefined) => !!a && (ctx.tokenAccounts.has(a) || acct.get(a)?.owner === ctx.treasury || a === ctx.treasury);
+  const ownerOf = (a: string) => acct.get(a)?.owner ?? a;
+  const internal = (...parties: (string | undefined)[]) => !!ctx.dogfood && parties.some((p) => p === ctx.dogfood);
+
+  const rows: TreasuryRow[] = [];
+  for (const ix of ixs) {
+    if (ix.program !== 'spl-token' || typeof ix.parsed !== 'object' || ix.parsed == null) continue;
+    const { type, info } = ix.parsed as { type?: string; info?: TokenInfo };
+    if (!info) continue;
+    const str = (k: string) => (typeof info[k] === 'string' ? (info[k] as string) : undefined);
+    const amount = info.tokenAmount?.amount ?? str('amount') ?? '0';
+    if (type === 'transfer' || type === 'transferChecked') {
+      const src = str('source'), dst = str('destination');
+      if (!src || !dst) continue;
+      const mint = str('mint') ?? acct.get(src)?.mint ?? acct.get(dst)?.mint ?? (ctx.tokenAccounts.has(src) || ctx.tokenAccounts.has(dst) ? USDC_MINT : '');
+      if (mint !== USDC_MINT) continue;   // only the USDC treasury; another mint's movements are not treasury rows
+      const inbound = isTreasury(dst) && !isTreasury(src), outbound = isTreasury(src) && !isTreasury(dst);
+      if (!inbound && !outbound) continue;
+      const other = inbound ? src : dst;
+      const counterparty = ownerOf(other);
+      rows.push({
+        signature, slot: tx.slot, blockTime: tx.blockTime, kind, direction: inbound ? 'in' : 'out',
+        amount, decimals: info.tokenAmount?.decimals ?? acct.get(other)?.decimals ?? USDC_DECIMALS, mint, counterparty, memo,
+        internal: internal(counterparty, str('authority'), str('multisigAuthority')),
+      });
+    } else if (type === 'burn' || type === 'burnChecked') {
+      const account = str('account'), authority = str('authority') ?? str('multisigAuthority');
+      if (!account || !(isTreasury(account) || authority === ctx.treasury)) continue;
+      const mint = str('mint') ?? acct.get(account)?.mint ?? '';
+      rows.push({
+        signature, slot: tx.slot, blockTime: tx.blockTime, kind, direction: 'burn',
+        amount, decimals: info.tokenAmount?.decimals ?? acct.get(account)?.decimals ?? 0, mint, counterparty: mint, memo, internal: false,
+      });
+    }
+  }
+  return rows;
+}
+
+/// The five totals, over the rows that are not internal.
+export function treasuryTotals(rows: TreasuryRow[]): TreasuryTotals {
+  let proofs = 0, collected = 0n, paidOut = 0n, buybacks = 0n, burns = 0;
+  const burned = new Map<string, { amount: bigint; decimals: number }>();
+  const big = (s: string) => { try { return BigInt(s); } catch { return 0n; } };
+  for (const r of rows) {
+    if (r.internal) continue;
+    if (r.kind === 'proof' && r.direction === 'in') { proofs++; collected += big(r.amount); }
+    else if (r.kind === 'payout' && r.direction === 'out') paidOut += big(r.amount);
+    else if (r.kind === 'buyback' && r.direction === 'out') buybacks += big(r.amount);
+    else if (r.kind === 'burn') {
+      burns++;
+      if (r.direction === 'burn') { const b = burned.get(r.mint) ?? { amount: 0n, decimals: r.decimals }; b.amount += big(r.amount); burned.set(r.mint, b); }
+    }
+  }
+  return {
+    proofs, collected: collected.toString(), paidOut: paidOut.toString(), buybacks: buybacks.toString(), burns,
+    burned: [...burned].map(([mint, b]) => ({ mint, amount: b.amount.toString(), decimals: b.decimals })),
+  };
+}
+
+function treasuryOffline(cfg: { treasury: string | null; dogfood: string | null }, error?: TreasurySnapshot['error']): TreasurySnapshot {
+  return {
+    configured: !!cfg.treasury, live: false, treasury: cfg.treasury, dogfood: cfg.dogfood, mint: USDC_MINT, cluster: 'mainnet-beta', rpc: rpcMode(),
+    slot: 0, updatedAt: Date.now(), rows: [], totals: zeroTotals(),
+    source: { tokenAccounts: 0, signaturesScanned: 0, transactionsRead: 0, truncated: false },
+    ...(error ? { error } : {}),
+  };
+}
+
+async function readTreasury(treasury: string, dogfood: string | null): Promise<TreasurySnapshot> {
+  const now = Date.now();
+  const slot = await rpc<number>('getSlot', [{ commitment: 'confirmed' }]);
+  // 1. the treasury's USDC token accounts (usually one, the associated account)
+  const accts = await rpc<{ value: { pubkey: string }[] }>('getTokenAccountsByOwner', [treasury, { mint: USDC_MINT }, { encoding: 'jsonParsed', commitment: 'confirmed' }]);
+  const tokenAccounts = new Set((accts?.value ?? []).map((a) => a.pubkey));
+  // 2. the history of the wallet and of each token account, as one set of confirmed signatures
+  //    (a burn is signed by the wallet; a transfer is indexed under the token account)
+  const lists = await Promise.all([treasury, ...tokenAccounts].map((a) => rpc<SigInfo[]>('getSignaturesForAddress', [a, { limit: SIGNATURE_CAP, commitment: 'confirmed' }])));
+  const seen = new Map<string, SigInfo>();
+  let truncated = false;
+  for (const l of lists) { if (l.length >= SIGNATURE_CAP) truncated = true; for (const s of l) if (s.err == null && !seen.has(s.signature)) seen.set(s.signature, s); }
+  const sigs = [...seen.values()];
+  // 3. each transaction, parsed: the token instructions and the memo decide the rows
+  const txs = await mapLimit(sigs, TX_CONCURRENCY, (s) => rpc<ParsedTransaction | null>('getTransaction', [s.signature, { encoding: 'jsonParsed', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }]));
+  const rows: TreasuryRow[] = [];
+  let read = 0;
+  txs.forEach((tx, i) => {
+    if (!tx) return;
+    read++;
+    if (!tx.transaction.signatures?.length) tx.transaction.signatures = [sigs[i]!.signature];
+    rows.push(...parseTreasuryTransaction(tx, { treasury, tokenAccounts, dogfood }));
+  });
+  rows.sort((a, b) => b.slot - a.slot || a.signature.localeCompare(b.signature));
+  return {
+    configured: true, live: true, treasury, dogfood, mint: USDC_MINT, cluster: 'mainnet-beta', rpc: rpcMode(), slot, updatedAt: now,
+    rows, totals: treasuryTotals(rows),
+    source: { tokenAccounts: tokenAccounts.size, signaturesScanned: sigs.length, transactionsRead: read, truncated },
+  };
+}
+
+let tCached: { at: number; key: string; snap: TreasurySnapshot } | null = null;
+let tInflight: Promise<TreasurySnapshot> | null = null;
+
+/// The treasury tab's read. Not configured (no BLINDSEAL_TREASURY) → `configured: false`, no RPC
+/// call, no error. Otherwise the same contract as getExplorerSnapshot: a live snapshot is cached in
+/// module memory for 60 s and shared by concurrent callers; failures are never cached; never throws.
+export async function getTreasurySnapshot(): Promise<TreasurySnapshot> {
+  const cfg = treasuryConfig();
+  if (!cfg.treasury) return treasuryOffline(cfg);
+  if (!rpcUrl()) return treasuryOffline(cfg, { code: 'RPC_OFF', message: 'Mainnet reads are switched off on this server (BLINDSEAL_RPC_URL=off).' });
+  const key = cfg.treasury + '/' + (cfg.dogfood ?? '');
+  if (tCached && tCached.key === key && Date.now() - tCached.at < SNAPSHOT_TTL_MS) return tCached.snap;
+  if (tInflight) return tInflight;
+  tInflight = readTreasury(cfg.treasury, cfg.dogfood)
+    .then((snap) => { tCached = { at: Date.now(), key, snap }; return snap; })
+    .catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      return /429|rate-limited/i.test(msg)
+        ? treasuryOffline(cfg, { code: 'RPC_RATE_LIMITED', message: 'The public Solana RPC is rate-limiting this server. Retry in a moment.' })
+        : treasuryOffline(cfg, { code: 'RPC_UNAVAILABLE', message: 'Solana RPC unreachable. Retry in a moment.' });
+    })
+    .finally(() => { tInflight = null; });
+  return tInflight;
+}
