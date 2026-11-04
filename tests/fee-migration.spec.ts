@@ -44,7 +44,10 @@ describe('0.8.0 Config migration: deployed verifier → new build', () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const conn = provider.connection;
-  const authority = (provider.wallet as anchorNs.Wallet).payer;
+  const wallet = (provider.wallet as anchorNs.Wallet).payer; // fee payer of every admin tx, and the upgrade authority
+  // The Config authority is a fresh key with a few SOL: the provider wallet holds the validator's mint (~5e17
+  // lamports), beyond the range the RPC's JSON numbers represent exactly, so its balances cannot be asserted.
+  const authority = Keypair.generate();
   const CONFIG = configPda();
   const cu = ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 });
   const balance = (k: PublicKey) => conn.getBalance(k, 'confirmed');
@@ -70,7 +73,7 @@ describe('0.8.0 Config migration: deployed verifier → new build', () => {
 
   before(async () => {
     while ((await conn.getSlot('confirmed')) < 20) await new Promise((r) => setTimeout(r, 400));
-    for (const [k, l] of [[source.publicKey, 2 * LAMPORTS_PER_SOL], [recipient.publicKey, LAMPORTS_PER_SOL / 100], [treasury.publicKey, LAMPORTS_PER_SOL / 100]] as const) {
+    for (const [k, l] of [[source.publicKey, 2 * LAMPORTS_PER_SOL], [recipient.publicKey, LAMPORTS_PER_SOL / 100], [treasury.publicKey, LAMPORTS_PER_SOL / 100], [authority.publicKey, 5 * LAMPORTS_PER_SOL]] as const) {
       await conn.confirmTransaction(await conn.requestAirdrop(k, l), 'confirmed');
     }
   });
@@ -136,11 +139,18 @@ describe('0.8.0 Config migration: deployed verifier → new build', () => {
     expect(infoBefore.lamports).to.equal(rentOld);
     const a0 = await balance(authority.publicKey);
     const sig = await send([buildSetFeeIx(authority.publicKey, 0, treasury.publicKey)], [authority]);
-    const txFee = (await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 }))!.meta!.fee;
     const info = await cfgInfo();
     expect(info.data.length).to.equal(CONFIG_SIZE);
     expect(info.lamports).to.equal(rentNew);
-    expect(a0 - (await balance(authority.publicKey))).to.equal(rentNew - rentOld + txFee);
+    // per-transaction accounting from the transaction itself: the authority (fee payer, index 0) pays the
+    // rent difference plus the fee, and the Config account receives exactly the difference
+    const t = (await conn.getTransaction(sig, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 }))!;
+    const keys = t.transaction.message.getAccountKeys().staticAccountKeys.map((k) => k.toBase58());
+    const delta = (k: PublicKey) => { const i = keys.indexOf(k.toBase58()); return t.meta!.postBalances[i]! - t.meta!.preBalances[i]!; };
+    console.log(`      rent ${rentOld} → ${rentNew} (+${rentNew - rentOld} lamports at local rent; mainnet: 40 × 5,080 = 203,200); tx fee ${t.meta!.fee} (paid by the wallet)`);
+    expect(-delta(authority.publicKey), 'the authority pays exactly the rent difference').to.equal(rentNew - rentOld);
+    expect(delta(CONFIG)).to.equal(rentNew - rentOld);
+    expect(await balance(authority.publicKey)).to.equal(a0 - (rentNew - rentOld));
     const c = decodeConfig(info.data);
     expect(c.hasFeeFields).to.equal(true);
     expect(c.feeLamports).to.equal(0n);
@@ -149,7 +159,6 @@ describe('0.8.0 Config migration: deployed verifier → new build', () => {
     expect(c.paused).to.equal(false);
     expect(c.allowedVkeys).to.deep.equal(decodeConfig(infoBefore.data).allowedVkeys);
     expect(c.bump).to.equal(decodeConfig(infoBefore.data).bump);
-    console.log(`      realloc rent difference ${rentNew - rentOld} lamports (local rent; mainnet charges 5,080/byte → 40 × 5,080 = 203,200)`);
   });
 
   it('5. set_fee(FEE, treasury); a consume moves exactly FEE lamports to the treasury', async function () {
