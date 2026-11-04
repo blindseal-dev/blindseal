@@ -218,7 +218,9 @@ describe('payout-gate — batch of SPL payouts, one attestation each', () => {
       const info = await conn.getAccountInfo(stagedPda(payer.publicKey, hex(att.nullifier)), 'confirmed');
       expect(info, 'staged PDA exists').to.not.equal(null);
       expect(info!.owner.equals(gate.programId)).to.equal(true);
-      const s = gate.coder.accounts.decode('Staged', info!.data) as any;
+      // the Anchor TS client camel-cases IDL account names on construction ('staged'); look it up rather than assume
+      const stagedName = (gate.idl as any).accounts.find((a: any) => a.name.toLowerCase() === 'staged').name as string;
+      const s = gate.coder.accounts.decode(stagedName, info!.data) as any;
       expect((s.payer as PublicKey).toBase58()).to.equal(payer.publicKey.toBase58());
       expect(Buffer.from(s.proof)).to.deep.equal(hex(att.proof.bytes));
       expect(Buffer.from(s.publicInputs)).to.deep.equal(hex(att.publicInputs[0]));
