@@ -12,6 +12,10 @@
 #       of rule 1's (prover --policy-variant one-rule-copied, test-only), so a different policy root;
 #       the suite asserts transfer-gate refuses it on chain (UnexpectedPolicyRoot)
 #   scripts/prove-localnet-fixture.sh all         → both, one after the other (≈ 4 h)
+#   scripts/prove-localnet-fixture.sh payout      → tests/fixtures/attestation-payout-1.json and -2.json (≈ 4 h)
+#       two SPL payouts through programs/payout-gate (batch_payout) from the seeded localnet payout wallets
+#       (tests/payout-gate.spec.ts; payloads tests/fixtures/payload-payout-{1,2}.json). Until they exist the
+#       suite reports the batch happy path, the amount-mismatch and the replay cases as pending.
 #   add --execute to any of them for a dry run in the SP1 executor (minutes, no proof, nothing written)
 #
 # Both bind the seed-derived localnet wallets (tests/m2.spec.ts: sha256("blindseal-localnet:<label>"))
@@ -21,7 +25,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 export PATH="$HOME/.cargo/bin:$PATH"
 WHICH="${1:-}"; MODE="${2:-}"
-case "$WHICH" in current|altpolicy|all) ;; *) sed -n '2,21p' "$0"; exit 2;; esac
+case "$WHICH" in current|altpolicy|all|payout) ;; *) sed -n '2,25p' "$0"; exit 2;; esac
 [ "$MODE" = "--execute" ] && export BLINDSEAL_EXECUTE=1
 
 cargo build --release --manifest-path crates/prover/Cargo.toml
@@ -45,6 +49,27 @@ prove() { # <name> <out> [extra prover args…]
   echo "← $name done in $(( (SECONDS - t0) / 60 )) min"
 }
 
+# payout-gate: the seeded wallets payout-payer / payout-recipient-{1,2} / payout-mint (tests/payout-gate.spec.ts),
+# batch_payout's discriminator sha256("global:batch_payout")[..8]; each payout is its own attestation.
+PAYOUT_COMMON=(
+  --target-program EPgeMVvpCDaCGoav5NDFBySPTxASBQfVEvaUY6KPKL4k   # payout-gate
+  --source-authority i5cyemNLcZvjNpC6Td1BkinrXDc9krCAU6UFA5i7q9w  # seeded payout-payer
+  --mint BianqHwTNRqBFDu4FjNVgNaJADMLRWgbiM8sLT3Es3cM             # seeded payout-mint
+  --instruction 0x19eef5f04d0d4e44                                # batch_payout
+  --expiry 2000000000 --chain-id 1
+)
+prove_payout() { # <n> <recipient> <amount>
+  local n="$1" out="tests/fixtures/attestation-payout-$1.json"
+  echo "→ payout-$n: $PROVER ${PAYOUT_COMMON[*]} --payload tests/fixtures/payload-payout-$n.json --recipient $2 --amount $3 --out $out"
+  local t0=$SECONDS
+  "$PROVER" "${PAYOUT_COMMON[@]}" --payload "tests/fixtures/payload-payout-$n.json" --recipient "$2" --amount "$3" --out "$out" --decision-id "localnet-payout-$n"
+  echo "← payout-$n done in $(( (SECONDS - t0) / 60 )) min"
+}
+
+if [ "$WHICH" = payout ]; then
+  prove_payout 1 H9GMqbp7bNsioYdjLeuDMkddpJ6Q6f7UiEU1gHi3zske 250000
+  prove_payout 2 FvD47iqapuVfnHgFkMu5qbPwfktucUSyufLE7vEDRxzV 750000
+fi
 if [ "$WHICH" = current ] || [ "$WHICH" = all ]; then
   prove current tests/fixtures/attestation-test-current.json
 fi
