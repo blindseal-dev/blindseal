@@ -54,6 +54,12 @@ fn execute(payload: &[u8], a: &Action) -> Result<u64, String> {
     stdin.write(&a.amount);
     stdin.write(&2_000_000_000u64);
     stdin.write(&[9u8; 32]);
+    // empty action policy (release 0.8.0): recipients, max amount, programs, instructions, mints
+    stdin.write(&Vec::<[u8; 32]>::new());
+    stdin.write(&None::<u64>);
+    stdin.write(&Vec::<[u8; 32]>::new());
+    stdin.write(&Vec::<[u8; 8]>::new());
+    stdin.write(&Vec::<[u8; 32]>::new());
     let client = ProverClient::builder().cpu().build();
     let mut err = Vec::new();
     let r = client.execute(&elf(), &stdin).stderr(&mut err).run();

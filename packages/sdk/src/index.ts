@@ -11,6 +11,7 @@ import {
   type ActionBinding, type Attestation, type DecodedPublicInputs,
 } from './ix.js';
 export * from './ix.js';
+export * from './policy.js';
 
 export class WrongClusterError extends Error {
   constructor(public readonly got: string) {

@@ -12,7 +12,13 @@
 //!
 //! Release 0.8.0: L0 runs in the guest too. The payload is decoded (base64, hex, URL, HTML entities,
 //! zero-width strip, NFKC, homoglyph fold; nested to depth 3) and L1 runs over every variant on the
-//! same serialized DFAs; a proof exists only if the raw text AND every decoded variant pass.
+//! same serialized DFAs. Both layers run on the raw payload AND on every JSON string leaf (keys and
+//! values, unescaped, any depth): JSON escapes (`\n`, `\t`, `\u0069`) hide an injection from the raw
+//! text alone. A proof exists only if every text passes (detector-core `screen`).
+//!
+//! Release 0.8.0 also adds a stateless action policy (allowed recipients, max amount, allowed target
+//! programs, instructions and mints; empty = no constraint) that the bound action must satisfy. The
+//! committed policyRoot = sha256("blindseal.policy.v2" ‖ rulesRoot ‖ actionPolicyHash).
 //!
 //! Public value commit order: payloadHash, policyRoot, detectorVersion, actionHash, nullifier,
 //! expirySlot.
@@ -20,8 +26,8 @@
 sp1_zkvm::entrypoint!(main);
 
 use blindseal_detector_core::{
-    action_hash, check_action_binding, nullifier, policy_root_from_serialized, run_layer0_serialized,
-    run_layer1_serialized, ActionFields, Commitments, SerializedL1, Severity,
+    action_hash, check_action_binding, nullifier, policy_root_from_serialized, policy_root_v2,
+    screen_payload_prepared, ActionFields, ActionPolicy, AlignedL1, Commitments, SerializedL1,
 };
 use sha2::{Digest, Sha256};
 
@@ -39,6 +45,15 @@ pub fn main() {
     let amount: u64 = sp1_zkvm::io::read();
     let expiry_slot: u64 = sp1_zkvm::io::read();
     let nonce: [u8; 32] = sp1_zkvm::io::read();
+    // action policy (release 0.8.0); empty lists / None = no constraint
+    let policy = ActionPolicy {
+        recipients: sp1_zkvm::io::read::<Vec<[u8; 32]>>(),
+        max_amount: sp1_zkvm::io::read::<Option<u64>>(),
+        target_programs: sp1_zkvm::io::read::<Vec<[u8; 32]>>(),
+        instructions: sp1_zkvm::io::read::<Vec<[u8; 8]>>(),
+        mints: sp1_zkvm::io::read::<Vec<[u8; 32]>>(),
+    }
+    .canonical();
 
     // 0) the payload must describe exactly this action
     let action = ActionFields {
@@ -53,20 +68,23 @@ pub fn main() {
     if let Err(e) = check_action_binding(&payload, &action) {
         panic!("payload/action binding refused: {}", e.code());
     }
+    // 0b) the action must satisfy the committed action policy
+    if let Err(e) = policy.check(&action) {
+        panic!("action policy refused: {}", e.code());
+    }
 
     // 1) commit payloadHash, 2) recompute policyRoot from the provided DFAs
     let payload_hash: [u8; 32] = Sha256::digest(&payload).into();
     let pol = SerializedL1 { dfas };
-    let policy_root = policy_root_from_serialized(&pol);
+    let rules_root = policy_root_from_serialized(&pol);
+    let policy_root = policy_root_v2(&rules_root, &policy.hash());
 
-    // 3) the deterministic layers must PASS (proof exists only for a clean payload): L1 on the raw
-    //    text, then L0 (decode-then-L1) on every decoded variant
-    let text = String::from_utf8_lossy(&payload);
-    let l1 = run_layer1_serialized(&text, &pol);
-    assert!(l1.verdict == Severity::Clean, "L1 did not pass");
-    if let Some(fire) = run_layer0_serialized(&text, &pol) {
-        panic!("L0 did not pass ({})", fire.decoder);
-    }
+    // 3) the deterministic layers must PASS (a proof exists only for a clean payload): L1 and L0 on
+    //    the raw text and on every JSON string leaf, with the rule DFAs deserialized once
+    let aligned = AlignedL1::new(&pol);
+    let prepared = aligned.prepare();
+    let screened = screen_payload_prepared(&payload, &prepared);
+    assert!(screened.clean(), "screening did not pass: {:?}", screened.patterns);
 
     // 4) bind the action (checked against the payload in step 0)
     let commitments = Commitments { payload_hash, policy_root, detector_version, expiry_slot, nonce };

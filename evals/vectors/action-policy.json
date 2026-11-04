@@ -1,0 +1,309 @@
+{
+  "rulesRoot": "0x36a9e9457db6ecfd752a379fc9279ad6a0acfea07928f61e2f3638a685c38397",
+  "actions": {
+    "sample": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "11111111111111111111111111111111",
+      "amount": "1000000"
+    },
+    "other-recipient": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf",
+      "mint": "11111111111111111111111111111111",
+      "amount": "1000000"
+    },
+    "at-max": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "11111111111111111111111111111111",
+      "amount": "10000000"
+    },
+    "over-max": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "11111111111111111111111111111111",
+      "amount": "10000001"
+    },
+    "zero": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "11111111111111111111111111111111",
+      "amount": "0"
+    },
+    "usdc": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "amount": "1"
+    },
+    "other-program": {
+      "targetProgram": "9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf",
+      "instruction": "0x981894646560fc2b",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "11111111111111111111111111111111",
+      "amount": "1"
+    },
+    "other-instruction": {
+      "targetProgram": "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa",
+      "instruction": "0x0000000000000002",
+      "recipient": "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+      "mint": "11111111111111111111111111111111",
+      "amount": "1"
+    }
+  },
+  "policies": [
+    {
+      "id": "empty",
+      "policy": {},
+      "actionPolicyHash": "0x053c16fe846d2f868c1c45c770a97ca6772d73265dddf604a4ada50d654493b9",
+      "policyRoot": "0x78bb3bab1765304373a6af9de2d7c081ce57bc862c039f6dd682c74e939eb10a",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "empty-explicit",
+      "policy": {
+        "recipients": [],
+        "maxAmount": null,
+        "targetPrograms": [],
+        "instructions": [],
+        "mints": []
+      },
+      "actionPolicyHash": "0x053c16fe846d2f868c1c45c770a97ca6772d73265dddf604a4ada50d654493b9",
+      "policyRoot": "0x78bb3bab1765304373a6af9de2d7c081ce57bc862c039f6dd682c74e939eb10a",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "demo",
+      "policy": {
+        "recipients": [
+          "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo"
+        ],
+        "maxAmount": "10000000"
+      },
+      "actionPolicyHash": "0xe8914f8815f52443ef2c046006f50f5cf3cb45c4671745f95d6f0bcb6377d9f9",
+      "policyRoot": "0x79f11a126ef624b03a351efc79747ee6dadcac8eab71f5e24061514e6205ea8e",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "recipient-not-allowed",
+        "at-max": "ok",
+        "over-max": "amount-over-max",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "max-zero",
+      "policy": {
+        "maxAmount": "0"
+      },
+      "actionPolicyHash": "0xd0005959aa4b8ab6a1abc5ac2aa19d376e2b1ec56906f727627fdbf2426e7657",
+      "policyRoot": "0x5f75c064848884adb99c2ea44e0f586e14b7e7a638304456a4a6f99bcc6f90e2",
+      "checks": {
+        "sample": "amount-over-max",
+        "other-recipient": "amount-over-max",
+        "at-max": "amount-over-max",
+        "over-max": "amount-over-max",
+        "zero": "ok",
+        "usdc": "amount-over-max",
+        "other-program": "amount-over-max",
+        "other-instruction": "amount-over-max"
+      }
+    },
+    {
+      "id": "max-number",
+      "policy": {
+        "maxAmount": 10000000
+      },
+      "actionPolicyHash": "0xa5411f6aef572a1257be4c7587b7a2c6bd34fa144ecdf21f144f9d086acf21a9",
+      "policyRoot": "0x5374efe9f3e1903ca8da5aed9427712597f4180ff77508a8e01abbdb1fd9be37",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "amount-over-max",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "max-u64",
+      "policy": {
+        "maxAmount": "18446744073709551615"
+      },
+      "actionPolicyHash": "0x45406ac367a6ac7158615b741a33f274be4ec2627d27d602912c77e0d5177b9f",
+      "policyRoot": "0xec294ff1aba4ad38bc282249040cff7e639ee0f696b2c8c0e29feef3a5838283",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "recipients-unsorted-dup",
+      "policy": {
+        "recipients": [
+          "9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf",
+          "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo",
+          "9H7xb7EXzwQ5RFmA2qWnNhML9geLjDFrZwhJYxCUVQzf"
+        ]
+      },
+      "actionPolicyHash": "0x1d45869632bf40712dfc5271419d7c3ab064a2c9053ec6e221ff8393e1570ec8",
+      "policyRoot": "0xf5ffd0a8cd6c8d82987ac707b22b75092d4046fb33dab3d08847ea09f42afdc5",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "programs",
+      "policy": {
+        "targetPrograms": [
+          "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
+        ]
+      },
+      "actionPolicyHash": "0x9606e8a4bbbee364d12cae68aac1892e7dc32ddc73bfbec0bf4ca1a8827e1d7e",
+      "policyRoot": "0x9100ce67211d941f4091a293ee258ebbc44e17421a2e79a590cb5db5c9293b4a",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "target-program-not-allowed",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "instructions",
+      "policy": {
+        "instructions": [
+          "0x981894646560fc2b",
+          "0x0000000000000001"
+        ]
+      },
+      "actionPolicyHash": "0x30ad7b16549fd7b9195aa24cf4a860ea8611746b05392762b4ce2ba979473e9e",
+      "policyRoot": "0xc82a2a2cffad97e7aa52f05f22355140e9ad256035fa0b1439867fff960c3994",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "ok",
+        "other-program": "ok",
+        "other-instruction": "instruction-not-allowed"
+      }
+    },
+    {
+      "id": "mints-native",
+      "policy": {
+        "mints": [
+          "11111111111111111111111111111111"
+        ]
+      },
+      "actionPolicyHash": "0x1436ab0a23c459c1a6a0cba4f232bbeb2879b37ae6ab4fc252c6423b74714d4c",
+      "policyRoot": "0xf0fb6230a17113cd313b0ed50eec94855ef8dbaf6f701cdb488599e36d3a83c2",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "ok",
+        "at-max": "ok",
+        "over-max": "ok",
+        "zero": "ok",
+        "usdc": "mint-not-allowed",
+        "other-program": "ok",
+        "other-instruction": "ok"
+      }
+    },
+    {
+      "id": "mints-usdc",
+      "policy": {
+        "mints": [
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        ]
+      },
+      "actionPolicyHash": "0x17f99858ad124e0397f03b178d05a6ecfe6fcc41fa83db5856ab70346c661ed7",
+      "policyRoot": "0x6d35ec185caf6696d94d93b6302458f49c39c9f03538ace3c855b2af61c75622",
+      "checks": {
+        "sample": "mint-not-allowed",
+        "other-recipient": "mint-not-allowed",
+        "at-max": "mint-not-allowed",
+        "over-max": "mint-not-allowed",
+        "zero": "mint-not-allowed",
+        "usdc": "ok",
+        "other-program": "mint-not-allowed",
+        "other-instruction": "mint-not-allowed"
+      }
+    },
+    {
+      "id": "everything",
+      "policy": {
+        "recipients": [
+          "6HwAr9cu97PENQ727LhLErACyGznWyenKpsfTVQ5rmXo"
+        ],
+        "maxAmount": "5000000",
+        "targetPrograms": [
+          "9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa"
+        ],
+        "instructions": [
+          "0x981894646560fc2b"
+        ],
+        "mints": [
+          "11111111111111111111111111111111"
+        ]
+      },
+      "actionPolicyHash": "0xa87535034febe68801b15d398f2c8aec894bb23235c57a33758cde233b433ced",
+      "policyRoot": "0xcabaa29bef6e3906279335b52d8948d2b399609ed5bf9ba5d3c6f907f83fe121",
+      "checks": {
+        "sample": "ok",
+        "other-recipient": "recipient-not-allowed",
+        "at-max": "amount-over-max",
+        "over-max": "amount-over-max",
+        "zero": "ok",
+        "usdc": "mint-not-allowed",
+        "other-program": "target-program-not-allowed",
+        "other-instruction": "instruction-not-allowed"
+      }
+    }
+  ]
+}

@@ -14,6 +14,10 @@ use regex_automata::{dfa::regex::Regex, util::syntax, Input};
 
 pub mod action_binding;
 pub use action_binding::{action_from_payload, check_action_binding, BindError};
+pub mod action_policy;
+pub use action_policy::{policy_root_v2, ActionPolicy, PolicyError};
+pub mod screen;
+pub use screen::{json_string_leaves, screen_payload, screen_payload_prepared, screen_payload_with, ScreenResult};
 use std::sync::OnceLock;
 
 /// JS `\s` (no `u` flag): space, tab, LF, VT, FF, CR, plus the Unicode space set and U+FEFF.
@@ -285,7 +289,7 @@ pub fn serialize_l1() -> SerializedL1 {
 
 /// A 4-byte-aligned copy of `bytes` (regex-automata `from_bytes` requires alignment; a plain
 /// Vec<u8> is only 1-aligned and its pointer can move). Backed by a Vec<u32> (4-aligned alloc).
-struct Aligned(Vec<u32>, usize);
+struct Aligned(Vec<u32>);
 impl Aligned {
     fn new(bytes: &[u8]) -> Self {
         let words = bytes.len().div_ceil(4);
@@ -294,7 +298,7 @@ impl Aligned {
         // into its byte view is in-bounds (words*4 ≥ bytes.len()).
         let dst = unsafe { core::slice::from_raw_parts_mut(v.as_mut_ptr() as *mut u8, words * 4) };
         dst[..bytes.len()].copy_from_slice(bytes);
-        Aligned(v, bytes.len())
+        Aligned(v)
     }
     fn bytes(&self) -> &[u8] {
         // SAFETY: viewing the Vec<u32> as its byte representation; len is the word-count*4,
@@ -303,28 +307,56 @@ impl Aligned {
     }
 }
 
-fn dfa_is_match_serialized(dfa_bytes: &[u8], text: &str) -> bool {
-    let aligned = Aligned::new(dfa_bytes);
-    // SAFETY: from_bytes_unchecked skips the O(n) transition-table validation pass (the bulk of
-    // the in-zkVM deserialization cost). Sound here because these bytes are produced by our own
-    // `serialize_l1`/policy DFAs and are committed via policy_root — they are not attacker-
-    // controlled. The build-time path (`run_layer1`) and the parity test guard correctness.
-    let (dfa, _) = unsafe { dense::DFA::from_bytes_unchecked(aligned.bytes()) }
-        .expect("deserialize forward DFA");
-    dfa.try_search_fwd(&Input::new(text)).ok().flatten().is_some()
+/// The rule DFAs, aligned once and deserialized once per run (release 0.8.0). The guest screens many
+/// texts per payload (the raw text, every JSON string leaf, every decoded variant of each), so the
+/// per-call copy + deserialization of the 0.7 path would dominate its cycles.
+pub struct AlignedL1(Vec<Aligned>);
+
+impl AlignedL1 {
+    pub fn new(pol: &SerializedL1) -> Self {
+        AlignedL1(pol.dfas.iter().map(|b| Aligned::new(b)).collect())
+    }
+    /// Deserialize every rule DFA (zero-copy views into the aligned buffers).
+    pub fn prepare(&self) -> PreparedL1<'_> {
+        PreparedL1(
+            self.0
+                .iter()
+                .map(|a| {
+                    // SAFETY: from_bytes_unchecked skips the O(n) transition-table validation pass (the
+                    // bulk of the in-zkVM deserialization cost). Sound here because these bytes are
+                    // produced by our own `serialize_l1` and are committed via the policy root — they are
+                    // not attacker-controlled. The build-time path (`run_layer1`) and the cross-mode
+                    // parity test guard correctness.
+                    unsafe { dense::DFA::from_bytes_unchecked(a.bytes()) }.expect("deserialize forward DFA").0
+                })
+                .collect(),
+        )
+    }
+}
+
+/// Deserialized rule DFAs, in RULES order.
+pub struct PreparedL1<'a>(Vec<dense::DFA<&'a [u32]>>);
+
+/// Guest-side L1 on prepared DFAs. Identical result to `run_layer1` (cross-mode parity test).
+pub fn run_layer1_prepared(text: &str, pol: &PreparedL1<'_>) -> RawResult {
+    let matched: Vec<bool> =
+        pol.0.iter().map(|dfa| dfa.try_search_fwd(&Input::new(text)).ok().flatten().is_some()).collect();
+    combine_l1(text, &matched)
 }
 
 /// Guest-side path: run the pre-serialized DFAs. Identical result to `run_layer1` (proven by
-/// the cross-mode parity test).
+/// the cross-mode parity test). Prepares the DFAs per call; the guest prepares them once.
 pub fn run_layer1_serialized(text: &str, pol: &SerializedL1) -> RawResult {
-    let matched: Vec<bool> = pol.dfas.iter().map(|b| dfa_is_match_serialized(b, text)).collect();
-    combine_l1(text, &matched)
+    let aligned = AlignedL1::new(pol);
+    run_layer1_prepared(text, &aligned.prepare())
 }
 
 /// Guest-side L0: the same decoders as `run_layer0`, with L1 evaluated on the pre-serialized DFAs.
 /// Identical to `run_layer0` on every parity vector (tests/serialized.rs).
 pub fn run_layer0_serialized(content: &str, pol: &SerializedL1) -> Option<L0Fire> {
-    run_layer0_with(content, &|t| run_layer1_serialized(t, pol))
+    let aligned = AlignedL1::new(pol);
+    let prepared = aligned.prepare();
+    run_layer0_with(content, &|t| run_layer1_prepared(t, &prepared))
 }
 
 // ---------------- action binding: actionHash + nullifier (canonical hashing spec) ----------------
