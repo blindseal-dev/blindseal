@@ -15,8 +15,15 @@
 //!      policyRoot, detectorVersion, expirySlot from the public inputs + nonce) == public actionHash
 //!   8. nullifier == sha256(domain || actionHash) and the Nullifier PDA does not exist
 //!   9. Groth16 verify via sp1-solana (alt_bn128 syscalls)
-//!  10. create the Nullifier PDA (payer = caller), record the calling program as
+//!  10. fee (0.8.0): if `Config.fee_lamports > 0`, transfer exactly that many lamports from
+//!      `fee_payer` to `treasury` (System Program CPI). Nothing before this step moves lamports, so a
+//!      refused or invalid proof costs nothing but the transaction fee.
+//!  11. create the Nullifier PDA (payer = caller), record the calling program as
 //!      `consumer_program`, emit `Consumed`
+//!
+//! The treasury account is part of the fixed account list whether or not a fee is set. It must be
+//! `Config.treasury` (step 3, right after `paused`), except while no treasury is configured — the
+//! zero key, which cannot be passed as a writable account — when the slot carries the fee payer.
 //!
 //! Steps 1–2 close a griefing path: before them, anyone who copied a submitted proof could call
 //! `verify_and_consume` directly with the same action fields and burn the nullifier before the
@@ -36,9 +43,15 @@
 //! guest parses the screened tool call and asserts it describes exactly the bound action, so a
 //! proof whose actionHash matches the caller's action here was screened for that action.
 //!
-//! Admin (authority only): `set_config`, `register_policy_root`, and `set_authority(new)` — the
-//! handover needs BOTH the current and the new authority to sign, so a mistyped key cannot take
-//! the config; it emits `AuthorityChanged`.
+//! Admin (authority only): `set_config`, `register_policy_root`, `set_fee(fee_lamports, treasury)`
+//! and `set_authority(new)` — the handover needs BOTH the current and the new authority to sign, so
+//! a mistyped key cannot take the config; it emits `AuthorityChanged`.
+//!
+//! Config layout (0.8.0): the account grew from 303 to 343 bytes (`fee_lamports: u64`, `treasury:
+//! Pubkey` appended). A Config written before 0.8.0 still reads: Borsh stops at `bump` and the two
+//! new fields come out of the zero padding behind the vkey vector as 0 / the zero key, as long as at
+//! most 6 vkeys are set (padding ≥ 40 bytes). `set_fee` reallocs the account to the full new size on
+//! its first call (rent difference paid by the authority, new bytes zeroed) and sets both fields.
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
     hash::hashv,
@@ -84,6 +97,8 @@ pub mod blindseal_verify {
         c.allowlist_policies = allowlist_policies;
         c.paused = false;
         c.bump = ctx.bumps.config;
+        c.fee_lamports = 0;
+        c.treasury = Pubkey::default();
         Ok(())
     }
 
@@ -105,6 +120,19 @@ pub mod blindseal_verify {
         if let Some(p) = paused {
             c.paused = p;
         }
+        Ok(())
+    }
+
+    /// Authority only. Sets the per-consume fee and the account that receives it, and grows a Config
+    /// written before 0.8.0 to the current size (payer = authority, new bytes zeroed). A fee above 0
+    /// needs a treasury: the zero key means "none" and is refused with `TreasuryUnset`. `set_fee(0,
+    /// treasury)` is the migration call: realloc + treasury set, nothing charged yet.
+    pub fn set_fee(ctx: Context<SetFee>, fee_lamports: u64, treasury: Pubkey) -> Result<()> {
+        require!(fee_lamports == 0 || treasury != Pubkey::default(), VerifyError::TreasuryUnset);
+        let c = &mut ctx.accounts.config;
+        c.fee_lamports = fee_lamports;
+        c.treasury = treasury;
+        emit!(FeeChanged { fee_lamports, treasury });
         Ok(())
     }
 
@@ -157,8 +185,13 @@ pub mod blindseal_verify {
         let nullifier: [u8; 32] = public_inputs[128..160].try_into().unwrap();
         let expiry_slot = u64::from_le_bytes(public_inputs[160..168].try_into().unwrap());
 
-        // 3. paused
+        // 3. paused, then the treasury slot: Config.treasury when one is configured; while none is
+        //    (the zero key, which cannot be passed writable) the slot carries the fee payer.
         require!(!config.paused, VerifyError::Paused);
+        let treasury = &ctx.accounts.treasury;
+        if config.treasury != Pubkey::default() {
+            require_keys_eq!(treasury.key(), config.treasury, VerifyError::TreasuryMismatch);
+        }
 
         // 4. vkey allowlist
         require!(config.allowed_vkeys.iter().any(|k| *k == detector_version), VerifyError::DisallowedVkey);
@@ -195,7 +228,23 @@ pub mod blindseal_verify {
         sp1_solana::verify_proof(&proof, &public_inputs, &vkey_hex, &sp1_solana::GROTH16_VK_5_0_0_BYTES)
             .map_err(|_| VerifyError::InvalidProof)?;
 
-        // 10. create the Nullifier PDA (payer = caller) and record the calling program (step 2
+        // 10. fee: every check has passed, so charge the caller now (before this point nothing moved)
+        let fee = config.fee_lamports;
+        if fee > 0 {
+            require!(config.treasury != Pubkey::default(), VerifyError::TreasuryUnset);
+            anchor_lang::system_program::transfer(
+                CpiContext::new(
+                    ctx.accounts.system_program.to_account_info(),
+                    anchor_lang::system_program::Transfer {
+                        from: ctx.accounts.fee_payer.to_account_info(),
+                        to: treasury.to_account_info(),
+                    },
+                ),
+                fee,
+            )?;
+        }
+
+        // 11. create the Nullifier PDA (payer = caller) and record the calling program (step 2
         //     proved it is the top-level program and equals action.target_program)
         let consumer = caller;
         let space = 8 + Nullifier::INIT_SPACE;
@@ -285,6 +334,10 @@ pub struct Config {
     pub allowlist_policies: bool,
     pub paused: bool,
     pub bump: u8,
+    /// Appended in 0.8.0 (see the header for how a pre-0.8.0 account reads).
+    pub fee_lamports: u64,
+    /// Receives `fee_lamports` on every consume; the zero key means no treasury (fee must be 0).
+    pub treasury: Pubkey,
 }
 
 #[account]
@@ -342,6 +395,33 @@ pub struct SetAuthority<'info> {
     pub new_authority: Signer<'info>,
 }
 
+#[event]
+pub struct FeeChanged {
+    pub fee_lamports: u64,
+    pub treasury: Pubkey,
+}
+
+/// `realloc` grows a pre-0.8.0 Config (303 bytes) to the current size; on an account already at that
+/// size it is a no-op (Anchor skips a zero delta). The authority pays the rent difference once. Anchor
+/// runs `realloc` before `has_one`, so a non-authority call grows the account and then fails as a
+/// whole — the transaction reverts and nothing persists.
+#[derive(Accounts)]
+pub struct SetFee<'info> {
+    #[account(
+        mut,
+        seeds = [CONFIG_SEED],
+        bump = config.bump,
+        has_one = authority @ VerifyError::Unauthorized,
+        realloc = 8 + Config::INIT_SPACE,
+        realloc::payer = authority,
+        realloc::zero = true,
+    )]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[derive(Accounts)]
 #[instruction(root: [u8; 32])]
 pub struct RegisterPolicyRoot<'info> {
@@ -365,6 +445,14 @@ pub struct VerifyAndConsume<'info> {
     pub nullifier: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// Debited `Config.fee_lamports` on a successful consume (the gated program forwards its own
+    /// signer; nothing is read from it when the fee is 0).
+    #[account(mut)]
+    pub fee_payer: Signer<'info>,
+    /// CHECK: must be `Config.treasury` (checked in the handler); while no treasury is configured the
+    /// slot carries the fee payer. Must be writable because a fee may be credited to it.
+    #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     /// CHECK: the instructions sysvar (address-constrained); read to identify the calling program.
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
@@ -405,4 +493,9 @@ pub enum VerifyError {
     // Appended (0.7.0).
     #[msg("new_authority argument does not match the co-signing new authority account")]
     NewAuthorityMismatch,
+    // Appended (0.8.0, fee switch).
+    #[msg("treasury account is not Config.treasury")]
+    TreasuryMismatch,
+    #[msg("a fee above 0 needs a treasury: Config.treasury is the zero key")]
+    TreasuryUnset,
 }

@@ -9,6 +9,11 @@
 //! different authority's funds. If the transfer fails the whole transaction reverts, so the
 //! Nullifier PDA is not created and the attestation can be retried (atomicity).
 //!
+//! Fee (release 0.8.0): the verifier may charge `Config.fee_lamports` per consume. The gate forwards
+//! `source` as the fee payer (it already pays the Nullifier rent) and the `treasury` account the
+//! client passes, which the verifier checks against `Config.treasury`. With the fee at 0 nothing
+//! moves, but both accounts stay in the list (fixed layout).
+//!
 //! Policy (release 0.7.0): before the CPI the gate checks that the attestation's committed policy
 //! root is one IT expects (`EXPECTED_POLICY_ROOTS`), else `UnexpectedPolicyRoot`. The verifier's
 //! own allowlist (allowlist_policies + register_policy_root) is the operator's global gate; this
@@ -85,6 +90,8 @@ pub mod transfer_gate {
             policy_root: ctx.accounts.policy_root.as_ref().map(|a| a.to_account_info()),
             nullifier: ctx.accounts.nullifier.to_account_info(),
             payer: ctx.accounts.source.to_account_info(),
+            fee_payer: ctx.accounts.source.to_account_info(),
+            treasury: ctx.accounts.treasury.to_account_info(),
             system_program: ctx.accounts.system_program.to_account_info(),
             instructions: ctx.accounts.instructions.to_account_info(),
         };
@@ -113,7 +120,7 @@ pub mod transfer_gate {
 
 #[derive(Accounts)]
 pub struct GatedTransfer<'info> {
-    /// The authority the transfer debits — also pays for the Nullifier PDA.
+    /// The authority the transfer debits — also pays for the Nullifier PDA and the verifier's fee.
     #[account(mut)]
     pub source: Signer<'info>,
     /// CHECK: any account may receive lamports; the attestation binds this exact key.
@@ -126,6 +133,10 @@ pub struct GatedTransfer<'info> {
     /// CHECK: blindseal-verify's Nullifier PDA, created by the verifier.
     #[account(mut)]
     pub nullifier: UncheckedAccount<'info>,
+    /// CHECK: blindseal-verify's fee treasury (`Config.treasury`; the source while none is configured),
+    /// validated by the verifier, which credits the fee to it.
+    #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
     /// Typed: a direct call that passes any other program here fails before the transfer.
     pub verify_program: Program<'info, BlindsealVerify>,
     pub system_program: Program<'info, System>,

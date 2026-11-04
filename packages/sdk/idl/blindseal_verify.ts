@@ -281,6 +281,68 @@ export type BlindsealVerify = {
       ]
     },
     {
+      "name": "setFee",
+      "docs": [
+        "Authority only. Sets the per-consume fee and the account that receives it, and grows a Config",
+        "written before 0.8.0 to the current size (payer = authority, new bytes zeroed). A fee above 0",
+        "needs a treasury: the zero key means \"none\" and is refused with `TreasuryUnset`. `set_fee(0,",
+        "treasury)` is the migration call: realloc + treasury set, nothing charged yet."
+      ],
+      "discriminator": [
+        18,
+        154,
+        24,
+        18,
+        237,
+        214,
+        19,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "feeLamports",
+          "type": "u64"
+        },
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "verifyAndConsume",
       "discriminator": [
         170,
@@ -323,6 +385,22 @@ export type BlindsealVerify = {
           "name": "payer",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "feePayer",
+          "docs": [
+            "Debited `Config.fee_lamports` on a successful consume (the gated program forwards its own",
+            "signer; nothing is read from it when the fee is 0)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "slot carries the fee payer. Must be writable because a fee may be credited to it."
+          ],
+          "writable": true
         },
         {
           "name": "systemProgram",
@@ -407,6 +485,19 @@ export type BlindsealVerify = {
         227,
         125
       ]
+    },
+    {
+      "name": "feeChanged",
+      "discriminator": [
+        103,
+        252,
+        132,
+        250,
+        1,
+        49,
+        116,
+        145
+      ]
     }
   ],
   "errors": [
@@ -484,6 +575,16 @@ export type BlindsealVerify = {
       "code": 6014,
       "name": "newAuthorityMismatch",
       "msg": "new_authority argument does not match the co-signing new authority account"
+    },
+    {
+      "code": 6015,
+      "name": "treasuryMismatch",
+      "msg": "treasury account is not Config.treasury"
+    },
+    {
+      "code": 6016,
+      "name": "treasuryUnset",
+      "msg": "a fee above 0 needs a treasury: Config.treasury is the zero key"
     }
   ],
   "types": [
@@ -588,6 +689,20 @@ export type BlindsealVerify = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "feeLamports",
+            "docs": [
+              "Appended in 0.8.0 (see the header for how a pre-0.8.0 account reads)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "Receives `fee_lamports` on every consume; the zero key means no treasury (fee must be 0)."
+            ],
+            "type": "pubkey"
           }
         ]
       }
@@ -626,6 +741,22 @@ export type BlindsealVerify = {
           },
           {
             "name": "consumer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "feeChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feeLamports",
+            "type": "u64"
+          },
+          {
+            "name": "treasury",
             "type": "pubkey"
           }
         ]

@@ -210,6 +210,7 @@ system_program::transfer(/* source → recipient, amount */)?;`, 'rust'),
           'the action hash recomputed from *your* fields (+ the committed values + the nonce) equals the public one — `ActionHashMismatch` otherwise',
           'the nullifier matches and has not been consumed — `NullifierAlreadyConsumed` on replay',
           'the Groth16 proof verifies (sp1-solana)',
+          'if the operator set a fee (`Config.fee_lamports`, 0 by default), exactly that many lamports move from your fee payer to the configured treasury — nothing moves before this step',
           'the Nullifier PDA is created (payer = your signer) and `Consumed` is emitted',
         ], true),
         p('Each step fails with its own error code. The five wrong-field cases all surface as `ActionHashMismatch`: the proof binds one hash over all of them, so the program cannot name which field diverged.'),
@@ -230,6 +231,9 @@ const sig = await submit(attestation, { wallet });   // refuses any RPC that is 
 policy_root PDA(["policy", policyRoot])          read, optional (pass the program id for None)
 nullifier   PDA(["nullifier", nullifier])        writable, must not exist
 payer       signer, writable                     pays the Nullifier PDA rent
+fee_payer   signer, writable                     debited Config.fee_lamports (0 unless the operator set one)
+treasury    writable                             Config.treasury (decodeConfig); the fee payer while none is set
+system_program, instructions sysvar
 program     6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx`, 'text'),
       ] },
     ],

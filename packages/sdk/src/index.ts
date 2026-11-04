@@ -7,8 +7,8 @@ import { createRequire } from 'node:module';
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, type Signer } from '@solana/web3.js';
 import {
   CHAIN_ID_SOLANA_MAINNET, DEFAULT_RPC_URL, MAINNET_GENESIS_HASH, PROGRAM_ID, TRANSFER_GATE_ID, VERIFY_CU_LIMIT,
-  actionArgsFrom, actionBindingReason, buildGatedTransferIx, decodePublicInputs, hex, nullifierPda, recomputeActionBinding,
-  type ActionBinding, type Attestation, type DecodedPublicInputs,
+  actionArgsFrom, actionBindingReason, buildGatedTransferIx, configPda, decodeConfig, decodePublicInputs, hex, nullifierPda, recomputeActionBinding, treasuryAccount,
+  type ActionBinding, type Attestation, type DecodedConfig, type DecodedPublicInputs,
 } from './ix.js';
 export * from './ix.js';
 export * from './policy.js';
@@ -35,6 +35,15 @@ export interface SubmitOptions {
   computeUnits?: number;
   /** Test hook only: skip the genesis guard (localnet). Never set in production. */
   allowNonMainnet?: boolean;
+  /** Reported before sending: the verifier's fee (lamports, 0 when none) and the account that receives it. */
+  onFee?: (fee: bigint, treasury: string) => void;
+}
+
+/** Read and decode the verifier's Config account (both the pre-0.8.0 and the current layout). */
+export async function readConfig(conn: Connection, programId = PROGRAM_ID): Promise<DecodedConfig> {
+  const info = await conn.getAccountInfo(configPda(programId), 'confirmed');
+  if (!info) throw new Error(`verifier Config ${configPda(programId).toBase58()} not found on this cluster`);
+  return decodeConfig(info.data);
 }
 
 /**
@@ -43,7 +52,9 @@ export interface SubmitOptions {
  * authority wallet. The verifier accepts verify_and_consume only as a CPI from the attestation's
  * target program, so any other target throws `UnsupportedTargetError` — submit through that
  * program instead. Refuses any cluster whose genesis hash is not mainnet-beta's (chainId 1 is
- * the only chain). Every local check runs before the RPC is contacted.
+ * the only chain). Every local check runs before the RPC is contacted. The verifier's Config is read
+ * for the fee treasury: the wallet pays `fee_lamports` (0 unless the operator set one) on top of the
+ * transfer and the Nullifier rent.
  */
 export async function submit(att: Attestation, opts: SubmitOptions): Promise<string> {
   if (att.chainId !== CHAIN_ID_SOLANA_MAINNET) throw new Error(`attestation chainId ${att.chainId} is not Solana mainnet (1)`);
@@ -59,7 +70,10 @@ export async function submit(att: Attestation, opts: SubmitOptions): Promise<str
     const genesis = await conn.getGenesisHash();
     if (genesis !== MAINNET_GENESIS_HASH) throw new WrongClusterError(genesis);
   }
-  const ix = buildGatedTransferIx(att, { source: opts.wallet.publicKey, recipient: action.recipient, policyRoot: opts.policyRoot });
+  const cfg = await readConfig(conn);
+  const treasury = treasuryAccount(cfg.treasury, opts.wallet.publicKey);
+  opts.onFee?.(cfg.feeLamports, treasury.toBase58());
+  const ix = buildGatedTransferIx(att, { source: opts.wallet.publicKey, recipient: action.recipient, policyRoot: opts.policyRoot, treasury });
   const tx = new Transaction().add(ComputeBudgetProgram.setComputeUnitLimit({ units: opts.computeUnits ?? VERIFY_CU_LIMIT }), ix);
   tx.feePayer = opts.wallet.publicKey;
   tx.recentBlockhash = (await conn.getLatestBlockhash('confirmed')).blockhash;

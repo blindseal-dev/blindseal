@@ -62,10 +62,13 @@ describe('buildVerifyIx', () => {
     expect(ix.keys[2].isWritable).toBe(true);
     expect(ix.keys[3].pubkey.equals(payer)).toBe(true);
     expect(ix.keys[3].isSigner).toBe(true);
-    expect(ix.keys[4].pubkey.equals(SystemProgram.programId)).toBe(true);
-    expect(ix.keys[5].pubkey.equals(SYSVAR_INSTRUCTIONS_PUBKEY)).toBe(true);
-    expect(ix.keys[5].isWritable || ix.keys[5].isSigner).toBe(false);
-    expect(ix.keys).toHaveLength(6);
+    // fee payer defaults to the payer; the treasury slot to the fee payer (no treasury configured)
+    expect(ix.keys[4].pubkey.equals(payer) && ix.keys[4].isSigner && ix.keys[4].isWritable).toBe(true);
+    expect(ix.keys[5].pubkey.equals(payer) && !ix.keys[5].isSigner && ix.keys[5].isWritable).toBe(true);
+    expect(ix.keys[6].pubkey.equals(SystemProgram.programId)).toBe(true);
+    expect(ix.keys[7].pubkey.equals(SYSVAR_INSTRUCTIONS_PUBKEY)).toBe(true);
+    expect(ix.keys[7].isWritable || ix.keys[7].isSigner).toBe(false);
+    expect(ix.keys).toHaveLength(8);
     expect(ix.data.subarray(0, 8)).toEqual(discriminator('verify_and_consume'));
     // Vec<u8> proof (260) + Vec<u8> blob (168) + ActionArgs (2+32+32+8+32+32+8+32 = 178)
     expect(ix.data.length).toBe(8 + 4 + 260 + 4 + 168 + 178);
@@ -87,9 +90,10 @@ describe('buildGatedTransferIx', () => {
     const ix = buildGatedTransferIx(att, { source: SOURCE.publicKey, recipient });
     const idl = JSON.parse(readFileSync(join(__dirname, '../idl/transfer_gate.json'), 'utf8'));
     const names = idl.instructions.find((i: any) => i.name === 'gated_transfer').accounts.map((a: any) => a.name);
-    expect(names).toEqual(['source', 'recipient', 'config', 'policy_root', 'nullifier', 'verify_program', 'system_program', 'instructions']);
+    expect(names).toEqual(['source', 'recipient', 'config', 'policy_root', 'nullifier', 'treasury', 'verify_program', 'system_program', 'instructions']);
     expect(ix.programId.equals(TRANSFER_GATE_ID)).toBe(true);
-    const want = [SOURCE.publicKey, recipient, configPda(), policyRootPda(hex(DRY_RUN.policyRoot)), nullifierPda(hex(DRY_RUN.nullifier)), PROGRAM_ID, SystemProgram.programId, SYSVAR_INSTRUCTIONS_PUBKEY];
+    // no treasury given: the slot carries the source (right while Config.treasury is unset)
+    const want = [SOURCE.publicKey, recipient, configPda(), policyRootPda(hex(DRY_RUN.policyRoot)), nullifierPda(hex(DRY_RUN.nullifier)), SOURCE.publicKey, PROGRAM_ID, SystemProgram.programId, SYSVAR_INSTRUCTIONS_PUBKEY];
     expect(ix.keys.map((k) => k.pubkey.toBase58())).toEqual(want.map((k) => k.toBase58()));
     expect(ix.keys[0].isSigner && ix.keys[0].isWritable).toBe(true);
     expect(ix.data.subarray(0, 8)).toEqual(discriminator('gated_transfer'));
@@ -97,10 +101,10 @@ describe('buildGatedTransferIx', () => {
   it('verify_and_consume IDL accounts end with the instructions sysvar', () => {
     const idl = JSON.parse(readFileSync(join(__dirname, '../idl/blindseal_verify.json'), 'utf8'));
     const accts = idl.instructions.find((i: any) => i.name === 'verify_and_consume').accounts;
-    expect(accts.map((a: any) => a.name)).toEqual(['config', 'policy_root', 'nullifier', 'payer', 'system_program', 'instructions']);
-    expect(accts[5].address).toBe(SYSVAR_INSTRUCTIONS_PUBKEY.toBase58());
+    expect(accts.map((a: any) => a.name)).toEqual(['config', 'policy_root', 'nullifier', 'payer', 'fee_payer', 'treasury', 'system_program', 'instructions']);
+    expect(accts[7].address).toBe(SYSVAR_INSTRUCTIONS_PUBKEY.toBase58());
     const errs = idl.errors.map((e: any) => [e.code, e.name]);
-    expect(errs.slice(11)).toEqual([[6011, 'DirectCallNotAllowed'], [6012, 'NestedCallNotAllowed'], [6013, 'CallerNotTargetProgram'], [6014, 'NewAuthorityMismatch']]);
+    expect(errs.slice(11)).toEqual([[6011, 'DirectCallNotAllowed'], [6012, 'NestedCallNotAllowed'], [6013, 'CallerNotTargetProgram'], [6014, 'NewAuthorityMismatch'], [6015, 'TreasuryMismatch'], [6016, 'TreasuryUnset']]);
   });
 });
 
@@ -142,6 +146,8 @@ describe('submit() sends the gated transaction only', () => {
     let raw: Buffer | null = null;
     const conn = {
       getGenesisHash: async () => '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+      // the verifier's Config, pre-0.8.0 layout (303 bytes): fee 0, no treasury
+      getAccountInfo: async () => ({ data: Buffer.alloc(303), owner: PROGRAM_ID, lamports: 1, executable: false }),
       getLatestBlockhash: async () => ({ blockhash: Keypair.generate().publicKey.toBase58(), lastValidBlockHeight: 0 }),
       sendRawTransaction: async (b: Buffer) => { raw = b; return 'sig'; },
       confirmTransaction: async () => ({ value: { err: null } }),

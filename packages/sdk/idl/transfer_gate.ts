@@ -28,7 +28,7 @@ export type TransferGate = {
         {
           "name": "source",
           "docs": [
-            "The authority the transfer debits — also pays for the Nullifier PDA."
+            "The authority the transfer debits — also pays for the Nullifier PDA and the verifier's fee."
           ],
           "writable": true,
           "signer": true
@@ -46,6 +46,13 @@ export type TransferGate = {
         },
         {
           "name": "nullifier",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "validated by the verifier, which credits the fee to it."
+          ],
           "writable": true
         },
         {

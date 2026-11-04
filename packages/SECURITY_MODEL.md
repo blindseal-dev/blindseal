@@ -84,6 +84,12 @@ transaction as the action. Its check order is documented in the header of
   proof is consumed, so a second use fails (`NullifierAlreadyConsumed`). If the action fails, the whole
   transaction reverts and the proof can be retried.
 - **Groth16 verification** of the proof against the public inputs.
+- **Fee (0.8.0)** — the config authority can set `fee_lamports` and a `treasury` (`set_fee`; default 0, none).
+  When set, a successful consume moves exactly that many lamports from the calling program's fee payer to the
+  treasury, after every check above has passed and in the same transaction as the Nullifier creation: a
+  refused or invalid proof is never charged, and the treasury account must be the configured one
+  (`TreasuryMismatch`). The fee does not enter the action hash, so existing attestations stay valid; it only
+  changes what the gated transaction costs its signer.
 
 The proof can also be checked off-chain with the WebAssembly verifier (`blindseal verify`, or the site's
 verify page). That checks the proof only; expiry, allowlists and the nullifier are the on-chain program's job.
