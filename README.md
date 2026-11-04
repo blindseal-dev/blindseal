@@ -163,7 +163,7 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
 | `crates/` | detector core (Rust, DFA rules), SP1 guest, prover, verifier |
 | `programs/` | Anchor programs: `blindseal-verify`, `transfer-gate` |
 | `apps/site` | the public site (Next.js) |
-| `docs/` | performance numbers, the local API data contract |
+| `docs/` | performance numbers, the local API data contract, release plans; `docs/design/` holds proposals that are not built (session proofs, a prover network) |
 
 Build the programs with `scripts/build-programs.sh`; run the on-chain suite with `scripts/test-m2.sh`.
 Deployed bytes reproduce with `solana-verify` from this repository at the tagged commit (see "From source" above).
