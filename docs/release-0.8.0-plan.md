@@ -1,5 +1,7 @@
 # Release 0.8.0: mainnet plan (read before signing)
 
+**Executed on 2026-11-05 — the record with every signature is `docs/release-0.8.0-notes.md`.**
+
 Release 0.8.0 changes what the proof asserts and adds a fee switch to the verifier:
 
 - **The guest** runs L0 (decode-then-L1) and L1 on the raw payload **and on every JSON string in it** (keys and
