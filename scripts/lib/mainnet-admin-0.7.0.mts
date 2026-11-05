@@ -306,4 +306,10 @@ async function main() {
   console.log(`Config after: ${show(after)}`);
 }
 
-main().catch((e) => { console.error(`mainnet-admin-0.7.0 failed: ${e instanceof Error ? e.message : e}`); process.exit(1); });
+main().catch((e) => {
+  console.error(`mainnet-admin-0.7.0 failed: ${e instanceof Error ? e.message : e}`);
+  // a preflight (RPC simulation) failure: web3.js hides the reason behind "Simulation failed" — print what it carries
+  const t = e as { transactionMessage?: string; transactionError?: unknown; transactionLogs?: string[] };
+  if (t?.transactionError !== undefined || t?.transactionLogs) console.error(`  preflight: ${t.transactionMessage ?? ''} error ${JSON.stringify(t.transactionError ?? null)} logs ${JSON.stringify(t.transactionLogs ?? [])}`);
+  process.exit(1);
+});

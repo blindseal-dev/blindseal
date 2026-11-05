@@ -8,8 +8,8 @@
 #      (crates/guest/elf/blindseal-guest) is that same ELF the check uses it directly, otherwise (a guest
 #      change staged ahead of its prover release) the binary is scanned for an ELF of that size and hash
 #   3. run the binary in execute-only mode (BLINDSEAL_EXECUTE=1: the SP1 executor, no proof) on the
-#      mainnet sample's tool call and action (tests/fixtures/mainnet-toolcall-demo.json,
-#      attestation-mainnet-demo-0.7.0.json); the public values it prints (payloadHash, policyRoot,
+#      mainnet sample's tool call, action and action policy (tests/fixtures/mainnet-toolcall-demo.json,
+#      attestation-mainnet-demo-0.8.0.json, action-policy-demo.json); the public values it prints (payloadHash, policyRoot,
 #      detectorVersion, actionHash, nullifier, expirySlot) and VKEY must equal the attestation's
 # The release is treated as untrusted input: downloads land in their own directory, nothing is run
 # from inside it, and the embed check runs python3 -I with paths as arguments.
@@ -22,7 +22,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 MANIFEST=packages/proxy/src/prover/manifest.json
-FIX_ATT=tests/fixtures/attestation-mainnet-demo-0.7.0.json
+FIX_ATT=tests/fixtures/attestation-mainnet-demo-0.8.0.json
+FIX_POLICY=tests/fixtures/action-policy-demo.json   # the sample's policy root commits this action policy (0.8.0)
 FIX_CALL=tests/fixtures/mainnet-toolcall-demo.json
 
 case "${1:-}" in
@@ -98,7 +99,7 @@ set +e
 OUT=$(BLINDSEAL_EXECUTE=1 "$DL/$ASSET" --payload "$PAYLOAD" --out "$WORK/unused.json" \
   --chain-id "$(att m.chainId)" --target-program "$(att m.action.targetProgram)" --source-authority "$(att m.action.sourceAuthority)" \
   --recipient "$(att m.action.recipient)" --mint "$(att m.action.mint)" --amount "$(att m.action.amount)" --instruction "$(att m.action.instruction)" \
-  --expiry "$(att m.expirySlot)" --nonce "$(att m.nonce)" 2>"$WORK/stderr.log"); RC=$?
+  --expiry "$(att m.expirySlot)" --nonce "$(att m.nonce)" --action-policy "$ROOT/$FIX_POLICY" 2>"$WORK/stderr.log"); RC=$?
 set -e
 echo "$OUT" | grep -E '^(VKEY|CYCLES|payloadHash|policyRoot|detectorVersion|actionHash|nullifier|expirySlot) ' | sed 's/^/  /'
 [ $RC -eq 0 ] || { echo "FAIL: execute-only run exited $RC"; tail -20 "$WORK/stderr.log"; exit 1; }
