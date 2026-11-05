@@ -1,11 +1,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { PendingMainnet } from '../pending-mainnet';
 
 // Prose inline markup → React (page.js's prose(): escaped text with `docs-ic` inline code). Deterministic,
-// server-renderable: `code`, **strong**, *em*, [label](href), and {{pending}} — the 0.8.0 "pending mainnet"
-// badge (pending-mainnet.tsx), removed with it.
-const RE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))|(\{\{pending\}\})/g;
+// server-renderable: `code`, **strong**, *em*, [label](href).
+const RE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(\[[^\]]+\]\([^)]+\))/g;
 
 export function inline(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -21,7 +19,6 @@ export function inline(text: string): ReactNode[] {
       const mm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(t)!;
       out.push(mm[2].startsWith('/') ? <Link prefetch={false} key={k++} className="link" href={mm[2]}>{mm[1]}</Link> : <a key={k++} className="link" href={mm[2]}>{mm[1]}</a>);
     }
-    else if (m[5]) out.push(<PendingMainnet key={k++} />);
     last = RE.lastIndex;
   }
   if (last < text.length) out.push(text.slice(last));

@@ -6,8 +6,8 @@ today. It ships with the product. We will keep it current.
 Blindseal is a layered defense. None of the four detection layers — L0 decode-then-L1,
 L1 deterministic rules, L2 embedding similarity against a known-attack corpus, L3 LLM
 judge — is sufficient alone. The limitations below describe what gets through the
-layers we run. L0 and L1 are inside the zero-knowledge proof from release 0.8.0 (pending mainnet: until the
-new detector version is allowed on chain, proofs carry the 0.7.0 guest, which proves L1 only); see
+layers we run. L0 and L1 are inside the zero-knowledge proof from release 0.8.0 (on mainnet since 2026-11-05; the 0.7.0
+detector version, which proved L1 only, is no longer allowed on chain); see
 [`SECURITY_MODEL.md`](./SECURITY_MODEL.md) for what is proven and what is not.
 
 What the proof alone catches, measured as the proof sees it (each sample placed in a tool call and screened raw

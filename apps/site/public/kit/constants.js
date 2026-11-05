@@ -28,7 +28,7 @@
 
   BS.COPY = Object.freeze({
     oneLiner: "Prove an agent's action was screened — without showing what it was.",   /* copy-bank one-liner; founder may revert to the "pwn" line */
-    honestScope: "Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received, on every string in it and on every decoded form of each, and that the action fits the committed action policy (L0, string screening and action policies are inside the proof since 0.8.0; pending mainnet until the new verifier key is allowed on chain); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn't pass through the proxy.",
+    honestScope: "Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received, on every string in it and on every decoded form of each, and that the action fits the committed action policy (L0, string screening and action policies are inside the proof since 0.8.0); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn't pass through the proxy.",
     detailedLead: "Blindseal is a privacy-preserving, verifiable screening layer for AI agents."
   });
 

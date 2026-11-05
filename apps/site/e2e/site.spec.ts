@@ -242,14 +242,13 @@ test('home FAQ: eight questions, none about a token; "No token" appears nowhere 
   expect(text).not.toMatch(/is there a token/i);
 });
 
-// ── 0.8.0: L0 inside the proof is stated with the "pending mainnet" marker, and the old wording is gone ──
+// ── 0.8.0 on mainnet: the "pending mainnet" marker is gone everywhere, and so is the old wording ──
 for (const path of ['/how-it-works', '/docs/scope', '/docs/concepts', '/docs']) {
-  test(`${path}: L0-in-proof sentences carry the pending-mainnet badge; no "not in proof yet"`, async ({ page }) => {
+  test(`${path}: no pending-mainnet badge or wording; no "not in proof yet"`, async ({ page }) => {
     await page.goto(path);
-    const badges = page.locator('[data-pending-mainnet]');
-    expect(await badges.count()).toBeGreaterThanOrEqual(1);
-    await expect(badges.first()).toHaveText('pending mainnet');
+    expect(await page.locator('[data-pending-mainnet]').count()).toBe(0);
     const text = await page.evaluate(() => document.body.innerText);
+    expect(text).not.toMatch(/pending mainnet/i);
     expect(text).not.toMatch(/not (in|inside) (the )?proof yet|L0 next|L1 today/i);
   });
 }

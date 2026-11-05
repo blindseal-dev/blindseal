@@ -155,7 +155,6 @@ html.bs-site[data-motion="reduce"] { scroll-behavior: auto; }
 .hiw-flows__v [data-count] { color: var(--ink); }
 .hiw-flows .chip, .hiw-flows__chips { grid-row: 1; grid-column: 2; justify-self: end; }
 .hiw-flows__chips { display: inline-flex; align-items: center; gap: 6px; }
-.hiw-flows__chips .chip[data-pending-mainnet] { margin-left: 0; vertical-align: baseline; }
 
 .hiw-example { display: grid; gap: 10px; margin-top: 28px; padding: 18px 20px; border: var(--hairline); border-radius: var(--r-panel); background: var(--panel); }
 .hiw-example__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }

@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { pageMeta } from '../meta';
 import Link from 'next/link';
-import { PendingMainnet } from '../pending-mainnet';
 import { HowKit, type HowData } from './how-kit';
 import { actionHash, nullifierOf, sha256Hex } from './action-hash';
 import att from './attestation-mainnet.json';
@@ -15,10 +14,10 @@ import { TocToggle } from './toc-toggle';
 //
 // Every value page.js pulled from the mockup fixtures comes from real, committed, deterministic
 // sources (fixtures.js is never loaded by the site):
-//   attestation-mainnet.json  the attestation consumed on Solana mainnet-beta on 2026-10-30 through transfer-gate
-//                             from the demo wallet under the 0.7.0 vkey (tests/fixtures/attestation-mainnet-demo-0.7.0.json,
+//   attestation-mainnet.json  the attestation consumed on Solana mainnet-beta on 2026-11-05 through transfer-gate
+//                             from the demo wallet under the 0.8.0 vkey (tests/fixtures/attestation-mainnet-demo-0.8.0.json,
 //                             verbatim): action fields, hashes, nullifier, expiry slot, nonce. Its tx signature is TX_SIG
-//                             (docs/release-0.7.0-notes.md, the sample proof).
+//                             (docs/release-0.8.0-notes.md, the sample proof).
 //   toolcall-mainnet.json     the tool call `blindseal attest` screened for it
 //                             (tests/fixtures/mainnet-toolcall.json, verbatim). payloadHash is
 //                             recomputed from it here and asserted against the attestation.
@@ -27,7 +26,8 @@ import { TocToggle } from './toc-toggle';
 //                             high_entropy catch-all (×2). Reproduce with
 //                             `redact(JSON.stringify({ tool: call.toolName, args: call.args }))`.
 //   RULES                     the committed policy snapshot the proxy serves (fixtures/policy.json,
-//                             root 0x36a9e945…8397 = this attestation's policyRoot): 22 L1 rules,
+//                             root 0x36a9e945…8397 = the rules root inside this attestation's policyRoot, which also
+//                             commits the demo action policy, tests/fixtures/action-policy-demo.json): 22 L1 rules,
 //                             4 L0 decoders — the same lists crates/detector-core compiles.
 //   the audit chain           apps/site/app/verify/disclosure-sample.json (a real signed
 //                             disclosure, #190–#199), recomputed client-side in how-kit.tsx.
@@ -37,7 +37,7 @@ export const metadata: Metadata = pageMeta({
   description: 'Four detection layers, redaction before the judge, a hash-chained audit log, and a Groth16 attestation bound to one on-chain action — and a plain line where the claim stops.',
 });
 
-const TX_SIG = '2HrABCZYnaHk66gmg9yi3mB27t487mpF6HgZMgbQJcxBhTm2L7nr1P2BbHPd46gHQWAvscAuJCTTGHtQz5mCFj26';
+const TX_SIG = '2fZ8TDPnfkHitJ4aHZzGuCu9mwkdBXLVm6LGWeMMwykQrWTNHNuXiDCeoXvi4HEChJ3xywKcF5kJkEcr4H7WvsCg';
 const PROGRAM_NAMES: Record<string, string> = {
   '9fjiagKZvaJ1cW1zEiddZD6iBemEARKfFQ4dW1mV5FKa': 'transfer-gate',
   '6z4HehpRyppJDxGXJubE7Z4GpE6feNytUb2Udya6kaGx': 'blindseal-verify',
@@ -149,13 +149,13 @@ export default function HowItWorks() {
             <div className="hiw-head reveal">
               <div className="section-head">
                 <div className="section-head__lead"><p className="section-head__eyebrow"><b>02</b> / Four layers</p><h2 className="section-head__title" id="h-four-layers">Four ways to spot suspicious instructions</h2><p className="hiw-caption">Two layers that match, two that judge.</p></div>
-                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1<PendingMainnet />. On attacks held out from writing the rules they catch 2.5 % (2 of 80), and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples. Detection in practice leans on the meaning-based checks, which are attested, not proven.</p>
+                <p className="section-head__body">Some checks look for known attack patterns. Others look at what the text means. The proof covers the pattern checks and the decoding before them, L0 and L1. On attacks held out from writing the rules they catch 2.5 % (2 of 80), and 29.0 % of the red-team set (9 of 31), with 0.5 % false positives on 210 benign samples. Detection in practice leans on the meaning-based checks, which are attested, not proven.</p>
               </div>
             </div>
             <div className="hiw-layers">
               <figure className="hiw-fig hiw-fig--narrow" id="fig-layers" data-fig="layers" data-fig-n="2" />
               <ul className="hiw-flows reveal cascade" aria-label="The four layers">
-                <li><span className="hiw-flows__k"><b>L0</b>Decode</span><span className="hiw-flows__v">Decodes base64, hex, URL and HTML-entity encodings, strips zero-width characters, folds homoglyphs and NFKC-normalises, nested to depth 3, and re-screens every form with L1. Inside the proof since 0.8.0. <span data-count="L0" /></span><span className="hiw-flows__chips"><span className="chip outline">Proven</span><PendingMainnet /></span></li>
+                <li><span className="hiw-flows__k"><b>L0</b>Decode</span><span className="hiw-flows__v">Decodes base64, hex, URL and HTML-entity encodings, strips zero-width characters, folds homoglyphs and NFKC-normalises, nested to depth 3, and re-screens every form with L1. Inside the proof since 0.8.0. <span data-count="L0" /></span><span className="hiw-flows__chips"><span className="chip outline">Proven</span></span></li>
                 <li><span className="hiw-flows__k"><b>L1</b>Patterns</span><span className="hiw-flows__v">Expressions for override phrasing, prompt extraction, hidden unicode, role tags and exfiltration links. <span data-count="L1" /></span><span className="chip outline">Proven</span></li>
                 <li><span className="hiw-flows__k"><b>L2</b>Similarity</span><span className="hiw-flows__v">Scores the redacted payload against known injections, from 0 to 1. Runs locally; TEE mode planned.</span><span className="chip neutral">Attested</span></li>
                 <li><span className="hiw-flows__k"><b>L3</b>Judge</span><span className="hiw-flows__v">Reads the redacted payload when L2 or a rule raises a doubt, and can clear an L2 flag. Off until you turn it on: runs on a local model, or at an AI provider you choose, which then receives the redacted payload. TEE mode planned.</span><span className="chip neutral">Attested</span></li>
@@ -277,7 +277,7 @@ export default function HowItWorks() {
             </div>
             <div className="hiw-claim reveal cascade">
               <div className="site-panel hiw-claim__panel">
-                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received, on every string in it and on every decoded form of each, and that the action fits the committed action policy (L0, string screening and action policies are inside the proof since 0.8.0; pending mainnet until the new verifier key is allowed on chain); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.<PendingMainnet /></p></div>
+                <div className="callout"><p className="callout__title">What we claim</p><p className="callout__body" data-honest="">Blindseal proves that a specific call was screened under a committed policy by a specific detector version, and that the committed L1 rules passed on the call as received, on every string in it and on every decoded form of each, and that the action fits the committed action policy (L0, string screening and action policies are inside the proof since 0.8.0); the model-based layers are attested, not proven: embeddings run locally, and the AI judge is off unless you turn it on (a TEE mode is planned). Blindseal does not prove an agent is safe, and does not cover traffic that doesn&apos;t pass through the proxy.</p></div>
               </div>
               <figure className="hiw-table" aria-label="Hidden versus public">
                 <table>

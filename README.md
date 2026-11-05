@@ -26,9 +26,8 @@ Today's proof covers checks for known attack patterns. It does not guarantee tha
 
 ## What is proven — and what is not
 
-The proof covers **L0 and L1** from release 0.8.0 (pending mainnet: the new detector version is allowed on chain
-once the owner signs step c1 of `docs/release-0.8.0-plan.md`; until then proofs carry the 0.7.0 guest, which covers
-L1 only). It states: *this payload (by hash) was screened by this detector version under the policy with this root;
+The proof covers **L0 and L1** from release 0.8.0 (on mainnet since 2026-11-05; the 0.7.0 detector version, which
+covered L1 only, is no longer allowed on chain). It states: *this payload (by hash) was screened by this detector version under the policy with this root;
 the committed L1 rules found it clean on the raw text, on every JSON string in it (keys and values, unescaped) and
 on every decoded variant of each (base64, hex, URL, HTML entities, zero-width strip, NFKC, homoglyph fold, nested to
 depth 3); the bound action satisfies the action policy the root commits to (allowed recipients, programs,
@@ -132,7 +131,7 @@ agent ──► proxy (127.0.0.1) ──► upstream MCP server
              │
              ├─ checks tool-call arguments (L0 + L1) and tool replies (all four layers)
              ├─ L1 rules (committed DFAs — PROVEN)
-             ├─ L0 decode-then-L1 (deterministic — PROVEN from 0.8.0, pending mainnet)
+             ├─ L0 decode-then-L1 (deterministic — PROVEN from 0.8.0)
              ├─ best-effort redaction (listed secret keys, key/token shapes, common PII)
              ├─ L2 embeddings (local) + L3 judge (off unless BLINDSEAL_LAYER3_PROVIDER is set) — ATTESTED
              ├─ hash-chained audit log (fingerprints + verdicts; content encrypted locally; signed disclosures)
