@@ -107,6 +107,8 @@ async function confirmSend(step: string, where: 'mainnet' | 'local'): Promise<vo
   if (got !== phrase) throw new Error('aborted: the confirmation did not match');
 }
 type Cfg = ReturnType<typeof decodeConfig>;
+/// Config as text: the 0.8.0 Config carries feeLamports as a BigInt, which JSON.stringify refuses.
+const show = (c: Cfg) => JSON.stringify(c, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
 
 function loadKeypair(file: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(file, 'utf8'))));
@@ -212,7 +214,7 @@ async function simulate(conn: Connection, payer: PublicKey, ixs: TransactionInst
   for (const l of v.logs ?? []) console.log(`    | ${l}`);
   if (JSON.stringify(v.err ?? null).includes('{"Custom":101}')) console.log('  (101 = InstructionFallbackNotFound: the deployed verifier has no such instruction — set_authority arrives with step 0)');
   const acc = v.accounts?.[0];
-  if (acc && !v.err) console.log(`  Config after (simulated): ${JSON.stringify(decodeConfig(Buffer.from(acc.data[0], 'base64')))}`);
+  if (acc && !v.err) console.log(`  Config after (simulated): ${show(decodeConfig(Buffer.from(acc.data[0], 'base64')))}`);
   return v;
 }
 
@@ -225,7 +227,7 @@ async function main() {
   const cfgInfo = await conn.getAccountInfo(configPda(), 'confirmed');
   if (!cfgInfo) throw new Error('Config does not exist on this cluster (deploy first: scripts/mainnet-deploy.sh)');
   const cfg = decodeConfig(cfgInfo.data);
-  console.log(`Config before: ${JSON.stringify(cfg)}`);
+  console.log(`Config before: ${show(cfg)}`);
   if (cfg.authority !== authority.publicKey.toBase58()) throw new Error(`config authority is ${cfg.authority}, not ${authority.publicKey.toBase58()}`);
   const rootRegistered = (await conn.getAccountInfo(policyRootPda(hex(DEFAULT_POLICY_ROOT)), 'confirmed')) !== null;
   const demoRegistered = (await conn.getAccountInfo(policyRootPda(hex(DEMO_POLICY_ROOT)), 'confirmed')) !== null;
@@ -301,7 +303,7 @@ async function main() {
   await conn.confirmTransaction(sig, 'confirmed');
   console.log(`SIGNATURE ${STEP} ${sig}`);
   const after = decodeConfig((await conn.getAccountInfo(configPda(), 'confirmed'))!.data);
-  console.log(`Config after: ${JSON.stringify(after)}`);
+  console.log(`Config after: ${show(after)}`);
 }
 
 main().catch((e) => { console.error(`mainnet-admin-0.7.0 failed: ${e instanceof Error ? e.message : e}`); process.exit(1); });

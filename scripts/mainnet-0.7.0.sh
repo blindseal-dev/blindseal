@@ -18,6 +18,8 @@
 #
 #   0    upgrade transfer-gate, THEN blindseal-verify, from verifiable builds
 #        (solana-verify, solanafoundation/solana-verifiable-build:4.3.0), and check each deployed hash
+#        --so-dir <dir>  deploy the .so files the `verifiable-build` workflow built (its artifacts, same image,
+#        native amd64) instead of building locally; refused unless their executable hashes are the release's
 #   b    register_policy_root(SDK DEFAULT_POLICY_ROOT; 0.8.0: 0x78bb3bab…, empty action policy) (no-op if registered)
 #   b2   register_policy_root(SDK DEMO_POLICY_ROOT 0x79f11a12…, the 0.8.0 mainnet sample's root) (no-op if registered)
 #   f    0.8.0, after the program upgrade: set_fee(0, --treasury <pubkey>) (Config realloc 303 → 343; charges nothing)
@@ -59,7 +61,10 @@ export PATH="$HOME/.local/share/solana/install/active_release/bin:$HOME/.cargo/b
 REL="$HOME/.local/share/solana/install/releases/stable-487f1df22d4c1972c51408c346da9499b11e1366/solana-release/bin"
 [ -d "$REL" ] && export PATH="$REL:$PATH"
 
-DRY=""; SIM=""; STEP=""; EXTRA=()
+DRY=""; SIM=""; STEP=""; EXTRA=(); SO_DIR=""
+# 0.8.0 verifiable-build executable hashes (docs/release-0.8.0-plan.md); --so-dir files must hash to these
+EXPECTED_HASH_transfer_gate=5d02435797e80ae99ab3600f5cae9f5b819b49de42c751ae69b0fc30c97dbc0b
+EXPECTED_HASH_blindseal_verify=95a7cd065535b73777a3ffd5b93f6e70c2d38f04021f3f1b0068f424fadc2167
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
@@ -67,6 +72,7 @@ while [ $# -gt 0 ]; do
     --url) RPC="${2:?--url needs a value}"; shift ;;
     0|a|b|b2|f|c1|c2|d) STEP="$1" ;;
     --new-sample|--ledger-pubkey|--new-authority-keypair|--treasury) EXTRA+=("$1" "${2:?$1 needs a value}"); shift ;;
+    --so-dir) SO_DIR="${2:?--so-dir needs a value}"; shift ;;
     *) sed -n '2,42p' "$0"; exit 2 ;;
   esac
   shift
@@ -114,7 +120,17 @@ case "$STEP" in
     solana program deploy --help 2>/dev/null | grep -q -- --no-auto-extend || {
       echo "this solana CLI does not auto-extend program data on upgrade; extend first:"
       echo "   solana program extend <program id> <additional bytes> -k <authority keypair> --url <rpc>"; exit 1; }
-    if [ -z "$SIM" ]; then
+    if [ -n "$SO_DIR" ]; then
+      # prebuilt artifacts of the verifiable-build workflow (same image, native amd64): accepted only at the release's hashes
+      mkdir -p programs/target/deploy
+      for lib in transfer_gate blindseal_verify; do
+        src=$(find "$SO_DIR" -name "$lib.so" -type f | head -1); [ -n "$src" ] || { echo "no $lib.so under $SO_DIR"; exit 1; }
+        got=$(solana-verify get-executable-hash "$src"); want_var="EXPECTED_HASH_$lib"; want="${!want_var}"
+        [ "$got" = "$want" ] || { echo "$src hashes to $got, not the release's $want — refusing"; exit 1; }
+        cp "$src" "programs/target/deploy/$lib.so"
+        echo "   prebuilt $lib ($(wc -c < "$src" | tr -d ' ') bytes): executable hash $got = release"
+      done
+    elif [ -z "$SIM" ]; then
       for lib in transfer_gate blindseal_verify; do
         run bash -c "cd programs && solana-verify build -b $BUILD_IMAGE --library-name $lib"
         [ -n "$DRY" ] || echo "   local executable hash $lib: $(solana-verify get-executable-hash "programs/target/deploy/$lib.so")"

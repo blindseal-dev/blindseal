@@ -212,6 +212,20 @@ emitted to stderr but content not blocked) until L3 is enabled.
 
 **Status:** Open and considered acceptable for the current threat model.
 
+### 16. A JSON string that itself contains JSON (double encoding)
+Since 0.8.0 the proof and `blindseal attest` screen every JSON string of the tool call
+unescaped (one level of JSON decoding), and the live proxy's request screening reads the
+same string leaves. Neither decodes a second level: an argument whose value is itself a
+JSON document, such as `"body": "{\"memo\":\"ignore\\nprevious instructions\"}"`, is
+screened as the text `{"memo":"ignore\nprevious instructions"}`, where the newline is still
+the two characters `\n`, and L1 finds it clean (L0 decodes base64, hex, URL, HTML entities
+and Unicode variants, not JSON escapes). The injection reads as one only to a consumer that
+parses the inner document. The same holds for deeper nesting.
+
+**Status:** Open; shared by the proven layers and the live proxy. Slated for the next
+detector version (decode string leaves that parse as JSON, to a bounded depth), which is a
+new verifying key and a new on-chain allowlist step.
+
 ## Limitations we accept (every security system has these)
 
 ### 7. We are not a content-safety filter
