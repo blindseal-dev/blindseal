@@ -36,13 +36,14 @@ beforeEach(() => { tmp = mkdtempSync(path.join(os.tmpdir(), 'blindseal-prover-')
 afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
 
 describe('prover resolution', () => {
-  it('ships a manifest with the release shape (sha256 values may still be TBD)', () => {
-    expect(PROVER_MANIFEST.version).toBe('0.7.0');
-    expect(PROVER_MANIFEST.release).toBe('https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.7.0');
+  it('ships the 0.8.0 manifest with the release shape, every asset pinned', () => {
+    expect(PROVER_MANIFEST.version).toBe('0.8.0');
+    expect(PROVER_MANIFEST.release).toBe('https://github.com/blindseal-dev/blindseal/releases/download/prover-v0.8.0');
     expect(Object.keys(PROVER_MANIFEST.assets).sort()).toEqual(['darwin-arm64', 'linux-x64', 'linux-x64-cuda']);
     expect(PROVER_MANIFEST.assets['darwin-arm64']!.name).toBe('blindseal-prover-darwin-arm64');
     expect(PROVER_MANIFEST.assets['linux-x64-cuda']!.name).toBe('blindseal-prover-linux-x64-cuda');
-    expect(PROVER_MANIFEST.guestElf?.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(PROVER_MANIFEST.guestElf?.sha256).toBe('859af59ddb7b9ec47fc48c11e9fa6155d038d837e3c991d18caf2af95461729c');
+    for (const a of Object.values(PROVER_MANIFEST.assets)) expect(a.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('--prover wins over $BLINDSEAL_PROVER and the installed binary', async () => {
